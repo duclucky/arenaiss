@@ -163,22 +163,15 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
     <>
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 40, animation: 'fadeIn 0.2s ease' }}
+        className="passport-backdrop"
       />
       <aside
         role="dialog"
         aria-label="Card Passport"
-        style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(460px, 100vw)', zIndex: 41,
-          background: '#1b212c', borderLeft: '1px solid var(--hairline-strong)',
-          overflowY: 'auto', boxShadow: '-30px 0 60px -20px rgba(0,0,0,0.8)',
-          animation: 'slideIn 0.28s cubic-bezier(0.2,0.8,0.2,1)',
-        }}
+        className="passport-modal"
       >
-        <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
-
         {/* Cleaner, data-oriented header. */}
-        <div style={{ display: 'flex', gap: 14, padding: 18, borderBottom: '1px solid var(--hairline)', position: 'sticky', top: 0, background: '#1b212c', zIndex: 2 }}>
+        <div className="passport-header">
           <div data-tier={card.tier} style={{ width: 66, flex: 'none', aspectRatio: '2.5/3.5', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(from var(--tier) r g b / 0.5)', background: '#0d1016' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {img ? <img src={img} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
@@ -193,10 +186,11 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
           <button className="btn btn-ghost" style={{ padding: '4px 10px', alignSelf: 'flex-start' }} onClick={onClose}>✕</button>
         </div>
 
-        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="passport-body">
+          <div className="passport-column">
           {/* Reference price (Index) */}
           <section>
-            <SectionLabel>REFERENCE PRICE · RENAISS OS INDEX</SectionLabel>
+            <SectionLabel>Reference estimate · Renaiss OS Index</SectionLabel>
             {loading ? <Skeleton /> : idx ? (
               <div className="panel" style={{ padding: 14, background: '#202734' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -224,8 +218,14 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
                 </div>
               </div>
             ) : (
-              <p className="caveat">This card could not be matched to Renaiss OS Index, or no reference price is available.</p>
+              <p className="caveat">
+                This card could not be matched to Renaiss OS Index, or no reference price is available. This section is not this token listing price;
+                exact-token asks are shown under Own it for real when available.
+              </p>
             )}
+            <p className="caveat passport-section-note">
+              Index estimates are based on Renaiss OS Index observations, not this token listing price. Exact-token seller asks appear under Own it for real.
+            </p>
           </section>
 
           {/* Custody */}
@@ -255,6 +255,8 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
             )}
           </section>
 
+          </div>
+          <div className="passport-column">
           {/* AI narration */}
           <section>
             <SectionLabel>
@@ -264,7 +266,7 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
               {narrLoading ? <Skeleton lines={4} /> : narr ? (
                 <>
                   <Narr text={narr.text} />
-                  {narr.note && <p className="caveat" style={{ marginTop: 6, fontStyle: 'italic' }}>{narr.note}</p>}
+                  {narr.mode === 'fallback' && <p className="caveat" style={{ marginTop: 6, fontStyle: 'italic' }}>AI narration is running in data-summary mode.</p>}
                 </>
               ) : <p className="caveat">Narration could not be generated.</p>}
             </div>
@@ -290,18 +292,19 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
                 <p className="caveat" style={{ marginBottom: 10 }}>
                   This section links to real Renaiss pages and is separate from the simulated game. Direct purchase uses the exact
                   card token id; packs come from <b>Renaiss /v0/packs</b> via this app&apos;s read-only <b>/api/packs</b> proxy.
+                  The ask price here is the seller&apos;s current listing for this exact token, so it can differ from the Index estimate.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                   {isListed ? (
                     <a className="btn btn-primary" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
-                      Buy this card on marketplace · {usdtFromBaseUnits(askPrice)}
+                      Buy exact listed card · Ask {usdtFromBaseUnits(askPrice)}
                     </a>
                   ) : (
                     <div className="panel" style={{ padding: '10px 12px', background: '#202734' }}>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>This exact card is not currently listed.</div>
                       <div className="caveat">Token #{card.tokenId.slice(0, 10)} has no active ask price in the marketplace API. You can still open its Renaiss card page or try real packs below.</div>
                       <a className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 10 }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
-                        Open this card page ↗
+                        Open exact card page ↗
                       </a>
                     </div>
                   )}
@@ -341,6 +344,7 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
               </div>
             )}
           </section>
+          </div>
         </div>
       </aside>
     </>

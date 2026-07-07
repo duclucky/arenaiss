@@ -12,6 +12,36 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-07 22:24 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `4979fa7` — "feat: add rainbow slab hover"
+- Commit phiên này: chuẩn bị commit "feat: make passport a wide modal"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này xử lý browser comments về giá trong Card Passport và đổi Passport UI từ drawer trượt ngang sang modal lớn khoảng 2/3 màn hình.
+
+### Đã xong
+- `features/passport/PassportDrawer.tsx`: đổi `aside` sang modal centered (`passport-modal`) thay vì side drawer; body chia 2 cột để hiển thị Reference/Custody/Provenance và AI/Stats/Ownership trong một khung rộng.
+- `features/passport/PassportDrawer.tsx`: đổi copy giá thành `Reference estimate · Renaiss OS Index`; thêm giải thích Index estimate không phải exact-token listing price; CTA ownership thành `Buy exact listed card · Ask ...`; fallback thành `Open exact card page`.
+- `features/passport/PassportDrawer.tsx`: ẩn note kỹ thuật `ANTHROPIC_API_KEY` khỏi UI, thay bằng câu thân thiện `AI narration is running in data-summary mode.`
+- `app/globals.css`: thêm class `passport-backdrop`, `passport-modal`, `passport-header`, `passport-body`, `passport-column`, responsive mobile fallback.
+- `scripts/e2e.mjs`: thêm regression checks modal rộng/centered, copy estimate vs ask, không expose env var name, ownership CTA phân biệt ask exact token.
+- TDD check: e2e fail trước ở `Passport should render as a centered wide modal... width 460`; sau implementation e2e PASS.
+- Verify mới nhất: `npm.cmd run lint` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; `npm.cmd run test:unit` PASS; e2e production server tạm PASS hero loop + modal/copy assertions, console errors none; bundle scan `.next/static` không có secret/write-SDK symbols.
+
+### Tiếp theo
+1. Nếu browser hiện chưa refresh được `localhost:3001`, chạy `python run_local.py` hoặc `npm.cmd run dev -- -p 3001`; trong phiên này build/e2e đã chạy qua server tạm 3002, còn các cách launch nền 3001 bằng `Start-Process` không giữ process ổn định trong sandbox.
+2. Nếu muốn modal cao hơn/thấp hơn, chỉnh `width`/`max-height` trong `.passport-modal`.
+
+### Cảnh báo
+- Modal cố gắng hiển thị nhiều thông tin trong một khung; dữ liệu async vẫn có skeleton nếu upstream chậm.
+- Giá `Reference estimate` và `Ask` là hai nguồn khác nhau: Index observations vs seller listing của exact token.
+
+### Nhật ký
+- 2026-07-07 codex: Cập nhật Passport thành wide modal và copy phân biệt giá; e2e đỏ-xanh cho modal/copy; visual screenshot mới ở `.e2e-output/07-passport.png`.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-07 21:58 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `73a5d62` — "chore: clear lint debt"

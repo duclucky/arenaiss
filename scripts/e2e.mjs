@@ -106,7 +106,21 @@ try {
     await anySlab.click();
     await page.waitForSelector('text=Card Passport', { timeout: 8000 });
     await page.waitForTimeout(2500);
-    const passportText = await page.locator('aside').innerText();
+    const passportDialog = page.locator('[role="dialog"][aria-label="Card Passport"]');
+    const dialogBox = await passportDialog.boundingBox();
+    if (!dialogBox || dialogBox.width < 780 || dialogBox.x < 120) {
+      throw new Error(`Passport should render as a centered wide modal, got ${dialogBox ? JSON.stringify(dialogBox) : 'no box'}`);
+    }
+    const passportText = await passportDialog.innerText();
+    if (!passportText.includes('Reference estimate')) {
+      throw new Error('Passport should label the index value as a Reference estimate');
+    }
+    if (!passportText.includes('not this token listing price')) {
+      throw new Error('Passport should explain that index estimate is not the exact token listing price');
+    }
+    if (passportText.includes('ANTHROPIC_API_KEY')) {
+      throw new Error('Passport UI should not expose technical environment variable names');
+    }
     if (passportText.includes('7d: —') && passportText.includes('30d: —') && passportText.includes('365d: —')) {
       throw new Error('Reference deltas should not render empty dash-only values');
     }
@@ -119,9 +133,12 @@ try {
       if (await page.locator('text=150000000000000000000').count()) throw new Error('Pack price should be formatted, not raw base units');
       const packLinkCount = await page.locator('a[href*="/gacha/"]').count();
       if (packLinkCount < 1) throw new Error('Real pack links should target the specific Renaiss gacha pack');
-      const cardLinks = await page.locator('aside a[href*="/card/"]').count();
+      const listedCardBuy = await passportDialog.locator('a', { hasText: 'Buy exact listed card · Ask' }).count();
+      const unlistedCardOpen = await passportDialog.locator('a', { hasText: 'Open exact card page' }).count();
+      if (listedCardBuy + unlistedCardOpen < 1) throw new Error('Ownership CTA should distinguish exact-token ask price from index estimate');
+      const cardLinks = await page.locator('[role="dialog"][aria-label="Card Passport"] a[href*="/card/"]').count();
       if (cardLinks < 1) throw new Error('Direct marketplace action should target the exact Renaiss card page');
-      const homepageOnlyLinks = await page.locator('aside a[href="https://www.renaiss.xyz"], aside a[href="https://renaiss.xyz"]').count();
+      const homepageOnlyLinks = await page.locator('[role="dialog"][aria-label="Card Passport"] a[href="https://www.renaiss.xyz"], [role="dialog"][aria-label="Card Passport"] a[href="https://renaiss.xyz"]').count();
       if (homepageOnlyLinks > 0) throw new Error('Ownership links should not point to the Renaiss homepage');
       await page.screenshot({ path: `${OUT}/08-own-real.png` });
     }
