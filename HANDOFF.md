@@ -12,6 +12,38 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-07 21:37 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `2f576e2` — "done: remove duplicate deck passport button"
+- Commit phiên này: chuẩn bị commit "chore: clear lint debt"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này tập trung dọn lint debt còn lại sau auth/browser-comment work:
+hook reset trong `components/Slab.tsx`, `features/pack-open/PackOpen.tsx`,
+`features/passport/PassportDrawer.tsx`, và các unused warning ở battle/balance.
+
+### Đã xong
+- `components/Slab.tsx`: bỏ reset state trong effect; image fallback variant nay reset theo image key.
+- `features/pack-open/PackOpen.tsx`: tách `PackOpenSequence` keyed by `pack.seed`, bỏ reset animation sync trong effect, bỏ import unused.
+- `features/passport/PassportDrawer.tsx`: tách wrapper/content keyed by `tokenId`; loading/detail/narration reset bằng initial state khi đổi card.
+- `features/battle/Battle.tsx`, `scripts/balance.mts`: dọn unused variables.
+- Verify mới nhất: `npm.cmd run lint` PASS; `npm.cmd run test:unit` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua server tạm `http://127.0.0.1:3002` PASS toàn hero loop, 0 console error; bundle scan `.next/static` không có secret/write-SDK symbols.
+
+### Tiếp theo
+1. Nếu còn polish UI từ browser comments, xử lý theo comment mới nhất và cập nhật e2e assertion tương ứng.
+2. Test thủ công auth UI bằng `python run_local.py`: register → chuyển về login → login lại → xác nhận account save synced.
+3. Khi deploy thật, thay JSON file store trong `data/` bằng DB/KV bền vững và đặt `AUTH_SECRET` random ở server env.
+
+### Cảnh báo
+- Auth vẫn là demo username/password JSON store theo yêu cầu hiện tại, chưa phải production auth.
+- `ANTHROPIC_API_KEY` chưa cấu hình thì Passport AI chạy deterministic fallback.
+- Gacha odds vẫn là ước lượng từ marketplace pool, không phải on-chain odds thật.
+
+### Nhật ký
+- 2026-07-07 codex: Dọn lint debt còn lại bằng refactor keyed component/state thay vì disable rule rộng; chạy lint/unit/typecheck/build/e2e/bundle scan đều đạt. Có thử launch server background trên 3001/3002; e2e ổn định nhất khi start production server trong cùng PowerShell job rồi cleanup.
+
+---
+
 ## Cập nhật lần cuối
 - Thời điểm: 2026-07-07 17:25 UTC
 - Agent: codex
@@ -112,17 +144,13 @@ không render nút phụ này.
   Next.js — đã thêm vào `.gitignore`, KHÔNG commit, KHÔNG xoá (không rõ nguồn gốc,
   để an toàn). `env.example.txt` là bản sao y hệt `.env.example` — vô hại, không
   cần sửa.
-- Verify mới nhất phiên Codex: `npm.cmd run test:unit` PASS; `npm.cmd run
-  typecheck` PASS; `npm.cmd run build` PASS; `E2E_BASE_URL=http://localhost:3001
-  npm.cmd run e2e` PASS toàn hero loop + browser-comment assertions, 0 console error;
-  HTTP API smoke test register/login/session/account-save PASS từ phiên auth; bundle
-  scan `.next/static` không có
-  `rk_`/`rsk_`/`X-Api-Secret`/`ANTHROPIC_API_KEY`/`createSecureClient`/
-  `pullGacha`/`buybackGacha`/`approvePermit2Usdt`/`deploySafeWallet`.
-  `npm.cmd run lint` hiện FAIL ở lỗi lint cũ ngoài phạm vi auth:
-  `components/Slab.tsx`, `features/pack-open/PackOpen.tsx`,
-  `features/passport/PassportDrawer.tsx` (`react-hooks/set-state-in-effect`) và
-  vài warning unused vars.
+- Verify mới nhất phiên Codex: `npm.cmd run lint` PASS; `npm.cmd run test:unit`
+  PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua
+  server tạm `http://127.0.0.1:3002` PASS toàn hero loop + browser-comment assertions,
+  0 console error; HTTP API smoke test register/login/session/account-save PASS từ
+  phiên auth; bundle scan `.next/static` không có `rk_`/`rsk_`/`X-Api-Secret`/
+  `ANTHROPIC_API_KEY`/`createSecureClient`/`pullGacha`/`buybackGacha`/
+  `approvePermit2Usdt`/`deploySafeWallet`.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
 - 2026-07-07 codex: Xử lý browser comment Deck: bỏ nút `Passport` overlay phụ trong

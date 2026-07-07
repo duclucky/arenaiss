@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useState } from 'react';
 import type { GameCard } from '@/lib/game/stats';
 import { ELEMENT_GLYPH, imageUrlFromSerial } from '@/lib/game/stats';
 import type { StatKey } from '@/lib/game/battle';
@@ -20,10 +20,16 @@ interface SlabProps {
 
 function SlabBase({ card, onClick, selected, defeated, highlightStat, interactive = true, reveal, revealDelayMs = 0 }: SlabProps) {
   // The serial-derived image can have silver/golden variants; try them before falling back.
-  const [variant, setVariant] = useState(0);
-  useEffect(() => { setVariant(0); }, [card.imageUrl, card.serial]);
+  const imageKey = `${card.imageUrl ?? ''}|${card.serial ?? ''}`;
+  const [imageState, setImageState] = useState({ key: imageKey, variant: 0 });
+  const variant = imageState.key === imageKey ? imageState.variant : 0;
   const imgSrc = variant === 0 ? card.imageUrl : imageUrlFromSerial(card.serial, variant);
-  function onImgError() { setVariant((v) => v + 1); }
+  function onImgError() {
+    setImageState((current) => ({
+      key: imageKey,
+      variant: current.key === imageKey ? current.variant + 1 : 1,
+    }));
+  }
 
   const stats: { key: StatKey; label: string; value: number }[] = [
     { key: 'atk', label: 'ATK', value: card.atk },

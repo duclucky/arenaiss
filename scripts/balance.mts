@@ -27,7 +27,7 @@ async function fetchPool(): Promise<MarketplaceItem[]> {
 function tierOf(cards: GameCard[], tier: Tier) { return cards.filter((c) => c.tier === tier); }
 function pick5(rng: Rng, pool: GameCard[]): GameCard[] { return shuffle(rng, pool).slice(0, 5); }
 
-const randomPolicy = (rng: Rng) => (_s: BattleState): StatKey => STAT_KEYS[rngInt(rng, 0, 3)];
+const randomPolicy = (rng: Rng) => (): StatKey => STAT_KEYS[rngInt(rng, 0, 3)];
 const greedyPolicy = (s: BattleState): StatKey => chooseStatGreedy(s, 'player');
 
 function main(pool: GameCard[]) {
@@ -36,7 +36,6 @@ function main(pool: GameCard[]) {
   for (const c of pool) comp[c.tier] = (comp[c.tier] || 0) + 1;
   console.log('Tier composition:', comp);
 
-  const rng = makeRng('balance-seed');
   const N = 400;
 
   // --- Test 1: greedy vs random, deck cân bằng (rút ngẫu nhiên cả hai) ---

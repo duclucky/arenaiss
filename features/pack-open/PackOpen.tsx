@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
-import { openPack, oddsTable, PACK_COST } from '@/lib/game/gacha';
+import { openPack, PACK_COST, type PackReveal } from '@/lib/game/gacha';
 import { makePackSeed } from '@/lib/client/pack';
 import type { Tier } from '@/lib/game/stats';
 
@@ -19,12 +19,18 @@ const TIER_SHOUT: Record<Tier, string> = {
 
 export function PackOpen() {
   const state = useArena();
-  const dispatch = useArenaDispatch();
   const pack = state.lastPack;
+
+  if (!pack) return null;
+  return <PackOpenSequence key={pack.seed} pack={pack} />;
+}
+
+function PackOpenSequence({ pack }: { pack: PackReveal }) {
+  const state = useArena();
+  const dispatch = useArenaDispatch();
 
   // Reveal common cards first and keep the rarest hit for the final beat.
   const order = useMemo(() => {
-    if (!pack) return [];
     return [...pack.cards].sort((a, b) => RANK[b.tier] - RANK[a.tier]);
   }, [pack]);
 
@@ -35,12 +41,8 @@ export function PackOpen() {
 
   // Add anticipation before the final reveal.
   useEffect(() => {
-    if (!pack) return;
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    setPhase('charging');
-    setRevealed(0);
-    setFlash(false);
 
     const t0 = setTimeout(() => setPhase('revealing'), 750);
     timers.current.push(t0);
@@ -61,9 +63,10 @@ export function PackOpen() {
       timers.current.push(t);
     });
     return () => timers.current.forEach(clearTimeout);
-  }, [order, pack]);
+    // This component is keyed by pack.seed, so the mount itself resets animation state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (!pack) return null;
   const topTier = pack.topTier;
   const canOpenAnother = state.pool.length > 0 && state.credits >= PACK_COST;
 

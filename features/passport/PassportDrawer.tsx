@@ -61,20 +61,29 @@ export function PassportDrawer() {
   const tokenId = state.passportToken;
   const card = useMemo(() => cardByToken(state, tokenId), [state, tokenId]);
 
+  if (!tokenId || !card) return null;
+  return (
+    <PassportDrawerContent
+      key={tokenId}
+      tokenId={tokenId}
+      card={card}
+      onClose={() => dispatch({ type: 'CLOSE_PASSPORT' })}
+    />
+  );
+}
+
+function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; card: GameCard; onClose: () => void }) {
   const [detail, setDetail] = useState<CardDetail | null>(null);
   const [idx, setIdx] = useState<IndexCard | null>(null);
   const [narr, setNarr] = useState<NarrationResult | null>(null);
   const [packs, setPacks] = useState<CardPack[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [narrLoading, setNarrLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [narrLoading, setNarrLoading] = useState(true);
   const [showReal, setShowReal] = useState(false);
-  const asOf = useMemo(() => new Date().toISOString(), [tokenId]);
+  const asOf = useMemo(() => new Date().toISOString(), []);
 
   useEffect(() => {
-    if (!tokenId || !card) return;
     let alive = true;
-    setDetail(null); setIdx(null); setNarr(null); setShowReal(false);
-    setLoading(true); setNarrLoading(true);
 
     (async () => {
       // 1) Card detail: on-chain activity, custody, and image.
@@ -142,7 +151,6 @@ export function PassportDrawer() {
     if (packs.length === 0) setPacks(await fetchPacks());
   }
 
-  if (!tokenId || !card) return null;
   const collectible = detail?.collectible;
   const img = collectible?.frontImageUrl || card.imageUrl;
   const activities: Activity[] = detail?.activities?.activities ?? [];
@@ -154,7 +162,7 @@ export function PassportDrawer() {
   return (
     <>
       <div
-        onClick={() => dispatch({ type: 'CLOSE_PASSPORT' })}
+        onClick={onClose}
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 40, animation: 'fadeIn 0.2s ease' }}
       />
       <aside
@@ -182,7 +190,7 @@ export function PassportDrawer() {
             </div>
             <div className="chip" style={{ marginTop: 6, fontSize: 10 }}>Card Passport · real reference data</div>
           </div>
-          <button className="btn btn-ghost" style={{ padding: '4px 10px', alignSelf: 'flex-start' }} onClick={() => dispatch({ type: 'CLOSE_PASSPORT' })}>✕</button>
+          <button className="btn btn-ghost" style={{ padding: '4px 10px', alignSelf: 'flex-start' }} onClick={onClose}>✕</button>
         </div>
 
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 18 }}>

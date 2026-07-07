@@ -58,7 +58,6 @@ export function Battle() {
   const over = battle.status !== 'ongoing';
   const pCard: GameCard | undefined = battle.playerQueue[0];
   const oCard: GameCard | undefined = battle.opponentQueue[0];
-  const lastRound = battle.rounds[battle.rounds.length - 1];
   const playerTurn = battle.attacker === 'player' && !over;
 
   return (
