@@ -1,0 +1,34 @@
+{
+  "name": "renaiss-arena",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "balance": "tsx scripts/balance.mts",
+    "sweep": "tsx scripts/sweep.mts",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@renaiss-protocol/client": "^0.1.0-alpha.1",
+    "framer-motion": "^12.42.2",
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "playwright-core": "^1.61.1",
+    "tsx": "^4.23.0",
+    "typescript": "^5"
+  }
+}

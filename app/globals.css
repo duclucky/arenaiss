@@ -1,0 +1,226 @@
+/* ============================================================================
+   Renaiss Arena — Premium Vault design system.
+   Nguồn thẩm mỹ: docs/art-direction.md (file đó THẮNG về phong cách/palette).
+   Dark-first, kính mờ, glow theo tier, "tủ trưng bày báu vật số".
+   ============================================================================ */
+
+:root {
+  /* Nền & bề mặt */
+  --bg: #0b0e14;
+  --surface: #151a23;
+  --raised: #1c222d;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.16);
+  /* Text */
+  --text: #edf0f5;
+  --text-sub: #a0a8b4;
+  --text-dim: #6b7280;
+  /* Accent vault */
+  --accent: #e5c07b;
+  --accent-soft: rgba(229, 192, 123, 0.16);
+  /* Tier colors */
+  --tier-top: #f5b301;
+  --tier-s: #a277ff;
+  --tier-a: #4c8dff;
+  --tier-b: #2fd3a5;
+  --tier-c: #8a93a0;
+  --tier-d: #5a626e;
+  /* Semantic */
+  --win: #2fd3a5;
+  --loss: #ff6b6b;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  /* Ánh sáng hắt trong "tủ" — hai vầng sáng mờ ở đỉnh. */
+  background-image:
+    radial-gradient(1200px 600px at 20% -10%, rgba(76, 141, 255, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 85% -5%, rgba(162, 119, 255, 0.07), transparent 55%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+button { font-family: inherit; cursor: pointer; }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+
+.tabnums { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+
+/* ---- Tier tokens: gắn --tier / --glow theo [data-tier] ---- */
+[data-tier='TOP'] { --tier: var(--tier-top); --glow: 0.85; }
+[data-tier='S']   { --tier: var(--tier-s);   --glow: 0.6; }
+[data-tier='A']   { --tier: var(--tier-a);   --glow: 0.45; }
+[data-tier='B']   { --tier: var(--tier-b);   --glow: 0.32; }
+[data-tier='C']   { --tier: var(--tier-c);   --glow: 0.18; }
+[data-tier='D']   { --tier: var(--tier-d);   --glow: 0.1; }
+
+/* ============================ SLAB (quan trọng nhất) ====================== */
+.slab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--raised), var(--surface));
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 14px 30px -18px rgba(0, 0, 0, 0.9),
+    0 0 calc(26px * var(--glow, 0.2)) rgba(from var(--tier) r g b / calc(0.5 * var(--glow, 0.2)));
+  border-color: rgba(from var(--tier) r g b / calc(0.35 + 0.4 * var(--glow, 0.2)));
+}
+.slab.interactive { cursor: pointer; }
+.slab.interactive:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 24px 44px -20px rgba(0, 0, 0, 0.95),
+    0 0 calc(40px * var(--glow, 0.3)) rgba(from var(--tier) r g b / calc(0.7 * var(--glow, 0.3)));
+  border-color: var(--tier);
+}
+.slab.selected { border-color: var(--tier); box-shadow: 0 0 0 2px var(--tier), 0 18px 36px -18px rgba(0,0,0,0.9); }
+.slab.defeated { filter: grayscale(0.72) brightness(0.6); opacity: 0.55; }
+
+/* thanh tier phát sáng ở đỉnh slab */
+.slab-tierbar {
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--tier), transparent);
+  box-shadow: 0 0 10px rgba(from var(--tier) r g b / 0.9);
+}
+.slab-label {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 8px; padding: 8px 10px 6px;
+}
+.slab-name { font-size: 12px; line-height: 1.25; letter-spacing: 0.02em; color: var(--text); font-weight: 600; }
+.slab-cert { font-size: 9.5px; color: var(--text-dim); margin-top: 3px; }
+.slab-grade {
+  flex: none; min-width: 34px; text-align: center; padding: 3px 6px; border-radius: 8px;
+  background: rgba(from var(--tier) r g b / 0.14); border: 1px solid rgba(from var(--tier) r g b / 0.5);
+  color: var(--tier); font-weight: 800; font-size: 15px; line-height: 1;
+}
+.slab-grade small { display: block; font-size: 7px; font-weight: 600; color: var(--text-sub); letter-spacing: 0.06em; }
+
+/* khung ảnh thẻ */
+.slab-art {
+  position: relative; margin: 0 8px; border-radius: var(--radius-sm); overflow: hidden;
+  aspect-ratio: 2.5 / 3.5; background: #0d1016;
+  border: 1px solid var(--hairline);
+}
+.slab-art img { width: 100%; height: 100%; object-fit: cover; }
+.slab-art .specular {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.05) 100%);
+  mix-blend-mode: screen;
+}
+.slab-art .noart {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  color: var(--text-dim); font-size: 10px; padding: 8px;
+}
+.slab-element {
+  position: absolute; top: 6px; left: 6px; font-size: 15px;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+}
+
+/* dải chỉ số HUD */
+.slab-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; padding: 8px; margin-top: auto; }
+.slab-stat { text-align: center; }
+.slab-stat .k { font-size: 8px; letter-spacing: 0.1em; color: var(--text-dim); }
+.slab-stat .v { font-size: 15px; font-weight: 800; color: var(--text); }
+.slab-stat.hot .v { color: var(--accent); text-shadow: 0 0 10px rgba(229,192,123,0.6); }
+.slab-power {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; border-top: 1px solid var(--hairline);
+  background: rgba(0,0,0,0.25);
+}
+.slab-power .lbl { font-size: 8px; letter-spacing: 0.14em; color: var(--text-dim); }
+.slab-power .val { font-size: 18px; font-weight: 900; color: var(--accent); }
+
+/* ============================ Buttons / chrome =========================== */
+.btn {
+  border: 1px solid var(--hairline-strong); background: var(--raised); color: var(--text);
+  padding: 11px 18px; border-radius: 11px; font-weight: 600; font-size: 14px;
+  transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary {
+  background: linear-gradient(180deg, var(--accent), #cfa85f); color: #1a1408; border-color: transparent;
+  box-shadow: 0 8px 22px -10px rgba(229, 192, 123, 0.7);
+}
+.btn-primary:hover:not(:disabled) { border-color: transparent; box-shadow: 0 12px 28px -10px rgba(229, 192, 123, 0.9); }
+.btn-ghost { background: transparent; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--hairline); font-size: 12px; color: var(--text-sub);
+}
+.chip-warn { background: rgba(245, 179, 1, 0.1); border-color: rgba(245,179,1,0.35); color: #f0c96b; }
+.chip-sim { background: rgba(47, 211, 165, 0.1); border-color: rgba(47,211,165,0.35); color: #6fe3c2; }
+
+.panel { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius); }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+
+/* Caveat text — bắt buộc hiển thị (chỉ số hư cấu, data beta). */
+.caveat { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+
+/* ============================ Animations ================================= */
+@keyframes packShake {
+  0%, 100% { transform: translate(0,0) rotate(0); }
+  20% { transform: translate(-3px, 1px) rotate(-1.2deg); }
+  40% { transform: translate(3px, -1px) rotate(1.2deg); }
+  60% { transform: translate(-2px, 2px) rotate(-0.8deg); }
+  80% { transform: translate(2px, -2px) rotate(0.8deg); }
+}
+@keyframes riseReveal {
+  0% { opacity: 0; transform: translateY(28px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sweep {
+  0% { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  30% { opacity: 0.9; }
+  100% { transform: translateX(220%) skewX(-18deg); opacity: 0; }
+}
+@keyframes winPop {
+  0% { transform: scale(1); } 40% { transform: scale(1.08) translateY(-4px); } 100% { transform: scale(1); }
+}
+@keyframes hshake {
+  0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); }
+}
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.anim-rise { animation: riseReveal 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anim-shake { animation: packShake 0.5s ease-in-out infinite; }
+.anim-win { animation: winPop 0.6s ease both; }
+.anim-loss { animation: hshake 0.4s ease both; }
+.anim-float { animation: floaty 3.2s ease-in-out infinite; }
+.anim-fade { animation: fadeIn 0.4s ease both; }
+
+.sweep-overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.sweep-overlay::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 55%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: sweep 0.85s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::after, *::before { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
