@@ -12,6 +12,32 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-07 21:58 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `73a5d62` — "chore: clear lint debt"
+- Commit phiên này: chuẩn bị commit "feat: add rainbow slab hover"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này xử lý yêu cầu UI: khi user hover vào card interactive, card có viền 7 sắc cầu vồng giống ảnh tham chiếu.
+
+### Đã xong
+- `app/globals.css`: thêm pseudo-element `.slab.interactive::before` với rainbow gradient border; chỉ hiện khi hover/focus-visible, không thêm DOM và không che nội dung card.
+- `scripts/e2e.mjs`: thêm regression assertion hover card phải có gradient border visible.
+- TDD check: e2e fail trước khi có CSS với lỗi `Interactive slab hover should show a visible rainbow border`, sau đó pass sau implementation.
+- Verify mới nhất: `npm.cmd run lint` PASS; `npm.cmd run test:unit` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; e2e production server tạm PASS hero loop và hover assertion. Bundle scan `.next/static` không có secret/write-SDK symbols.
+
+### Tiếp theo
+1. Nếu muốn hiệu ứng mạnh hơn nữa, chỉnh riêng độ dày `padding` của `.slab.interactive::before` hoặc glow hover trong `app/globals.css`.
+2. Refresh `http://localhost:3001/` để xem bản đang chạy local.
+
+### Cảnh báo
+- E2E lần xanh vẫn log 2 console errors `502 Bad Gateway` từ resource upstream; script không fail vì hero loop và assertion UI đều pass. Nếu cần console sạch tuyệt đối, cần điều tra upstream resource/image/API trả 502.
+
+### Nhật ký
+- 2026-07-07 codex: Thêm rainbow border hover cho `.slab.interactive`; chụp visual check ở `.e2e-output/rainbow-hover.png`; `localhost:3001` trả HTTP 200 sau build.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-07 21:37 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `2f576e2` — "done: remove duplicate deck passport button"

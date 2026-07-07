@@ -85,13 +85,36 @@ a { color: inherit; }
   border-color: rgba(from var(--tier) r g b / calc(0.35 + 0.4 * var(--glow, 0.2)));
 }
 .slab.interactive { cursor: pointer; }
+.slab.interactive::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #ffdf5d 0%, #ff6b6b 17%, #ff4fd8 34%, #7b61ff 51%, #2f7cff 68%, #2fd3a5 84%, #ffdf5d 100%);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
 .slab.interactive:hover {
   transform: translateY(-6px);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.06) inset,
     0 24px 44px -20px rgba(0, 0, 0, 0.95),
+    0 0 18px rgba(255, 223, 93, 0.28),
+    0 0 22px rgba(255, 79, 216, 0.22),
+    0 0 28px rgba(47, 124, 255, 0.24),
     0 0 calc(40px * var(--glow, 0.3)) rgba(from var(--tier) r g b / calc(0.7 * var(--glow, 0.3)));
   border-color: var(--tier);
+}
+.slab.interactive:hover::before,
+.slab.interactive:focus-visible::before {
+  opacity: 1;
 }
 .slab.selected { border-color: var(--tier); box-shadow: 0 0 0 2px var(--tier), 0 18px 36px -18px rgba(0,0,0,0.9); }
 .slab.defeated { filter: grayscale(0.72) brightness(0.6); opacity: 0.55; }

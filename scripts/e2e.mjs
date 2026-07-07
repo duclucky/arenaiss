@@ -39,6 +39,19 @@ try {
   if (await page.locator('.slab-passport-overlay').count()) throw new Error('Hover-only Passport overlay should not be rendered');
   const fixedPassportButtons = await page.locator('.slab-passport-button', { hasText: 'View Passport' }).count();
   if (fixedPassportButtons < slabCount) throw new Error(`Expected fixed View Passport buttons on every slab, got ${fixedPassportButtons}/${slabCount}`);
+  const firstInteractiveSlab = page.locator('.slab.interactive').first();
+  await firstInteractiveSlab.hover();
+  await page.waitForTimeout(250);
+  const rainbowHover = await firstInteractiveSlab.evaluate((el) => {
+    const before = window.getComputedStyle(el, '::before');
+    return {
+      backgroundImage: before.backgroundImage,
+      opacity: before.opacity,
+    };
+  });
+  if (!/(linear|conic)-gradient/.test(rainbowHover.backgroundImage) || Number(rainbowHover.opacity) < 0.95) {
+    throw new Error('Interactive slab hover should show a visible rainbow border');
+  }
   log(`✓ pack opened, ${slabCount} slabs revealed`);
 
   // Open a few more packs so the deck can fill.
