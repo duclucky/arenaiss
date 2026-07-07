@@ -13,16 +13,15 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 17:15 UTC
+- Thời điểm: 2026-07-07 17:25 UTC
 - Agent: codex
-- Commit gần nhất trước cập nhật này: `d2fd4b1` — "done: clarify real pack passport data"
-- Commit phiên này: chuẩn bị commit "done: add exact marketplace card links"
+- Commit gần nhất trước cập nhật này: `f5697a1` — "done: add exact marketplace card links"
+- Commit phiên này: chuẩn bị commit "done: remove duplicate deck passport button"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Đã làm rõ hơn phần sở hữu thật trong Passport:
-nếu card có active ask price thì hiện `Buy this card on marketplace` với link đúng
-`https://www.renaiss.xyz/card/{tokenId}`; nếu chưa listed thì hiện trạng thái không
-listed và vẫn cho mở đúng trang thẻ. Real packs nằm bên dưới như lựa chọn khác.
+Không có file nào đang viết dở. Đã bỏ nút `Passport` phụ trong Deck collection vì
+slab đã có nút `View Passport` cố định ở footer; e2e có regression assertion cho việc
+không render nút phụ này.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -126,6 +125,10 @@ listed và vẫn cho mở đúng trang thẻ. Real packs nằm bên dưới như
   vài warning unused vars.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Xử lý browser comment Deck: bỏ nút `Passport` overlay phụ trong
+  `features/deck-builder/DeckBuilder.tsx`; giữ CTA duy nhất là `View Passport` trong
+  `components/Slab.tsx`. `scripts/e2e.mjs` thêm assertion không còn `.card-grid`
+  button text `Passport`.
 - 2026-07-07 codex: Làm rõ ownership trong Passport: thêm `lib/renaiss/links.ts`
   với `renaissCardUrl()` = `https://www.renaiss.xyz/card/{tokenId}` (đã probe 200),
   `renaissGachaPackUrl()`, `renaissGachaUrl()`; `features/passport/PassportDrawer.tsx`

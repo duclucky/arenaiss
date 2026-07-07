@@ -105,13 +105,6 @@ export function DeckBuilder() {
                 {inDeck && (
                   <div style={{ position: 'absolute', top: 8, right: 8, background: 'var(--accent)', color: '#1a1408', borderRadius: 999, width: 22, height: 22, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 13 }}>✓</div>
                 )}
-                <button
-                  className="btn btn-ghost"
-                  style={{ position: 'absolute', bottom: 54, left: '50%', transform: 'translateX(-50%)', padding: '3px 10px', fontSize: 11, opacity: 0.9 }}
-                  onClick={(e) => { e.stopPropagation(); dispatch({ type: 'OPEN_PASSPORT', tokenId: card.tokenId }); }}
-                >
-                  Passport
-                </button>
               </div>
             );
           })}

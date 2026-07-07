@@ -62,6 +62,9 @@ try {
   for (let i = 0; i < n; i++) { await collectionSlabs.nth(i).click(); await page.waitForTimeout(150); }
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${OUT}/04-deck.png` });
+  if (await page.locator('.card-grid button', { hasText: /^Passport$/ }).count()) {
+    throw new Error('Deck collection should not render the extra Passport button');
+  }
   log(`✓ deck: clicked ${n} cards`);
 
   // Start battle.
