@@ -143,6 +143,7 @@ export interface GameCard {
   gradeNum: number | null;
   year: number | null;
   fmvUsd: number | null;
+  askPriceInUSDT: string | null;
   askUsdt: number | null;
   vaultLocation: string | null;
   ownerAddress: string | null;
@@ -230,6 +231,7 @@ export function buildCards(items: MarketplaceItem[]): GameCard[] {
       gradeNum: s.gradeNum,
       year: it.year ?? null,
       fmvUsd: s.fmvUsd,
+      askPriceInUSDT: it.askPriceInUSDT ?? null,
       askUsdt: parseAskUsdt(it.askPriceInUSDT),
       vaultLocation: it.vaultLocation ?? null,
       ownerAddress: it.ownerAddress ?? null,

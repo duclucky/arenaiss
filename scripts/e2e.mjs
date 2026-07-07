@@ -103,6 +103,10 @@ try {
       if (await page.locator('text=150000000000000000000').count()) throw new Error('Pack price should be formatted, not raw base units');
       const packLinkCount = await page.locator('a[href*="/gacha/"]').count();
       if (packLinkCount < 1) throw new Error('Real pack links should target the specific Renaiss gacha pack');
+      const cardLinks = await page.locator('aside a[href*="/card/"]').count();
+      if (cardLinks < 1) throw new Error('Direct marketplace action should target the exact Renaiss card page');
+      const homepageOnlyLinks = await page.locator('aside a[href="https://www.renaiss.xyz"], aside a[href="https://renaiss.xyz"]').count();
+      if (homepageOnlyLinks > 0) throw new Error('Ownership links should not point to the Renaiss homepage');
       await page.screenshot({ path: `${OUT}/08-own-real.png` });
     }
     log('✓ passport drawer opened');

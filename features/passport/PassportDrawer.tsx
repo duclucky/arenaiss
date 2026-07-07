@@ -7,6 +7,7 @@ import {
   type NarrationResult,
 } from '@/lib/client/api';
 import type { CardDetail, IndexCard, CardPack, Activity } from '@/lib/renaiss/schemas';
+import { renaissCardUrl, renaissGachaPackUrl, renaissGachaUrl } from '@/lib/renaiss/links';
 import { STAT_FORMULA_NOTES, ELEMENT_GLYPH, type GameCard } from '@/lib/game/stats';
 
 function fmtDate(ts: string | number | null | undefined): string {
@@ -38,9 +39,6 @@ function usdtFromBaseUnits(input: string | number | null | undefined): string {
     const n = Number(input);
     return Number.isFinite(n) ? `$${n.toLocaleString('en-US')}` : String(input);
   }
-}
-function packUrl(slug: string): string {
-  return `https://www.renaiss.xyz/gacha/${encodeURIComponent(slug)}`;
 }
 // Minimal markdown renderer for narration paragraphs, bold, and emphasis.
 function Narr({ text }: { text: string }) {
@@ -150,6 +148,8 @@ export function PassportDrawer() {
   const activities: Activity[] = detail?.activities?.activities ?? [];
   const deltas = idx?.deltas ?? null;
   const hasDeltas = !!deltas && [deltas.d7, deltas.d30, deltas.d365].some((v) => v != null);
+  const askPrice = collectible?.askPriceInUSDT ?? card.askPriceInUSDT;
+  const isListed = !!askPrice && askPrice !== 'NO-ASK-PRICE';
 
   return (
     <>
@@ -278,10 +278,29 @@ export function PassportDrawer() {
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>How to own it for real</button>
             ) : (
               <div className="panel" style={{ padding: 14 }}>
+                <SectionLabel>OWN IT FOR REAL</SectionLabel>
+                <p className="caveat" style={{ marginBottom: 10 }}>
+                  This section links to real Renaiss pages and is separate from the simulated game. Direct purchase uses the exact
+                  card token id; packs come from <b>Renaiss /v0/packs</b> via this app&apos;s read-only <b>/api/packs</b> proxy.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {isListed ? (
+                    <a className="btn btn-primary" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
+                      Buy this card on marketplace · {usdtFromBaseUnits(askPrice)}
+                    </a>
+                  ) : (
+                    <div className="panel" style={{ padding: '10px 12px', background: '#202734' }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>This exact card is not currently listed.</div>
+                      <div className="caveat">Token #{card.tokenId.slice(0, 10)} has no active ask price in the marketplace API. You can still open its Renaiss card page or try real packs below.</div>
+                      <a className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 10 }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
+                        Open this card page ↗
+                      </a>
+                    </div>
+                  )}
+                </div>
                 <SectionLabel>REAL RENAISS PACKS</SectionLabel>
                 <p className="caveat" style={{ marginBottom: 10 }}>
-                  Source: <b>Renaiss /v0/packs</b> via this app&apos;s read-only <b>/api/packs</b> proxy. These are real Renaiss packs
-                  that use real USDT and a wallet, separate from the simulated game packs. Renaiss pack pages currently state each pack contains 1 card.
+                  Real packs use real USDT and a wallet. Renaiss pack pages currently state each pack contains 1 card.
                 </p>
                 {packs.length === 0 ? <Skeleton /> : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -289,7 +308,7 @@ export function PassportDrawer() {
                       <a
                         key={p.slug}
                         className="panel"
-                        href={packUrl(p.slug)}
+                        href={renaissGachaPackUrl(p.slug)}
                         target="_blank"
                         rel="noreferrer"
                         style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: '#202734', textDecoration: 'none' }}
@@ -306,7 +325,7 @@ export function PassportDrawer() {
                         <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 800 }}>Open ↗</span>
                       </a>
                     ))}
-                    <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href="https://www.renaiss.xyz/gacha" target="_blank" rel="noreferrer">
+                    <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissGachaUrl()} target="_blank" rel="noreferrer">
                       View all Renaiss packs ↗
                     </a>
                   </div>

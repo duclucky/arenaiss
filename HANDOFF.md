@@ -13,16 +13,16 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 16:55 UTC
+- Thời điểm: 2026-07-07 17:15 UTC
 - Agent: codex
-- Commit gần nhất trước cập nhật này: `f289d79` — "done: address browser UI comments"
-- Commit phiên này: chuẩn bị commit "done: clarify real pack passport data"
+- Commit gần nhất trước cập nhật này: `d2fd4b1` — "done: clarify real pack passport data"
+- Commit phiên này: chuẩn bị commit "done: add exact marketplace card links"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Đã xử lý browser comments mới nhất trong Passport:
-giải thích nguồn dữ liệu real packs, format lại giá pack thật, link từng pack tới
-`https://www.renaiss.xyz/gacha/{slug}`, và không render dòng delta toàn dấu gạch khi
-Renaiss OS Index không trả 7d/30d/365d.
+Không có file nào đang viết dở. Đã làm rõ hơn phần sở hữu thật trong Passport:
+nếu card có active ask price thì hiện `Buy this card on marketplace` với link đúng
+`https://www.renaiss.xyz/card/{tokenId}`; nếu chưa listed thì hiện trạng thái không
+listed và vẫn cho mở đúng trang thẻ. Real packs nằm bên dưới như lựa chọn khác.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -126,6 +126,13 @@ Renaiss OS Index không trả 7d/30d/365d.
   vài warning unused vars.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Làm rõ ownership trong Passport: thêm `lib/renaiss/links.ts`
+  với `renaissCardUrl()` = `https://www.renaiss.xyz/card/{tokenId}` (đã probe 200),
+  `renaissGachaPackUrl()`, `renaissGachaUrl()`; `features/passport/PassportDrawer.tsx`
+  hiện nút `Buy this card on marketplace` khi `askPriceInUSDT` có giá, fallback
+  `Open this card page` khi không listed. `lib/game/stats.ts` giữ raw
+  `askPriceInUSDT` trong `GameCard`; thêm `tests/renaiss-links.test.mts`; e2e assert
+  ownership links dùng `/card/` và không trỏ homepage.
 - 2026-07-07 codex: Xử lý browser comments Passport: `features/passport/PassportDrawer.tsx`
   thêm note nguồn `Renaiss /v0/packs` qua proxy `/api/packs`, format `priceInUsdt`
   từ base units 18 decimals, format EV/top prize từ cent-like strings, đổi từng pack

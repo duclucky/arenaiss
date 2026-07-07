@@ -91,6 +91,11 @@ Trả về:
   `bidder, asker, nftTokenId, erc20Token, amount, feeAccrued`. Phân trang bằng
   `nextCursor` (query `activitiesCursor`, `activitiesLimit`).
 
+Frontend link thẻ thật: `https://www.renaiss.xyz/card/{tokenId}`. Probe 2026-07-07:
+route này trả 200; các pattern `/marketplace/{tokenId}` và `/collectibles/{tokenId}`
+trả 404. Nếu `askPriceInUSDT` khác `"NO-ASK-PRICE"`, có thể hiển thị nút mua trực
+tiếp tới đúng URL này; nếu không listed thì chỉ mở trang thẻ hoặc gợi ý pack.
+
 ### GET /v0/packs  và  GET /v0/packs/{slug} → nút "làm sao sở hữu thật"
 `/v0/packs` → `cardPacks[] { slug, name, packType (limited|perpetual), stage,
 description, author, priceInUsdt, expectedValueInUsd, featuredCardFmvInUsd }`

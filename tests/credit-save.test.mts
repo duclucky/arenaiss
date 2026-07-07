@@ -15,6 +15,7 @@ function sampleCard(tokenId: string): GameCard {
     gradeNum: 10,
     year: 1999,
     fmvUsd: 100,
+    askPriceInUSDT: null,
     askUsdt: null,
     vaultLocation: 'Demo vault',
     ownerAddress: null,
