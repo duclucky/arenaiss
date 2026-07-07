@@ -2,12 +2,13 @@
 
 import { useArena, useArenaDispatch, deckCards } from '@/app/arena/state';
 import type { Screen } from '@/app/arena/state';
+import { STORAGE_KEY } from '@/lib/game/save';
 
-// Header vault: logo, credit ẢO, nav, và các nhãn AN TOÀN luôn hiển thị.
+// Vault header: logo, virtual credit, nav, and always-visible safety labels.
 
 const NAV: { screen: Screen; label: string }[] = [
   { screen: 'intro', label: 'Vault' },
-  { screen: 'roster', label: 'Bộ sưu tập' },
+  { screen: 'roster', label: 'Collection' },
   { screen: 'deck', label: 'Deck' },
 ];
 
@@ -15,6 +16,11 @@ export function Hud() {
   const state = useArena();
   const dispatch = useArenaDispatch();
   const deckN = deckCards(state).length;
+
+  function resetProgress() {
+    window.localStorage.removeItem(STORAGE_KEY);
+    dispatch({ type: 'RESET_RUN' });
+  }
 
   return (
     <header
@@ -28,7 +34,7 @@ export function Hud() {
         <span style={{ fontSize: 22 }}>🃏</span>
         <div>
           <div style={{ fontWeight: 800, letterSpacing: '0.06em', fontSize: 15 }}>RENAISS ARENA</div>
-          <div style={{ fontSize: 9.5, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>GACHA-AS-DRAFT · MÔ PHỎNG</div>
+          <div style={{ fontSize: 9.5, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>GACHA-AS-DRAFT · SIMULATED</div>
         </div>
       </div>
 
@@ -50,15 +56,19 @@ export function Hud() {
       </nav>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="chip" title="Chỉ đọc dữ liệu on-chain — không ký ví, không giao dịch">🔒 read-only</span>
+        <span className="chip" title="Read-only data access: no wallet signing and no transactions">Read-only</span>
+        <span className="chip" title="Anonymous progress is stored only in this browser on this device">Local save</span>
         <div
           className="chip"
           style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)', borderColor: 'rgba(229,192,123,0.4)' }}
-          title="Credit ẢO kiếm bằng chơi — KHÔNG phải tiền thật"
+          title="Virtual credits earned by playing. Not money and not redeemable."
         >
           <span className="tabnums">{state.credits}</span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>CREDIT ẢO</span>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>VIRTUAL CREDITS</span>
         </div>
+        <button className="btn btn-ghost" style={{ padding: '7px 10px', fontSize: 12 }} onClick={resetProgress} title="Clear anonymous progress saved on this device">
+          Reset
+        </button>
       </div>
     </header>
   );

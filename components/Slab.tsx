@@ -5,8 +5,7 @@ import type { GameCard } from '@/lib/game/stats';
 import { ELEMENT_GLYPH, imageUrlFromSerial } from '@/lib/game/stats';
 import type { StatKey } from '@/lib/game/battle';
 
-// SLAB — mỗi quân bài là một "slab giám định số": thanh tier phát sáng, nhãn
-// grade, ảnh thẻ THẬT ở giữa, chỉ số game phủ như HUD. (docs/art-direction.md)
+// Slab: a digital graded-card case with tier glow, real card art, and fictional game stats.
 
 interface SlabProps {
   card: GameCard;
@@ -19,12 +18,8 @@ interface SlabProps {
   revealDelayMs?: number;
 }
 
-function shortName(name: string): string {
-  return name.length > 46 ? name.slice(0, 44) + '…' : name;
-}
-
 function SlabBase({ card, onClick, selected, defeated, highlightStat, interactive = true, reveal, revealDelayMs = 0 }: SlabProps) {
-  // Ảnh dựng từ serial; nếu 404 → thử lần lượt các biến thể (silver/golden) → noart.
+  // The serial-derived image can have silver/golden variants; try them before falling back.
   const [variant, setVariant] = useState(0);
   useEffect(() => { setVariant(0); }, [card.imageUrl, card.serial]);
   const imgSrc = variant === 0 ? card.imageUrl : imageUrlFromSerial(card.serial, variant);
@@ -47,9 +42,10 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
       title={card.name}
     >
       <div className="slab-tierbar" />
+      {interactive && <span className="slab-info" aria-hidden="true">ⓘ</span>}
       <div className="slab-label">
         <div>
-          <div className="slab-name">{shortName(card.name)}</div>
+          <div className="slab-name">{card.name}</div>
           <div className="slab-cert mono">
             {card.gradingCompany ?? 'RAW'} · {card.year ?? '—'} · #{card.tokenId.slice(0, 6)}
           </div>
@@ -63,13 +59,14 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
       <div className="slab-art">
         <span className="slab-element" title={card.element}>{ELEMENT_GLYPH[card.element]}</span>
         {imgSrc ? (
-          // ảnh thẻ THẬT từ Renaiss (lazy-load). Dùng <img> để tránh cấu hình domain.
+          // Keep the real Renaiss render lazy-loaded without adding image-domain config.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imgSrc} alt={card.name} loading="lazy" onError={onImgError} />
         ) : (
           <div className="noart">{card.pokemonName || card.name.split(' ').slice(-2).join(' ')}</div>
         )}
         <span className="specular" />
+        {interactive && <span className="slab-passport-overlay">View Passport →</span>}
       </div>
 
       <div className="slab-stats">

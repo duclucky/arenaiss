@@ -8,7 +8,7 @@
 > back to the real Renaiss packs & marketplace.
 
 Built with Next.js (App Router) + TypeScript. **Read-only, no wallet, no real money.**
-Bản mô tả sản phẩm (tiếng Việt) nằm trong `docs/` và `CLAUDE.md`.
+Internal build notes live in `docs/`, `AGENTS.md`, and `CLAUDE.md`.
 
 ---
 
@@ -90,9 +90,11 @@ the live alpha on 2026-07-07).
   `X-Api-Secret`, no `ANTHROPIC_API_KEY`, and none of the transactional SDK symbols
   in `.next/static`.
 - **Virtual economy.** Opening a pack is **simulated** — no USDT, no signing, no
-  on-chain tx — labeled "MÔ PHỎNG" everywhere. Credits are earned by playing.
+  on-chain tx. Credits are virtual, earned by playing, and not redeemable.
 - **Fictional stats.** Never presented as valuation or investment advice.
-- **No localStorage/sessionStorage.** Game state lives in React state only.
+- **Local anonymous save only stores game progress.** `localStorage` contains roster,
+  virtual credits, deck tokens, pull history, version, and timestamps. It never stores
+  API keys, secrets, auth tokens, or sensitive data.
 
 ---
 
@@ -157,8 +159,8 @@ Patterns follow the SDK: **Zod-validate every response, errors-as-values (no thr
 3. **Battle — the skill beat.** Each turn you pick ATK/DEF/AURA; the preview shows
    type-adjusted numbers; a lower-tier card with the right element counter topples a
    higher-tier one; the log says *why* each round was won. → *Innovation + Clarity*
-4. **Result → credits → open again.** Virtual credits close the loop; "MÔ PHỎNG" label
-   makes the simulated economy explicit. → *Clarity + Safety*
+4. **Result → credits → open again.** Virtual credits close the loop; the UI states
+   that credits are in-game only, not money and not redeemable. → *Clarity + Safety*
 5. **Card Passport (the glue).** Click any card: real reference price + confidence
    (Renaiss OS Index, with `asOf`), on-chain provenance (txHashes), custody + country,
    and an AI narration that cites sources and never claims fraud. → *Ecosystem relevance + Clarity + Safety*

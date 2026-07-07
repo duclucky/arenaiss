@@ -13,17 +13,16 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 11:16 UTC
-- Agent: claude-code
-- Commit gần nhất: `6e56231` — "feat: hero loop end-to-end (pack open -> deck -> battle -> passport)"
-  (đây là **commit đầu tiên của repo** — trước phiên này thư mục KHÔNG có git;
-  đã `git init` + commit toàn bộ code hiện có để agent sau có mốc tham chiếu)
+- Thời điểm: 2026-07-07 15:37 UTC
+- Agent: codex
+- Commit gần nhất trước phiên: `da53e48` — "docs: fill HANDOFF.md with real progress, flag Vietnamese-UI violation"
+- Commit phiên này: chuẩn bị commit "done: english ui and anonymous local save"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Phiên vừa xong đã build trọn hero loop (B1→B6),
-build production pass, e2e headless chạy hết vòng lặp không lỗi console. Việc
-CẤP THIẾT nhất để lại cho phiên sau là dịch toàn bộ copy UI sang tiếng Anh (xem
-"Cảnh báo" — đây là vi phạm một ràng buộc bất biến, không phải polish tuỳ chọn).
+Không có file nào đang viết dở. Phiên Codex vừa sửa các việc cấp thiết: UI/copy
+sản phẩm đã chuyển sang tiếng Anh, Card Passport prompt/fallback đã tiếng Anh,
+anonymous localStorage save đã có versioning + savedAt + reset, và daily credit
+refill đã tách thành hàm thuần. Hero loop e2e headless pass, 0 console error.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -47,29 +46,21 @@ CẤP THIẾT nhất để lại cho phiên sau là dịch toàn bộ copy UI sa
 - [x] B6. Polish + README nộp bài + kịch bản video — `README.md` (tiếng Anh, đầy đủ
       data sources/attribution/assumptions/limitations/safety + 6 gạch đầu dòng demo).
       Đã build production + quét bundle client (xem "Cảnh báo" bên dưới về kết quả).
-- Stretch: [ ] localStorage save  [ ] Google login  [ ] by-image scan — CHƯA làm
-  (đúng chủ ý chống scope-creep — nhưng xem cảnh báo về localStorage/Google login,
-  đây KHÔNG phải stretch thuần tuý mà là một ràng buộc trong CLAUDE.md, xem dưới).
+- [x] B2 bổ sung còn thiếu: credit pure function + anonymous save layer —
+      `lib/game/credit.ts`, `lib/game/save.ts`, `app/arena/state.tsx`,
+      `tests/credit-save.test.mts`. Luật refill: qua mốc 00:00 UTC, nếu credit
+      <100 thì đặt về 200; credit >=100 không đổi; không cộng dồn.
+- Stretch/Core còn lại: [ ] Google login + server-side account save  [ ] by-image scan.
 
 ## Tiếp theo (next steps — cụ thể, làm được ngay)
-1. **[ƯU TIÊN CAO] Dịch toàn bộ UI copy sang tiếng Anh** — hiện TOÀN BỘ đang tiếng
-   Việt (vi phạm CLAUDE.md "App TIẾNG ANH toàn bộ"). Cần sửa hết các file trong
-   `components/*.tsx` và `features/**/*.tsx` (Hud, TierLegend, Slab, Intro, PackOpen,
-   Roster, DeckBuilder, Battle, Result, PassportDrawer) + comment trong
-   `lib/game/stats.ts` (`STAT_FORMULA_NOTES`, hiển thị trực tiếp trong Passport).
-   README.md đã tiếng Anh — không cần sửa. Docs nội bộ (`docs/`, `prompts/`,
-   `CLAUDE.md`, `HANDOFF.md`) giữ nguyên tiếng Việt (đúng quy ước).
-2. Cân nhắc triển khai lưu tiến trình theo đúng CLAUDE.md: "Hai chế độ lưu (làm cả
-   hai): ẩn danh → localStorage máy user; Google login → chơi đa thiết bị". HIỆN
-   TẠI game state chỉ nằm trong React (`useReducer` ở `app/arena/state.tsx`) —
-   refresh trang là mất hết tiến trình. Đây LÀ một ràng buộc trong CLAUDE.md
-   ("Hai chế độ lưu (làm cả hai)"), không phải optional — cần làm trước khi nộp
-   nếu thời gian cho phép. Bắt đầu bằng bản ẩn danh (localStorage + versioning),
-   Google login có thể để stretch nếu hết giờ.
-3. Bật AI narration thật: thêm `ANTHROPIC_API_KEY=sk-ant-...` vào `.env.local`,
+1. **Làm Google login + save server-side theo tài khoản** — chưa có auth/provider.
+   Cần chọn hạ tầng (vd NextAuth/Auth.js + adapter/KV/DB), chỉ xin scope định danh
+   tối thiểu, và thực thi cùng `applyDailyCreditRefill()` ở server. UI copy đã có
+   anonymous local save; cần thêm copy bắt buộc: "Sign in with Google to play
+   across devices with your full demo pull history."
+2. Bật AI narration thật: thêm `ANTHROPIC_API_KEY=sk-ant-...` vào `.env.local`,
    test lại `/api/passport/narrate` để `mode` trả về `"ai"` thay vì `"fallback"`.
-4. (Tuỳ) Quay video demo theo 6 gạch đầu dòng trong `README.md` mục cuối, SAU KHI
-   đã dịch UI sang tiếng Anh (đừng quay video với UI tiếng Việt).
+3. (Tuỳ) Quay video demo theo 6 gạch đầu dòng trong `README.md` mục cuối.
 
 ## Quyết định đã chốt (để agent sau không hỏi lại)
 - App tiếng ANH toàn bộ (UI/copy/README/video). Trao đổi với chủ dự án có thể VN.
@@ -93,23 +84,13 @@ CẤP THIẾT nhất để lại cho phiên sau là dịch toàn bộ copy UI sa
   ("Add to collection →"/"Continue") tách khỏi CTA Passport.
 
 ## Cảnh báo / nợ kỹ thuật (đọc kỹ trước khi code tiếp)
-- **[VI PHẠM RÀNG BUỘC — sửa trước khi nộp] UI đang 100% tiếng Việt.** CLAUDE.md
-  và AGENTS.md đều ghi rõ "App TIẾNG ANH toàn bộ (UI, copy, README, video demo)".
-  Toàn bộ copy trong `components/` và `features/` (nhãn nút, tiêu đề, caveat,
-  nhật ký trận, Passport...) hiện là tiếng Việt vì phiên build ban đầu (một task
-  prompt tiếng Việt) đã code trực tiếp bằng tiếng Việt mà không đối chiếu lại quy
-  tắc ngôn ngữ sản phẩm. README.md thì ĐÃ tiếng Anh (không cần sửa). Đây là việc
-  ưu tiên #1 của phiên sau.
-- **Không có persistence.** Game state chỉ sống trong `useReducer` (React), mất
-  hết khi refresh/đóng tab. CLAUDE.md yêu cầu "Hai chế độ lưu (làm cả hai): ẩn
-  danh → localStorage; Google login → đa thiết bị" — CHƯA làm cái nào. Không phải
-  bug (không có code lỗi), mà là tính năng bắt buộc chưa bắt đầu.
-- **Chưa có Google login / auth** — không có route, không có provider nào được
-  cấu hình. Cần quyết định thư viện (NextAuth?) nếu làm tiếp mục lưu đa thiết bị.
+- **Chưa có Google login / auth** — không có route, provider, hay server/KV save.
+  Đây là phần còn lại của ràng buộc "hai chế độ lưu". Anonymous localStorage đã
+  làm; đa thiết bị theo tài khoản chưa làm.
 - **Chưa cấu hình `ANTHROPIC_API_KEY`** trong `.env.local` → Card Passport AI
-  narration đang chạy ở chế độ fallback (tóm tắt deterministic từ dữ liệu, KHÔNG
-  gọi LLM thật). Route `/api/passport/narrate` đã sẵn code gọi Anthropic Messages
-  API khi có key — chỉ cần điền key là chuyển sang `mode: "ai"`.
+  narration đang chạy ở chế độ fallback (deterministic summary từ dữ liệu đã
+  validate, tiếng Anh). Route `/api/passport/narrate` đã sẵn code gọi Anthropic
+  Messages API khi có key — chỉ cần điền key là chuyển sang `mode: "ai"`.
 - **Odds gacha là ước lượng, không phải on-chain thật** — do SDK alpha
   `@renaiss-protocol/client@0.1.0-alpha.1` không có field `chance` và
   `listGachaMachines()`/`/v0/gacha/packs` trả 404 trong môi trường này (đã xác
@@ -127,20 +108,22 @@ CẤP THIẾT nhất để lại cho phiên sau là dịch toàn bộ copy UI sa
   Next.js — đã thêm vào `.gitignore`, KHÔNG commit, KHÔNG xoá (không rõ nguồn gốc,
   để an toàn). `env.example.txt` là bản sao y hệt `.env.example` — vô hại, không
   cần sửa.
-- Build production + `tsc --noEmit` đều PASS tại thời điểm commit `6e56231`. Đã
-  quét bundle client (`.next/static`) xác nhận KHÔNG có `rk_`/`rsk_`/`X-Api-Secret`/
-  `ANTHROPIC_API_KEY`/`createSecureClient`/`pullGacha`/`buybackGacha`/
-  `approvePermit2Usdt`/`deploySafeWallet`/`localStorage`/`sessionStorage`.
-- **Đối chiếu mục "Quyết định đã chốt" (dưới) với code hiện tại — CHƯA khớp hết:**
-  mục "Credit: hồi mỗi ngày lúc 00:00 UTC..." và "CTA 'bấm được': overlay 'View
-  Passport →' khi hover, icon ⓘ luôn hiện, hint 1 lần sau gói đầu" đều CHƯA được
-  code (không tìm thấy logic hồi credit theo ngày, không có overlay/icon/hint nào
-  trong `components/Slab.tsx`). Mục layout thẻ ("thứ tự dọc tier→nhãn→ảnh→3 chỉ
-  số→power tách riêng") thì Slab.tsx HIỆN TẠI đã đúng cấu trúc này, chỉ khác ở
-  chỗ tên thẻ đang cắt theo ký tự (44 ký tự + "…") chứ không phải line-clamp 2
-  dòng CSS — có thể chấp nhận được, nhưng chưa đúng 100% tinh thần bản gốc.
+- Verify mới nhất phiên Codex: `npm.cmd run test:unit` PASS; `npm.cmd run
+  typecheck` PASS; `npm.cmd run build` PASS; `npm.cmd run e2e` PASS toàn hero
+  loop, 0 console error; bundle scan `.next/static` không có `rk_`/`rsk_`/
+  `X-Api-Secret`/`ANTHROPIC_API_KEY`/`createSecureClient`/`pullGacha`/
+  `buybackGacha`/`approvePermit2Usdt`/`deploySafeWallet`. `localStorage` hiện là
+  mong muốn và chỉ dùng cho tiến trình game.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Dịch UI/copy sản phẩm sang tiếng Anh (`components/`,
+  `features/`, `app/layout.tsx`, `README.md`, `prompts/passport-narration.md`,
+  `lib/passport/prompt.ts`); thêm CTA slab `ⓘ` + overlay "View Passport →" +
+  hint một lần sau gói đầu; thêm anonymous localStorage save (`lib/game/save.ts`,
+  `app/arena/state.tsx`) với version/savedAt/reset/pullHistory; thêm pure daily
+  credit refill (`lib/game/credit.ts`) + unit test (`tests/credit-save.test.mts`).
+  Verify: unit/typecheck/build/e2e đều pass, bundle scan không lộ key/secret/write
+  SDK symbols. Dev server đang chạy ở `http://localhost:3000` trong phiên này.
 - 2026-07-07 claude-code: `git init` + commit đầu tiên (`6e56231`) vì repo chưa hề
   có git trước đó. Cập nhật HANDOFF.md với tiến độ THẬT (B1→B6 xong), xác nhận lại
   bằng build production sạch + quét bundle an toàn. Ghi rõ nợ kỹ thuật quan trọng

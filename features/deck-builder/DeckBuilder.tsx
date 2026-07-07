@@ -40,8 +40,8 @@ export function DeckBuilder() {
     <div className="anim-fade" style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 22px 60px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24 }}>Lắp deck</h2>
-          <p className="caveat">Chọn 5 thẻ. Thứ tự = tầng chiến thuật (thẻ đầu ra trận trước). Sắp xếp để khắc chế đối thủ.</p>
+          <h2 style={{ margin: 0, fontSize: 24 }}>Build deck</h2>
+          <p className="caveat">Choose 5 cards. Order matters: the first card fights first. Arrange your deck to exploit type advantage.</p>
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
           <div style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-dim)' }}>TEAM POWER</div>
@@ -61,7 +61,7 @@ export function DeckBuilder() {
                     <Slab card={card} selected onClick={(c) => dispatch({ type: 'OPEN_PASSPORT', tokenId: c.tokenId })} />
                     <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                       <button className="btn btn-ghost" style={{ flex: 1, padding: '5px' }} onClick={() => move(i, -1)} disabled={i === 0}>←</button>
-                      <button className="btn btn-ghost" style={{ padding: '5px 8px' }} onClick={() => dispatch({ type: 'TOGGLE_DECK', tokenId: card.tokenId })} title="Bỏ khỏi deck">✕</button>
+                      <button className="btn btn-ghost" style={{ padding: '5px 8px' }} onClick={() => dispatch({ type: 'TOGGLE_DECK', tokenId: card.tokenId })} title="Remove from deck">✕</button>
                       <button className="btn btn-ghost" style={{ flex: 1, padding: '5px' }} onClick={() => move(i, 1)} disabled={i === deck.length - 1}>→</button>
                     </div>
                   </div>
@@ -79,17 +79,17 @@ export function DeckBuilder() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
           <button className="btn btn-primary" style={{ padding: '14px 34px', fontSize: 16 }} disabled={!full} onClick={startBattle}>
-            {full ? '⚔ Vào trận' : `Chọn thêm ${5 - deck.length} thẻ`}
+            {full ? '⚔ Start battle' : `Choose ${5 - deck.length} more`}
           </button>
         </div>
       </div>
 
       <h3 style={{ fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)', margin: '0 0 12px' }}>
-        BỘ SƯU TẬP ({available.length})
+        COLLECTION ({available.length})
       </h3>
       {available.length === 0 ? (
         <div className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-sub)' }}>
-          Chưa có thẻ. <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Mở gói</button>
+          No cards yet. <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Open pack</button>
         </div>
       ) : (
         <div className="card-grid">

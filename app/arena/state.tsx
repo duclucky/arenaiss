@@ -1,12 +1,14 @@
 'use client';
 
-import { createContext, useContext, useReducer, type ReactNode, type Dispatch } from 'react';
+import { createContext, useContext, useEffect, useReducer, type ReactNode, type Dispatch } from 'react';
 import type { GameCard } from '@/lib/game/stats';
 import type { PackReveal } from '@/lib/game/gacha';
 import { STARTING_CREDITS, PACK_COST, WIN_REWARD, LOSS_REWARD } from '@/lib/game/gacha';
 import type { BattleState, StatKey } from '@/lib/game/battle';
 import { initBattle, stepRound, chooseStatGreedy } from '@/lib/game/battle';
 import type { Category } from '@/lib/client/api';
+import { applyDailyCreditRefill } from '@/lib/game/credit';
+import { parseSavedArena, serializeArenaSave, STORAGE_KEY, type ArenaSave, type PullHistoryEntry } from '@/lib/game/save';
 
 export type Screen = 'intro' | 'pack' | 'roster' | 'deck' | 'battle' | 'result';
 
@@ -23,6 +25,11 @@ export interface ArenaState {
   battle: BattleState | null;
   battleReward: number | null;
   packCount: number;
+  pullHistory: PullHistoryEntry[];
+  lastCreditRefillAt: string | null;
+  passportHintSeen: boolean;
+  saveReady: boolean;
+  lastSavedAt: string | null;
   passportToken: string | null;
 }
 
@@ -39,6 +46,11 @@ const initialState: ArenaState = {
   battle: null,
   battleReward: null,
   packCount: 0,
+  pullHistory: [],
+  lastCreditRefillAt: null,
+  passportHintSeen: false,
+  saveReady: false,
+  lastSavedAt: null,
   passportToken: null,
 };
 
@@ -47,7 +59,10 @@ export type Action =
   | { type: 'POOL_LOADING' }
   | { type: 'POOL_LOADED'; pool: GameCard[] }
   | { type: 'POOL_ERROR'; error: string }
-  | { type: 'OPEN_PACK'; reveal: PackReveal }
+  | { type: 'HYDRATE_SAVE'; save: ArenaSave; credits: number; lastCreditRefillAt: string }
+  | { type: 'SAVE_READY' }
+  | { type: 'SAVED'; savedAt: string }
+  | { type: 'OPEN_PACK'; reveal: PackReveal; openedAt: string }
   | { type: 'HYDRATE_IMAGES'; images: Record<string, string | null> }
   | { type: 'GOTO'; screen: Screen }
   | { type: 'TOGGLE_DECK'; tokenId: string }
@@ -57,6 +72,7 @@ export type Action =
   | { type: 'END_BATTLE' }
   | { type: 'OPEN_PASSPORT'; tokenId: string }
   | { type: 'CLOSE_PASSPORT' }
+  | { type: 'DISMISS_PASSPORT_HINT' }
   | { type: 'RESET_RUN' };
 
 function mergeRoster(roster: GameCard[], cards: GameCard[]): GameCard[] {
@@ -79,6 +95,24 @@ function reducer(state: ArenaState, action: Action): ArenaState {
       return { ...state, pool: action.pool, poolLoading: false };
     case 'POOL_ERROR':
       return { ...state, poolLoading: false, poolError: action.error };
+    case 'HYDRATE_SAVE':
+      return {
+        ...state,
+        category: action.save.category,
+        credits: action.credits,
+        roster: action.save.roster,
+        deckTokens: action.save.deckTokens,
+        packCount: action.save.packCount,
+        pullHistory: action.save.pullHistory,
+        lastCreditRefillAt: action.lastCreditRefillAt,
+        passportHintSeen: action.save.passportHintSeen,
+        lastSavedAt: action.save.savedAt,
+        saveReady: true,
+      };
+    case 'SAVE_READY':
+      return { ...state, saveReady: true };
+    case 'SAVED':
+      return { ...state, lastSavedAt: action.savedAt };
     case 'OPEN_PACK': {
       const credits = state.credits - PACK_COST;
       return {
@@ -87,6 +121,10 @@ function reducer(state: ArenaState, action: Action): ArenaState {
         lastPack: action.reveal,
         roster: mergeRoster(state.roster, action.reveal.cards),
         packCount: state.packCount + 1,
+        pullHistory: [
+          ...state.pullHistory,
+          { seed: action.reveal.seed, tokenIds: action.reveal.cards.map((card) => card.tokenId), openedAt: action.openedAt },
+        ].slice(-100),
         screen: 'pack',
       };
     }
@@ -127,11 +165,20 @@ function reducer(state: ArenaState, action: Action): ArenaState {
       return { ...state, credits: state.credits + reward, battleReward: reward, screen: 'result' };
     }
     case 'OPEN_PASSPORT':
-      return { ...state, passportToken: action.tokenId };
+      return { ...state, passportToken: action.tokenId, passportHintSeen: true };
     case 'CLOSE_PASSPORT':
       return { ...state, passportToken: null };
+    case 'DISMISS_PASSPORT_HINT':
+      return { ...state, passportHintSeen: true };
     case 'RESET_RUN':
-      return { ...initialState, pool: state.pool, category: state.category };
+      return {
+        ...initialState,
+        pool: state.pool,
+        category: state.category,
+        saveReady: state.saveReady,
+        lastSavedAt: null,
+        lastCreditRefillAt: new Date().toISOString(),
+      };
     default:
       return state;
   }
@@ -142,6 +189,46 @@ const DispatchCtx = createContext<Dispatch<Action> | null>(null);
 
 export function ArenaProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  useEffect(() => {
+    const save = parseSavedArena(window.localStorage.getItem(STORAGE_KEY));
+    if (!save) {
+      dispatch({ type: 'SAVE_READY' });
+      return;
+    }
+    const refill = applyDailyCreditRefill({
+      credits: save.credits,
+      lastRefillAt: save.lastCreditRefillAt,
+      now: new Date(),
+    });
+    dispatch({ type: 'HYDRATE_SAVE', save, credits: refill.credits, lastCreditRefillAt: refill.lastRefillAt });
+  }, []);
+
+  useEffect(() => {
+    if (!state.saveReady) return;
+    const saved = serializeArenaSave({
+      category: state.category,
+      credits: state.credits,
+      roster: state.roster,
+      deckTokens: state.deckTokens,
+      packCount: state.packCount,
+      pullHistory: state.pullHistory,
+      lastCreditRefillAt: state.lastCreditRefillAt,
+      passportHintSeen: state.passportHintSeen,
+    });
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    dispatch({ type: 'SAVED', savedAt: saved.savedAt });
+  }, [
+    state.category,
+    state.credits,
+    state.roster,
+    state.deckTokens,
+    state.packCount,
+    state.pullHistory,
+    state.lastCreditRefillAt,
+    state.passportHintSeen,
+    state.saveReady,
+  ]);
+
   return (
     <StateCtx.Provider value={state}>
       <DispatchCtx.Provider value={dispatch}>{children}</DispatchCtx.Provider>

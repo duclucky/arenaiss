@@ -1,20 +1,19 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
-// Dùng system font stack (định nghĩa trong globals.css) — không phụ thuộc font
-// mạng, khớp art-direction (typography thanh, tabular-nums cho số).
+// System font stack lives in globals.css to keep the app independent from font CDNs.
 
 export const metadata: Metadata = {
   title: 'Renaiss Arena — Gacha-as-Draft Card Battler',
   description:
-    'Card-battler mô phỏng cho hệ sinh thái Renaiss: mở gói (odds tham chiếu) → lắp deck → đấu có skill → soi Card Passport thật. Kinh tế ẢO, chỉ số HƯ CẤU, read-only.',
+    'A simulated gacha-as-draft card battler for Renaiss: open packs with reference odds, build a deck, battle with skill, and inspect real Card Passports. Virtual economy, fictional stats, read-only data.',
 };
 
 export const viewport = { themeColor: '#0b0e14' };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

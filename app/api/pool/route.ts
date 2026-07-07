@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   }
 
   if (items.length === 0) {
-    return NextResponse.json({ error: lastError ?? 'pool rỗng', collection: [] }, { status: 502 });
+    return NextResponse.json({ error: lastError ?? 'empty pool', collection: [] }, { status: 502 });
   }
   return NextResponse.json({ collection: items, count: items.length, category });
 }

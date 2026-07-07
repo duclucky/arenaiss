@@ -28,8 +28,8 @@ export function oddsTable(pool: GameCard[]): OddsRow[] {
   const counts: Record<Tier, number> = { TOP: 0, S: 0, A: 0, B: 0, C: 0, D: 0 };
   for (const c of pool) counts[c.tier]++;
   const labels: Record<Tier, string> = {
-    TOP: 'Top — huyền thoại', S: 'S — cực hiếm', A: 'A — hiếm',
-    B: 'B — khá', C: 'C — thường', D: 'D — phổ thông',
+    TOP: 'Top — legendary', S: 'S — ultra rare', A: 'A — rare',
+    B: 'B — solid', C: 'C — common', D: 'D — starter',
   };
   return TIERS.map((tier) => ({ tier, chance: TIER_ODDS[tier], label: labels[tier], poolCount: counts[tier] }));
 }

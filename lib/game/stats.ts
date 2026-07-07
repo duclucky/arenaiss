@@ -249,10 +249,10 @@ export function buildCards(items: MarketplaceItem[]): GameCard[] {
 
 // Mô tả công thức để hiển thị minh bạch trong UI.
 export const STAT_FORMULA_NOTES = {
-  atk: 'ATK = 58 + (số grade × 3.7), giới hạn 58–96. RAW/không rõ grade = 62.',
-  def: 'DEF = 62 + tuổi thẻ × 0.7 (vintage có legacy bonus), giới hạn 62–92.',
-  aura: 'AURA = 48 + 47·percentile(FMV) trong pool, giới hạn 48–95 (band nén để độ hiếm không áp đảo).',
+  atk: 'ATK = 58 + (grade number × 3.7), capped at 58-96. RAW or unknown grade = 62.',
+  def: 'DEF = 62 + card age × 0.7, capped at 62-92. Older cards get a legacy bonus.',
+  aura: 'AURA = 48 + 47·percentile(FMV) within the current pool, capped at 48-95.',
   power: `POWER = ${POWER_WEIGHTS.atk}·ATK + ${POWER_WEIGHTS.aura}·AURA + ${POWER_WEIGHTS.def}·DEF.`,
-  element: `ELEMENT suy từ định danh set (deterministic). Type-advantage RPSLS 5 chiều: mỗi element khắc 2 element kế tiếp (×${TYPE_ADVANTAGE_MULT}), bị 2 element trước khắc (×${TYPE_DISADVANTAGE_MULT}). Đây là đòn bẩy mạnh nhất — khéo chọn khắc chế có thể lật thẻ tier cao (đã cân bằng qua self-test: deck khéo tier thấp thắng deck tier cao ~43%).`,
-  tier: 'TIER gán theo percentile rarityScore (0.68·percentile-FMV + 0.32·grade) trong pool.',
+  element: `ELEMENT is deterministically derived from set identity. Five-way type advantage: each element counters the next two (×${TYPE_ADVANTAGE_MULT}) and is countered by the previous two (×${TYPE_DISADVANTAGE_MULT}). This is the strongest battle lever, so smart counterplay can beat higher-tier cards.`,
+  tier: 'TIER is assigned by pool-relative rarityScore: 0.68·FMV percentile + 0.32·grade.',
 } as const;

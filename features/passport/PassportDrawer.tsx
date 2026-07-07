@@ -19,7 +19,7 @@ function fmtDate(ts: string | number | null | undefined): string {
 function cents(c: number | null | undefined): string {
   return c == null ? '—' : '$' + (c / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
-// Render markdown tối giản (đoạn + **đậm** + _nghiêng_).
+// Minimal markdown renderer for narration paragraphs, bold, and emphasis.
 function Narr({ text }: { text: string }) {
   return (
     <>
@@ -56,12 +56,12 @@ export function PassportDrawer() {
     setLoading(true); setNarrLoading(true);
 
     (async () => {
-      // 1) Card detail (on-chain + custody + ảnh)
+      // 1) Card detail: on-chain activity, custody, and image.
       const d = await fetchCardDetail(tokenId);
       if (!alive) return;
       setDetail(d);
 
-      // 2) Reference giá từ Index (resolve tên → href → detail)
+      // 2) Reference price from Index: resolve name -> href -> detail.
       const q = card.pokemonName || card.name;
       const results = await searchIndex(q);
       let indexCard: IndexCard | null = null;
@@ -72,7 +72,7 @@ export function PassportDrawer() {
       setIdx(indexCard);
       setLoading(false);
 
-      // 3) AI narration (server-side, có fallback)
+      // 3) AI narration: server-side, with deterministic fallback.
       const collectible = d?.collectible;
       const activities: Activity[] = d?.activities?.activities ?? [];
       const input = {
@@ -144,7 +144,7 @@ export function PassportDrawer() {
       >
         <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
 
-        {/* Header — tông SẠCH hơn game */}
+        {/* Cleaner, data-oriented header. */}
         <div style={{ display: 'flex', gap: 14, padding: 18, borderBottom: '1px solid var(--hairline)', position: 'sticky', top: 0, background: '#1b212c', zIndex: 2 }}>
           <div data-tier={card.tier} style={{ width: 66, flex: 'none', aspectRatio: '2.5/3.5', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(from var(--tier) r g b / 0.5)', background: '#0d1016' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -155,7 +155,7 @@ export function PassportDrawer() {
             <div className="mono" style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
               {card.gradingCompany ?? 'RAW'} {card.grade ?? ''} · {ELEMENT_GLYPH[card.element]} {card.element} · #{card.tokenId.slice(0, 10)}…
             </div>
-            <div className="chip" style={{ marginTop: 6, fontSize: 10 }}>Card Passport · dữ liệu THẬT</div>
+            <div className="chip" style={{ marginTop: 6, fontSize: 10 }}>Card Passport · real reference data</div>
           </div>
           <button className="btn btn-ghost" style={{ padding: '4px 10px', alignSelf: 'flex-start' }} onClick={() => dispatch({ type: 'CLOSE_PASSPORT' })}>✕</button>
         </div>
@@ -163,40 +163,40 @@ export function PassportDrawer() {
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Reference price (Index) */}
           <section>
-            <SectionLabel>GIÁ THAM CHIẾU · RENAISS OS INDEX</SectionLabel>
+            <SectionLabel>REFERENCE PRICE · RENAISS OS INDEX</SectionLabel>
             {loading ? <Skeleton /> : idx ? (
               <div className="panel" style={{ padding: 14, background: '#202734' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                   <span className="tabnums" style={{ fontSize: 26, fontWeight: 900 }}>{cents(idx.priceUsdCents)}</span>
                   {idx.confidence && (
                     <span className="chip" style={{ borderColor: idx.confidence === 'high' ? 'var(--win)' : idx.confidence === 'low' ? 'var(--loss)' : 'var(--hairline-strong)' }}>
-                      tin cậy: {idx.confidence}
+                      confidence: {idx.confidence}
                     </span>
                   )}
                 </div>
                 {idx.deltas && (
                   <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12 }}>
-                    <Delta label="7n" v={idx.deltas.d7} /><Delta label="30n" v={idx.deltas.d30} /><Delta label="365n" v={idx.deltas.d365} />
+                    <Delta label="7d" v={idx.deltas.d7} /><Delta label="30d" v={idx.deltas.d30} /><Delta label="365d" v={idx.deltas.d365} />
                   </div>
                 )}
                 <div className="caveat" style={{ marginTop: 10 }}>
-                  {idx.observationCount ?? '—'} quan sát{idx.sourceCount ? ` · ${idx.sourceCount} nguồn` : ''}
-                  {idx.lastSaleAt ? ` · bán gần nhất ${idx.lastSaleAt.slice(0, 10)}` : ''}.
-                  Nguồn: <b>Renaiss OS Index</b>, tính đến {asOf.slice(0, 10)}.
-                  {idx.observationCount != null && idx.observationCount < 10 ? ' Dữ liệu mỏng — tham chiếu thử nghiệm.' : ''}
+                  {idx.observationCount ?? '—'} observations{idx.sourceCount ? ` · ${idx.sourceCount} sources` : ''}
+                  {idx.lastSaleAt ? ` · last sale ${idx.lastSaleAt.slice(0, 10)}` : ''}.
+                  Source: <b>Renaiss OS Index</b>, as of {asOf.slice(0, 10)}.
+                  {idx.observationCount != null && idx.observationCount < 10 ? ' Thin data — treat as experimental reference.' : ''}
                 </div>
               </div>
             ) : (
-              <p className="caveat">Chưa khớp được lá này với Renaiss OS Index (hoặc không có dữ liệu giá).</p>
+              <p className="caveat">This card could not be matched to Renaiss OS Index, or no reference price is available.</p>
             )}
           </section>
 
           {/* Custody */}
           <section>
-            <SectionLabel>LƯU KÝ</SectionLabel>
+            <SectionLabel>CUSTODY</SectionLabel>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span className="chip">🏛 {collectible?.vaultLocation ?? card.vaultLocation ?? 'không rõ'}</span>
-              <span className="chip">🌍 {collectible?.vaultRegionCountryCode ?? 'không rõ quốc gia'}</span>
+              <span className="chip">🏛 {collectible?.vaultLocation ?? card.vaultLocation ?? 'unknown vault'}</span>
+              <span className="chip">🌍 {collectible?.vaultRegionCountryCode ?? 'unknown country'}</span>
             </div>
           </section>
 
@@ -214,14 +214,14 @@ export function PassportDrawer() {
                 ))}
               </div>
             ) : (
-              <p className="caveat">Không có dữ liệu hoạt động on-chain.</p>
+              <p className="caveat">No on-chain activity data is available.</p>
             )}
           </section>
 
           {/* AI narration */}
           <section>
             <SectionLabel>
-              PASSPORT AI {narr && <span className="chip" style={{ marginLeft: 8, fontSize: 9 }}>{narr.mode === 'ai' ? '🤖 LLM' : '📄 tóm tắt dữ liệu'}</span>}
+              PASSPORT AI {narr && <span className="chip" style={{ marginLeft: 8, fontSize: 9 }}>{narr.mode === 'ai' ? '🤖 LLM' : '📄 data summary'}</span>}
             </SectionLabel>
             <div className="panel" style={{ padding: 14, background: '#202734' }}>
               {narrLoading ? <Skeleton lines={4} /> : narr ? (
@@ -229,30 +229,30 @@ export function PassportDrawer() {
                   <Narr text={narr.text} />
                   {narr.note && <p className="caveat" style={{ marginTop: 6, fontStyle: 'italic' }}>{narr.note}</p>}
                 </>
-              ) : <p className="caveat">Không tạo được diễn giải.</p>}
+              ) : <p className="caveat">Narration could not be generated.</p>}
             </div>
           </section>
 
-          {/* Chỉ số game (hư cấu) */}
+          {/* Fictional game stats */}
           <section>
-            <SectionLabel>CHỈ SỐ GAME (HƯ CẤU)</SectionLabel>
+            <SectionLabel>FICTIONAL GAME STATS</SectionLabel>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
               <Stat k="ATK" v={card.atk} /><Stat k="DEF" v={card.def} /><Stat k="AURA" v={card.aura} />
               <Stat k="POWER" v={card.power} accent /><Stat k="TIER" v={card.tier} />
             </div>
-            <p className="caveat">{STAT_FORMULA_NOTES.power} Chỉ số HƯ CẤU cho gameplay — KHÔNG phản ánh định giá tài sản / lời khuyên đầu tư.</p>
+            <p className="caveat">{STAT_FORMULA_NOTES.power} Fictional gameplay stats only — not asset valuation or investment advice.</p>
           </section>
 
-          {/* Sở hữu THẬT — phễu hệ sinh thái */}
+          {/* Real ownership funnel */}
           <section>
             {!showReal ? (
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>✨ Làm sao sở hữu lá THẬT?</button>
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>How to own it for real</button>
             ) : (
               <div className="panel" style={{ padding: 14 }}>
-                <SectionLabel>GÓI THẬT CỦA RENAISS</SectionLabel>
+                <SectionLabel>REAL RENAISS PACKS</SectionLabel>
                 <p className="caveat" style={{ marginBottom: 10 }}>
-                  Đây là gói THẬT trên Renaiss (tốn USDT thật, cần ví) — TÁCH biệt hoàn toàn với gói mô phỏng trong game.
-                  Mỗi gói có cơ hội trúng thẻ giám định như thế này.
+                  These are real Renaiss packs that use real USDT and a wallet. They are completely separate from the simulated game packs.
+                  Each pack may contain graded cards like this one.
                 </p>
                 {packs.length === 0 ? <Skeleton /> : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -265,7 +265,7 @@ export function PassportDrawer() {
                       </div>
                     ))}
                     <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href="https://renaiss.xyz" target="_blank" rel="noreferrer">
-                      Mở marketplace Renaiss ↗
+                      Open Renaiss marketplace ↗
                     </a>
                   </div>
                 )}

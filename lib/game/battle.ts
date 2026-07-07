@@ -2,14 +2,7 @@ import type { GameCard, Element } from './stats';
 import { typeMultiplier, typeVerdict, ELEMENT_GLYPH } from './stats';
 
 // ============================================================================
-// BATTLE ENGINE — Top-Trumps theo lượt, DETERMINISTIC, CÓ SKILL.
-//  - Hai deck 5 thẻ, người chơi TỰ sắp thứ tự (một tầng quyết định).
-//  - Mỗi lượt cả hai lật thẻ đầu hàng; NGƯỜI TẤN CÔNG (luân phiên) chọn 1 thuộc
-//    tính (atk/def/aura) để so — quyết định chiến thuật, không auto.
-//  - TYPE-ADVANTAGE (RPSLS 5 element) nhân vào chỉ số → khắc chế lật kèo.
-//  - Thẻ thua bị KO (loại); thẻ thắng ở lại. Hết sạch 5 thẻ trước là THUA.
-//  - Hoà điểm → người tấn công thắng (aggressor edge). Không có RNG trong trận →
-//    kết quả tái lập hoàn toàn theo (decks + lựa chọn).
+// BATTLE ENGINE: deterministic turn-based Top Trumps with player agency.
 // ============================================================================
 
 export type Side = 'player' | 'opponent';
@@ -60,12 +53,12 @@ export function initBattle(playerDeck: GameCard[], opponentDeck: GameCard[], see
 
 function elNote(a: Element, d: Element): string {
   const v = typeVerdict(a, d);
-  if (v === 'neutral') return `${ELEMENT_GLYPH[a]} ${a} vs ${ELEMENT_GLYPH[d]} ${d}: trung tính`;
-  const sym = v === 'advantage' ? '≻ khắc' : '≺ bị khắc';
+  if (v === 'neutral') return `${ELEMENT_GLYPH[a]} ${a} vs ${ELEMENT_GLYPH[d]} ${d}: neutral`;
+  const sym = v === 'advantage' ? '≻ counters' : '≺ is countered by';
   return `${ELEMENT_GLYPH[a]} ${a} ${sym} ${ELEMENT_GLYPH[d]} ${d}`;
 }
 
-// Tính hiệu quả của một lượt cho một stat cụ thể (không thay đổi state).
+// Preview a stat choice without mutating battle state.
 export function previewRound(state: BattleState, stat: StatKey) {
   const p = state.playerQueue[0];
   const o = state.opponentQueue[0];
@@ -76,8 +69,7 @@ export function previewRound(state: BattleState, stat: StatKey) {
   return { p, o, pMult, oMult, pEff, oEff };
 }
 
-// AI tham lam: chọn stat tối đa hoá (oppEff - playerEff) ở cặp thẻ đầu hàng.
-// Cũng dùng làm GỢI Ý cho người chơi.
+// Greedy AI: choose the stat with the best effective margin.
 export function chooseStatGreedy(state: BattleState, side: Side): StatKey {
   let best: StatKey = 'atk';
   let bestMargin = -Infinity;
@@ -92,15 +84,14 @@ export function chooseStatGreedy(state: BattleState, side: Side): StatKey {
   return best;
 }
 
-// Thực thi một lượt. `stat` là lựa chọn của NGƯỜI TẤN CÔNG hiện tại
-// (nếu attacker là opponent, gọi chooseStatGreedy trước rồi truyền vào).
+// Resolve one round using the current attacker's chosen stat.
 export function stepRound(state: BattleState, stat: StatKey): { state: BattleState; round: RoundResult } {
   if (state.status !== 'ongoing') return { state, round: state.rounds[state.rounds.length - 1] };
   const { p, o, pMult, oMult, pEff, oEff } = previewRound(state, stat);
   const attacker = state.attacker;
 
   let winner: Side;
-  if (pEff === oEff) winner = attacker; // hoà → người tấn công thắng
+  if (pEff === oEff) winner = attacker;
   else winner = pEff > oEff ? 'player' : 'opponent';
   const loser: Side = winner === 'player' ? 'opponent' : 'player';
 
@@ -110,16 +101,16 @@ export function stepRound(state: BattleState, stat: StatKey): { state: BattleSta
   if (loser === 'player') playerQueue.shift();
   else opponentQueue.shift();
 
-  const attackerLabel = attacker === 'player' ? 'Bạn' : 'Đối thủ';
+  const attackerLabel = attacker === 'player' ? 'You' : 'Opponent';
   const winCard = winner === 'player' ? p : o;
   const winEff = winner === 'player' ? pEff : oEff;
   const loseCard = loser === 'player' ? p : o;
   const loseEff = loser === 'player' ? pEff : oEff;
   const typeNote = elNote(p.element, o.element);
   const reason =
-    `${attackerLabel} tấn công bằng ${STAT_LABEL[stat]}. ` +
+    `${attackerLabel} attacked with ${STAT_LABEL[stat]}. ` +
     `${winCard.name.split(' ').slice(0, 3).join(' ')} (${winEff}) ` +
-    `${pEff === oEff ? 'hoà và thắng nhờ thế tấn công' : 'vượt'} ` +
+    `${pEff === oEff ? 'tied and won by attacker edge against' : 'beat'} ` +
     `${loseCard.name.split(' ').slice(0, 3).join(' ')} (${loseEff}) → KO.`;
 
   const round: RoundResult = {

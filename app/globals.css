@@ -1,21 +1,19 @@
 /* ============================================================================
    Renaiss Arena — Premium Vault design system.
-   Nguồn thẩm mỹ: docs/art-direction.md (file đó THẮNG về phong cách/palette).
-   Dark-first, kính mờ, glow theo tier, "tủ trưng bày báu vật số".
+   Visual source: docs/art-direction.md.
+   Dark-first, glass, tier glow, premium digital vault.
    ============================================================================ */
 
 :root {
-  /* Nền & bề mặt */
+  /* Surfaces */
   --bg: #0b0e14;
   --surface: #151a23;
   --raised: #1c222d;
   --hairline: rgba(255, 255, 255, 0.08);
   --hairline-strong: rgba(255, 255, 255, 0.16);
-  /* Text */
   --text: #edf0f5;
   --text-sub: #a0a8b4;
   --text-dim: #6b7280;
-  /* Accent vault */
   --accent: #e5c07b;
   --accent-soft: rgba(229, 192, 123, 0.16);
   /* Tier colors */
@@ -62,7 +60,7 @@ a { color: inherit; }
 .tabnums { font-variant-numeric: tabular-nums; }
 .mono { font-family: var(--font-mono); }
 
-/* ---- Tier tokens: gắn --tier / --glow theo [data-tier] ---- */
+/* ---- Tier tokens ---- */
 [data-tier='TOP'] { --tier: var(--tier-top); --glow: 0.85; }
 [data-tier='S']   { --tier: var(--tier-s);   --glow: 0.6; }
 [data-tier='A']   { --tier: var(--tier-a);   --glow: 0.45; }
@@ -70,7 +68,7 @@ a { color: inherit; }
 [data-tier='C']   { --tier: var(--tier-c);   --glow: 0.18; }
 [data-tier='D']   { --tier: var(--tier-d);   --glow: 0.1; }
 
-/* ============================ SLAB (quan trọng nhất) ====================== */
+/* ============================ SLAB ======================================== */
 .slab {
   position: relative;
   display: flex;
@@ -98,7 +96,6 @@ a { color: inherit; }
 .slab.selected { border-color: var(--tier); box-shadow: 0 0 0 2px var(--tier), 0 18px 36px -18px rgba(0,0,0,0.9); }
 .slab.defeated { filter: grayscale(0.72) brightness(0.6); opacity: 0.55; }
 
-/* thanh tier phát sáng ở đỉnh slab */
 .slab-tierbar {
   height: 4px;
   background: linear-gradient(90deg, transparent, var(--tier), transparent);
@@ -108,7 +105,10 @@ a { color: inherit; }
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 8px; padding: 8px 10px 6px;
 }
-.slab-name { font-size: 12px; line-height: 1.25; letter-spacing: 0.02em; color: var(--text); font-weight: 600; }
+.slab-name {
+  font-size: 12px; line-height: 1.25; letter-spacing: 0.02em; color: var(--text); font-weight: 600;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .slab-cert { font-size: 9.5px; color: var(--text-dim); margin-top: 3px; }
 .slab-grade {
   flex: none; min-width: 34px; text-align: center; padding: 3px 6px; border-radius: 8px;
@@ -117,7 +117,6 @@ a { color: inherit; }
 }
 .slab-grade small { display: block; font-size: 7px; font-weight: 600; color: var(--text-sub); letter-spacing: 0.06em; }
 
-/* khung ảnh thẻ */
 .slab-art {
   position: relative; margin: 0 8px; border-radius: var(--radius-sm); overflow: hidden;
   aspect-ratio: 2.5 / 3.5; background: #0d1016;
@@ -137,8 +136,25 @@ a { color: inherit; }
   position: absolute; top: 6px; left: 6px; font-size: 15px;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
 }
+.slab-info {
+  position: absolute; top: 9px; right: 9px; z-index: 2;
+  width: 22px; height: 22px; display: grid; place-items: center;
+  border-radius: 999px; background: rgba(11,14,20,0.72);
+  border: 1px solid rgba(from var(--tier) r g b / 0.55);
+  color: var(--tier); font-size: 13px; font-weight: 800;
+}
+.slab-passport-overlay {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 800;
+  letter-spacing: 0.04em; color: #0d1016; background: linear-gradient(180deg, rgba(229,192,123,0.88), var(--accent));
+  transform: translateY(105%); transition: transform 0.2s ease;
+}
+.slab.interactive:hover .slab-passport-overlay,
+.slab.interactive:focus .slab-passport-overlay,
+.slab.interactive:focus-within .slab-passport-overlay {
+  transform: translateY(0);
+}
 
-/* dải chỉ số HUD */
 .slab-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; padding: 8px; margin-top: auto; }
 .slab-stat { text-align: center; }
 .slab-stat .k { font-size: 8px; letter-spacing: 0.1em; color: var(--text-dim); }
@@ -178,7 +194,7 @@ a { color: inherit; }
 .panel { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius); }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
 
-/* Caveat text — bắt buộc hiển thị (chỉ số hư cấu, data beta). */
+/* Caveat text: required for fictional stats and beta data. */
 .caveat { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
 
 /* ============================ Animations ================================= */

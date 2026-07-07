@@ -1,48 +1,43 @@
 import { z } from 'zod';
 
-// System prompt lớp AI Card Passport — NẠP NGUYÊN KHỐI từ prompts/passport-narration.md.
-// (Giữ đồng bộ với file đó; mọi ràng buộc là bắt buộc.)
-export const PASSPORT_SYSTEM_PROMPT = `Bạn là "Card Passport", trợ lý minh bạch cho người sưu tầm trên nền tảng Renaiss
-(đồ sưu tầm RWA — thẻ giám định — trên BNB Chain). Nhiệm vụ: đọc dữ liệu thật của
-MỘT lá thẻ và giải thích cho một collector bình thường hiểu: lá này là gì, lịch
-sử on-chain ra sao, được lưu ký thế nào, và giá tham chiếu đáng tin tới đâu.
+// System prompt for Card Passport AI narration. Keep in sync with prompts/passport-narration.md.
+export const PASSPORT_SYSTEM_PROMPT = `You are "Card Passport", a transparent collector assistant for Renaiss
+(RWA collectibles: graded cards on BNB Chain). Your task is to read the real data
+for ONE card and explain, in plain collector language, what the card is, what its
+on-chain history shows, how it is custodied, and how reliable the reference price is.
 
-NGUYÊN TẮC BẤT BIẾN (không bao giờ vi phạm):
-1. CHỈ dùng dữ liệu được cung cấp trong message. TUYỆT ĐỐI không bịa số, không
-   suy ra dữ liệu không có. Nếu một trường là null/thiếu, nói thẳng "không có dữ
-   liệu cho mục này".
-2. MỖI phát biểu có số liệu phải kèm NGUỒN và THỜI ĐIỂM. Giá reference luôn ghi
-   "theo Renaiss OS Index, tính đến <asOf>". Dữ liệu on-chain ghi kèm txHash/thời
-   gian khi phù hợp.
-3. TÔN TRỌNG độ tin cậy. Nếu confidence là "low" hoặc observationCount rất nhỏ,
-   KHÔNG trình bày con số như sự thật chắc chắn — nói rõ nó mỏng/thử nghiệm và
-   khuyên thận trọng. Nếu các method (median/mean/vwap) lệch nhau nhiều, nêu ra
-   như dấu hiệu giá biến động/thanh khoản mỏng.
-4. KHÔNG BAO GIỜ khẳng định "hàng giả", "gian lận", "wash-trade" như kết luận.
-   Chỉ được nêu "tín hiệu đáng lưu ý cần kiểm tra thêm" kèm bằng chứng cụ thể
-   (VD txHash, mốc thời gian) và mức độ chắc chắn. Người đọc tự đánh giá.
-5. KHÔNG đưa lời khuyên đầu tư/tài chính, không dự đoán giá tương lai, không hối
-   thúc mua/bán. Được mô tả dữ kiện quá khứ đã có.
-6. Đây là dữ liệu BETA, có thể thiếu/trễ/đang cập nhật. Kết thúc bằng một câu
-   nhắc ngắn rằng đây là tham chiếu thử nghiệm, không phải sự thật thị trường đã
-   xác minh.
+INVARIANT RULES:
+1. Use ONLY the data supplied in the message. Never invent numbers or infer missing
+   data. If a field is null or missing, say that no data is available for that point.
+2. Every numeric claim must include source and time. Reference prices must say
+   "according to Renaiss OS Index, as of <asOf>". On-chain data should include
+   txHash/time when relevant.
+3. Respect confidence. If confidence is "low" or observationCount is small, do not
+   present the number as certain. Say that the data is thin/experimental and should
+   be treated cautiously. If methods diverge, explain that as possible volatility or
+   thin liquidity.
+4. Never conclude that a card is fake, fraudulent, or wash-traded. You may mention
+   "signals worth checking" only when tied to concrete evidence such as txHash and
+   timestamp, with uncertainty.
+5. Do not give financial or investment advice, future price predictions, or buy/sell
+   pressure. You may describe historical facts in the provided data.
+6. This is beta data and may be incomplete, delayed, or updating. End with a short
+   caveat that this is experimental reference data, not verified market truth.
 
-GIỌNG VĂN: rõ ràng, thân thiện, đúng trọng tâm, như một người bạn sành sỏi giải
-thích cho người mới. Không sáo rỗng, không cường điệu, không marketing.
+VOICE: clear, friendly, concise, and grounded. Avoid hype and marketing language.
 
-ĐỊNH DẠNG ĐẦU RA (ngắn gọn, prose là chính):
-- Tóm tắt 1–2 câu: lá thẻ này là gì.
-- Provenance: kể vắn tắt hành trình on-chain (sinh ra → qua tay → giao dịch gần
-  nhất), kèm mốc/txHash. Nếu có tín hiệu đáng lưu ý, nêu như "điểm cần kiểm tra".
-- Lưu ký: giữ ở đâu (provider/quốc gia/loại vault) và điều đó nghĩa là gì với
-  người mua.
-- Giá tham chiếu: khoảng giá + độ tin cậy + nguồn + thời điểm; nêu nếu dữ liệu
-  mỏng hoặc các phương pháp lệch nhau.
-- Một câu caveat cuối (beta, tham chiếu thử nghiệm, không phải lời khuyên).
-Nếu dữ liệu quá thiếu để nói điều gì có ý nghĩa, nói thẳng như vậy thay vì lấp
-đầy bằng suy đoán.`;
+OUTPUT FORMAT:
+- Summary: 1-2 sentences explaining what the card is.
+- Provenance: brief on-chain journey with timestamps/txHashes when present. If there
+  are signals worth checking, frame them as signals, not conclusions.
+- Custody: where/how it is held and what that means for a collector.
+- Reference price: price range/value, confidence, source, and time; mention thin data
+  or divergent methods when applicable.
+- Final caveat: beta reference, not verified market truth, not financial advice.
+If the data is too sparse to say something meaningful, say that directly instead of
+filling space with speculation.`;
 
-// Input contract (khớp prompts/passport-narration.md) — Zod validate ở route.
+// Input contract matching prompts/passport-narration.md; route validates with Zod.
 export const PassportInputSchema = z.object({
   card: z.object({
     name: z.string(),
@@ -80,8 +75,7 @@ export const PassportInputSchema = z.object({
 });
 export type PassportInput = z.infer<typeof PassportInputSchema>;
 
-// Fallback deterministic (khi chưa cấu hình LLM key) — vẫn tôn trọng mọi ràng buộc:
-// chỉ dùng dữ liệu có, kèm nguồn + thời điểm, không khẳng định gian lận, có caveat.
+// Deterministic fallback used when no LLM key is configured.
 export function fallbackNarration(input: PassportInput): string {
   const { card, custody, onchain, reference, asOf } = input;
   const asOfShort = asOf.slice(0, 10);
@@ -89,44 +83,44 @@ export function fallbackNarration(input: PassportInput): string {
 
   const gradeStr = [card.gradingCompany, card.grade].filter(Boolean).join(' ');
   lines.push(
-    `**${card.name}**${card.setName ? ` — thuộc set ${card.setName}` : ''}${gradeStr ? `, giám định ${gradeStr}` : ''}${card.year ? `, phát hành ${card.year}` : ''}.`,
+    `**${card.name}**${card.setName ? ` from ${card.setName}` : ''}${gradeStr ? `, graded ${gradeStr}` : ''}${card.year ? `, released in ${card.year}` : ''}.`,
   );
 
   // Provenance
   const acts = onchain.activities ?? [];
   if (acts.length > 0) {
     const last = acts[0];
-    const when = last.timestamp ? new Date(Number(last.timestamp) * 1000).toISOString().slice(0, 10) : 'không rõ thời điểm';
+    const when = last.timestamp ? new Date(Number(last.timestamp) * 1000).toISOString().slice(0, 10) : 'unknown date';
     lines.push(
-      `**Provenance:** ghi nhận ${acts.length} hoạt động on-chain; gần nhất là "${last.type}" (${when}${last.txHash ? `, tx ${last.txHash.slice(0, 10)}…` : ''}). Đây là dữ kiện quá khứ, không suy diễn thêm.`,
+      `**Provenance:** ${acts.length} on-chain activities are recorded; the latest is "${last.type}" (${when}${last.txHash ? `, tx ${last.txHash.slice(0, 10)}...` : ''}). This is historical data only, with no extra inference.`,
     );
   } else {
-    lines.push('**Provenance:** không có dữ liệu hoạt động on-chain cho mục này.');
+    lines.push('**Provenance:** no on-chain activity data is available for this card.');
   }
 
   // Custody
   if (custody.vaultLocation || custody.countryCode) {
     lines.push(
-      `**Lưu ký:** ${custody.vaultLocation ? `loại vault "${custody.vaultLocation}"` : 'loại vault không rõ'}${custody.countryCode ? `, đặt tại ${custody.countryCode}` : ''}. Thẻ vật lý được giữ hộ; quyền on-chain đại diện cho vật phẩm trong kho.`,
+      `**Custody:** ${custody.vaultLocation ? `vault type "${custody.vaultLocation}"` : 'vault type is unknown'}${custody.countryCode ? `, located in ${custody.countryCode}` : ''}. The physical card is held in custody; the on-chain record represents the vaulted item.`,
     );
   } else {
-    lines.push('**Lưu ký:** không có dữ liệu custody cho mục này.');
+    lines.push('**Custody:** no custody data is available for this card.');
   }
 
   // Reference price
   if (reference && reference.priceUsd != null) {
-    const conf = reference.confidence ?? 'không rõ';
+    const conf = reference.confidence ?? 'unknown';
     const thin = reference.observationCount != null && reference.observationCount < 10;
     lines.push(
-      `**Giá tham chiếu:** ~$${reference.priceUsd.toLocaleString('en-US')} theo ${reference.source}, độ tin cậy ${conf}${reference.observationCount != null ? `, dựa trên ${reference.observationCount} quan sát` : ''} (tính đến ${asOfShort}).` +
-        (thin ? ' Số quan sát khá mỏng → xem như thử nghiệm, nên thận trọng.' : ''),
+      `**Reference price:** ~$${reference.priceUsd.toLocaleString('en-US')} according to ${reference.source}, confidence ${conf}${reference.observationCount != null ? `, based on ${reference.observationCount} observations` : ''} (as of ${asOfShort}).` +
+        (thin ? ' The observation count is thin, so treat this as experimental reference data.' : ''),
     );
   } else {
-    lines.push('**Giá tham chiếu:** không có dữ liệu giá từ Renaiss OS Index cho lá này (hoặc chưa khớp được).');
+    lines.push('**Reference price:** no Renaiss OS Index price data is available for this card, or it could not be matched.');
   }
 
   lines.push(
-    '_Đây là dữ liệu beta — tham chiếu thử nghiệm, không phải sự thật thị trường đã xác minh, và không phải lời khuyên đầu tư._',
+    '_This is beta data: experimental reference, not verified market truth, and not financial advice._',
   );
   return lines.join('\n\n');
 }

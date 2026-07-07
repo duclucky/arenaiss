@@ -21,7 +21,7 @@ export function Intro() {
   function openFirst() {
     if (!canOpen) return;
     const reveal = openPack(state.pool, makePackSeed(state.packCount));
-    dispatch({ type: 'OPEN_PACK', reveal });
+    dispatch({ type: 'OPEN_PACK', reveal, openedAt: new Date().toISOString() });
   }
 
   return (
@@ -29,25 +29,26 @@ export function Intro() {
       <div style={{ textAlign: 'center', marginBottom: 30 }}>
         <div className="anim-float" style={{ fontSize: 60, marginBottom: 8 }}>🗝️</div>
         <h1 style={{ fontSize: 34, margin: '0 0 8px', letterSpacing: '-0.01em' }}>
-          Vào phòng chờ <span style={{ color: 'var(--accent)' }}>Vault</span>
+          Enter the <span style={{ color: 'var(--accent)' }}>Vault</span>
         </h1>
         <p style={{ color: 'var(--text-sub)', maxWidth: 620, margin: '0 auto', lineHeight: 1.6 }}>
-          Mở gói theo odds tham chiếu → nhận <b>mẫu thẻ giám định thật</b> vào bộ sưu tập → lắp deck →
-          đấu Top-Trumps <b>có skill</b>. Thắng để nhận credit ẢO mở tiếp. Mỗi lá dẫn tới Card Passport thật.
+          Open packs using reference odds → collect fictional cards based on real graded-card data → build a deck →
+          battle in a skill-based Top-Trumps game. Win virtual credits to open more. Every card links to its real Card Passport.
         </p>
       </div>
 
-      {/* Nhãn an toàn */}
+      {/* Safety labels */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 26 }}>
-        <span className="chip chip-sim">💠 Mở gói MÔ PHỎNG — không tốn tiền thật</span>
-        <span className="chip chip-warn">⚠ Chỉ số game HƯ CẤU — không phải định giá / lời khuyên đầu tư</span>
-        <span className="chip">🔒 Read-only · không ký ví · không on-chain</span>
+        <span className="chip chip-sim">Simulated pack opening — no real money</span>
+        <span className="chip chip-warn">Fictional game stats — not valuation or investment advice</span>
+        <span className="chip">Read-only · no wallet signing · no on-chain action</span>
+        <span className="chip">Data is saved only on this device</span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
-        {/* Chọn dòng thẻ */}
+        {/* Category picker */}
         <div className="panel" style={{ padding: 20 }}>
-          <h3 style={{ margin: '0 0 14px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>DÒNG THẺ</h3>
+          <h3 style={{ margin: '0 0 14px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>CARD LINE</h3>
           <div style={{ display: 'flex', gap: 10 }}>
             {CATEGORIES.map((c) => (
               <button
@@ -66,7 +67,7 @@ export function Intro() {
             ))}
           </div>
           <p className="caveat" style={{ marginTop: 14 }}>
-            Pool minh hoạ lấy từ <b>marketplace Renaiss thật</b> ({state.poolLoading ? 'đang tải…' : `${state.pool.length} thẻ`}).
+            Demo pool is built from the <b>real Renaiss marketplace</b> ({state.poolLoading ? 'loading...' : `${state.pool.length} cards`}).
           </p>
           <button
             className="btn btn-primary"
@@ -74,17 +75,17 @@ export function Intro() {
             disabled={!canOpen}
             onClick={openFirst}
           >
-            {state.poolLoading ? 'Đang mở tủ…' : state.credits < PACK_COST ? 'Không đủ credit' : `Mở gói đầu tiên · ${PACK_COST} credit`}
+            {state.poolLoading ? 'Opening the vault...' : state.credits < PACK_COST ? 'Not enough credits' : `Open first pack · ${PACK_COST} credits`}
           </button>
-          {state.poolError && <p className="caveat" style={{ color: 'var(--loss)', marginTop: 8 }}>Lỗi tải pool: {state.poolError}</p>}
+          {state.poolError && <p className="caveat" style={{ color: 'var(--loss)', marginTop: 8 }}>Pool load failed: {state.poolError}</p>}
         </div>
 
-        {/* Bảng odds minh bạch */}
+        {/* Transparent odds table */}
         <div className="panel" style={{ padding: 20 }}>
-          <h3 style={{ margin: '0 0 6px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>ODDS THEO TIER</h3>
+          <h3 style={{ margin: '0 0 6px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>TIER ODDS</h3>
           <p className="caveat" style={{ marginBottom: 12 }}>
-            Odds <b>ước lượng từ thành phần pool marketplace thật</b>. Gacha odds on-chain chưa công khai ở API alpha —
-            xem README. Đây là tham chiếu thử nghiệm, không phải sự thật thị trường.
+            Odds are <b>estimated from the real marketplace pool composition</b>. On-chain gacha odds are not exposed by the alpha API;
+            see README. This is an experimental reference, not verified market truth.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {rows.map((r) => (
@@ -94,7 +95,7 @@ export function Intro() {
                   <div style={{ width: `${Math.max(2, r.chance * 100)}%`, height: '100%', background: 'var(--tier)', boxShadow: '0 0 8px var(--tier)' }} />
                 </div>
                 <span className="tabnums" style={{ width: 46, textAlign: 'right', fontSize: 12, color: 'var(--text-sub)' }}>{(r.chance * 100).toFixed(0)}%</span>
-                <span className="tabnums" style={{ width: 60, textAlign: 'right', fontSize: 10, color: 'var(--text-dim)' }}>{r.poolCount} thẻ</span>
+                <span className="tabnums" style={{ width: 60, textAlign: 'right', fontSize: 10, color: 'var(--text-dim)' }}>{r.poolCount} cards</span>
               </div>
             ))}
           </div>

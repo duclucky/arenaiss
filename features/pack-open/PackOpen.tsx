@@ -9,12 +9,12 @@ import type { Tier } from '@/lib/game/stats';
 
 const RANK: Record<Tier, number> = { TOP: 0, S: 1, A: 2, B: 3, C: 4, D: 5 };
 const TIER_SHOUT: Record<Tier, string> = {
-  TOP: 'HUYỀN THOẠI! Một lá Top rơi vào tủ của bạn.',
-  S: 'CỰC HIẾM! Một lá tier S xuất hiện.',
-  A: 'Hiếm! Một lá tier A đáng giá.',
-  B: 'Chắc tay — một lá tier B.',
-  C: 'Một lá tier C cho bộ sưu tập.',
-  D: 'Một lá phổ thông để khởi động.',
+  TOP: 'LEGENDARY! A Top-tier card entered your vault.',
+  S: 'ULTRA RARE! A tier S card appeared.',
+  A: 'Rare hit! A tier A card joined the run.',
+  B: 'Solid pull — a tier B card.',
+  C: 'A tier C card for the collection.',
+  D: 'A common card to get started.',
 };
 
 export function PackOpen() {
@@ -22,7 +22,7 @@ export function PackOpen() {
   const dispatch = useArenaDispatch();
   const pack = state.lastPack;
 
-  // Thứ tự reveal: hiếm nhất LẬT SAU CÙNG (cao trào).
+  // Reveal common cards first and keep the rarest hit for the final beat.
   const order = useMemo(() => {
     if (!pack) return [];
     return [...pack.cards].sort((a, b) => RANK[b.tier] - RANK[a.tier]);
@@ -33,9 +33,7 @@ export function PackOpen() {
   const [flash, setFlash] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // (Hydrate ảnh do ArenaApp lo tập trung — không bị huỷ khi điều hướng.)
-
-  // Chuỗi reveal có "khựng nhịp" trước lá cuối (anticipation).
+  // Add anticipation before the final reveal.
   useEffect(() => {
     if (!pack) return;
     timers.current.forEach(clearTimeout);
@@ -44,13 +42,13 @@ export function PackOpen() {
     setRevealed(0);
     setFlash(false);
 
-    const t0 = setTimeout(() => setPhase('revealing'), 750); // gói rung rồi "nứt"
+    const t0 = setTimeout(() => setPhase('revealing'), 750);
     timers.current.push(t0);
 
     let acc = 900;
     order.forEach((card, i) => {
       const isLast = i === order.length - 1;
-      const gap = isLast ? 720 : 330; // dừng lâu hơn trước lá cao trào
+      const gap = isLast ? 720 : 330;
       acc += gap;
       const t = setTimeout(() => {
         setRevealed(i + 1);
@@ -72,7 +70,7 @@ export function PackOpen() {
   function openAnother() {
     if (!canOpenAnother) return;
     const reveal = openPack(state.pool, makePackSeed(state.packCount));
-    dispatch({ type: 'OPEN_PACK', reveal });
+    dispatch({ type: 'OPEN_PACK', reveal, openedAt: new Date().toISOString() });
   }
 
   return (
@@ -100,14 +98,15 @@ export function PackOpen() {
           >
             🎴
           </div>
-          <p style={{ color: 'var(--text-sub)', marginTop: 22, letterSpacing: '0.1em' }}>Gói đang nứt ra…</p>
+          <p style={{ color: 'var(--text-sub)', marginTop: 22, letterSpacing: '0.1em' }}>The pack is cracking open...</p>
         </div>
       ) : (
         <>
           <div style={{ textAlign: 'center', marginBottom: 22 }}>
             <div data-tier={topTier} style={{ display: 'inline-block' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>KẾT QUẢ MỞ GÓI (MÔ PHỎNG)</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>SIMULATED PACK RESULT</div>
               <h2 style={{ margin: '6px 0 0', color: 'var(--tier)', fontSize: 22 }}>{TIER_SHOUT[topTier]}</h2>
+              <p className="caveat" style={{ marginTop: 8 }}>Tap any card to view its real Card Passport.</p>
             </div>
           </div>
 
@@ -126,15 +125,23 @@ export function PackOpen() {
 
           {phase === 'done' && (
             <div className="anim-fade" style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 30, flexWrap: 'wrap' }}>
-              <button className="btn" onClick={() => dispatch({ type: 'GOTO', screen: 'roster' })}>Vào bộ sưu tập →</button>
-              <button className="btn btn-primary" onClick={() => dispatch({ type: 'GOTO', screen: 'deck' })}>Lắp deck & đấu</button>
+              <button className="btn" onClick={() => dispatch({ type: 'GOTO', screen: 'roster' })}>Add to collection →</button>
+              <button className="btn btn-primary" onClick={() => dispatch({ type: 'GOTO', screen: 'deck' })}>Build deck & battle</button>
               <button className="btn btn-ghost" disabled={!canOpenAnother} onClick={openAnother}>
-                {canOpenAnother ? `Mở gói nữa · ${PACK_COST}` : 'Hết credit'}
+                {canOpenAnother ? `Open another · ${PACK_COST}` : 'Out of credits'}
               </button>
             </div>
           )}
-          <p className="caveat" style={{ textAlign: 'center', marginTop: 18 }}>
-            Click bất kỳ lá nào để mở Card Passport thật. Chỉ số hiển thị là HƯ CẤU cho gameplay.
+          {!state.passportHintSeen && phase === 'done' && (
+            <p className="caveat anim-fade" style={{ textAlign: 'center', marginTop: 18 }}>
+              Tap any card to view its real Card Passport.
+              <button className="btn btn-ghost" style={{ marginLeft: 8, padding: '3px 8px', fontSize: 10 }} onClick={() => dispatch({ type: 'DISMISS_PASSPORT_HINT' })}>
+                Got it
+              </button>
+            </p>
+          )}
+          <p className="caveat" style={{ textAlign: 'center', marginTop: 10 }}>
+            These are fictional gameplay stats based on real graded-card data, not valuation or investment advice.
           </p>
         </>
       )}

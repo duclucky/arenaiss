@@ -9,7 +9,7 @@ export const revalidate = 300;
 
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get('q');
-  if (!q) return NextResponse.json({ error: 'thiếu tham số q', results: [] }, { status: 400 });
+  if (!q) return NextResponse.json({ error: 'missing q parameter', results: [] }, { status: 400 });
 
   const res = await indexFetch(`/v1/search?q=${encodeURIComponent(q)}`);
   if (!res.ok) {

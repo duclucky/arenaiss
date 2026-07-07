@@ -2,26 +2,23 @@ import { NextResponse } from 'next/server';
 import { PASSPORT_SYSTEM_PROMPT, PassportInputSchema, fallbackNarration } from '@/lib/passport/prompt';
 import { safeParse } from '@/lib/renaiss/schemas';
 
-// Lớp AI Card Passport — gọi SERVER-SIDE (giữ key LLM ở server). Nhận dữ liệu ĐÃ
-// validate (từ proxy của ta), validate lại bằng Zod, rồi để LLM DIỄN GIẢI (không
-// cho LLM tự gọi API/bịa số). Nếu chưa cấu hình ANTHROPIC_API_KEY → fallback
-// deterministic (vẫn tôn trọng mọi ràng buộc: nguồn + thời điểm + caveat).
+// Card Passport AI layer: server-side only, with validated data and deterministic fallback.
 
 export const runtime = 'nodejs';
 
-const MODEL = 'claude-haiku-4-5-20251001'; // nhanh, đủ cho narration ngắn
+const MODEL = 'claude-haiku-4-5-20251001';
 
 export async function POST(req: Request) {
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'body không phải JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'body is not valid JSON' }, { status: 400 });
   }
 
   const parsed = safeParse(PassportInputSchema, body);
   if (!parsed.ok) {
-    return NextResponse.json({ error: `input không hợp lệ: ${parsed.error}` }, { status: 400 });
+    return NextResponse.json({ error: `invalid input: ${parsed.error}` }, { status: 400 });
   }
   const input = parsed.data;
 
@@ -30,7 +27,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       text: fallbackNarration(input),
       mode: 'fallback',
-      note: 'Chưa cấu hình ANTHROPIC_API_KEY — đang dùng bản tóm tắt deterministic từ chính dữ liệu đã validate.',
+      note: 'ANTHROPIC_API_KEY is not configured, so this is a deterministic summary from the same validated data.',
     });
   }
 
@@ -49,7 +46,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: 'user',
-            content: `Đây là dữ liệu THẬT (đã validate) của một lá thẻ. Diễn giải theo đúng định dạng đầu ra:\n\n\`\`\`json\n${JSON.stringify(input, null, 2)}\n\`\`\``,
+            content: `This is validated real reference data for one card. Explain it using the required output format:\n\n\`\`\`json\n${JSON.stringify(input, null, 2)}\n\`\`\``,
           },
         ],
       }),
@@ -58,20 +55,20 @@ export async function POST(req: Request) {
       return NextResponse.json({
         text: fallbackNarration(input),
         mode: 'fallback',
-        note: `LLM lỗi ${res.status} — dùng bản tóm tắt deterministic.`,
+        note: `LLM returned ${res.status}; using deterministic summary.`,
       });
     }
     const data = (await res.json()) as { content?: { type: string; text?: string }[] };
     const text = (data.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim();
     if (!text) {
-      return NextResponse.json({ text: fallbackNarration(input), mode: 'fallback', note: 'LLM trả rỗng — dùng fallback.' });
+      return NextResponse.json({ text: fallbackNarration(input), mode: 'fallback', note: 'LLM returned empty text; using fallback.' });
     }
     return NextResponse.json({ text, mode: 'ai' });
   } catch (e) {
     return NextResponse.json({
       text: fallbackNarration(input),
       mode: 'fallback',
-      note: `LLM ngoại lệ (${e instanceof Error ? e.message : 'unknown'}) — dùng fallback.`,
+      note: `LLM exception (${e instanceof Error ? e.message : 'unknown'}); using fallback.`,
     });
   }
 }

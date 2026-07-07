@@ -16,20 +16,20 @@ function Screens() {
   const state = useArena();
   const dispatch = useArenaDispatch();
 
-  // Tải pool khi vào hoặc đổi dòng thẻ.
+  // Load pool on entry and when the card line changes.
   useEffect(() => {
     let alive = true;
     dispatch({ type: 'POOL_LOADING' });
     loadPool(state.category).then((pool) => {
       if (!alive) return;
-      if (pool.length === 0) dispatch({ type: 'POOL_ERROR', error: 'không tải được pool marketplace' });
+      if (pool.length === 0) dispatch({ type: 'POOL_ERROR', error: 'marketplace pool could not be loaded' });
       else dispatch({ type: 'POOL_LOADED', pool });
     });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.category]);
 
-  // (Ảnh slab dựng thẳng từ serial trong buildCards — không cần hydrate qua API.)
+  // Slab images are derived from serials in buildCards; no extra detail hydration needed.
 
   return (
     <>

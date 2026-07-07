@@ -20,22 +20,22 @@ export function Roster() {
 
   function openAnother() {
     if (state.pool.length === 0 || state.credits < PACK_COST) return;
-    dispatch({ type: 'OPEN_PACK', reveal: openPack(state.pool, makePackSeed(state.packCount)) });
+    dispatch({ type: 'OPEN_PACK', reveal: openPack(state.pool, makePackSeed(state.packCount)), openedAt: new Date().toISOString() });
   }
 
   return (
     <div className="anim-fade" style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 22px 60px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 24 }}>Bộ sưu tập</h2>
-          <p className="caveat">{state.roster.length} mẫu thẻ · click để soi Passport thật · các chỉ số là HƯ CẤU cho gameplay.</p>
+          <h2 style={{ margin: 0, fontSize: 24 }}>Collection</h2>
+          <p className="caveat">{state.roster.length} fictional cards · tap a card to view its real Card Passport · stats are fictional gameplay attributes.</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
           <button className="btn" disabled={state.pool.length === 0 || state.credits < PACK_COST} onClick={openAnother}>
-            Mở gói · {PACK_COST}
+            Open pack · {PACK_COST}
           </button>
           <button className="btn btn-primary" disabled={state.roster.length === 0} onClick={() => dispatch({ type: 'GOTO', screen: 'deck' })}>
-            Lắp deck →
+            Build deck →
           </button>
         </div>
       </div>
@@ -44,8 +44,8 @@ export function Roster() {
       {sorted.length === 0 ? (
         <div className="panel" style={{ padding: 50, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
-          <p style={{ color: 'var(--text-sub)' }}>Chưa có thẻ nào. Mở gói đầu tiên để bắt đầu.</p>
-          <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Về Vault</button>
+          <p style={{ color: 'var(--text-sub)' }}>No cards yet. Open your first pack to start.</p>
+          <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Back to Vault</button>
         </div>
       ) : (
         <div className="card-grid">
