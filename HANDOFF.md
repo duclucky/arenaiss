@@ -13,15 +13,16 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 16:35 UTC
+- Thời điểm: 2026-07-07 16:55 UTC
 - Agent: codex
-- Commit gần nhất trước cập nhật này: `a81a3e2` — "done: simple credentials auth"
-- Commit phiên này: chuẩn bị commit "done: address browser UI comments"
+- Commit gần nhất trước cập nhật này: `f289d79` — "done: address browser UI comments"
+- Commit phiên này: chuẩn bị commit "done: clarify real pack passport data"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Đã xử lý 5 browser comments mới nhất: copy auth nhấn
-mạnh server sync, bỏ chip header "Read-only"/"Local save", bỏ icon info trên slab,
-thu gọn `POWER` thành `PWR`, và luôn hiện nút `View Passport` ở đáy thẻ.
+Không có file nào đang viết dở. Đã xử lý browser comments mới nhất trong Passport:
+giải thích nguồn dữ liệu real packs, format lại giá pack thật, link từng pack tới
+`https://www.renaiss.xyz/gacha/{slug}`, và không render dòng delta toàn dấu gạch khi
+Renaiss OS Index không trả 7d/30d/365d.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -125,6 +126,12 @@ thu gọn `POWER` thành `PWR`, và luôn hiện nút `View Passport` ở đáy 
   vài warning unused vars.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Xử lý browser comments Passport: `features/passport/PassportDrawer.tsx`
+  thêm note nguồn `Renaiss /v0/packs` qua proxy `/api/packs`, format `priceInUsdt`
+  từ base units 18 decimals, format EV/top prize từ cent-like strings, đổi từng pack
+  thành link riêng `https://www.renaiss.xyz/gacha/{slug}`, và thay dòng delta toàn
+  `—` bằng empty state "Recent trend unavailable". `scripts/e2e.mjs` thêm regression
+  assertions cho raw price/link pack/delta; `docs/api-reference.md` ghi lại units.
 - 2026-07-07 codex: Xử lý browser comments: `components/AuthPanel.tsx` đổi message
   logged-out sang "Log in to sync progress on the server."; `components/Hud.tsx`
   bỏ hai chip "Read-only"/"Local save"; `components/Slab.tsx` + `app/globals.css`

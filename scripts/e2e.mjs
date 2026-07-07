@@ -90,10 +90,21 @@ try {
     await anySlab.click();
     await page.waitForSelector('text=Card Passport', { timeout: 8000 });
     await page.waitForTimeout(2500);
+    const passportText = await page.locator('aside').innerText();
+    if (passportText.includes('7d: —') && passportText.includes('30d: —') && passportText.includes('365d: —')) {
+      throw new Error('Reference deltas should not render empty dash-only values');
+    }
     await page.screenshot({ path: `${OUT}/07-passport.png` });
     // Open the real-ownership funnel.
     const ownBtn = page.locator('text=How to own it for real');
-    if (await ownBtn.count()) { await ownBtn.click(); await page.waitForTimeout(1500); await page.screenshot({ path: `${OUT}/08-own-real.png` }); }
+    if (await ownBtn.count()) {
+      await ownBtn.click();
+      await page.waitForTimeout(1500);
+      if (await page.locator('text=150000000000000000000').count()) throw new Error('Pack price should be formatted, not raw base units');
+      const packLinkCount = await page.locator('a[href*="/gacha/"]').count();
+      if (packLinkCount < 1) throw new Error('Real pack links should target the specific Renaiss gacha pack');
+      await page.screenshot({ path: `${OUT}/08-own-real.png` });
+    }
     log('✓ passport drawer opened');
   }
 

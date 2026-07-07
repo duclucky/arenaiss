@@ -95,6 +95,10 @@ Trả về:
 `/v0/packs` → `cardPacks[] { slug, name, packType (limited|perpetual), stage,
 description, author, priceInUsdt, expectedValueInUsd, featuredCardFmvInUsd }`
 (KHÔNG kèm nội dung/odds gói).
+Probe UI/live 2026-07-07: `priceInUsdt` là base units 18 decimals (vd
+`150000000000000000000` → `$150/pack`); `expectedValueInUsd` và
+`featuredCardFmvInUsd` đang là cent-like string (vd `15500` → `$155`, `443400` →
+`$4,434`). Link pack thật dùng `https://www.renaiss.xyz/gacha/{slug}`.
 `/v0/packs/{slug}` → như trên + `recentOpenedPacks[] { collectibleTokenId, tier,
 fmv, pulledAtTimestamp }`. Nội dung/odds đầy đủ của gói KHÔNG trả về ở đây.
 

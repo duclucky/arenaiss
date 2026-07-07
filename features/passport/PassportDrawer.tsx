@@ -19,6 +19,29 @@ function fmtDate(ts: string | number | null | undefined): string {
 function cents(c: number | null | undefined): string {
   return c == null ? '—' : '$' + (c / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
+function moneyFromCents(input: string | number | null | undefined): string {
+  if (input == null || input === '') return '—';
+  const n = Number(input);
+  if (!Number.isFinite(n)) return String(input);
+  return '$' + (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+function usdtFromBaseUnits(input: string | number | null | undefined): string {
+  if (input == null || input === '') return '—';
+  try {
+    const raw = BigInt(String(input));
+    const scale = BigInt('1000000000000000000');
+    const whole = raw / scale;
+    const frac = raw % scale;
+    const centsPart = Number((frac * BigInt(100)) / scale);
+    return `$${Number(whole).toLocaleString('en-US')}${centsPart ? `.${String(centsPart).padStart(2, '0')}` : ''}`;
+  } catch {
+    const n = Number(input);
+    return Number.isFinite(n) ? `$${n.toLocaleString('en-US')}` : String(input);
+  }
+}
+function packUrl(slug: string): string {
+  return `https://www.renaiss.xyz/gacha/${encodeURIComponent(slug)}`;
+}
 // Minimal markdown renderer for narration paragraphs, bold, and emphasis.
 function Narr({ text }: { text: string }) {
   return (
@@ -125,6 +148,8 @@ export function PassportDrawer() {
   const collectible = detail?.collectible;
   const img = collectible?.frontImageUrl || card.imageUrl;
   const activities: Activity[] = detail?.activities?.activities ?? [];
+  const deltas = idx?.deltas ?? null;
+  const hasDeltas = !!deltas && [deltas.d7, deltas.d30, deltas.d365].some((v) => v != null);
 
   return (
     <>
@@ -174,9 +199,13 @@ export function PassportDrawer() {
                     </span>
                   )}
                 </div>
-                {idx.deltas && (
+                {hasDeltas ? (
                   <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12 }}>
-                    <Delta label="7d" v={idx.deltas.d7} /><Delta label="30d" v={idx.deltas.d30} /><Delta label="365d" v={idx.deltas.d365} />
+                    <Delta label="7d" v={deltas!.d7} /><Delta label="30d" v={deltas!.d30} /><Delta label="365d" v={deltas!.d365} />
+                  </div>
+                ) : (
+                  <div className="caveat" style={{ marginTop: 8 }}>
+                    Recent trend unavailable: Renaiss OS Index did not return 7d/30d/365d deltas for this card.
                   </div>
                 )}
                 <div className="caveat" style={{ marginTop: 10 }}>
@@ -251,21 +280,34 @@ export function PassportDrawer() {
               <div className="panel" style={{ padding: 14 }}>
                 <SectionLabel>REAL RENAISS PACKS</SectionLabel>
                 <p className="caveat" style={{ marginBottom: 10 }}>
-                  These are real Renaiss packs that use real USDT and a wallet. They are completely separate from the simulated game packs.
-                  Each pack may contain graded cards like this one.
+                  Source: <b>Renaiss /v0/packs</b> via this app&apos;s read-only <b>/api/packs</b> proxy. These are real Renaiss packs
+                  that use real USDT and a wallet, separate from the simulated game packs. Renaiss pack pages currently state each pack contains 1 card.
                 </p>
                 {packs.length === 0 ? <Skeleton /> : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {packs.filter((p) => p.stage === 'active').slice(0, 4).map((p) => (
-                      <div key={p.slug} className="panel" style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: '#202734' }}>
+                      <a
+                        key={p.slug}
+                        className="panel"
+                        href={packUrl(p.slug)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: '#202734', textDecoration: 'none' }}
+                      >
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-                          <div className="caveat">{p.packType ?? ''}{p.priceInUsdt ? ` · ${p.priceInUsdt} USDT` : ''}{p.expectedValueInUsd ? ` · EV ~$${p.expectedValueInUsd}` : ''}</div>
+                          <div className="caveat">
+                            {p.packType ?? ''}
+                            {p.priceInUsdt ? ` · ${usdtFromBaseUnits(p.priceInUsdt)}/pack` : ''}
+                            {p.expectedValueInUsd ? ` · EV ${moneyFromCents(p.expectedValueInUsd)}` : ''}
+                            {p.featuredCardFmvInUsd ? ` · top ${moneyFromCents(p.featuredCardFmvInUsd)}` : ''}
+                          </div>
                         </div>
-                      </div>
+                        <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 800 }}>Open ↗</span>
+                      </a>
                     ))}
-                    <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href="https://renaiss.xyz" target="_blank" rel="noreferrer">
-                      Open Renaiss marketplace ↗
+                    <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href="https://www.renaiss.xyz/gacha" target="_blank" rel="noreferrer">
+                      View all Renaiss packs ↗
                     </a>
                   </div>
                 )}
