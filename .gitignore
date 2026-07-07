@@ -13,6 +13,7 @@
 # testing
 /coverage
 /.e2e-output/
+__pycache__/
 
 # next.js
 /.next/

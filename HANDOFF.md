@@ -13,16 +13,15 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 15:37 UTC
+- Thời điểm: 2026-07-07 15:50 UTC
 - Agent: codex
-- Commit gần nhất trước phiên: `da53e48` — "docs: fill HANDOFF.md with real progress, flag Vietnamese-UI violation"
-- Commit phiên này: chuẩn bị commit "done: english ui and anonymous local save"
+- Commit gần nhất trước cập nhật này: `c6d4fe3` — "done: english ui and anonymous local save"
+- Commit phiên này: chuẩn bị commit "chore: add local web launcher"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Phiên Codex vừa sửa các việc cấp thiết: UI/copy
-sản phẩm đã chuyển sang tiếng Anh, Card Passport prompt/fallback đã tiếng Anh,
-anonymous localStorage save đã có versioning + savedAt + reset, và daily credit
-refill đã tách thành hàm thuần. Hero loop e2e headless pass, 0 console error.
+Không có file nào đang viết dở. Theo yêu cầu mới nhất, Codex tạm dừng trước khi
+triển khai Google login để thêm helper local `run_local.py`: chạy `npm run dev`,
+đợi server sẵn sàng, rồi mở browser vào `http://localhost:3000`.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -53,14 +52,16 @@ refill đã tách thành hàm thuần. Hero loop e2e headless pass, 0 console er
 - Stretch/Core còn lại: [ ] Google login + server-side account save  [ ] by-image scan.
 
 ## Tiếp theo (next steps — cụ thể, làm được ngay)
-1. **Làm Google login + save server-side theo tài khoản** — chưa có auth/provider.
+1. Chạy local bằng `python run_local.py` (hoặc `python run_local.py --port 3001`
+   nếu port 3000 bận). Dùng Ctrl+C để dừng dev server.
+2. **Làm Google login + save server-side theo tài khoản** — chưa có auth/provider.
    Cần chọn hạ tầng (vd NextAuth/Auth.js + adapter/KV/DB), chỉ xin scope định danh
    tối thiểu, và thực thi cùng `applyDailyCreditRefill()` ở server. UI copy đã có
    anonymous local save; cần thêm copy bắt buộc: "Sign in with Google to play
    across devices with your full demo pull history."
-2. Bật AI narration thật: thêm `ANTHROPIC_API_KEY=sk-ant-...` vào `.env.local`,
+3. Bật AI narration thật: thêm `ANTHROPIC_API_KEY=sk-ant-...` vào `.env.local`,
    test lại `/api/passport/narrate` để `mode` trả về `"ai"` thay vì `"fallback"`.
-3. (Tuỳ) Quay video demo theo 6 gạch đầu dòng trong `README.md` mục cuối.
+4. (Tuỳ) Quay video demo theo 6 gạch đầu dòng trong `README.md` mục cuối.
 
 ## Quyết định đã chốt (để agent sau không hỏi lại)
 - App tiếng ANH toàn bộ (UI/copy/README/video). Trao đổi với chủ dự án có thể VN.
@@ -116,6 +117,10 @@ refill đã tách thành hàm thuần. Hero loop e2e headless pass, 0 console er
   mong muốn và chỉ dùng cho tiến trình game.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Thêm `run_local.py` để chủ dự án chạy local dễ hơn:
+  `python run_local.py` sẽ gọi `npm run dev -- --hostname localhost --port 3000`,
+  đợi server phản hồi rồi mở browser. Verify helper bằng `python -m py_compile
+  run_local.py` và `python run_local.py --help`. Chưa bắt đầu code Google login.
 - 2026-07-07 codex: Dịch UI/copy sản phẩm sang tiếng Anh (`components/`,
   `features/`, `app/layout.tsx`, `README.md`, `prompts/passport-narration.md`,
   `lib/passport/prompt.ts`); thêm CTA slab `ⓘ` + overlay "View Passport →" +
