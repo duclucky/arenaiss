@@ -13,15 +13,15 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 15:50 UTC
+- Thời điểm: 2026-07-07 16:10 UTC
 - Agent: codex
-- Commit gần nhất trước cập nhật này: `c6d4fe3` — "done: english ui and anonymous local save"
-- Commit phiên này: chuẩn bị commit "chore: add local web launcher"
+- Commit gần nhất trước cập nhật này: `56cf885` — "chore: add local web launcher"
+- Commit phiên này: chuẩn bị commit "done: simple credentials auth"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Theo yêu cầu mới nhất, Codex tạm dừng trước khi
-triển khai Google login để thêm helper local `run_local.py`: chạy `npm run dev`,
-đợi server sẵn sàng, rồi mở browser vào `http://localhost:3000`.
+Không có file nào đang viết dở. Theo yêu cầu mới nhất, đã bỏ hướng Google/email-code
+login và chuyển sang đăng ký/đăng nhập đơn giản bằng username + password cho bản test.
+Không có dev server nào cần giữ chạy sau phiên; dùng `python run_local.py` để mở lại.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -49,16 +49,16 @@ triển khai Google login để thêm helper local `run_local.py`: chạy `npm r
       `lib/game/credit.ts`, `lib/game/save.ts`, `app/arena/state.tsx`,
       `tests/credit-save.test.mts`. Luật refill: qua mốc 00:00 UTC, nếu credit
       <100 thì đặt về 200; credit >=100 không đổi; không cộng dồn.
-- Stretch/Core còn lại: [ ] Google login + server-side account save  [ ] by-image scan.
+- Stretch/Core còn lại: [x] Simple username/password login + server-side account save
+  [ ] by-image scan.
 
 ## Tiếp theo (next steps — cụ thể, làm được ngay)
-1. Chạy local bằng `python run_local.py` (hoặc `python run_local.py --port 3001`
-   nếu port 3000 bận). Dùng Ctrl+C để dừng dev server.
-2. **Làm Google login + save server-side theo tài khoản** — chưa có auth/provider.
-   Cần chọn hạ tầng (vd NextAuth/Auth.js + adapter/KV/DB), chỉ xin scope định danh
-   tối thiểu, và thực thi cùng `applyDailyCreditRefill()` ở server. UI copy đã có
-   anonymous local save; cần thêm copy bắt buộc: "Sign in with Google to play
-   across devices with your full demo pull history."
+1. Test thủ công auth UI: chạy `python run_local.py` rồi bấm `Register`, nhập
+   username/password/confirm; sau khi tạo xong UI tự chuyển về `Login`; đăng nhập
+   lại bằng username/password.
+2. Khi cần deploy thật, thay JSON file store trong `data/users.json` và
+   `data/account-saves.json` bằng DB/KV bền vững; nhớ đặt `AUTH_SECRET` random trong
+   môi trường server.
 3. Bật AI narration thật: thêm `ANTHROPIC_API_KEY=sk-ant-...` vào `.env.local`,
    test lại `/api/passport/narrate` để `mode` trả về `"ai"` thay vì `"fallback"`.
 4. (Tuỳ) Quay video demo theo 6 gạch đầu dòng trong `README.md` mục cuối.
@@ -70,8 +70,8 @@ triển khai Google login để thêm helper local `run_local.py`: chạy `npm r
   Top-Trumps game. Win VIRTUAL credits to open more. Every card links to its
   real Card Passport. (Thẻ game là "dựa trên dữ liệu thẻ thật", KHÔNG phải NFT
   người chơi sở hữu.)
-- Hai chế độ lưu, LÀM CẢ HAI: (a) ẩn danh → localStorage; (b) Google login →
-  chơi đa thiết bị, giữ lịch sử mở thẻ demo. Chỉ xin scope định danh tối thiểu.
+- Hai chế độ lưu đã có: (a) ẩn danh → localStorage; (b) username/password test account →
+  server-side JSON save. Google login đã bị bỏ theo yêu cầu mới nhất của chủ dự án.
 - Credit: hồi mỗi ngày lúc 00:00 UTC, CHỈ với id có credit < 100, NẠP CHO ĐỦ VỀ
   200 (không cộng dồn). Là hàm thuần dùng chung; chế độ login thực thi ở server
   (đáng tin), chế độ ẩn danh tính ở client (kiểu "danh dự", không chống gian lận
@@ -85,9 +85,10 @@ triển khai Google login để thêm helper local `run_local.py`: chạy `npm r
   ("Add to collection →"/"Continue") tách khỏi CTA Passport.
 
 ## Cảnh báo / nợ kỹ thuật (đọc kỹ trước khi code tiếp)
-- **Chưa có Google login / auth** — không có route, provider, hay server/KV save.
-  Đây là phần còn lại của ràng buộc "hai chế độ lưu". Anonymous localStorage đã
-  làm; đa thiết bị theo tài khoản chưa làm.
+- **Auth hiện là local/demo JSON store, không phải production auth.** Password được
+  hash bằng scrypt, session là HttpOnly signed cookie, save nằm server-side trong
+  `data/` (đã gitignore). Theo yêu cầu chủ dự án, không có rate-limit/captcha/email
+  verification. Nếu deploy thật cần DB/KV bền vững và `AUTH_SECRET` random.
 - **Chưa cấu hình `ANTHROPIC_API_KEY`** trong `.env.local` → Card Passport AI
   narration đang chạy ở chế độ fallback (deterministic summary từ dữ liệu đã
   validate, tiếng Anh). Route `/api/passport/narrate` đã sẵn code gọi Anthropic
@@ -110,13 +111,25 @@ triển khai Google login để thêm helper local `run_local.py`: chạy `npm r
   để an toàn). `env.example.txt` là bản sao y hệt `.env.example` — vô hại, không
   cần sửa.
 - Verify mới nhất phiên Codex: `npm.cmd run test:unit` PASS; `npm.cmd run
-  typecheck` PASS; `npm.cmd run build` PASS; `npm.cmd run e2e` PASS toàn hero
-  loop, 0 console error; bundle scan `.next/static` không có `rk_`/`rsk_`/
-  `X-Api-Secret`/`ANTHROPIC_API_KEY`/`createSecureClient`/`pullGacha`/
-  `buybackGacha`/`approvePermit2Usdt`/`deploySafeWallet`. `localStorage` hiện là
-  mong muốn và chỉ dùng cho tiến trình game.
+  typecheck` PASS; `npm.cmd run build` PASS; `E2E_BASE_URL=http://localhost:3001
+  npm.cmd run e2e` PASS toàn hero loop, 0 console error; HTTP API smoke test
+  register/login/session/account-save PASS; bundle scan `.next/static` không có
+  `rk_`/`rsk_`/`X-Api-Secret`/`ANTHROPIC_API_KEY`/`createSecureClient`/
+  `pullGacha`/`buybackGacha`/`approvePermit2Usdt`/`deploySafeWallet`.
+  `npm.cmd run lint` hiện FAIL ở lỗi lint cũ ngoài phạm vi auth:
+  `components/Slab.tsx`, `features/pack-open/PackOpen.tsx`,
+  `features/passport/PassportDrawer.tsx` (`react-hooks/set-state-in-effect`) và
+  vài warning unused vars.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Triển khai đăng ký/đăng nhập đơn giản theo yêu cầu mới nhất
+  (không Google/email code): `lib/auth/{credentials,session,store}.ts`,
+  `app/api/auth/{register,login,logout,session}/route.ts`,
+  `app/api/account/save/route.ts`, `lib/auth/account-save.server.ts`,
+  `components/AuthPanel.tsx`, `lib/client/auth.ts`. Register chỉ tạo account rồi
+  chuyển về Login; login set HttpOnly cookie; server save dùng cùng pure daily
+  credit refill. Thêm `tests/auth.test.mts`, cập nhật README/env mẫu và e2e nhận
+  `E2E_BASE_URL`.
 - 2026-07-07 codex: Thêm `run_local.py` để chủ dự án chạy local dễ hơn:
   `python run_local.py` sẽ gọi `npm run dev -- --hostname localhost --port 3000`,
   đợi server phản hồi rồi mở browser. Verify helper bằng `python -m py_compile

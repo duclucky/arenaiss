@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:unit": "tsx tests/credit-save.test.mts",
+    "test:unit": "tsx tests/credit-save.test.mts && tsx tests/auth.test.mts",
     "typecheck": "tsc --noEmit",
     "balance": "tsx scripts/balance.mts",
     "sweep": "tsx scripts/sweep.mts",

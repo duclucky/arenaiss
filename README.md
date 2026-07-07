@@ -95,6 +95,9 @@ the live alpha on 2026-07-07).
 - **Local anonymous save only stores game progress.** `localStorage` contains roster,
   virtual credits, deck tokens, pull history, version, and timestamps. It never stores
   API keys, secrets, auth tokens, or sensitive data.
+- **Simple test accounts use server-side storage.** Passwords are scrypt-hashed in
+  `data/users.json`, account saves live in `data/account-saves.json`, and the browser
+  only receives an HttpOnly signed session cookie.
 
 ---
 
@@ -104,13 +107,15 @@ Requires **Node ≥ 22** (SDK requires ≥ 24; this repo was built on Node 24).
 
 ```bash
 npm install
-# create .env.local (see .env.example) with the partner Index key/secret:
+# create .env.local (see env.example.txt) with the partner Index key/secret:
 #   RENAISS_INDEX_API_KEY=rk_...
 #   RENAISS_INDEX_API_SECRET=rsk_...
 #   RENAISS_INDEX_BASE=https://api.renaissos.com
 #   RENAISS_MARKETPLACE_BASE=https://api.renaiss.xyz
 # optional — enables real LLM Card Passport narration (else deterministic fallback):
 #   ANTHROPIC_API_KEY=sk-ant-...
+# required for stable login sessions outside local throwaway testing:
+#   AUTH_SECRET=replace_with_a_random_32_byte_secret
 npm run dev      # http://localhost:3000
 ```
 

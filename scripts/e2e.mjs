@@ -7,6 +7,7 @@ const exe = process.env.PW_CHROME
 const OUT = 'D:/renaiss-arena/.e2e-output';
 mkdirSync(OUT, { recursive: true });
 const log = (...a) => console.log(...a);
+const baseUrl = process.env.E2E_BASE_URL || 'http://localhost:3000';
 
 const browser = await chromium.launch({ executablePath: exe, headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -15,7 +16,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 try {
-  await page.goto('http://localhost:3000/', { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForSelector('text=Enter the', { timeout: 15000 });
   // Wait for pool load and enabled first-pack button.
   await page.waitForFunction(() => {

@@ -59,7 +59,7 @@ export type Action =
   | { type: 'POOL_LOADING' }
   | { type: 'POOL_LOADED'; pool: GameCard[] }
   | { type: 'POOL_ERROR'; error: string }
-  | { type: 'HYDRATE_SAVE'; save: ArenaSave; credits: number; lastCreditRefillAt: string }
+  | { type: 'HYDRATE_SAVE'; save: ArenaSave; credits: number; lastCreditRefillAt: string | null }
   | { type: 'SAVE_READY' }
   | { type: 'SAVED'; savedAt: string }
   | { type: 'OPEN_PACK'; reveal: PackReveal; openedAt: string }

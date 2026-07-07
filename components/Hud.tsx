@@ -3,6 +3,7 @@
 import { useArena, useArenaDispatch, deckCards } from '@/app/arena/state';
 import type { Screen } from '@/app/arena/state';
 import { STORAGE_KEY } from '@/lib/game/save';
+import { AuthPanel } from './AuthPanel';
 
 // Vault header: logo, virtual credit, nav, and always-visible safety labels.
 
@@ -69,6 +70,7 @@ export function Hud() {
         <button className="btn btn-ghost" style={{ padding: '7px 10px', fontSize: 12 }} onClick={resetProgress} title="Clear anonymous progress saved on this device">
           Reset
         </button>
+        <AuthPanel />
       </div>
     </header>
   );
