@@ -57,8 +57,6 @@ export function Hud() {
       </nav>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="chip" title="Read-only data access: no wallet signing and no transactions">Read-only</span>
-        <span className="chip" title="Anonymous progress is stored only in this browser on this device">Local save</span>
         <div
           className="chip"
           style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)', borderColor: 'rgba(229,192,123,0.4)' }}

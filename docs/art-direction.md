@@ -42,10 +42,9 @@ Tier càng cao, cường độ glow + độ bão hoà càng lớn. Hiển thị 
   3. Khung ảnh thẻ (bo góc trong, phản chiếu kính nhẹ ở mép).
   4. Dải chỉ số: ATK · DEF · AURA = 3 CỘT ĐỀU NHAU, canh giữa, mỗi cột số-trên
      nhãn-dưới, có khoảng thở. (Toàn chữ tiếng Anh.)
-  5. POWER: một DẢI RIÊNG bên dưới, nổi bật hơn (nó là tổng) — không nằm chung
-     hàng với 3 chỉ số kia.
-  6. Nút/nhãn Passport: TÁCH HẲN khỏi hàng chỉ số — là dải bấm ở đáy thẻ (xem
-     "CTA" bên dưới). KHÔNG đặt xen giữa các chỉ số.
+  5. POWER: thu gọn thành `PWR + số` ở đáy thẻ để không chiếm hết chiều ngang.
+  6. Nút/nhãn Passport: LUÔN HIỆN ở đáy thẻ, chung hàng với `PWR` nhưng là vùng
+     bấm riêng ghi "View Passport". KHÔNG dùng overlay hover hoặc icon info ở góc.
 - Xử lý ảnh: nếu là ảnh thẻ trần → bọc khung slab số; nếu đã là ảnh slab thật →
   đặt thẳng vào tủ, KHÔNG bọc hai lần. Luôn lazy-load + cache.
 - Hiệu ứng kính: highlight chéo mờ (specular) trên mặt hộp; bóng đổ mềm phía dưới
@@ -58,9 +57,8 @@ Một tính năng người dùng không biết là nó tồn tại = coi như kh
 tầng tín hiệu (tất cả chữ TIẾNG ANH):
 - Lớp nền: cả thẻ `cursor: pointer`; hover → nhấc + sáng viền tier (affordance
   mạnh nhất).
-- CTA chính: overlay trồi từ đáy ảnh khi hover, ghi "View Passport →". Ẩn lúc
-  thường để thẻ gọn.
-- Cho mobile/lướt nhanh (không có hover): một icon ⓘ (info) LUÔN HIỆN ở góc thẻ.
+- CTA chính: nút "View Passport" LUÔN HIỆN ở đáy thẻ, cạnh chỉ số `PWR`. Không dùng
+  overlay hover-only và không dùng icon info ở góc thẻ, để phần nhãn có chỗ cho tier.
 - Onboarding: sau gói đầu tiên, hiện HINT 1 LẦN "Tap any card to view its real
   Card Passport", tự ẩn sau khi user bấm lần đầu.
 - Dùng từ "Passport" nhất quán ở nút thẻ, tiêu đề drawer, CTA — bấm chỗ nào có

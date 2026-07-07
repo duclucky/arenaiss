@@ -115,7 +115,7 @@ a { color: inherit; }
   background: rgba(from var(--tier) r g b / 0.14); border: 1px solid rgba(from var(--tier) r g b / 0.5);
   color: var(--tier); font-weight: 800; font-size: 15px; line-height: 1;
 }
-.slab-grade small { display: block; font-size: 7px; font-weight: 600; color: var(--text-sub); letter-spacing: 0.06em; }
+.slab-grade small { display: block; font-size: 7px; font-weight: 700; color: var(--tier); letter-spacing: 0.06em; margin-top: 2px; text-transform: uppercase; }
 
 .slab-art {
   position: relative; margin: 0 8px; border-radius: var(--radius-sm); overflow: hidden;
@@ -136,25 +136,6 @@ a { color: inherit; }
   position: absolute; top: 6px; left: 6px; font-size: 15px;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
 }
-.slab-info {
-  position: absolute; top: 9px; right: 9px; z-index: 2;
-  width: 22px; height: 22px; display: grid; place-items: center;
-  border-radius: 999px; background: rgba(11,14,20,0.72);
-  border: 1px solid rgba(from var(--tier) r g b / 0.55);
-  color: var(--tier); font-size: 13px; font-weight: 800;
-}
-.slab-passport-overlay {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-  padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 800;
-  letter-spacing: 0.04em; color: #0d1016; background: linear-gradient(180deg, rgba(229,192,123,0.88), var(--accent));
-  transform: translateY(105%); transition: transform 0.2s ease;
-}
-.slab.interactive:hover .slab-passport-overlay,
-.slab.interactive:focus .slab-passport-overlay,
-.slab.interactive:focus-within .slab-passport-overlay {
-  transform: translateY(0);
-}
-
 .slab-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; padding: 8px; margin-top: auto; }
 .slab-stat { text-align: center; }
 .slab-stat .k { font-size: 8px; letter-spacing: 0.1em; color: var(--text-dim); }
@@ -162,11 +143,20 @@ a { color: inherit; }
 .slab-stat.hot .v { color: var(--accent); text-shadow: 0 0 10px rgba(229,192,123,0.6); }
 .slab-power {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px; border-top: 1px solid var(--hairline);
+  gap: 8px; padding: 6px 8px; border-top: 1px solid var(--hairline);
   background: rgba(0,0,0,0.25);
 }
-.slab-power .lbl { font-size: 8px; letter-spacing: 0.14em; color: var(--text-dim); }
-.slab-power .val { font-size: 18px; font-weight: 900; color: var(--accent); }
+.slab-power-score { display: inline-flex; align-items: baseline; gap: 5px; min-width: 52px; }
+.slab-power .lbl { font-size: 8px; letter-spacing: 0.1em; color: var(--text-dim); }
+.slab-power .val { font-size: 16px; font-weight: 900; color: var(--accent); }
+.slab-passport-button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 24px; padding: 4px 7px; border-radius: 7px;
+  border: 1px solid rgba(229,192,123,0.4);
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 10px; font-weight: 800; line-height: 1; white-space: nowrap;
+}
+.slab.interactive:hover .slab-passport-button { background: var(--accent); color: #1a1408; }
 
 /* ============================ Buttons / chrome =========================== */
 .btn {

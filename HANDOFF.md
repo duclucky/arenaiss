@@ -13,15 +13,15 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 ---
 
 ## Cập nhật lần cuối
-- Thời điểm: 2026-07-07 16:10 UTC
+- Thời điểm: 2026-07-07 16:35 UTC
 - Agent: codex
-- Commit gần nhất trước cập nhật này: `56cf885` — "chore: add local web launcher"
-- Commit phiên này: chuẩn bị commit "done: simple credentials auth"
+- Commit gần nhất trước cập nhật này: `a81a3e2` — "done: simple credentials auth"
+- Commit phiên này: chuẩn bị commit "done: address browser UI comments"
 
 ## Đang làm gì (current focus)
-Không có file nào đang viết dở. Theo yêu cầu mới nhất, đã bỏ hướng Google/email-code
-login và chuyển sang đăng ký/đăng nhập đơn giản bằng username + password cho bản test.
-Không có dev server nào cần giữ chạy sau phiên; dùng `python run_local.py` để mở lại.
+Không có file nào đang viết dở. Đã xử lý 5 browser comments mới nhất: copy auth nhấn
+mạnh server sync, bỏ chip header "Read-only"/"Local save", bỏ icon info trên slab,
+thu gọn `POWER` thành `PWR`, và luôn hiện nút `View Passport` ở đáy thẻ.
 
 ## Đã xong (theo bước ở docs/build-plan.md mục 7)
 - [x] B1. Data layer + proxy routes + Zod schema — `app/api/{pool,cards,packs,index/*,passport/narrate}/route.ts`, `lib/renaiss/{schemas,index.server,marketplace.server}.ts`
@@ -37,6 +37,8 @@ Không có dev server nào cần giữ chạy sau phiên; dùng `python run_loca
       dựng thẳng từ Serial (attributes) → `graded-cards-renders/{serial}/nft_image[_silver|_golden].jpg`,
       KHÔNG cần gọi thêm API/thẻ (tránh rate-limit marketplace). Verify bằng
       `scripts/e2e.mjs` (Playwright headless) — chạy hết vòng, 0 console error.
+      Browser-comment polish mới nhất: header chỉ giữ credits/reset/auth; slab có tier
+      trong badge grade và nút `View Passport` cố định ở footer.
 - [x] B5. Card Passport drawer + AI narration + nút "own it for real" —
       `features/passport/PassportDrawer.tsx`, `lib/passport/prompt.ts`,
       `app/api/passport/narrate/route.ts`. AI narration DÙNG FALLBACK deterministic
@@ -79,10 +81,10 @@ Không có dev server nào cần giữ chạy sau phiên; dùng `python run_loca
 - Thẻ: layout lại để HẾT chồng chữ — thứ tự dọc [thanh tier]→[nhãn: tên+grade]→
   [ảnh]→[ATK·DEF·AURA 3 cột đều]→[POWER dải riêng]→[nút Passport tách khỏi hàng
   chỉ số]. Tên thẻ tối đa 2 dòng + ellipsis.
-- CTA "bấm được": cả thẻ cursor:pointer + hover nhấc/sáng viền; overlay
-  "View Passport →" khi hover; icon ⓘ luôn hiện (cho mobile); hint 1 lần sau gói
-  đầu "Tap any card to view its real Card Passport". Màn kết quả có nút thoát rõ
-  ("Add to collection →"/"Continue") tách khỏi CTA Passport.
+- CTA "bấm được": cả thẻ cursor:pointer + hover nhấc/sáng viền; nút `View Passport`
+  luôn hiện ở footer cạnh `PWR`, không dùng overlay hover-only và không dùng icon info
+  ở góc thẻ; hint 1 lần sau gói đầu "Tap any card to view its real Card Passport".
+  Màn kết quả có nút thoát rõ ("Add to collection →"/"Continue") tách khỏi CTA Passport.
 
 ## Cảnh báo / nợ kỹ thuật (đọc kỹ trước khi code tiếp)
 - **Auth hiện là local/demo JSON store, không phải production auth.** Password được
@@ -112,8 +114,9 @@ Không có dev server nào cần giữ chạy sau phiên; dùng `python run_loca
   cần sửa.
 - Verify mới nhất phiên Codex: `npm.cmd run test:unit` PASS; `npm.cmd run
   typecheck` PASS; `npm.cmd run build` PASS; `E2E_BASE_URL=http://localhost:3001
-  npm.cmd run e2e` PASS toàn hero loop, 0 console error; HTTP API smoke test
-  register/login/session/account-save PASS; bundle scan `.next/static` không có
+  npm.cmd run e2e` PASS toàn hero loop + browser-comment assertions, 0 console error;
+  HTTP API smoke test register/login/session/account-save PASS từ phiên auth; bundle
+  scan `.next/static` không có
   `rk_`/`rsk_`/`X-Api-Secret`/`ANTHROPIC_API_KEY`/`createSecureClient`/
   `pullGacha`/`buybackGacha`/`approvePermit2Usdt`/`deploySafeWallet`.
   `npm.cmd run lint` hiện FAIL ở lỗi lint cũ ngoài phạm vi auth:
@@ -122,6 +125,12 @@ Không có dev server nào cần giữ chạy sau phiên; dùng `python run_loca
   vài warning unused vars.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-07 codex: Xử lý browser comments: `components/AuthPanel.tsx` đổi message
+  logged-out sang "Log in to sync progress on the server."; `components/Hud.tsx`
+  bỏ hai chip "Read-only"/"Local save"; `components/Slab.tsx` + `app/globals.css`
+  bỏ icon info/overlay hover, hiện tier trong badge grade và thêm nút `View Passport`
+  cố định cạnh `PWR`; `scripts/e2e.mjs` thêm assertion cho các yêu cầu này và sửa
+  catch để e2e trả exit code 1 khi fail.
 - 2026-07-07 codex: Triển khai đăng ký/đăng nhập đơn giản theo yêu cầu mới nhất
   (không Google/email code): `lib/auth/{credentials,session,store}.ts`,
   `app/api/auth/{register,login,logout,session}/route.ts`,

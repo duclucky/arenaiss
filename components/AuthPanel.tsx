@@ -15,7 +15,7 @@ export function AuthPanel() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState('Data is saved only on this device.');
+  const [message, setMessage] = useState('Log in to sync progress on the server.');
   const [busy, setBusy] = useState(false);
   const loadedSession = useRef(false);
   const suppressNextSync = useRef(false);
@@ -58,7 +58,7 @@ export function AuthPanel() {
         setMessage(`Signed in as ${sessionUser.username}. Account save loaded.`);
       } else {
         await putAccountSave(currentSave);
-        setMessage(`Signed in as ${sessionUser.username}. Anonymous progress synced.`);
+        setMessage(`Signed in as ${sessionUser.username}. Current progress synced to server.`);
       }
     });
   }, [currentSave, dispatch, state.saveReady]);
@@ -89,7 +89,7 @@ export function AuthPanel() {
     setMode('login');
     setPassword('');
     setConfirmPassword('');
-    setMessage('Account created. Sign in with your username and password.');
+    setMessage('Account created. Log in to start server sync.');
   }
 
   async function login() {
@@ -116,7 +116,7 @@ export function AuthPanel() {
       setMessage(`Signed in as ${result.user.username}. Account save loaded.`);
     } else {
       await putAccountSave(currentSave);
-      setMessage(`Signed in as ${result.user.username}. Anonymous progress synced.`);
+      setMessage(`Signed in as ${result.user.username}. Current progress synced to server.`);
     }
   }
 
@@ -125,7 +125,7 @@ export function AuthPanel() {
     setUser(null);
     setPassword('');
     setConfirmPassword('');
-    setMessage('Signed out. Data is saved only on this device.');
+    setMessage('Signed out. Log in to sync progress on the server.');
   }
 
   if (user) {

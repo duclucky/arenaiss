@@ -42,7 +42,6 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
       title={card.name}
     >
       <div className="slab-tierbar" />
-      {interactive && <span className="slab-info" aria-hidden="true">ⓘ</span>}
       <div className="slab-label">
         <div>
           <div className="slab-name">{card.name}</div>
@@ -52,7 +51,7 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
         </div>
         <div className="slab-grade">
           {card.gradeNum ?? '—'}
-          <small>{card.tier}</small>
+          <small>Tier {card.tier}</small>
         </div>
       </div>
 
@@ -66,7 +65,6 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
           <div className="noart">{card.pokemonName || card.name.split(' ').slice(-2).join(' ')}</div>
         )}
         <span className="specular" />
-        {interactive && <span className="slab-passport-overlay">View Passport →</span>}
       </div>
 
       <div className="slab-stats">
@@ -78,8 +76,11 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
         ))}
       </div>
       <div className="slab-power">
-        <span className="lbl">POWER</span>
-        <span className="val tabnums">{card.power}</span>
+        <span className="slab-power-score">
+          <span className="lbl">PWR</span>
+          <span className="val tabnums">{card.power}</span>
+        </span>
+        {interactive && <span className="slab-passport-button">View Passport</span>}
       </div>
     </div>
   );

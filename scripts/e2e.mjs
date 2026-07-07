@@ -18,6 +18,9 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForSelector('text=Enter the', { timeout: 15000 });
+  await page.waitForSelector('text=Log in to sync progress on the server.', { timeout: 5000 });
+  if (await page.locator('header >> text=Read-only').count()) throw new Error('Header still shows Read-only chip');
+  if (await page.locator('header >> text=Local save').count()) throw new Error('Header still shows Local save chip');
   // Wait for pool load and enabled first-pack button.
   await page.waitForFunction(() => {
     const b = [...document.querySelectorAll('button')].find((x) => /Open first pack/.test(x.textContent || ''));
@@ -32,6 +35,10 @@ try {
   await page.waitForTimeout(3500);
   await page.screenshot({ path: `${OUT}/02-pack.png` });
   const slabCount = await page.locator('.slab').count();
+  if (await page.locator('.slab-info').count()) throw new Error('Slab info icon should not be rendered');
+  if (await page.locator('.slab-passport-overlay').count()) throw new Error('Hover-only Passport overlay should not be rendered');
+  const fixedPassportButtons = await page.locator('.slab-passport-button', { hasText: 'View Passport' }).count();
+  if (fixedPassportButtons < slabCount) throw new Error(`Expected fixed View Passport buttons on every slab, got ${fixedPassportButtons}/${slabCount}`);
   log(`✓ pack opened, ${slabCount} slabs revealed`);
 
   // Open a few more packs so the deck can fill.
@@ -92,6 +99,7 @@ try {
 
   log('\nCONSOLE ERRORS:', errors.length ? errors.slice(0, 10) : 'none');
 } catch (e) {
+  process.exitCode = 1;
   log('E2E ERROR:', e.message);
   await page.screenshot({ path: `${OUT}/ERROR.png` }).catch(()=>{});
   log('CONSOLE ERRORS:', errors.slice(0, 10));
