@@ -1,0 +1,88 @@
+# Deploy Arenaiss on Namecheap Stellar
+
+This project is a server-rendered Next.js app with API routes and server-side JSON
+account storage. Do not deploy it as a static site.
+
+## GitHub
+
+- Repository visibility: private.
+- Recommended repository name: `arenaiss`.
+- Do not commit `.env.local`, `data/`, `.next/`, or `node_modules/`.
+
+## Namecheap Stellar / cPanel Node.js app
+
+Use cPanel's Node.js application feature if it is available on the Stellar plan.
+
+Required runtime:
+
+- Node.js 22+ preferred; Node.js 24 is known to work locally.
+- If cPanel only offers an older Node.js version, this Next.js 16 app may not run
+  correctly. In that case, use another Node host or upgrade the hosting runtime.
+
+Suggested cPanel app settings:
+
+- Application mode: `Production`
+- Application root: a folder outside `public_html`, for example `arenaiss`
+- Application URL: `arenaiss.xyz`
+- Application startup file: `server.js`
+- Environment:
+  - `NODE_ENV=production`
+  - `AUTH_SECRET=<random 32-byte secret>`
+  - `RENAISS_INDEX_API_KEY=<server-side key>`
+  - `RENAISS_INDEX_API_SECRET=<server-side secret>`
+  - `RENAISS_MARKETPLACE_BASE=https://api.renaiss.xyz`
+  - `RENAISS_INDEX_BASE=https://api.renaissos.com`
+  - `PASSPORT_AI_BASE_URL=https://v98store.com/v1`
+  - `PASSPORT_AI_MODEL=deepseek-v4-flash`
+  - `PASSPORT_AI_API_KEY=<optional server-side provider key>`
+
+Install/build commands in the app directory:
+
+```bash
+npm ci
+npm run build
+```
+
+Then restart the Node.js app from cPanel.
+
+## Private GitHub repo deployment
+
+For private repos, cPanel needs GitHub access:
+
+1. Create or use an SSH key in cPanel.
+2. Add the public key to the GitHub private repo as a deploy key.
+3. Clone/pull the repo into the app root.
+4. Run `npm ci` and `npm run build`.
+5. Restart the Node.js app.
+
+If cPanel Git cannot pull private repos cleanly, upload a zip of the committed
+project, extract it into the app root, then run the same install/build commands.
+
+## Domain and DNS
+
+For `arenaiss.xyz` bought on Namecheap and hosted on Namecheap Stellar, either:
+
+1. Use Namecheap hosting nameservers for the domain, then add `arenaiss.xyz` as the
+   primary/addon domain in cPanel.
+2. Or keep existing DNS and point records to the hosting server IP from cPanel:
+   - `A` record: `@` -> the hosting shared IP
+   - `CNAME` record: `www` -> `arenaiss.xyz`
+
+The exact IP is shown in cPanel / hosting account details.
+
+After DNS resolves, enable SSL in cPanel:
+
+1. Open `SSL/TLS Status`.
+2. Run AutoSSL for `arenaiss.xyz` and `www.arenaiss.xyz`.
+3. Force HTTPS if cPanel provides that option.
+
+## Persistence warning
+
+The current demo stores test accounts and account saves in:
+
+- `data/users.json`
+- `data/account-saves.json`
+
+This is acceptable on hosting with persistent disk, but it is not a production
+database. Back up `data/` regularly. Before a public launch, replace it with a DB
+or KV store.

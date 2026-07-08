@@ -12,6 +12,35 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-09 deploy prep Namecheap Stellar
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `ca3d6a4` — "fix: rename product brand to Arenaiss"
+- Commit phiên này: chuẩn bị commit `chore: prepare namecheap node deployment`
+
+### Đang làm gì
+Đang chuẩn bị deploy `Arenaiss` lên hosting Namecheap Stellar và domain `arenaiss.xyz`. User chọn repo GitHub private.
+
+### Đã xong
+- Kiểm tra repo: chưa có `origin`; GitHub CLI đã login account `duclucky`.
+- `server.js`: thêm startup file production cho cPanel/Passenger Node.js app, chạy Next bằng `node server.js`.
+- `docs/deploy-namecheap-stellar.md`: thêm hướng dẫn deploy trên Namecheap Stellar/cPanel, biến môi trường server-side, DNS `arenaiss.xyz`, SSL/AutoSSL, và cảnh báo persistence `data/*.json`.
+- Verification startup file: `npm.cmd run build` PASS; chạy `node server.js -p 3036` + production e2e PASS, console errors none.
+
+### Tiếp theo
+1. Commit batch deploy prep.
+2. Tạo GitHub repo private `duclucky/arenaiss`, set `origin`, push code.
+3. Trong Namecheap cPanel: tạo Node.js app trỏ startup file `server.js`, clone/pull private repo hoặc upload zip, set env vars, chạy `npm ci`, `npm run build`, restart app.
+4. Trỏ DNS `arenaiss.xyz` về hosting Namecheap và bật AutoSSL.
+
+### Cảnh báo
+- Stellar/cPanel cần Node.js 22+ (Node 24 đã verify local). Nếu Namecheap chỉ cho Node thấp hơn, cần đổi host hoặc runtime.
+- Server-side account save hiện dùng persistent disk `data/`; ổn hơn serverless, nhưng vẫn chưa phải DB production.
+
+### Nhật ký
+- 2026-07-09 codex: Chuẩn bị deploy package cho Namecheap Stellar/cPanel Node.js.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-09 Arenaiss brand
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `fa12a7f` — "fix: clarify gacha demo notice"
