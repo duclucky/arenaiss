@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useArena, useArenaDispatch, cardByToken } from '@/app/arena/state';
-import { fetchCardDetail, searchIndex, fetchIndexCardByHref, fetchPacks } from '@/lib/client/api';
+import {
+  fetchCardDetail,
+  searchIndex,
+  fetchIndexCardByHref,
+  fetchPacks,
+  narratePassport,
+  type NarrationResult,
+} from '@/lib/client/api';
 import type { CardDetail, IndexCard, CardPack, Activity } from '@/lib/renaiss/schemas';
 import { renaissCardUrl, renaissGachaPackUrl, renaissGachaUrl } from '@/lib/renaiss/links';
 import { STAT_FORMULA_NOTES, ELEMENT_GLYPH, type GameCard } from '@/lib/game/stats';
@@ -41,6 +48,21 @@ function usdtFromBaseUnits(input: string | number | null | undefined): string {
   }
 }
 
+function Narr({ text }: { text: string }) {
+  return (
+    <>
+      {text.split('\n\n').map((p, i) => {
+        const html = p
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/_(.+?)_/g, '<em style="color:var(--text-dim)">$1</em>');
+        return <p key={i} style={{ margin: '0 0 10px', lineHeight: 1.55, fontSize: 13.5 }} dangerouslySetInnerHTML={{ __html: html }} />;
+      })}
+    </>
+  );
+}
+
 export function PassportDrawer() {
   const state = useArena();
   const dispatch = useArenaDispatch();
@@ -61,8 +83,10 @@ export function PassportDrawer() {
 function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: GameCard; onClose: () => void }) {
   const [detail, setDetail] = useState<CardDetail | null>(null);
   const [idx, setIdx] = useState<IndexCard | null>(null);
+  const [narr, setNarr] = useState<NarrationResult | null>(null);
   const [packs, setPacks] = useState<CardPack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [narrLoading, setNarrLoading] = useState(true);
   const [showReal, setShowReal] = useState(false);
   const asOf = useMemo(() => new Date().toISOString(), []);
 
@@ -83,6 +107,51 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
       if (!alive) return;
       setIdx(indexCard);
       setLoading(false);
+
+      const collectible = d?.collectible;
+      const activities: Activity[] = d?.activities?.activities ?? [];
+      const input = {
+        card: {
+          name: card.name,
+          setName: card.setName,
+          grade: card.grade,
+          gradingCompany: card.gradingCompany,
+          year: card.year,
+          tokenId: card.tokenId,
+        },
+        custody: {
+          vaultLocation: collectible?.vaultLocation ?? card.vaultLocation ?? null,
+          countryCode: collectible?.vaultRegionCountryCode ?? null,
+        },
+        onchain: {
+          activities: activities.slice(0, 8).map((a) => ({
+            type: a.type,
+            timestamp: a.timestamp != null ? String(a.timestamp) : null,
+            txHash: a.txHash ?? null,
+            amount: a.amount ?? null,
+          })),
+          lastSale: null,
+        },
+        reference: indexCard
+          ? {
+              source: 'Renaiss OS Index',
+              priceUsd: indexCard.priceUsdCents != null ? indexCard.priceUsdCents / 100 : null,
+              confidence: indexCard.confidence ?? null,
+              observationCount: indexCard.observationCount ?? null,
+              lastSaleAt: indexCard.lastSaleAt ?? null,
+              deltas: indexCard.deltas ?? null,
+              sourceBreakdown: (indexCard.sourceBreakdown ?? []).map((s) => ({
+                bucket: s.bucket ?? null,
+                medianUsd: s.medianUsdCents != null ? s.medianUsdCents / 100 : null,
+              })),
+            }
+          : null,
+        asOf,
+      };
+      const n = await narratePassport(input);
+      if (!alive) return;
+      setNarr(n);
+      setNarrLoading(false);
     })();
 
     return () => { alive = false; };
@@ -246,6 +315,26 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
                   )}
                 </div>
               )}
+            </section>
+
+            <section>
+              <SectionLabel>
+                Passport AI {narr && <span className="chip" style={{ marginLeft: 8, fontSize: 9 }}>{narr.mode === 'ai' ? 'AI insight' : 'data insight'}</span>}
+              </SectionLabel>
+              <div className="panel" style={{ padding: 14, background: '#202734' }}>
+                {narrLoading ? <Skeleton lines={4} /> : narr ? (
+                  <>
+                    <Narr text={narr.text} />
+                    {narr.mode === 'fallback' && (
+                      <p className="caveat" style={{ marginTop: 6, fontStyle: 'italic' }}>
+                        Live AI is not configured on this server, so this insight uses the same validated data deterministically.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="caveat">Passport AI insight could not be generated.</p>
+                )}
+              </div>
             </section>
 
             <section>

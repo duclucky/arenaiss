@@ -12,6 +12,36 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 03:05 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `a028856` — "fix: de-duplicate passport content"
+- Commit phiên này: chuẩn bị commit "feat: restore cached passport ai"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này khôi phục Passport AI sau khi nhận ra bước trước đã bỏ quá tay, đồng thời đổi provider sang OpenAI-compatible endpoint `https://v98store.com/v1` với model `deepseek-v4-flash` và thêm cache server-side để không tốn quota mỗi lần user mở Passport.
+
+### Đã xong
+- `features/passport/PassportDrawer.tsx`: khôi phục section `Passport AI` dạng insight ngắn, đặt sau CTA ownership để `How to own it for real` vẫn dễ thấy; UI không nhắc tên env/provider kỹ thuật.
+- `app/api/passport/narrate/route.ts`: đổi từ Anthropic hard-code sang OpenAI-compatible `/chat/completions`; đọc `PASSPORT_AI_API_KEY`, `PASSPORT_AI_BASE_URL`, `PASSPORT_AI_MODEL`; mặc định base/model theo v98store/deepseek-v4-flash.
+- `lib/passport/cache.ts`, `lib/passport/cache.server.ts`: thêm cache theo `tokenId` + fingerprint dữ liệu thật, TTL 7 ngày, lưu server-side ở `data/passport-ai-cache.json` (đã gitignore). Chỉ cache kết quả AI thật; fallback không cache để khi thêm key có thể generate AI ngay.
+- `lib/passport/prompt.ts`, `prompts/passport-narration.md`: đổi prompt sang insight ngắn 2-4 câu, không lặp nhãn `Reference price:`, `Custody:`, `Provenance:`.
+- `tests/passport-ai.test.mts`, `scripts/e2e.mjs`: thêm regression cho fallback insight, fingerprint bỏ qua `asOf`, fingerprint đổi khi data đổi, TTL 7 ngày, và modal phải render Passport AI.
+- `README.md`, `.env.example`, `env.example.txt`: cập nhật hướng dẫn `PASSPORT_AI_*` và ghi rõ server cache 7 ngày.
+- Verify mới nhất: `npm.cmd run test:unit` PASS; `npm.cmd run lint` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua server tạm `http://127.0.0.1:3012` PASS, console errors none; bundle scan `.next/static` không có `rk_`/`rsk_`/`X-Api-Secret`/`PASSPORT_AI_API_KEY`/`ANTHROPIC_API_KEY`/write-SDK symbols.
+
+### Tiếp theo
+1. Nếu muốn test AI thật, thêm `PASSPORT_AI_API_KEY=...` vào `.env.local`, giữ mặc định `PASSPORT_AI_BASE_URL=https://v98store.com/v1` và `PASSPORT_AI_MODEL=deepseek-v4-flash`, restart server, mở một Passport và kiểm tra `data/passport-ai-cache.json` được tạo.
+2. Khi deploy production, thay file cache JSON bằng Redis/KV/DB nếu cần chạy nhiều instance.
+
+### Cảnh báo
+- Server `localhost:3001` trong browser có thể vẫn là process cũ; cần restart local server để thấy Passport AI/cache mới.
+- `data/passport-ai-cache.json` không được commit; đây là cache runtime.
+
+### Nhật ký
+- 2026-07-08 codex: Khôi phục Passport AI theo insight gọn, đổi provider sang OpenAI-compatible v98store/deepseek-v4-flash, thêm cache quota-safe 7 ngày theo fingerprint dữ liệu.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 01:44 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `5a91b77` — "feat: make passport a wide modal"

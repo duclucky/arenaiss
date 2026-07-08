@@ -75,9 +75,12 @@ the live alpha on 2026-07-07).
   slab-scan (`/v1/graded/by-image`) are noted as **stretch**, not built — the hero loop
   came first (anti-scope-creep per `docs/build-plan.md §10`).
 - Odds are estimated (see Assumptions), not on-chain-authoritative.
-- The **Card Passport AI narration** runs server-side. Without `ANTHROPIC_API_KEY` it
-  falls back to a deterministic summary built from the *same validated data* — still
-  citing source + time, never asserting fraud, always with a caveat.
+- The **Card Passport AI insight** runs server-side through an OpenAI-compatible
+  provider. Without `PASSPORT_AI_API_KEY` it falls back to a deterministic insight
+  built from the *same validated data* — still grounded, never asserting fraud,
+  always with a caveat. Successful AI generations are cached server-side by
+  `tokenId` + source-data fingerprint for 7 days, so reopening the same Passport
+  does not spend provider quota again.
 
 ## Safety (a scored criterion — designed in, not bolted on)
 
@@ -87,7 +90,7 @@ the live alpha on 2026-07-07).
 - **All keys server-side.** Partner key/secret live in route handlers
   (`lib/renaiss/index.server.ts`, guarded by `server-only`); never `NEXT_PUBLIC_`.
   *Verified*: a production build + bundle scan finds no `rk_`/`rsk_`, no
-  `X-Api-Secret`, no `ANTHROPIC_API_KEY`, and none of the transactional SDK symbols
+  `X-Api-Secret`, no `PASSPORT_AI_API_KEY`, and none of the transactional SDK symbols
   in `.next/static`.
 - **Virtual economy.** Opening a pack is **simulated** — no USDT, no signing, no
   on-chain tx. Credits are virtual, earned by playing, and not redeemable.
@@ -112,8 +115,10 @@ npm install
 #   RENAISS_INDEX_API_SECRET=rsk_...
 #   RENAISS_INDEX_BASE=https://api.renaissos.com
 #   RENAISS_MARKETPLACE_BASE=https://api.renaiss.xyz
-# optional — enables real LLM Card Passport narration (else deterministic fallback):
-#   ANTHROPIC_API_KEY=sk-ant-...
+# optional — enables real LLM Card Passport insight (else deterministic fallback):
+#   PASSPORT_AI_BASE_URL=https://v98store.com/v1
+#   PASSPORT_AI_MODEL=deepseek-v4-flash
+#   PASSPORT_AI_API_KEY=your_provider_key_here
 # required for stable login sessions outside local throwaway testing:
 #   AUTH_SECRET=replace_with_a_random_32_byte_secret
 npm run dev      # http://localhost:3000
@@ -128,7 +133,7 @@ curl "https://api.renaissos.com/v1/search?q=charizard" \
 ### Verify the key-leak guarantee yourself
 ```bash
 npm run build
-grep -rE 'rk_|rsk_|createSecureClient|pullGacha|ANTHROPIC_API_KEY' .next/static   # → no matches
+grep -rE 'rk_|rsk_|createSecureClient|pullGacha|PASSPORT_AI_API_KEY' .next/static   # → no matches
 ```
 
 ### Dev tools (not shipped to the client)

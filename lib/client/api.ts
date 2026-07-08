@@ -79,6 +79,9 @@ export interface NarrationResult {
   text: string;
   mode: 'ai' | 'fallback';
   note?: string;
+  cached?: boolean;
+  generatedAt?: string;
+  model?: string;
 }
 
 export async function narratePassport(payload: unknown): Promise<NarrationResult | null> {

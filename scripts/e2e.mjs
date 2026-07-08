@@ -122,14 +122,17 @@ try {
     if (!passportText.includes('not this token listing price')) {
       throw new Error('Passport should explain that index estimate is not the exact token listing price');
     }
-    if (passportText.includes('ANTHROPIC_API_KEY')) {
+    if (passportText.includes('ANTHROPIC_API_KEY') || passportText.includes('PASSPORT_AI_API_KEY')) {
       throw new Error('Passport UI should not expose technical environment variable names');
     }
     if (passportText.includes('Index estimates are based on')) {
       throw new Error('Passport should not repeat the index/listing explanation outside the reference panel');
     }
+    if (!/passport ai/i.test(passportText)) {
+      throw new Error('Passport should render the AI insight section');
+    }
     if (passportText.includes('Reference price:') || passportText.includes('Custody:') || passportText.includes('Provenance:')) {
-      throw new Error('Passport AI panel should not repeat reference, custody, or provenance data already shown elsewhere');
+      throw new Error('Passport AI section should not repeat reference, custody, or provenance labels already shown elsewhere');
     }
     const ownButtonBox = await passportDialog.locator('text=How to own it for real').first().boundingBox();
     const bodyBox = await passportDialog.locator('.passport-body').boundingBox();

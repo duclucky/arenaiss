@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 // System prompt for Card Passport AI narration. Keep in sync with prompts/passport-narration.md.
 export const PASSPORT_SYSTEM_PROMPT = `You are "Card Passport", a transparent collector assistant for Renaiss
-(RWA collectibles: graded cards on BNB Chain). Your task is to read the real data
-for ONE card and explain, in plain collector language, what the card is, what its
-on-chain history shows, how it is custodied, and how reliable the reference price is.
+(RWA collectibles: graded cards on BNB Chain). The UI already shows the raw
+reference estimate, custody chips, and on-chain activity table. Your task is to add
+a short collector insight that helps a player understand the card without repeating
+those raw fields.
 
 INVARIANT RULES:
 1. Use ONLY the data supplied in the message. Never invent numbers or infer missing
@@ -27,15 +28,13 @@ INVARIANT RULES:
 VOICE: clear, friendly, concise, and grounded. Avoid hype and marketing language.
 
 OUTPUT FORMAT:
-- Summary: 1-2 sentences explaining what the card is.
-- Provenance: brief on-chain journey with timestamps/txHashes when present. If there
-  are signals worth checking, frame them as signals, not conclusions.
-- Custody: where/how it is held and what that means for a collector.
-- Reference price: price range/value, confidence, source, and time; mention thin data
-  or divergent methods when applicable.
-- Final caveat: beta reference, not verified market truth, not financial advice.
-If the data is too sparse to say something meaningful, say that directly instead of
-filling space with speculation.`;
+Write 2-4 short sentences, maximum 120 words. Do not use section labels such as
+"Summary:", "Provenance:", "Custody:", or "Reference price:". Do not repeat the
+full price, vault location, tx list, or source table already shown by the UI. You may
+mention confidence or thin data in plain language when it affects interpretation.
+End with a compact caveat that this is experimental reference data, not verified
+market truth or financial advice. If the data is too sparse to say something
+meaningful, say that directly instead of filling space with speculation.`;
 
 // Input contract matching prompts/passport-narration.md; route validates with Zod.
 export const PassportInputSchema = z.object({
@@ -79,48 +78,24 @@ export type PassportInput = z.infer<typeof PassportInputSchema>;
 export function fallbackNarration(input: PassportInput): string {
   const { card, custody, onchain, reference, asOf } = input;
   const asOfShort = asOf.slice(0, 10);
-  const lines: string[] = [];
-
   const gradeStr = [card.gradingCompany, card.grade].filter(Boolean).join(' ');
-  lines.push(
-    `**${card.name}**${card.setName ? ` from ${card.setName}` : ''}${gradeStr ? `, graded ${gradeStr}` : ''}${card.year ? `, released in ${card.year}` : ''}.`,
-  );
-
-  // Provenance
+  const identity = `**${card.name}**${card.setName ? ` from ${card.setName}` : ''}${gradeStr ? `, graded ${gradeStr}` : ''}${card.year ? `, released in ${card.year}` : ''}`;
   const acts = onchain.activities ?? [];
-  if (acts.length > 0) {
-    const last = acts[0];
-    const when = last.timestamp ? new Date(Number(last.timestamp) * 1000).toISOString().slice(0, 10) : 'unknown date';
-    lines.push(
-      `**Provenance:** ${acts.length} on-chain activities are recorded; the latest is "${last.type}" (${when}${last.txHash ? `, tx ${last.txHash.slice(0, 10)}...` : ''}). This is historical data only, with no extra inference.`,
-    );
-  } else {
-    lines.push('**Provenance:** no on-chain activity data is available for this card.');
-  }
+  const history = acts.length > 0
+    ? `It has ${acts.length} recorded on-chain event${acts.length === 1 ? '' : 's'}, so there is a visible custody trail rather than just a static catalog entry.`
+    : 'The current dataset does not include on-chain activity for this card, so the visible trail is sparse.';
+  const custodyHint = custody.vaultLocation || custody.countryCode
+    ? 'The vault metadata gives enough context to understand this as a custodied physical collectible represented on-chain.'
+    : 'Custody metadata is incomplete, so treat the physical-location context as unavailable.';
+  const confidence = reference?.confidence ?? null;
+  const thin = reference?.observationCount != null && reference.observationCount < 10;
+  const referenceHint = reference?.priceUsd != null
+    ? `The index match exists as of ${asOfShort}${confidence ? ` with ${confidence} confidence` : ''}${thin ? ', but the sample is thin' : ''}.`
+    : 'No matched index estimate is available, so the Passport should be read mostly from identity, custody, and activity data.';
 
-  // Custody
-  if (custody.vaultLocation || custody.countryCode) {
-    lines.push(
-      `**Custody:** ${custody.vaultLocation ? `vault type "${custody.vaultLocation}"` : 'vault type is unknown'}${custody.countryCode ? `, located in ${custody.countryCode}` : ''}. The physical card is held in custody; the on-chain record represents the vaulted item.`,
-    );
-  } else {
-    lines.push('**Custody:** no custody data is available for this card.');
-  }
-
-  // Reference price
-  if (reference && reference.priceUsd != null) {
-    const conf = reference.confidence ?? 'unknown';
-    const thin = reference.observationCount != null && reference.observationCount < 10;
-    lines.push(
-      `**Reference price:** ~$${reference.priceUsd.toLocaleString('en-US')} according to ${reference.source}, confidence ${conf}${reference.observationCount != null ? `, based on ${reference.observationCount} observations` : ''} (as of ${asOfShort}).` +
-        (thin ? ' The observation count is thin, so treat this as experimental reference data.' : ''),
-    );
-  } else {
-    lines.push('**Reference price:** no Renaiss OS Index price data is available for this card, or it could not be matched.');
-  }
-
-  lines.push(
-    '_This is beta data: experimental reference, not verified market truth, and not financial advice._',
-  );
-  return lines.join('\n\n');
+  return [
+    `${identity}. ${history}`,
+    `${custodyHint} ${referenceHint}`,
+    '_Experimental reference data only; not verified market truth or financial advice._',
+  ].join('\n\n');
 }
