@@ -125,6 +125,8 @@ try {
   // Start battle and play to result. Credit balance should deduct stake before payout.
   await goBattle.click();
   await page.waitForSelector('text=BATTLE LOG', { timeout: 10000 });
+  await page.waitForSelector('text=How battles work', { timeout: 5000 });
+  await page.waitForSelector('text=Type advantage matters', { timeout: 5000 });
   await page.waitForSelector('text=ROUND', { timeout: 5000 });
   await page.waitForSelector('text=9600', { timeout: 5000 });
   log('ok battle started and 100-credit stake deducted');

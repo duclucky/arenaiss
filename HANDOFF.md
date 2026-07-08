@@ -12,6 +12,41 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 battle log split panels
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `654c2d7` — "fix: strengthen battle fx visuals"
+- Commit phiên này: chuẩn bị commit `fix: split battle log and rules panels`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý phản hồi user rằng phần log battle khó đọc và cần chia thành 2 panel: log riêng, giải thích luật chơi riêng.
+
+### Đã xong
+- `features/battle/Battle.tsx`: thay block log cũ bằng `BattleInfo`, gồm panel `BATTLE LOG / Round history` và panel `RULES / How battles work`.
+- `features/battle/Battle.tsx`: log từng round được tách ý rõ hơn: ai chọn stat, ai thắng, điểm You/Opponent, card nào KO, ghi chú type matchup.
+- `features/battle/Battle.tsx`: panel luật chơi giải thích stat, type advantage, tie, KO, stake/payout virtual credit bằng hằng số economy hiện tại.
+- `app/globals.css`: thêm layout hai panel responsive, row log dễ quét, badge KO và màu thắng/thua.
+- `scripts/e2e.mjs`: thêm regression kiểm tra battle screen có panel `How battles work` và dòng luật `Type advantage matters`.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3026`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+
+### Tiếp theo
+1. Reload `localhost:3001` để xem battle log mới.
+2. Nếu user muốn đọc luật nhanh hơn nữa, có thể rút gọn panel rules thành icon/badge nhưng hiện tại đã tách khỏi log đúng yêu cầu.
+
+### Cảnh báo
+- Không có cảnh báo build/test mới.
+
+### Nhật ký
+- 2026-07-08 codex: Tách battle log thành log panel và rules panel, không chạm battle engine.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 battle FX visual polish
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `6106d10` — "feat: battle FX timeline (framer-motion)"

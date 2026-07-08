@@ -622,6 +622,121 @@ a { color: inherit; }
   color: var(--text-dim);
   font-size: 10px;
 }
+.battle-info-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.85fr);
+  gap: 14px;
+  margin-top: 18px;
+  align-items: stretch;
+}
+.battle-log-panel,
+.battle-rules-panel {
+  padding: 14px;
+  background: rgba(21, 26, 35, 0.82);
+}
+.battle-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.battle-panel-kicker {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+.battle-panel-head h3 {
+  margin: 2px 0 0;
+  font-size: 15px;
+}
+.battle-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.battle-log-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 11px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035);
+}
+.battle-log-row[data-winner='player'] {
+  border-color: rgba(47, 211, 165, 0.22);
+}
+.battle-log-row[data-winner='opponent'] {
+  border-color: rgba(255, 107, 107, 0.22);
+}
+.battle-log-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 900;
+  background: rgba(229, 192, 123, 0.13);
+  color: var(--accent);
+}
+.battle-log-main {
+  min-width: 0;
+}
+.battle-log-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+.battle-log-win {
+  color: var(--win);
+}
+.battle-log-loss {
+  color: var(--loss);
+}
+.battle-log-score {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.battle-log-ko {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--loss);
+  font-size: 10px;
+  font-weight: 800;
+}
+.battle-log-note {
+  margin-top: 5px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.battle-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-sub);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.battle-rule-list b {
+  color: var(--text);
+}
 @keyframes battleStrike {
   0% { transform: translateY(-8px) scale(1.04); }
   38% { transform: translateY(-14px) scale(1.08); }
@@ -639,6 +754,11 @@ a { color: inherit; }
   }
   .slab-stat.hot {
     transform: none;
+  }
+}
+@media (max-width: 900px) {
+  .battle-info-grid {
+    grid-template-columns: 1fr;
   }
 }
 

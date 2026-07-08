@@ -6,6 +6,7 @@ import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
 import { BattleFx, battleCardMotion } from './BattleFx';
 import { useCombatTimeline } from './useCombatTimeline';
+import { BATTLE_STAKE, WIN_REWARD } from '@/lib/game/gacha';
 import {
   chooseStatGreedy,
   previewRound,
@@ -13,6 +14,7 @@ import {
   STAT_LABEL,
   type StatKey,
   type RoundResult,
+  type Side,
 } from '@/lib/game/battle';
 import type { GameCard } from '@/lib/game/stats';
 import { ELEMENT_GLYPH, typeVerdict } from '@/lib/game/stats';
@@ -184,23 +186,75 @@ export function Battle() {
         )}
       </div>
 
-      <div style={{ marginTop: 18 }}>
-        <div style={{ fontSize: 11, letterSpacing: '0.12em', color: 'var(--text-dim)', marginBottom: 8 }}>BATTLE LOG - WHY EACH ROUND WON</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
-          {[...battle.rounds].reverse().map((r) => (
-            <div key={r.index} className="panel anim-fade" style={{ padding: '9px 12px', display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span style={{ width: 22, height: 22, borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, background: r.winner === 'player' ? 'rgba(47,211,165,0.15)' : 'rgba(255,107,107,0.15)', color: r.winner === 'player' ? 'var(--win)' : 'var(--loss)' }}>
-                {r.index + 1}
-              </span>
-              <span style={{ fontSize: 12.5, color: 'var(--text-sub)', flex: 1 }}>{r.reason}</span>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.typeNote}</span>
-            </div>
-          ))}
-          {battle.rounds.length === 0 && <p className="caveat">No rounds yet - attack to begin.</p>}
+      <BattleInfo rounds={battle.rounds} />
+    </div>
+  );
+}
+
+function BattleInfo({ rounds }: { rounds: RoundResult[] }) {
+  return (
+    <div className="battle-info-grid">
+      <section className="panel battle-log-panel">
+        <div className="battle-panel-head">
+          <div>
+            <div className="battle-panel-kicker">BATTLE LOG</div>
+            <h3>Round history</h3>
+          </div>
+          <span className="chip">{rounds.length} rounds</span>
         </div>
+        <div className="battle-log-list">
+          {[...rounds].reverse().map((r) => <RoundLogRow key={r.index} round={r} />)}
+          {rounds.length === 0 && <p className="caveat">No rounds yet - attack to begin.</p>}
+        </div>
+      </section>
+
+      <section className="panel battle-rules-panel">
+        <div className="battle-panel-head">
+          <div>
+            <div className="battle-panel-kicker">RULES</div>
+            <h3>How battles work</h3>
+          </div>
+        </div>
+        <ul className="battle-rule-list">
+          <li><b>Choose a stat.</b> The attacker picks ATK, DEF, or AURA; both cards compare that same stat.</li>
+          <li><b>Type advantage matters.</b> Element matchups can boost or reduce the effective score shown in the log.</li>
+          <li><b>Higher score wins.</b> If scores tie, the current attacker wins the edge.</li>
+          <li><b>Loser is KO.</b> The losing card leaves the lineup. Battle ends when one side has no cards left.</li>
+          <li><b>Virtual stake.</b> Starting costs {BATTLE_STAKE} credits; a win pays {WIN_REWARD}. Credits are not real money.</li>
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function RoundLogRow({ round }: { round: RoundResult }) {
+  const playerWon = round.winner === 'player';
+  const attackerLabel = sideLabel(round.attacker);
+  const winnerLabel = sideLabel(round.winner);
+  const loserLabel = sideLabel(round.loser);
+
+  return (
+    <div className="battle-log-row anim-fade" data-winner={round.winner}>
+      <span className="battle-log-index">{round.index + 1}</span>
+      <div className="battle-log-main">
+        <div className="battle-log-title">
+          <span>{attackerLabel} chose {STAT_LABEL[round.stat]}</span>
+          <span className={playerWon ? 'battle-log-win' : 'battle-log-loss'}>{winnerLabel} won</span>
+        </div>
+        <div className="battle-log-score tabnums">
+          <span>You {round.playerEff}</span>
+          <span>vs</span>
+          <span>Opponent {round.opponentEff}</span>
+          <span className="battle-log-ko">{loserLabel} card KO</span>
+        </div>
+        <div className="battle-log-note mono">{round.typeNote}</div>
       </div>
     </div>
   );
+}
+
+function sideLabel(side: Side) {
+  return side === 'player' ? 'You' : 'Opponent';
 }
 
 function TypeArrow({ p, o }: { p: GameCard; o: GameCard }) {
