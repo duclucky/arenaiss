@@ -12,6 +12,31 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 03:52 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `b8ce9c2` — "fix: polish passport bullet copy"
+- Commit phiên này: chuẩn bị commit "fix: collapse marketplace panel"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này xử lý browser comment trong Passport modal: bỏ link `View all Renaiss packs` và thay bằng nút thu gọn để user quay lại đọc Passport AI mà không cần cuộn xuống.
+
+### Đã xong
+- `features/passport/PassportDrawer.tsx`: bỏ link `View all Renaiss packs`; thay bằng button `Collapse marketplace`.
+- `features/passport/PassportDrawer.tsx`: bỏ import `renaissGachaUrl` không còn dùng.
+- `scripts/e2e.mjs`: thêm regression đảm bảo link `View all Renaiss packs` không render, nút collapse tồn tại, collapse ẩn panel marketplace và khôi phục CTA `Check on Renaiss Marketplace`.
+- Verify mới nhất: `npm.cmd run lint` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua server tạm `http://127.0.0.1:3018` PASS, console errors none; bundle scan `.next/static` không có secret/write-SDK symbols.
+
+### Tiếp theo
+1. Restart server đang chạy ở `localhost:3001` để browser thấy nút collapse mới.
+
+### Cảnh báo
+- Không có cảnh báo mới.
+
+### Nhật ký
+- 2026-07-08 codex: Marketplace panel trong Passport giờ có thể collapse, không còn link tổng `View all Renaiss packs`.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 03:34 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `ee5b907` — "feat: restore cached passport ai"

@@ -12,7 +12,7 @@ import {
   type NarrationResult,
 } from '@/lib/client/api';
 import type { CardDetail, IndexCard, CardPack, Activity } from '@/lib/renaiss/schemas';
-import { renaissCardUrl, renaissGachaPackUrl, renaissGachaUrl } from '@/lib/renaiss/links';
+import { renaissCardUrl, renaissGachaPackUrl } from '@/lib/renaiss/links';
 import { STAT_FORMULA_NOTES, ELEMENT_GLYPH, type GameCard } from '@/lib/game/stats';
 
 function fmtDate(ts: string | number | null | undefined): string {
@@ -342,9 +342,9 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
                           <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 800 }}>Open</span>
                         </a>
                       ))}
-                      <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissGachaUrl()} target="_blank" rel="noreferrer">
-                        View all Renaiss packs
-                      </a>
+                      <button className="btn" style={{ width: '100%' }} onClick={() => setShowReal(false)}>
+                        Collapse marketplace
+                      </button>
                     </div>
                   )}
                 </div>

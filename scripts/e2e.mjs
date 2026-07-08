@@ -163,6 +163,13 @@ try {
       if (await page.locator('text=150000000000000000000').count()) throw new Error('Pack price should be formatted, not raw base units');
       const packLinkCount = await page.locator('a[href*="/gacha/"]').count();
       if (packLinkCount < 1) throw new Error('Real pack links should target the specific Renaiss gacha pack');
+      if (await passportDialog.locator('text=View all Renaiss packs').count()) {
+        throw new Error('Expanded marketplace panel should not render the View all Renaiss packs link');
+      }
+      const collapseBtn = passportDialog.locator('button', { hasText: 'Collapse marketplace' });
+      if (await collapseBtn.count() < 1) {
+        throw new Error('Expanded marketplace panel should provide a collapse button');
+      }
       const listedCardBuy = await passportDialog.locator('a', { hasText: 'Buy exact listed card · Ask' }).count();
       const unlistedCardOpen = await passportDialog.locator('a', { hasText: 'Open exact card page' }).count();
       if (listedCardBuy + unlistedCardOpen < 1) throw new Error('Ownership CTA should distinguish exact-token ask price from index estimate');
@@ -170,6 +177,15 @@ try {
       if (cardLinks < 1) throw new Error('Direct marketplace action should target the exact Renaiss card page');
       const homepageOnlyLinks = await page.locator('[role="dialog"][aria-label="Card Passport"] a[href="https://www.renaiss.xyz"], [role="dialog"][aria-label="Card Passport"] a[href="https://renaiss.xyz"]').count();
       if (homepageOnlyLinks > 0) throw new Error('Ownership links should not point to the Renaiss homepage');
+      await collapseBtn.click();
+      await page.waitForTimeout(300);
+      if (await passportDialog.locator('a', { hasText: 'Buy exact listed card · Ask' }).count()) {
+        throw new Error('Collapse marketplace should hide the expanded marketplace panel');
+      }
+      if (await passportDialog.locator('button', { hasText: 'Check on Renaiss Marketplace' }).count() < 1) {
+        throw new Error('Collapse marketplace should restore the primary marketplace CTA');
+      }
+      await passportDialog.locator('[data-testid="passport-ai-list"] li').first().waitFor({ timeout: 5000 });
       await page.screenshot({ path: `${OUT}/08-own-real.png` });
     }
     log('✓ passport drawer opened');
