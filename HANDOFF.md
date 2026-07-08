@@ -12,6 +12,41 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 battle FX visual polish
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `6106d10` — "feat: battle FX timeline (framer-motion)"
+- Commit phiên này: chuẩn bị commit `fix: strengthen battle fx visuals`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý phản hồi user: FX vẫn chưa đặc sắc và đường kẻ dọc giữa arena gây khó chịu.
+
+### Đã xong
+- `app/globals.css`: bỏ divider dọc giữa battle arena; thay bằng stage glow ngang và nền arena đổi theo stat đang clash.
+- `app/globals.css`: tăng độ rõ của ATK beam/slash, DEF shield, AURA pulse, impact ring, sparks và stage overlay.
+- `features/battle/BattleFx.tsx`: tăng lunge distance/scale/impact shake cho card motion; thêm spark streak elements và stage FX variants.
+- `features/battle/Battle.tsx`: thêm `data-combat-stat` cho arena để CSS đổi motif theo stat mà không chạm battle engine.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3025`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+- Visual spot-check screenshot: `.e2e-output/06-battle-fx.png` xác nhận không còn đường kẻ dọc và ATK slash rõ hơn.
+
+### Tiếp theo
+1. Reload `localhost:3001` để xem FX mới.
+2. Nếu user vẫn muốn “đặc sắc” hơn nữa, ưu tiên tăng art direction ở battle stage/FX assets riêng thay vì đổi engine.
+
+### Cảnh báo
+- Không có cảnh báo build/test mới.
+
+### Nhật ký
+- 2026-07-08 codex: Polish visual battle FX sau phản hồi trực tiếp; giữ battle logic deterministic.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 battle FX timeline
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `a722544` — "feat: update gacha economy and battle ui"

@@ -27,6 +27,11 @@ const PARTICLES = [
   [-17, -52], [20, -55], [54, 14], [-55, 16],
 ] as const;
 
+const SPARKS = [
+  [-88, -22, -16], [-62, 24, 12], [-34, -46, -8], [0, 38, 0],
+  [34, -44, 8], [64, 22, -10], [88, -18, 16], [18, -64, 24],
+] as const;
+
 function sideX(side: Side) {
   return side === 'player' ? -1 : 1;
 }
@@ -49,24 +54,24 @@ export function battleCardMotion(
   const isAttacker = round.attacker === side;
   const isWinner = round.winner === side;
   const dir = sideX(side);
-  const attackDistance = round.stat === 'atk' ? 92 : round.stat === 'def' ? 54 : 68;
+  const attackDistance = round.stat === 'atk' ? 132 : round.stat === 'def' ? 82 : 104;
 
   if (phase === 'lockIn') {
-    return { x: -dir * 10, y: 5, scale: 0.98, rotate: -dir * 1.5, filter: 'grayscale(0) brightness(1.08)' };
+    return { x: -dir * 16, y: 8, scale: 0.97, rotate: -dir * 2.4, filter: 'grayscale(0) brightness(1.1)' };
   }
   if (phase === 'clash') {
     return isAttacker
-      ? { x: -dir * attackDistance, y: -8, scale: 1.09, rotate: -dir * 4, filter: 'grayscale(0) brightness(1.18)' }
-      : { x: 0, y: 0, scale: 1.02, rotate: 0, filter: 'grayscale(0) brightness(1.05)' };
+      ? { x: -dir * attackDistance, y: -14, scale: 1.14, rotate: -dir * 6, filter: 'grayscale(0) brightness(1.24) saturate(1.16)' }
+      : { x: 0, y: 0, scale: 1.03, rotate: 0, filter: 'grayscale(0) brightness(1.08)' };
   }
   if (phase === 'impact') {
-    if (isAttacker) return { x: -dir * (attackDistance - 18), y: -4, scale: 1.07, rotate: -dir * 2, filter: 'grayscale(0) brightness(1.2)' };
+    if (isAttacker) return { x: -dir * (attackDistance - 22), y: -8, scale: 1.12, rotate: -dir * 3, filter: 'grayscale(0) brightness(1.28) saturate(1.2)' };
     return {
-      x: [0, dir * 8, -dir * 7, dir * 5, 0],
-      y: [0, -3, 3, -2, 0],
+      x: [0, dir * 14, -dir * 12, dir * 8, 0],
+      y: [0, -6, 5, -3, 0],
       scale: 1.02,
-      rotate: [0, dir * 2, -dir * 2, 0],
-      filter: 'grayscale(0) brightness(1.12)',
+      rotate: [0, dir * 3, -dir * 3, 0],
+      filter: 'grayscale(0) brightness(1.16)',
     };
   }
   if (phase === 'resolve') {
@@ -87,17 +92,17 @@ const layerVariants: Variants = {
 
 const beamVariants: Variants = {
   lockIn: { opacity: 0, scaleX: 0.1, scaleY: 0.7 },
-  clash: { opacity: 1, scaleX: 1, scaleY: 1, transition: { duration: 0.2, ease: 'easeOut' } },
-  impact: { opacity: 0.9, scaleX: 1.04, scaleY: 1.28, transition: { duration: 0.12, ease: 'circOut' } },
-  resolve: { opacity: 0, scaleX: 0.72, scaleY: 0.8, transition: { duration: 0.22 } },
+  clash: { opacity: 1, scaleX: 1, scaleY: 1, transition: { duration: 0.22, ease: 'easeOut' } },
+  impact: { opacity: 1, scaleX: 1.12, scaleY: 1.45, transition: { duration: 0.12, ease: 'circOut' } },
+  resolve: { opacity: 0, scaleX: 0.82, scaleY: 0.9, transition: { duration: 0.22 } },
   settle: { opacity: 0, scaleX: 0.1 },
 };
 
 const impactVariants: Variants = {
   lockIn: { opacity: 0, scale: 0.3 },
   clash: { opacity: 0, scale: 0.5 },
-  impact: { opacity: [0, 1, 0.2], scale: [0.4, 1.35, 0.9], transition: { duration: 0.22, ease: 'circOut' } },
-  resolve: { opacity: 0, scale: 1.6, transition: { duration: 0.18 } },
+  impact: { opacity: [0, 1, 0.16], scale: [0.32, 1.72, 1.08], transition: { duration: 0.24, ease: 'circOut' } },
+  resolve: { opacity: 0, scale: 2.05, transition: { duration: 0.2 } },
   settle: { opacity: 0 },
 };
 
@@ -111,9 +116,9 @@ const shieldVariants: Variants = {
 
 const pulseVariants: Variants = {
   lockIn: { opacity: 0, scale: 0.4 },
-  clash: { opacity: 0.8, scale: 1.25, transition: { duration: 0.3, ease: 'easeOut' } },
-  impact: { opacity: 0.55, scale: 1.85, transition: { duration: 0.22, ease: 'circOut' } },
-  resolve: { opacity: 0, scale: 2.25, transition: { duration: 0.22 } },
+  clash: { opacity: 0.9, scale: 1.48, transition: { duration: 0.32, ease: 'easeOut' } },
+  impact: { opacity: 0.72, scale: 2.25, transition: { duration: 0.24, ease: 'circOut' } },
+  resolve: { opacity: 0, scale: 2.8, transition: { duration: 0.24 } },
   settle: { opacity: 0 },
 };
 
@@ -128,6 +133,28 @@ const particleVariants: Variants = {
     scale: [0.45, 1, 0.25],
     transition: { duration: 0.48, ease: 'easeOut' },
   }),
+  settle: { opacity: 0 },
+};
+
+const sparkVariants: Variants = {
+  lockIn: { opacity: 0, x: 0, y: 0, scaleX: 0.2 },
+  clash: (spark: readonly [number, number, number]) => ({
+    opacity: 0.92,
+    x: spark[0] * 0.45,
+    y: spark[1] * 0.45,
+    rotate: spark[2],
+    scaleX: 1,
+    transition: { duration: 0.22, ease: 'easeOut' },
+  }),
+  impact: (spark: readonly [number, number, number]) => ({
+    opacity: [1, 0.35],
+    x: spark[0],
+    y: spark[1],
+    rotate: spark[2] * 1.8,
+    scaleX: 1.35,
+    transition: { duration: 0.18, ease: 'circOut' },
+  }),
+  resolve: { opacity: 0, scaleX: 0.4, transition: { duration: 0.18 } },
   settle: { opacity: 0 },
 };
 
@@ -170,6 +197,17 @@ export function BattleFx({ fxRound, phase, reduced, onSkip }: BattleFxProps) {
         onPointerDown={onSkip}
       >
         <motion.div
+          className={`battle-fx-stage battle-fx-stage-${round.stat}`}
+          variants={{
+            lockIn: { opacity: 0.42, scale: 0.96 },
+            clash: { opacity: 0.78, scale: 1.04, transition: { duration: 0.22, ease: 'easeOut' } },
+            impact: { opacity: 0.9, scale: 1.08, transition: { duration: 0.16 } },
+            resolve: { opacity: 0.35, scale: 1.03 },
+            settle: { opacity: 0, scale: 1 },
+          }}
+        />
+
+        <motion.div
           className="battle-fx-label"
           variants={{
             lockIn: { opacity: 1, y: 2, scale: 0.94 },
@@ -207,6 +245,14 @@ export function BattleFx({ fxRound, phase, reduced, onSkip }: BattleFxProps) {
         )}
 
         {!reduced && <motion.div className="battle-fx-impact" variants={impactVariants} />}
+
+        {!reduced && (
+          <motion.div className="battle-fx-sparks">
+            {SPARKS.map((spark, i) => (
+              <motion.span key={i} custom={spark} variants={sparkVariants} />
+            ))}
+          </motion.div>
+        )}
 
         {!reduced && (
           <motion.div

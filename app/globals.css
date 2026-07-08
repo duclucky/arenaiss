@@ -244,19 +244,63 @@ a { color: inherit; }
   padding: 28px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 24% 50%, rgba(229, 192, 123, 0.13), transparent 32%),
-    radial-gradient(circle at 76% 50%, rgba(255, 107, 107, 0.12), transparent 34%),
+    linear-gradient(112deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 18px),
+    linear-gradient(68deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 22px),
+    radial-gradient(ellipse at 24% 52%, rgba(229, 192, 123, 0.16), transparent 36%),
+    radial-gradient(ellipse at 76% 52%, rgba(76, 141, 255, 0.13), transparent 36%),
     linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
 }
 .battle-arena::before {
   content: '';
   position: absolute;
-  left: 50%;
-  top: 12%;
-  bottom: 12%;
-  width: 1px;
-  background: linear-gradient(transparent, rgba(229,192,123,0.45), transparent);
-  box-shadow: 0 0 24px rgba(229,192,123,0.3);
+  left: 12%;
+  right: 12%;
+  bottom: 9%;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(229,192,123,0.18), transparent 70%);
+  filter: blur(8px);
+  opacity: 0.78;
+  pointer-events: none;
+}
+.battle-arena::after {
+  content: '';
+  position: absolute;
+  inset: 12% 10%;
+  border-radius: 24px;
+  background:
+    linear-gradient(90deg, transparent 0 18%, rgba(255,255,255,0.045) 48%, transparent 82%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.05), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.battle-arena[data-combat-active='true']::after {
+  opacity: 1;
+}
+.battle-arena[data-combat-stat='atk'] {
+  background:
+    linear-gradient(112deg, rgba(255,107,74,0.08) 0 1px, transparent 1px 18px),
+    linear-gradient(68deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 22px),
+    radial-gradient(ellipse at 24% 52%, rgba(255,107,74,0.2), transparent 38%),
+    radial-gradient(ellipse at 76% 52%, rgba(255,107,74,0.12), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+}
+.battle-arena[data-combat-stat='def'] {
+  background:
+    linear-gradient(112deg, rgba(76,141,255,0.08) 0 1px, transparent 1px 18px),
+    linear-gradient(68deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 22px),
+    radial-gradient(ellipse at 24% 52%, rgba(76,141,255,0.18), transparent 38%),
+    radial-gradient(ellipse at 76% 52%, rgba(76,141,255,0.2), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+}
+.battle-arena[data-combat-stat='aura'] {
+  background:
+    linear-gradient(112deg, rgba(162,119,255,0.08) 0 1px, transparent 1px 18px),
+    linear-gradient(68deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 22px),
+    radial-gradient(ellipse at 30% 52%, rgba(162,119,255,0.18), transparent 38%),
+    radial-gradient(ellipse at 70% 52%, rgba(47,211,165,0.14), transparent 40%),
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
 }
 .battle-card-wrap {
   position: relative;
@@ -322,11 +366,33 @@ a { color: inherit; }
 .battle-fx-layer::before {
   content: '';
   position: absolute;
-  inset: 11% 16%;
+  inset: 9% 12%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 58%);
-  opacity: 0.35;
+  background:
+    radial-gradient(ellipse, color-mix(in srgb, var(--fx-color) 20%, transparent), transparent 58%),
+    linear-gradient(90deg, transparent, rgba(255,255,255,0.11), transparent);
+  opacity: 0.62;
   pointer-events: none;
+}
+.battle-fx-stage {
+  position: absolute;
+  inset: 7% 8%;
+  z-index: 1;
+  border-radius: 28px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--fx-color) 18%, transparent), transparent),
+    radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--fx-color) 18%, transparent), transparent 62%);
+  filter: blur(1px);
+}
+.battle-fx-stage-atk {
+  clip-path: polygon(0 42%, 45% 30%, 100% 48%, 55% 62%, 0 58%);
+}
+.battle-fx-stage-def {
+  border: 1px solid color-mix(in srgb, var(--fx-color) 35%, transparent);
+}
+.battle-fx-stage-aura {
+  border-radius: 50%;
 }
 .battle-fx-label {
   position: absolute;
@@ -346,42 +412,57 @@ a { color: inherit; }
 }
 .battle-fx-beam {
   position: absolute;
-  left: 33%;
-  top: 48%;
-  z-index: 3;
-  width: 34%;
-  height: 9px;
+  left: 25%;
+  top: 47%;
+  z-index: 5;
+  width: 50%;
+  height: 18px;
   transform-origin: center;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--fx-color), #fff, var(--fx-color), transparent);
-  filter: drop-shadow(0 0 10px var(--fx-color));
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--fx-color) 78%, white), #fff, var(--fx-color), transparent);
+  filter: drop-shadow(0 0 14px var(--fx-color)) drop-shadow(0 0 30px color-mix(in srgb, var(--fx-color) 70%, transparent));
   pointer-events: none;
 }
 .battle-fx-layer[data-attacker='opponent'] .battle-fx-beam {
   background: linear-gradient(270deg, transparent, var(--fx-color), #fff, var(--fx-color), transparent);
 }
 .battle-fx-beam-atk {
-  height: 7px;
-  clip-path: polygon(0 42%, 82% 0, 100% 50%, 82% 100%, 0 58%);
+  height: 22px;
+  clip-path: polygon(0 43%, 18% 22%, 78% 0, 100% 50%, 78% 100%, 18% 78%, 0 57%);
+}
+.battle-fx-beam-atk::before,
+.battle-fx-beam-atk::after {
+  content: '';
+  position: absolute;
+  inset: 42% -6%;
+  height: 3px;
+  background: rgba(255,255,255,0.9);
+  transform: rotate(11deg);
+  filter: drop-shadow(0 0 8px #fff);
+}
+.battle-fx-beam-atk::after {
+  transform: rotate(-9deg);
+  opacity: 0.68;
 }
 .battle-fx-beam-def {
-  height: 12px;
+  height: 20px;
   background:
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--fx-color) 60%, white), transparent),
-    repeating-linear-gradient(90deg, transparent 0 16px, rgba(255,255,255,0.7) 17px 19px, transparent 20px 34px);
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--fx-color) 75%, white), transparent),
+    repeating-linear-gradient(90deg, transparent 0 12px, rgba(255,255,255,0.78) 13px 16px, transparent 17px 28px);
 }
 .battle-fx-aura {
   position: absolute;
   left: 50%;
   top: 50%;
   z-index: 3;
-  width: 170px;
-  height: 170px;
-  margin: -85px 0 0 -85px;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--fx-color) 75%, transparent);
   background: radial-gradient(circle, color-mix(in srgb, var(--fx-color) 22%, transparent), transparent 60%);
-  filter: drop-shadow(0 0 18px var(--fx-color));
+  filter: drop-shadow(0 0 24px var(--fx-color));
 }
 .battle-fx-aura span {
   position: absolute;
@@ -396,27 +477,69 @@ a { color: inherit; }
   position: absolute;
   top: 34%;
   z-index: 4;
-  width: 96px;
-  height: 148px;
+  width: 132px;
+  height: 190px;
   border-radius: 48% 48% 42% 42%;
   border: 2px solid color-mix(in srgb, var(--fx-color) 78%, white);
   background: linear-gradient(135deg, color-mix(in srgb, var(--fx-color) 24%, transparent), rgba(255,255,255,0.08));
-  filter: drop-shadow(0 0 18px var(--fx-color));
+  filter: drop-shadow(0 0 24px var(--fx-color));
   pointer-events: none;
+}
+.battle-fx-shield::before,
+.battle-fx-shield::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 18%;
+  height: 2px;
+  background: rgba(255,255,255,0.72);
+  transform: rotate(28deg);
+}
+.battle-fx-shield::after {
+  top: 42%;
+  transform: rotate(-22deg);
 }
 .battle-fx-impact {
   position: absolute;
   left: 50%;
   top: 50%;
   z-index: 4;
-  width: 112px;
-  height: 112px;
-  margin: -56px 0 0 -56px;
+  width: 190px;
+  height: 190px;
+  margin: -95px 0 0 -95px;
   border-radius: 50%;
   background:
     radial-gradient(circle, rgba(255,255,255,0.95), color-mix(in srgb, var(--fx-color) 50%, transparent) 30%, transparent 68%);
-  filter: drop-shadow(0 0 24px var(--fx-color));
+  filter: drop-shadow(0 0 30px var(--fx-color));
   pointer-events: none;
+}
+.battle-fx-impact::before,
+.battle-fx-impact::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--fx-color) 80%, white);
+}
+.battle-fx-impact::after {
+  inset: 34%;
+}
+.battle-fx-sparks {
+  position: absolute;
+  left: 50%;
+  top: 49%;
+  z-index: 6;
+  pointer-events: none;
+}
+.battle-fx-sparks span {
+  position: absolute;
+  width: 54px;
+  height: 3px;
+  margin-left: -27px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #fff, var(--fx-color), transparent);
+  filter: drop-shadow(0 0 10px var(--fx-color));
 }
 .battle-fx-burst {
   position: absolute;

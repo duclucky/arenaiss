@@ -94,6 +94,7 @@ export function Battle() {
       <motion.div
         className="battle-arena panel"
         data-combat-active={combat.active}
+        data-combat-stat={activeStat ?? undefined}
         animate={!combat.reduced && combat.phase === 'impact' ? { x: [0, -4, 5, -3, 0] } : { x: 0 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
         onClick={combat.active ? combat.skip : undefined}
