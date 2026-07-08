@@ -4,20 +4,26 @@ import { useEffect, useRef, useState } from 'react';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
 import {
-  previewRound, chooseStatGreedy,
-  STAT_KEYS, STAT_LABEL, type StatKey,
+  chooseStatGreedy,
+  previewRound,
+  STAT_KEYS,
+  STAT_LABEL,
+  type StatKey,
+  type RoundResult,
 } from '@/lib/game/battle';
 import type { GameCard } from '@/lib/game/stats';
 import { ELEMENT_GLYPH, typeVerdict } from '@/lib/game/stats';
 
 function Pips({ n, side }: { n: number; side: 'p' | 'o' }) {
   return (
-    <div style={{ display: 'flex', gap: 5, flexDirection: side === 'p' ? 'row' : 'row-reverse' }}>
+    <div style={{ display: 'flex', gap: 6, flexDirection: side === 'p' ? 'row' : 'row-reverse' }}>
       {Array.from({ length: 5 }).map((_, i) => (
         <span key={i} style={{
-          width: 14, height: 14, borderRadius: 4,
+          width: 16,
+          height: 16,
+          borderRadius: 5,
           background: i < n ? (side === 'p' ? 'var(--accent)' : 'var(--loss)') : 'rgba(255,255,255,0.08)',
-          boxShadow: i < n ? `0 0 8px ${side === 'p' ? 'var(--accent)' : 'var(--loss)'}` : 'none',
+          boxShadow: i < n ? `0 0 12px ${side === 'p' ? 'var(--accent)' : 'var(--loss)'}` : 'none',
           transition: 'all 0.3s ease',
         }} />
       ))}
@@ -30,27 +36,27 @@ export function Battle() {
   const dispatch = useArenaDispatch();
   const battle = state.battle;
   const [flashStat, setFlashStat] = useState<StatKey | null>(null);
+  const [lastRound, setLastRound] = useState<RoundResult | null>(null);
   const prevRounds = useRef(0);
 
-  // Flash the stat that was just compared.
   useEffect(() => {
     if (!battle) return;
     if (battle.rounds.length > prevRounds.current) {
       const last = battle.rounds[battle.rounds.length - 1];
       setFlashStat(last.stat);
-      const t = setTimeout(() => setFlashStat(null), 750);
+      setLastRound(last);
+      const t = setTimeout(() => setFlashStat(null), 900);
       prevRounds.current = battle.rounds.length;
       return () => clearTimeout(t);
     }
     prevRounds.current = battle.rounds.length;
   }, [battle?.rounds.length, battle]);
 
-  // Opponent turn: greedy choice after a short beat.
   useEffect(() => {
     if (!battle || battle.status !== 'ongoing' || battle.attacker !== 'opponent') return;
     const t = setTimeout(() => {
       dispatch({ type: 'BATTLE_STEP', stat: chooseStatGreedy(battle, 'opponent') });
-    }, 950);
+    }, 1050);
     return () => clearTimeout(t);
   }, [battle, dispatch]);
 
@@ -59,103 +65,96 @@ export function Battle() {
   const pCard: GameCard | undefined = battle.playerQueue[0];
   const oCard: GameCard | undefined = battle.opponentQueue[0];
   const playerTurn = battle.attacker === 'player' && !over;
+  const turn = battle.rounds.length + (over ? 0 : 1);
 
   return (
-    <div className="anim-fade" style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 22px 60px' }}>
-      {/* HP pips */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+    <div className="anim-fade" style={{ maxWidth: 1180, margin: '0 auto', padding: '18px 22px 60px' }}>
+      <div className="battle-topline">
         <div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 5 }}>YOUR DECK</div>
+          <div className="battle-side-label">YOUR LINEUP</div>
           <Pips n={battle.playerQueue.length} side="p" />
         </div>
-        <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-dim)' }}>
-          Turn {battle.rounds.length + (over ? 0 : 1)}
-        </div>
+        <div className="battle-round-title">ROUND {turn}</div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 5 }}>OPPONENT (AI)</div>
+          <div className="battle-side-label">OPPONENT AI</div>
           <Pips n={battle.opponentQueue.length} side="o" />
         </div>
       </div>
 
-      {/* Bàn kính đối đầu */}
-      <div className="panel" style={{ padding: 20, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 18, alignItems: 'center' }}>
-          <div style={{ maxWidth: 210, marginLeft: 'auto', width: '100%', position: 'relative' }}>
-            {pCard ? <Slab card={pCard} interactive={false} highlightStat={flashStat} /> : <Defeated who="You" />}
-            {flashStat && pCard && <span className="sweep-overlay" />}
-          </div>
-
-          <div style={{ textAlign: 'center', minWidth: 120 }}>
-            {over ? (
-              <div className={battle.status === 'player_win' ? 'anim-win' : 'anim-loss'}>
-                <div style={{ fontSize: 40 }}>{battle.status === 'player_win' ? '🏆' : '💀'}</div>
-                <div style={{ fontWeight: 900, color: battle.status === 'player_win' ? 'var(--win)' : 'var(--loss)' }}>
-                  {battle.status === 'player_win' ? 'WIN' : 'LOSS'}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-dim)' }}>VS</div>
-                {pCard && oCard && (
-                  <TypeArrow p={pCard} o={oCard} />
-                )}
-              </>
-            )}
-          </div>
-
-          <div style={{ maxWidth: 210, width: '100%', position: 'relative' }}>
-            {oCard ? <Slab card={oCard} interactive={false} highlightStat={flashStat} /> : <Defeated who="Opponent" />}
-            {flashStat && oCard && <span className="sweep-overlay" />}
-          </div>
+      <div className="battle-arena panel">
+        <div className="battle-card-wrap battle-card-player" data-active={battle.attacker === 'player' && !over} data-win={lastRound?.winner === 'player' && !!flashStat}>
+          <div className="battle-role-chip">{battle.attacker === 'player' && !over ? 'ATTACKING' : 'DEFENDING'}</div>
+          {pCard ? <Slab card={pCard} interactive={false} battleMode highlightStat={flashStat} /> : <Defeated who="You" />}
         </div>
 
-        {/* Action bar */}
-        <div style={{ marginTop: 20 }}>
+        <div className="battle-center">
           {over ? (
-            <div style={{ textAlign: 'center' }}>
-              <button className="btn btn-primary" style={{ padding: '13px 30px', fontSize: 16 }} onClick={() => dispatch({ type: 'END_BATTLE' })}>
-                View result →
-              </button>
-            </div>
-          ) : playerTurn && pCard && oCard ? (
-            <div>
-              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-sub)', marginBottom: 10 }}>
-                YOUR TURN — choose a stat to attack with. Type advantage can swing the round:
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, maxWidth: 560, margin: '0 auto' }}>
-                {STAT_KEYS.map((s) => {
-                  const pv = previewRound(battle, s);
-                  const win = pv.pEff >= pv.oEff;
-                  return (
-                    <button
-                      key={s}
-                      className="btn"
-                      style={{ flexDirection: 'column', gap: 4, padding: '12px 8px', borderColor: win ? 'var(--win)' : 'var(--hairline-strong)' }}
-                      onClick={() => dispatch({ type: 'BATTLE_STEP', stat: s })}
-                    >
-                      <span style={{ fontWeight: 800, letterSpacing: '0.06em' }}>{STAT_LABEL[s]}</span>
-                      <span className="tabnums" style={{ fontSize: 13 }}>
-                        <b style={{ color: win ? 'var(--win)' : 'var(--text)' }}>{pv.pEff}</b>
-                        <span style={{ color: 'var(--text-dim)' }}> vs </span>
-                        <b style={{ color: !win ? 'var(--loss)' : 'var(--text-sub)' }}>{pv.oEff}</b>
-                      </span>
-                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{win ? 'wins round' : 'loses round'}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className={battle.status === 'player_win' ? 'anim-win' : 'anim-loss'}>
+              <div className="battle-clash-title">{battle.status === 'player_win' ? 'VICTORY' : 'DEFEAT'}</div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', color: 'var(--text-sub)', fontSize: 13, padding: '10px' }}>
-              <span className="anim-float" style={{ display: 'inline-block' }}>⚙</span> Opponent is choosing a move...
-            </div>
+            <>
+              <div className="battle-clash-title">{flashStat ? `${STAT_LABEL[flashStat]} CLASH` : 'VS'}</div>
+              {pCard && oCard && <TypeArrow p={pCard} o={oCard} />}
+              {lastRound && (
+                <div className="battle-last-hit">
+                  {lastRound.winner === 'player' ? 'You won' : 'Opponent won'} with {STAT_LABEL[lastRound.stat]}
+                </div>
+              )}
+            </>
           )}
+        </div>
+
+        <div className="battle-card-wrap battle-card-opponent" data-active={battle.attacker === 'opponent' && !over} data-win={lastRound?.winner === 'opponent' && !!flashStat}>
+          <div className="battle-role-chip">{battle.attacker === 'opponent' && !over ? 'ATTACKING' : 'DEFENDING'}</div>
+          {oCard ? <Slab card={oCard} interactive={false} battleMode highlightStat={flashStat} /> : <Defeated who="Opponent" />}
         </div>
       </div>
 
-      {/* Why each round resolved the way it did */}
       <div style={{ marginTop: 18 }}>
-        <div style={{ fontSize: 11, letterSpacing: '0.12em', color: 'var(--text-dim)', marginBottom: 8 }}>BATTLE LOG — WHY EACH ROUND WON</div>
+        {over ? (
+          <div style={{ textAlign: 'center' }}>
+            <button className="btn btn-primary" style={{ padding: '13px 30px', fontSize: 16 }} onClick={() => dispatch({ type: 'END_BATTLE' })}>
+              View result
+            </button>
+          </div>
+        ) : playerTurn && pCard && oCard ? (
+          <div>
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-sub)', marginBottom: 10 }}>
+              YOUR TURN - choose the attack stat. Type advantage can swing the round.
+            </div>
+            <div className="battle-stat-grid">
+              {STAT_KEYS.map((s) => {
+                const pv = previewRound(battle, s);
+                const win = pv.pEff >= pv.oEff;
+                return (
+                  <button
+                    key={s}
+                    className="btn battle-stat-button"
+                    data-win={win}
+                    onClick={() => dispatch({ type: 'BATTLE_STEP', stat: s })}
+                  >
+                    <span className="battle-stat-name">{STAT_LABEL[s]}</span>
+                    <span className="battle-stat-values tabnums">
+                      <b>{pv.pEff}</b>
+                      <span>vs</span>
+                      <b>{pv.oEff}</b>
+                    </span>
+                    <span className="battle-stat-outcome">{win ? 'wins round' : 'loses round'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: 'var(--text-sub)', fontSize: 13, padding: '10px' }}>
+            Opponent is choosing a move...
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <div style={{ fontSize: 11, letterSpacing: '0.12em', color: 'var(--text-dim)', marginBottom: 8 }}>BATTLE LOG - WHY EACH ROUND WON</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
           {[...battle.rounds].reverse().map((r) => (
             <div key={r.index} className="panel anim-fade" style={{ padding: '9px 12px', display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -166,7 +165,7 @@ export function Battle() {
               <span className="mono" style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.typeNote}</span>
             </div>
           ))}
-          {battle.rounds.length === 0 && <p className="caveat">No rounds yet — attack to begin.</p>}
+          {battle.rounds.length === 0 && <p className="caveat">No rounds yet - attack to begin.</p>}
         </div>
       </div>
     </div>
@@ -178,8 +177,8 @@ function TypeArrow({ p, o }: { p: GameCard; o: GameCard }) {
   const color = v === 'advantage' ? 'var(--win)' : v === 'disadvantage' ? 'var(--loss)' : 'var(--text-dim)';
   const label = v === 'advantage' ? 'You counter' : v === 'disadvantage' ? 'You are countered' : 'Neutral';
   return (
-    <div style={{ marginTop: 8, fontSize: 11, color }}>
-      <div style={{ fontSize: 16 }}>{ELEMENT_GLYPH[p.element]} {v === 'advantage' ? '≻' : v === 'disadvantage' ? '≺' : '='} {ELEMENT_GLYPH[o.element]}</div>
+    <div style={{ marginTop: 10, fontSize: 11, color }}>
+      <div style={{ fontSize: 18 }}>{ELEMENT_GLYPH[p.element]} {v === 'advantage' ? '>' : v === 'disadvantage' ? '<' : '='} {ELEMENT_GLYPH[o.element]}</div>
       <div style={{ letterSpacing: '0.06em' }}>{label}</div>
     </div>
   );
@@ -187,7 +186,7 @@ function TypeArrow({ p, o }: { p: GameCard; o: GameCard }) {
 
 function Defeated({ who }: { who: string }) {
   return (
-    <div style={{ aspectRatio: '2.5/4', maxWidth: 210, border: '1.5px dashed var(--hairline)', borderRadius: 14, display: 'grid', placeItems: 'center', color: 'var(--text-dim)', margin: '0 auto', width: '100%' }}>
+    <div style={{ aspectRatio: '2.5/4', maxWidth: 280, border: '1.5px dashed var(--hairline)', borderRadius: 14, display: 'grid', placeItems: 'center', color: 'var(--text-dim)', margin: '0 auto', width: '100%' }}>
       {who}: no cards left
     </div>
   );

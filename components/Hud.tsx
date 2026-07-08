@@ -5,12 +5,12 @@ import type { Screen } from '@/app/arena/state';
 import { STORAGE_KEY } from '@/lib/game/save';
 import { AuthPanel } from './AuthPanel';
 
-// Vault header: logo, virtual credit, nav, and always-visible safety labels.
+// Header: logo, virtual credit, nav, and account controls.
 
 const NAV: { screen: Screen; label: string }[] = [
-  { screen: 'intro', label: 'Vault' },
-  { screen: 'roster', label: 'Collection' },
-  { screen: 'deck', label: 'Deck' },
+  { screen: 'intro', label: 'Gacha' },
+  { screen: 'roster', label: 'Roster' },
+  { screen: 'deck', label: 'Lineup' },
 ];
 
 export function Hud() {

@@ -8,6 +8,7 @@ export interface PullHistoryEntry {
   seed: string;
   tokenIds: string[];
   openedAt: string;
+  packId?: string;
 }
 
 export interface ArenaSave {
@@ -21,6 +22,7 @@ export interface ArenaSave {
   pullHistory: PullHistoryEntry[];
   lastCreditRefillAt: string | null;
   passportHintSeen: boolean;
+  welcomePackOpened: boolean;
 }
 
 export interface ArenaSaveInput {
@@ -32,6 +34,7 @@ export interface ArenaSaveInput {
   pullHistory: PullHistoryEntry[];
   lastCreditRefillAt: string | null;
   passportHintSeen: boolean;
+  welcomePackOpened: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,6 +72,16 @@ function parsePullHistory(value: unknown): PullHistoryEntry[] {
       isStringArray(entry.tokenIds) &&
       typeof entry.openedAt === 'string'
     );
+  }).map((entry) => {
+    const parsed: PullHistoryEntry = {
+      seed: entry.seed,
+      tokenIds: entry.tokenIds,
+      openedAt: entry.openedAt,
+    };
+    if (isRecord(entry) && typeof entry.packId === 'string') {
+      parsed.packId = entry.packId;
+    }
+    return parsed;
   });
 }
 
@@ -84,6 +97,7 @@ export function serializeArenaSave(input: ArenaSaveInput, now: Date = new Date()
     pullHistory: input.pullHistory,
     lastCreditRefillAt: input.lastCreditRefillAt,
     passportHintSeen: input.passportHintSeen,
+    welcomePackOpened: input.welcomePackOpened,
   };
 }
 
@@ -118,6 +132,7 @@ export function parseSavedArena(raw: string | null): ArenaSave | null {
       pullHistory: parsePullHistory(value.pullHistory),
       lastCreditRefillAt,
       passportHintSeen: value.passportHintSeen === true,
+      welcomePackOpened: value.welcomePackOpened === true,
     },
     new Date(value.savedAt),
   );

@@ -181,6 +181,175 @@ a { color: inherit; }
 }
 .slab.interactive:hover .slab-passport-button { background: var(--accent); color: #1a1408; }
 
+.slab.slab-battle {
+  border-radius: 16px;
+}
+.slab.slab-battle .slab-label {
+  display: none;
+}
+.slab.slab-battle .slab-art {
+  margin: 10px 10px 0;
+}
+.slab.slab-battle .slab-stat .k {
+  font-size: 9px;
+}
+.slab.slab-battle .slab-stat .v {
+  font-size: 18px;
+}
+.slab.slab-battle .slab-power {
+  padding: 8px 10px;
+}
+.slab.slab-battle .slab-power .val {
+  font-size: 20px;
+}
+
+/* ============================ Battle arena ================================ */
+.battle-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.battle-side-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+}
+.battle-round-title {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(229, 192, 123, 0.4);
+  background: linear-gradient(180deg, rgba(229, 192, 123, 0.18), rgba(76, 141, 255, 0.08));
+  color: var(--accent);
+  font-weight: 950;
+  font-size: 18px;
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 18px rgba(229, 192, 123, 0.34);
+}
+.battle-arena {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(150px, 220px) minmax(260px, 330px);
+  justify-content: center;
+  align-items: center;
+  gap: clamp(18px, 4vw, 48px);
+  padding: 28px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 24% 50%, rgba(229, 192, 123, 0.13), transparent 32%),
+    radial-gradient(circle at 76% 50%, rgba(255, 107, 107, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+}
+.battle-arena::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  bottom: 12%;
+  width: 1px;
+  background: linear-gradient(transparent, rgba(229,192,123,0.45), transparent);
+  box-shadow: 0 0 24px rgba(229,192,123,0.3);
+}
+.battle-card-wrap {
+  position: relative;
+  width: min(100%, 330px);
+  transition: transform 0.28s ease, filter 0.28s ease;
+}
+.battle-card-wrap[data-active='true'] {
+  transform: translateY(-8px) scale(1.04);
+  filter: saturate(1.12);
+}
+.battle-card-wrap[data-win='true'] {
+  animation: battleStrike 0.7s ease both;
+}
+.battle-role-chip {
+  position: absolute;
+  z-index: 4;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(11, 14, 20, 0.92);
+  border: 1px solid var(--hairline-strong);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+.battle-card-wrap[data-active='true'] .battle-role-chip {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(229,192,123,0.28);
+}
+.battle-center {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.battle-clash-title {
+  font-size: 26px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  text-shadow: 0 0 22px rgba(76,141,255,0.45);
+}
+.battle-last-hit {
+  margin-top: 12px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.battle-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  max-width: 660px;
+  margin: 0 auto;
+}
+.battle-stat-button {
+  min-height: 74px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  justify-items: center;
+  gap: 3px;
+  padding: 10px 12px;
+  text-align: center;
+}
+.battle-stat-button[data-win='true'] {
+  border-color: var(--win);
+  background: rgba(47, 211, 165, 0.08);
+}
+.battle-stat-name {
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+.battle-stat-values {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.battle-stat-values b {
+  font-size: 18px;
+}
+.battle-stat-values span,
+.battle-stat-outcome {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+@keyframes battleStrike {
+  0% { transform: translateY(-8px) scale(1.04); }
+  38% { transform: translateY(-14px) scale(1.08); }
+  100% { transform: translateY(-8px) scale(1.04); }
+}
+
 /* ============================ Passport modal =============================== */
 .passport-backdrop {
   position: fixed;

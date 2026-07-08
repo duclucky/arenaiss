@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useReducer, type ReactNode, type Dispatch } from 'react';
 import type { GameCard } from '@/lib/game/stats';
 import type { PackReveal } from '@/lib/game/gacha';
-import { STARTING_CREDITS, PACK_COST, WIN_REWARD, LOSS_REWARD } from '@/lib/game/gacha';
+import { BATTLE_STAKE, STARTING_CREDITS, WIN_REWARD, LOSS_REWARD, WELCOME_PACK_ID, settleBattleCredits } from '@/lib/game/gacha';
 import type { BattleState, StatKey } from '@/lib/game/battle';
 import { initBattle, stepRound, chooseStatGreedy } from '@/lib/game/battle';
 import type { Category } from '@/lib/client/api';
@@ -31,6 +31,7 @@ export interface ArenaState {
   saveReady: boolean;
   lastSavedAt: string | null;
   passportToken: string | null;
+  welcomePackOpened: boolean;
 }
 
 const initialState: ArenaState = {
@@ -52,6 +53,7 @@ const initialState: ArenaState = {
   saveReady: false,
   lastSavedAt: null,
   passportToken: null,
+  welcomePackOpened: false,
 };
 
 export type Action =
@@ -106,6 +108,7 @@ function reducer(state: ArenaState, action: Action): ArenaState {
         pullHistory: action.save.pullHistory,
         lastCreditRefillAt: action.lastCreditRefillAt,
         passportHintSeen: action.save.passportHintSeen,
+        welcomePackOpened: action.save.welcomePackOpened,
         lastSavedAt: action.save.savedAt,
         saveReady: true,
       };
@@ -114,7 +117,7 @@ function reducer(state: ArenaState, action: Action): ArenaState {
     case 'SAVED':
       return { ...state, lastSavedAt: action.savedAt };
     case 'OPEN_PACK': {
-      const credits = state.credits - PACK_COST;
+      const credits = Math.max(0, state.credits - action.reveal.cost);
       return {
         ...state,
         credits,
@@ -123,8 +126,14 @@ function reducer(state: ArenaState, action: Action): ArenaState {
         packCount: state.packCount + 1,
         pullHistory: [
           ...state.pullHistory,
-          { seed: action.reveal.seed, tokenIds: action.reveal.cards.map((card) => card.tokenId), openedAt: action.openedAt },
+          {
+            seed: action.reveal.seed,
+            tokenIds: action.reveal.cards.map((card) => card.tokenId),
+            openedAt: action.openedAt,
+            packId: action.reveal.packId,
+          },
         ].slice(-100),
+        welcomePackOpened: state.welcomePackOpened || action.reveal.packId === WELCOME_PACK_ID,
         screen: 'pack',
       };
     }
@@ -147,8 +156,10 @@ function reducer(state: ArenaState, action: Action): ArenaState {
     case 'REORDER_DECK':
       return { ...state, deckTokens: action.tokens };
     case 'START_BATTLE':
+      if (state.credits < BATTLE_STAKE) return state;
       return {
         ...state,
+        credits: settleBattleCredits(state.credits, 'start'),
         battle: initBattle(action.playerDeck, action.opponentDeck, action.seed),
         battleReward: null,
         screen: 'battle',
@@ -162,7 +173,7 @@ function reducer(state: ArenaState, action: Action): ArenaState {
       if (!state.battle) return state;
       const won = state.battle.status === 'player_win';
       const reward = won ? WIN_REWARD : LOSS_REWARD;
-      return { ...state, credits: state.credits + reward, battleReward: reward, screen: 'result' };
+      return { ...state, credits: settleBattleCredits(state.credits, won ? 'player_win' : 'opponent_win'), battleReward: reward, screen: 'result' };
     }
     case 'OPEN_PASSPORT':
       return { ...state, passportToken: action.tokenId, passportHintSeen: true };
@@ -214,6 +225,7 @@ export function ArenaProvider({ children }: { children: ReactNode }) {
       pullHistory: state.pullHistory,
       lastCreditRefillAt: state.lastCreditRefillAt,
       passportHintSeen: state.passportHintSeen,
+      welcomePackOpened: state.welcomePackOpened,
     });
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     dispatch({ type: 'SAVED', savedAt: saved.savedAt });
@@ -226,6 +238,7 @@ export function ArenaProvider({ children }: { children: ReactNode }) {
     state.pullHistory,
     state.lastCreditRefillAt,
     state.passportHintSeen,
+    state.welcomePackOpened,
     state.saveReady,
   ]);
 
@@ -248,7 +261,7 @@ export function useArenaDispatch(): Dispatch<Action> {
 }
 
 // Helpers dùng nhiều nơi.
-export { chooseStatGreedy, PACK_COST, WIN_REWARD, LOSS_REWARD };
+export { chooseStatGreedy, BATTLE_STAKE, WIN_REWARD, LOSS_REWARD };
 export function deckCards(state: ArenaState): GameCard[] {
   const byId = new Map(state.roster.map((c) => [c.tokenId, c]));
   return state.deckTokens.map((t) => byId.get(t)).filter((c): c is GameCard => !!c);

@@ -1,11 +1,9 @@
 'use client';
 
 import { memo, useState } from 'react';
+import type { StatKey } from '@/lib/game/battle';
 import type { GameCard } from '@/lib/game/stats';
 import { ELEMENT_GLYPH, imageUrlFromSerial } from '@/lib/game/stats';
-import type { StatKey } from '@/lib/game/battle';
-
-// Slab: a digital graded-card case with tier glow, real card art, and fictional game stats.
 
 interface SlabProps {
   card: GameCard;
@@ -14,16 +12,17 @@ interface SlabProps {
   defeated?: boolean;
   highlightStat?: StatKey | null;
   interactive?: boolean;
-  reveal?: boolean; // animation trồi lên (pack open)
+  battleMode?: boolean;
+  reveal?: boolean;
   revealDelayMs?: number;
 }
 
-function SlabBase({ card, onClick, selected, defeated, highlightStat, interactive = true, reveal, revealDelayMs = 0 }: SlabProps) {
-  // The serial-derived image can have silver/golden variants; try them before falling back.
+function SlabBase({ card, onClick, selected, defeated, highlightStat, interactive = true, battleMode, reveal, revealDelayMs = 0 }: SlabProps) {
   const imageKey = `${card.imageUrl ?? ''}|${card.serial ?? ''}`;
   const [imageState, setImageState] = useState({ key: imageKey, variant: 0 });
   const variant = imageState.key === imageKey ? imageState.variant : 0;
   const imgSrc = variant === 0 ? card.imageUrl : imageUrlFromSerial(card.serial, variant);
+
   function onImgError() {
     setImageState((current) => ({
       key: imageKey,
@@ -36,9 +35,10 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
     { key: 'def', label: 'DEF', value: card.def },
     { key: 'aura', label: 'AURA', value: card.aura },
   ];
+
   return (
     <div
-      className={`slab${interactive ? ' interactive' : ''}${selected ? ' selected' : ''}${defeated ? ' defeated' : ''}${reveal ? ' anim-rise' : ''}`}
+      className={`slab${interactive ? ' interactive' : ''}${selected ? ' selected' : ''}${defeated ? ' defeated' : ''}${battleMode ? ' slab-battle' : ''}${reveal ? ' anim-rise' : ''}`}
       data-tier={card.tier}
       style={reveal ? { animationDelay: `${revealDelayMs}ms` } : undefined}
       onClick={onClick ? () => onClick(card) : undefined}
@@ -52,11 +52,11 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
         <div>
           <div className="slab-name">{card.name}</div>
           <div className="slab-cert mono">
-            {card.gradingCompany ?? 'RAW'} · {card.year ?? '—'} · #{card.tokenId.slice(0, 6)}
+            {card.gradingCompany ?? 'RAW'} - {card.year ?? 'unknown'} - #{card.tokenId.slice(0, 6)}
           </div>
         </div>
         <div className="slab-grade">
-          {card.gradeNum ?? '—'}
+          {card.gradeNum ?? '-'}
           <small>Tier {card.tier}</small>
         </div>
       </div>
@@ -64,7 +64,6 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
       <div className="slab-art">
         <span className="slab-element" title={card.element}>{ELEMENT_GLYPH[card.element]}</span>
         {imgSrc ? (
-          // Keep the real Renaiss render lazy-loaded without adding image-domain config.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imgSrc} alt={card.name} loading="lazy" onError={onImgError} />
         ) : (

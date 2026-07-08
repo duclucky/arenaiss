@@ -76,6 +76,7 @@ const afterNextMidnight = new Date('2026-07-07T00:00:01.000Z');
       pullHistory: [{ seed: 'pack-1', tokenIds: [card.tokenId], openedAt: afterNextMidnight.toISOString() }],
       lastCreditRefillAt: afterNextMidnight.toISOString(),
       passportHintSeen: true,
+      welcomePackOpened: true,
     },
     afterNextMidnight,
   );

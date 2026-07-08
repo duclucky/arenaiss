@@ -12,6 +12,100 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 07:20 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `10110a1` — "fix: collapse marketplace panel"
+- Commit phiên này: chuẩn bị commit `feat: update gacha economy and battle ui`
+
+### Đang làm gì
+Không còn code đang viết dở trong batch này. Phiên heartbeat đã tiếp tục từ handoff 04:18 UTC, chạy verification, sửa lỗi save parser và cập nhật e2e theo flow economy/pack/battle mới.
+
+### Đã xong
+- `lib/game/gacha.ts`: chốt economy ảo mới: starting credits `10000`, battle stake `100`, winner payout `199`, loser payout `0`, helper refund draw; thêm catalog `Welcome Pack`, `Eden Pack`, `OMEGA Pack`, `RenaCrypt Pack`.
+- `components/PackChoices.tsx`, `features/intro/Intro.tsx`, `features/roster/Roster.tsx`, `features/pack-open/PackOpen.tsx`: UI mở pack mới; Welcome Pack free mở 5 thẻ một lần, paid packs 300/500/800 credits mở 1 thẻ.
+- `app/arena/state.tsx`, `lib/game/save.ts`, `components/AuthPanel.tsx`: lưu `welcomePackOpened`, lưu `packId` trong lịch sử pull, trừ credit khi mở paid pack, trừ stake khi start battle và cộng payout khi kết thúc.
+- `components/Hud.tsx`, `features/deck-builder/DeckBuilder.tsx`, `features/result/Result.tsx`: đổi nav/copy sang `Gacha`, `Roster`, `Lineup`; start battle hiển thị stake; result hiển thị payout/balance mới.
+- `features/battle/Battle.tsx`, `components/Slab.tsx`, `app/globals.css`: battle UI lớn hơn, ẩn slab label/cert trong battle mode, thêm role chip ATTACKING/DEFENDING, round title nổi bật, stat buttons tách dòng không chồng chữ.
+- `tests/economy-pack.test.mts`, `tests/credit-save.test.mts`: thêm/điều chỉnh unit test cho economy, pack catalog, welcome pack và save.
+- `scripts/e2e.mjs`: cập nhật flow production e2e theo nav mới, Welcome Pack 5 cards, paid pack 1 card/price 300, battle stake deduction, Passport regressions.
+
+### Verification mới nhất
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run lint` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3020`; console errors: none.
+- Bundle scan `.next/static` với `rg` cho secret/write-SDK symbols (`PASSPORT_AI_API_KEY`, `ANTHROPIC_API_KEY`, `createSecureClient`, `pullGacha`, v.v.) không có match.
+- Visual spot-check screenshots: `.e2e-output/03-eden-pack.png`, `.e2e-output/05-lineup.png`, `.e2e-output/06-battle.png`.
+
+### Tiếp theo
+1. Restart server dev/user-visible ở `localhost:3001` để browser thấy bản mới nhất.
+2. Nếu muốn nâng thêm battle animation, làm một batch riêng tập trung vào motion/FX; bản hiện tại đã có layout lớn hơn, role chip và stat buttons không overlap.
+
+### Cảnh báo
+- Không có cảnh báo build/test mới.
+- `HANDOFF.md` vẫn có các đoạn cũ hiển thị mojibake trong terminal PowerShell do codepage, không phải thay đổi logic app.
+
+### Nhật ký
+- 2026-07-08 codex: Heartbeat đã chạy đúng lịch, tiếp tục từ dirty tree, hoàn tất verification và chuẩn bị commit batch economy/pack/battle UI.
+
+---
+
+## Cập nhật phiên Codex 2026-07-08 04:18 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `10110a1` — "fix: collapse marketplace panel"
+- Commit phiên này: **chưa commit**; đang dở theo yêu cầu dừng vì sắp hết quota.
+
+### Đang làm gì
+Đang triển khai batch lớn theo browser comments + yêu cầu economy mới:
+1. Nav labels: `Vault` -> `Gacha`, `Collection` -> `Roster`, `Deck` -> `Lineup`.
+2. Economy: starting credits `10000`; battle stake `100` trừ khi start; thắng cộng `199`, thua cộng `0`; draw helper hoàn `100`.
+3. Pack model: paid packs `Eden Pack` 300, `OMEGA Pack` 500, `RenaCrypt Pack` 800; mỗi paid pack mở 1 thẻ. `Welcome Pack` mở 5 thẻ, free, chỉ dùng một lần theo `welcomePackOpened`.
+4. Battle UI: đang thay arena lớn hơn, thẻ battle ẩn label/cert để nhìn artwork rõ hơn, role chip ATTACKING/DEFENDING, stat buttons không chồng text, round title nổi bật.
+
+### Đã xong nhưng chưa verify đầy đủ
+- `lib/game/gacha.ts`: rewrite sạch ASCII, thêm `PACKS`, `PackId`, `WELCOME_PACK_ID`, `STARTING_CREDITS=10000`, `BATTLE_STAKE=100`, `WIN_REWARD=199`, `openPack(pool, seed, packId)`, `settleBattleCredits()`. Unit test `tests/economy-pack.test.mts` đã được thêm và **đã pass một lần** sau khi sửa gacha.
+- `tests/economy-pack.test.mts`: test đỏ rồi xanh cho economy/pack catalog/welcome pack.
+- `lib/game/save.ts`: thêm `welcomePackOpened` và `packId` trong pull history. Lưu ý: vừa sửa lỗi cú pháp thiếu `))` ở `parsePullHistory`; **chưa chạy lại test sau fix cú pháp này**.
+- `app/arena/state.tsx`: nối `welcomePackOpened`, `OPEN_PACK` trừ `action.reveal.cost`, set welcome opened, `START_BATTLE` trừ stake, `END_BATTLE` cộng reward qua `settleBattleCredits`.
+- `components/AuthPanel.tsx`: thêm `welcomePackOpened` vào server save sync.
+- `components/PackChoices.tsx`: file mới, UI chọn Welcome/Paid packs, dispatch `OPEN_PACK` theo pack id.
+- `features/intro/Intro.tsx`: rewrite sang màn `Gacha`, dùng `PackChoices`, copy English sạch hơn.
+- `features/roster/Roster.tsx`: rewrite sang `Roster`, thêm pack choices, bỏ copy Collection.
+- `features/pack-open/PackOpen.tsx`: rewrite để paid pack 1 card hiển thị gọn, Welcome Pack 5 cards; bỏ nút mở pack mặc định 100.
+- `features/result/Result.tsx`: rewrite payout theo stake/win reward; bỏ nút open pack 100.
+- `features/deck-builder/DeckBuilder.tsx`: rewrite thành `Build lineup`, start battle requires stake.
+- `components/Hud.tsx`: đổi nav label thành `Gacha` / `Roster` / `Lineup`.
+- `components/Slab.tsx`: rewrite sạch ASCII, thêm prop `battleMode`.
+- `features/battle/Battle.tsx`: rewrite battle UI với arena mới, role chip, stat buttons mới.
+- `app/globals.css`: thêm CSS battle arena, battle stat buttons, battle-mode slab.
+
+### Cảnh báo
+- Working tree hiện đang dirty và **chưa commit**. Không revert các file này.
+- Verification mới nhất trước khi dừng: `npm.cmd run test:unit` fail do `lib/game/save.ts` thiếu `))`; lỗi đó vừa được sửa, nhưng **chưa chạy lại** `test:unit`, `typecheck`, `lint`, `build`, `e2e`.
+- E2E chắc chắn cần cập nhật vì text cũ `Collection`, `Deck`, `Open pack · 100`, `Build deck` đã đổi.
+- `components/PackChoices.tsx` đang tạo grid 4 cột hoặc 2 cột; cần kiểm tra mobile/desktop visual.
+- User đang mở `localhost:3001`, có thể vẫn là process cũ; sau khi hoàn tất phải restart local server.
+
+### Tiếp theo
+1. Chạy `npm.cmd run test:unit`; nếu fail, sửa các type/call site liên quan `welcomePackOpened`/save.
+2. Chạy `npm.cmd run typecheck` và `npm.cmd run lint`; sửa lỗi import/type sau các rewrite.
+3. Cập nhật `scripts/e2e.mjs` cho flow mới:
+   - `Gacha` nav thay `Vault`
+   - `Roster` thay `Collection`
+   - `Lineup` thay `Deck`
+   - Welcome Pack mở 5 cards một lần
+   - Paid pack mở 1 card với price 300/500/800
+   - Start battle stake copy/credit behavior
+4. Chạy `npm.cmd run build` + production e2e.
+5. Kiểm tra visual battle: thẻ có đủ lớn không, label đã ẩn trong battle chưa, stat buttons không overlap.
+6. Nếu verify pass, cập nhật handoff lần nữa và commit, gợi ý message: `feat: update gacha economy and battle ui`.
+
+### Nhật ký
+- 2026-07-08 codex: Tạm dừng giữa batch economy/pack/battle UI theo yêu cầu user. Đã ghi lại đầy đủ file và trạng thái; chưa commit vì chưa verify xanh.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 03:52 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `b8ce9c2` — "fix: polish passport bullet copy"

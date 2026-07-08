@@ -29,6 +29,7 @@ export function AuthPanel() {
     pullHistory: state.pullHistory,
     lastCreditRefillAt: state.lastCreditRefillAt,
     passportHintSeen: state.passportHintSeen,
+    welcomePackOpened: state.welcomePackOpened,
   }), [
     state.category,
     state.credits,
@@ -38,6 +39,7 @@ export function AuthPanel() {
     state.pullHistory,
     state.lastCreditRefillAt,
     state.passportHintSeen,
+    state.welcomePackOpened,
   ]);
 
   useEffect(() => {
