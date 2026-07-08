@@ -2,7 +2,6 @@
 
 import { useArena, useArenaDispatch, deckCards } from '@/app/arena/state';
 import type { Screen } from '@/app/arena/state';
-import { STORAGE_KEY } from '@/lib/game/save';
 import { AuthPanel } from './AuthPanel';
 
 // Header: logo, virtual credit, nav, and account controls.
@@ -17,11 +16,6 @@ export function Hud() {
   const state = useArena();
   const dispatch = useArenaDispatch();
   const deckN = deckCards(state).length;
-
-  function resetProgress() {
-    window.localStorage.removeItem(STORAGE_KEY);
-    dispatch({ type: 'RESET_RUN' });
-  }
 
   return (
     <header
@@ -65,9 +59,6 @@ export function Hud() {
           <span className="tabnums">{state.credits}</span>
           <span style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>VIRTUAL CREDITS</span>
         </div>
-        <button className="btn btn-ghost" style={{ padding: '7px 10px', fontSize: 12 }} onClick={resetProgress} title="Clear anonymous progress saved on this device">
-          Reset
-        </button>
         <AuthPanel />
       </div>
     </header>

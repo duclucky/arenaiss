@@ -27,6 +27,9 @@ export interface RoundResult {
   koCard: GameCard;
   playerRemaining: number;
   opponentRemaining: number;
+  margin: number;
+  bestMargin: number;
+  initiativeKept: boolean;
   typeNote: string;
   reason: string;
 }
@@ -84,6 +87,25 @@ export function chooseStatGreedy(state: BattleState, side: Side): StatKey {
   return best;
 }
 
+function opposite(side: Side): Side {
+  return side === 'player' ? 'opponent' : 'player';
+}
+
+export function initiativePreview(state: BattleState, side: Side, stat: StatKey) {
+  const margins = STAT_KEYS.map((s) => {
+    const { pEff, oEff } = previewRound(state, s);
+    return side === 'player' ? pEff - oEff : oEff - pEff;
+  });
+  const bestMargin = Math.max(...margins);
+  const chosen = previewRound(state, stat);
+  const margin = side === 'player' ? chosen.pEff - chosen.oEff : chosen.oEff - chosen.pEff;
+  return {
+    margin,
+    bestMargin,
+    keepsInitiative: margin >= 0 && margin === bestMargin,
+  };
+}
+
 // Resolve one round using the current attacker's chosen stat.
 export function stepRound(state: BattleState, stat: StatKey): { state: BattleState; round: RoundResult } {
   if (state.status !== 'ongoing') return { state, round: state.rounds[state.rounds.length - 1] };
@@ -94,6 +116,8 @@ export function stepRound(state: BattleState, stat: StatKey): { state: BattleSta
   if (pEff === oEff) winner = attacker;
   else winner = pEff > oEff ? 'player' : 'opponent';
   const loser: Side = winner === 'player' ? 'opponent' : 'player';
+  const initiative = initiativePreview(state, attacker, stat);
+  const initiativeKept = winner === attacker && initiative.keepsInitiative;
 
   const playerQueue = state.playerQueue.slice();
   const opponentQueue = state.opponentQueue.slice();
@@ -130,6 +154,9 @@ export function stepRound(state: BattleState, stat: StatKey): { state: BattleSta
     koCard,
     playerRemaining: playerQueue.length,
     opponentRemaining: opponentQueue.length,
+    margin: initiative.margin,
+    bestMargin: initiative.bestMargin,
+    initiativeKept,
     typeNote,
     reason,
   };
@@ -143,7 +170,7 @@ export function stepRound(state: BattleState, stat: StatKey): { state: BattleSta
     playerQueue,
     opponentQueue,
     rounds: [...state.rounds, round],
-    attacker: attacker === 'player' ? 'opponent' : 'player',
+    attacker: initiativeKept ? attacker : opposite(attacker),
     status,
   };
   return { state: next, round };

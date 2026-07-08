@@ -80,13 +80,15 @@ function SlabBase({ card, onClick, selected, defeated, highlightStat, interactiv
           </div>
         ))}
       </div>
-      <div className="slab-power">
-        <span className="slab-power-score">
-          <span className="lbl">PWR</span>
-          <span className="val tabnums">{card.power}</span>
-        </span>
-        {interactive && <span className="slab-passport-button">View Passport</span>}
-      </div>
+      {!battleMode && (
+        <div className="slab-power">
+          <span className="slab-power-score">
+            <span className="lbl">PWR</span>
+            <span className="val tabnums">{card.power}</span>
+          </span>
+          {interactive && <span className="slab-passport-button">View Passport</span>}
+        </div>
+      )}
     </div>
   );
 }

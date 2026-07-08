@@ -589,7 +589,7 @@ a { color: inherit; }
   margin: 0 auto;
 }
 .battle-stat-button {
-  min-height: 74px;
+  min-height: 86px;
   display: grid;
   grid-template-rows: auto auto auto;
   align-items: center;
@@ -733,6 +733,14 @@ a { color: inherit; }
   border-radius: 999px;
   background: rgba(255, 107, 107, 0.12);
   color: var(--loss);
+  font-size: 10px;
+  font-weight: 800;
+}
+.battle-log-initiative {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(229, 192, 123, 0.1);
+  color: var(--accent);
   font-size: 10px;
   font-weight: 800;
 }

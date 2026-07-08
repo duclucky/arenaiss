@@ -9,6 +9,7 @@ import { useCombatTimeline } from './useCombatTimeline';
 import { BATTLE_STAKE, WIN_REWARD } from '@/lib/game/gacha';
 import {
   chooseStatGreedy,
+  initiativePreview,
   previewRound,
   STAT_KEYS,
   STAT_LABEL,
@@ -158,13 +159,14 @@ export function Battle() {
                 YOUR TURN - choose an action.
               </div>
               <div className="battle-effective-help">
-                Effective score = visible stat x type multiplier. <span data-tone="boost">Green</span> is boosted, <span data-tone="nerf">red</span> is reduced, white is unchanged.
+                Effective score = visible stat x type multiplier. <span data-tone="boost">Green</span> is boosted, <span data-tone="nerf">red</span> is reduced. Best winning margin keeps the next action.
               </div>
             </div>
             <div className="battle-stat-grid">
               {STAT_KEYS.map((s) => {
                 const pv = previewRound(battle, s);
                 const win = pv.pEff >= pv.oEff;
+                const initiative = initiativePreview(battle, 'player', s);
                 const playerBase = pCard[s];
                 const opponentBase = oCard[s];
                 return (
@@ -180,7 +182,9 @@ export function Battle() {
                       <span>vs</span>
                       <EffectiveScore base={opponentBase} value={pv.oEff} />
                     </span>
-                    <span className="battle-stat-outcome">{win ? 'wins round' : 'loses round'}</span>
+                    <span className="battle-stat-outcome">
+                      {win ? (initiative.keepsInitiative ? 'wins + keeps initiative' : 'wins, passes turn') : 'loses round'}
+                    </span>
                   </button>
                 );
               })}
@@ -224,7 +228,8 @@ function BattleInfo({ rounds }: { rounds: RoundResult[] }) {
         </div>
         <ul className="battle-rule-list">
           <li><b>Choose an action.</b> Pick ATK, DEF, or AURA; both cards compare that same visible stat.</li>
-          <li><b>Type advantage matters.</b> Effective score = visible stat x type multiplier. Boosted scores are green; reduced scores are red.</li>
+          <li><b>Margin matters.</b> If several actions win, the best winning margin keeps initiative for the next action.</li>
+          <li><b>PWR is lineup rating.</b> PWR helps compare cards while building a lineup; rounds are decided by the chosen action score.</li>
           <li><b>Higher score wins.</b> If scores tie, the current attacker wins the edge.</li>
           <li><b>Loser is KO.</b> The losing card leaves the lineup. Battle ends when one side has no cards left.</li>
           <li><b>Virtual stake.</b> Starting costs {BATTLE_STAKE} credits; a win pays {WIN_REWARD}. Credits are not real money.</li>
@@ -267,6 +272,7 @@ function RoundLogRow({ round }: { round: RoundResult }) {
           <span>vs</span>
           <span>Opponent <EffectiveScore base={round.opponentBase} value={round.opponentEff} /></span>
           <span className="battle-log-ko">{loserLabel} card KO</span>
+          <span className="battle-log-initiative">{round.initiativeKept ? `${attackerLabel} keeps initiative` : 'Initiative passes'}</span>
         </div>
         <div className="battle-log-note mono">{round.typeNote}</div>
       </div>

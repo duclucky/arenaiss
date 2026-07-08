@@ -50,8 +50,10 @@ async function addCurrentPackToRoster() {
 
 try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 30000 });
-  await page.waitForSelector('text=Enter the', { timeout: 15000 });
+  await page.waitForSelector('text=Build a', { timeout: 15000 });
+  await page.waitForSelector('text=Draft a dream lineup from simulated Renaiss pack vaults.', { timeout: 5000 });
   await page.waitForSelector('text=Log in to sync progress on the server.', { timeout: 5000 });
+  if (await page.locator('header >> text=Reset').count()) throw new Error('Header should not expose Reset progress control');
   if (await page.locator('header >> text=Read-only').count()) throw new Error('Header still shows Read-only chip');
   if (await page.locator('header >> text=Local save').count()) throw new Error('Header still shows Local save chip');
   if (await page.locator('nav >> text=Vault').count()) throw new Error('Nav should not show Vault');
@@ -90,11 +92,11 @@ try {
   }
   await page.locator('nav >> text=Gacha').click();
   await page.locator('button', { hasText: 'Eden Pack' }).waitFor({ timeout: 5000 });
-  await page.waitForSelector('text=300 credits', { timeout: 5000 });
-  await page.locator('button', { hasText: 'OMEGA Pack' }).waitFor({ timeout: 5000 });
-  await page.waitForSelector('text=500 credits', { timeout: 5000 });
-  await page.locator('button', { hasText: 'RenaCrypt Pack' }).waitFor({ timeout: 5000 });
   await page.waitForSelector('text=800 credits', { timeout: 5000 });
+  await page.locator('button', { hasText: 'OMEGA Pack' }).waitFor({ timeout: 5000 });
+  await page.waitForSelector('text=300 credits', { timeout: 5000 });
+  await page.locator('button', { hasText: 'RenaCrypt Pack' }).waitFor({ timeout: 5000 });
+  await page.waitForSelector('text=500 credits', { timeout: 5000 });
   await page.waitForSelector('text=PACK VAULT', { timeout: 5000 });
   await page.waitForSelector('text=ODDS', { timeout: 5000 });
   await page.waitForSelector('text=Rip a Pack', { timeout: 5000 });
@@ -103,7 +105,7 @@ try {
   await openPackByName('Eden Pack');
   const edenSlabs = await visibleSlabCount();
   if (edenSlabs !== 1) throw new Error(`Paid Eden Pack should reveal 1 visible slab, got ${edenSlabs}`);
-  await page.waitForSelector('text=9700', { timeout: 5000 });
+  await page.waitForSelector('text=9200', { timeout: 5000 });
   await page.screenshot({ path: `${OUT}/03-eden-pack.png` });
   await addCurrentPackToRoster();
   log('ok paid pack price and 1-card reveal verified');
@@ -150,13 +152,13 @@ try {
   await goBattle.click();
   await page.waitForSelector('text=BATTLE LOG', { timeout: 10000 });
   await page.waitForSelector('text=How battles work', { timeout: 5000 });
-  await page.waitForSelector('text=Type advantage matters', { timeout: 5000 });
+  await page.waitForSelector('text=Margin matters', { timeout: 5000 });
   await page.waitForSelector('text=ROUND', { timeout: 5000 });
-  await page.waitForSelector('text=7100', { timeout: 5000 });
+  await page.waitForSelector('text=7600', { timeout: 5000 });
   log('ok battle started and 100-credit stake deducted');
   for (let turn = 0; turn < 20; turn++) {
     if (await page.locator('text=View result').count()) break;
-    const statBtns = page.locator('button', { hasText: /(wins|loses) round/ });
+    const statBtns = page.locator('button.battle-stat-button');
     if (await statBtns.count()) {
       await statBtns.first().click();
       if (turn === 0) {

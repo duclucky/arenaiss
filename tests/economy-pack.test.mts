@@ -51,9 +51,9 @@ assert.equal(BATTLE_STAKE, 100);
 assert.deepEqual(
   PACKS.filter((pack) => pack.id !== WELCOME_PACK_ID).map((pack) => [pack.id, pack.cost, pack.size, pack.categories]),
   [
-    ['eden', 300, 1, ['ONE_PIECE']],
-    ['omega', 500, 1, ['POKEMON']],
-    ['renacrypt', 800, 1, ['POKEMON', 'ONE_PIECE']],
+    ['eden', 800, 1, ['ONE_PIECE']],
+    ['omega', 300, 1, ['POKEMON']],
+    ['renacrypt', 500, 1, ['POKEMON', 'ONE_PIECE']],
   ],
 );
 

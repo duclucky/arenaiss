@@ -12,6 +12,46 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 battle initiative + gacha polish
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `2222ba0` — "fix: explain effective battle scores"
+- Commit phiên này: chuẩn bị commit `feat: add battle initiative and polish gacha`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý feedback mới nhất: battle choices cần có ý nghĩa khi nhiều action đều thắng, PWR gây nhầm trong battle, gacha pack price/copy cần chỉnh, và header không nên có Reset.
+
+### Đã xong
+- `lib/game/battle.ts`: thêm initiative/momentum deterministic. Nếu action thắng với margin tốt nhất trong các action thắng, attacker giữ lượt kế tiếp; nếu chọn action thắng nhưng margin kém hơn, initiative chuyển bên kia. Kết quả KO vẫn dựa trên engine hiện có, không dùng RNG mới.
+- `features/battle/Battle.tsx`: action buttons chỉ hiển thị effective score đã qua type multiplier, tô xanh/đỏ/trắng; outcome nói rõ `wins + keeps initiative`, `wins, passes turn`, hoặc `loses round`.
+- `features/battle/Battle.tsx`: rules panel giải thích `Margin matters` và `PWR is lineup rating`; battle log có badge initiative mỗi round.
+- `components/Slab.tsx`: ẩn `PWR` trong battle mode để tránh hiểu nhầm đây là chỉ số quyết định round.
+- `app/globals.css`: tăng chiều cao action buttons, thêm style badge initiative.
+- `lib/game/gacha.ts`, `tests/economy-pack.test.mts`: đổi giá pack theo yêu cầu mới: Eden 800, OMEGA 300, RenaCrypt 500; Welcome Pack vẫn free 5 cards một lần.
+- `features/intro/Intro.tsx`: đổi hero copy thành mô tả rõ “simulated Renaiss pack vaults”, draft lineup, Pokemon/One Piece slabs, battle credits, Card Passport.
+- `components/Hud.tsx`: bỏ nút `Reset` khỏi header; không còn UI xoá tiến trình tài khoản/anonymous một chạm.
+- `scripts/e2e.mjs`: cập nhật regression cho hero copy mới, không có Reset, giá pack mới, credit expected mới, và rule text mới.
+
+### Verification mới nhất
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3033`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+
+### Tiếp theo
+1. Reload `localhost:3001` nếu tab browser chưa tự HMR.
+2. Nếu user muốn battle sâu hơn nữa, bước tiếp theo hợp lý là hiển thị preview “initiative kept/pass” bằng icon hoặc tooltip, không đổi engine thêm khi chưa cần.
+
+### Cảnh báo
+- Initiative là thay đổi gameplay có chủ đích theo feedback “chọn gì cũng thắng thì cần lý do để suy nghĩ”; đã có unit test `tests/battle-initiative.test.mts`.
+- Giá/odds vẫn là mô phỏng dựa trên pool marketplace vì upstream chưa expose public pack odds qua alpha read API.
+
+### Nhật ký
+- 2026-07-08 codex: TDD đỏ-xanh cho giá pack mới; cập nhật battle initiative để action choice có hệ quả lượt kế; bỏ Reset header và cập nhật e2e.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 effective score explanation
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `3354aae` — "fix: show base stats in battle actions"

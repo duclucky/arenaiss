@@ -40,7 +40,7 @@ export const PACKS: PackDefinition[] = [
   {
     id: 'eden',
     name: 'Eden Pack',
-    cost: 300,
+    cost: 800,
     size: 1,
     description: 'One Piece themed simulated pack inspired by the real Eden Pack.',
     categories: ['ONE_PIECE'],
@@ -51,7 +51,7 @@ export const PACKS: PackDefinition[] = [
   {
     id: 'omega',
     name: 'OMEGA Pack',
-    cost: 500,
+    cost: 300,
     size: 1,
     description: 'Pokemon themed simulated pack inspired by the real OMEGA pack.',
     categories: ['POKEMON'],
@@ -62,7 +62,7 @@ export const PACKS: PackDefinition[] = [
   {
     id: 'renacrypt',
     name: 'RenaCrypt Pack',
-    cost: 800,
+    cost: 500,
     size: 1,
     description: 'Mixed simulated vault pack inspired by the real RenaCrypt perpetual pack.',
     categories: ['POKEMON', 'ONE_PIECE'],
@@ -74,7 +74,7 @@ export const PACKS: PackDefinition[] = [
 
 export const DEFAULT_PACK_ID: PackId = 'eden';
 export const PAID_PACKS = PACKS.filter((pack) => pack.id !== WELCOME_PACK_ID);
-export const PACK_COST = PACKS.find((pack) => pack.id === DEFAULT_PACK_ID)?.cost ?? 300;
+export const PACK_COST = PACKS.find((pack) => pack.id === DEFAULT_PACK_ID)?.cost ?? 800;
 
 export interface PackReveal {
   cards: GameCard[];

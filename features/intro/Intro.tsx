@@ -27,11 +27,11 @@ export function Intro() {
       <div style={{ textAlign: 'center', marginBottom: 30 }}>
         <div className="anim-float" style={{ fontSize: 44, marginBottom: 8, fontWeight: 900, color: 'var(--accent)' }}>RA</div>
         <h1 style={{ fontSize: 34, margin: '0 0 8px', letterSpacing: '0' }}>
-          Enter the <span style={{ color: 'var(--accent)' }}>Gacha</span>
+          Build a <span style={{ color: 'var(--accent)' }}>Vault Lineup</span>
         </h1>
         <p style={{ color: 'var(--text-sub)', maxWidth: 660, margin: '0 auto', lineHeight: 1.6 }}>
-          Open simulated packs using reference odds, collect fictional cards based on real graded-card data,
-          build a lineup, then battle for virtual credits. Every card links to its real Card Passport.
+          Draft a dream lineup from simulated Renaiss pack vaults. Rip Pokemon and One Piece slabs,
+          then battle for virtual credits with every card linked to its real Card Passport.
         </p>
       </div>
 
