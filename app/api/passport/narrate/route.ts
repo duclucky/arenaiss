@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 
 const DEFAULT_BASE_URL = 'https://v98store.com/v1';
 const DEFAULT_MODEL = 'deepseek-v4-flash';
+const DEFAULT_TIMEOUT_MS = 12000;
 
 function providerBaseUrl(): string {
   return (process.env.PASSPORT_AI_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
@@ -16,6 +17,11 @@ function providerBaseUrl(): string {
 
 function providerModel(): string {
   return process.env.PASSPORT_AI_MODEL ?? DEFAULT_MODEL;
+}
+
+function providerTimeoutMs(): number {
+  const raw = Number(process.env.PASSPORT_AI_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 30000) : DEFAULT_TIMEOUT_MS;
 }
 
 export async function POST(req: Request) {
@@ -56,6 +62,7 @@ export async function POST(req: Request) {
     const model = providerModel();
     const res = await fetch(`${providerBaseUrl()}/chat/completions`, {
       method: 'POST',
+      signal: AbortSignal.timeout(providerTimeoutMs()),
       headers: {
         authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',

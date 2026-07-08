@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
+import { BattleFx, battleCardMotion } from './BattleFx';
+import { useCombatTimeline } from './useCombatTimeline';
 import {
   chooseStatGreedy,
   previewRound,
@@ -35,37 +38,44 @@ export function Battle() {
   const state = useArena();
   const dispatch = useArenaDispatch();
   const battle = state.battle;
-  const [flashStat, setFlashStat] = useState<StatKey | null>(null);
   const [lastRound, setLastRound] = useState<RoundResult | null>(null);
   const prevRounds = useRef(0);
+  const combat = useCombatTimeline();
+  const { start: startCombatFx } = combat;
 
   useEffect(() => {
     if (!battle) return;
     if (battle.rounds.length > prevRounds.current) {
       const last = battle.rounds[battle.rounds.length - 1];
-      setFlashStat(last.stat);
       setLastRound(last);
-      const t = setTimeout(() => setFlashStat(null), 900);
+      startCombatFx(last);
       prevRounds.current = battle.rounds.length;
-      return () => clearTimeout(t);
+      return;
     }
     prevRounds.current = battle.rounds.length;
-  }, [battle?.rounds.length, battle]);
+  }, [battle?.rounds.length, battle, startCombatFx]);
 
   useEffect(() => {
-    if (!battle || battle.status !== 'ongoing' || battle.attacker !== 'opponent') return;
+    if (!battle || combat.active || battle.status !== 'ongoing' || battle.attacker !== 'opponent') return;
     const t = setTimeout(() => {
       dispatch({ type: 'BATTLE_STEP', stat: chooseStatGreedy(battle, 'opponent') });
     }, 1050);
     return () => clearTimeout(t);
-  }, [battle, dispatch]);
+  }, [battle, combat.active, dispatch]);
 
   if (!battle) return null;
   const over = battle.status !== 'ongoing';
-  const pCard: GameCard | undefined = battle.playerQueue[0];
-  const oCard: GameCard | undefined = battle.opponentQueue[0];
-  const playerTurn = battle.attacker === 'player' && !over;
+  const pCard: GameCard | undefined = combat.fxRound?.round.playerCard ?? battle.playerQueue[0];
+  const oCard: GameCard | undefined = combat.fxRound?.round.opponentCard ?? battle.opponentQueue[0];
+  const playerTurn = battle.attacker === 'player' && !over && !combat.active;
   const turn = battle.rounds.length + (over ? 0 : 1);
+  const activeStat = combat.fxRound ? combat.fxRound.round.stat : null;
+  const showResultButton = over && !combat.active;
+
+  function playPlayerStat(stat: StatKey) {
+    if (combat.active) return;
+    dispatch({ type: 'BATTLE_STEP', stat });
+  }
 
   return (
     <div className="anim-fade" style={{ maxWidth: 1180, margin: '0 auto', padding: '18px 22px 60px' }}>
@@ -81,20 +91,32 @@ export function Battle() {
         </div>
       </div>
 
-      <div className="battle-arena panel">
-        <div className="battle-card-wrap battle-card-player" data-active={battle.attacker === 'player' && !over} data-win={lastRound?.winner === 'player' && !!flashStat}>
-          <div className="battle-role-chip">{battle.attacker === 'player' && !over ? 'ATTACKING' : 'DEFENDING'}</div>
-          {pCard ? <Slab card={pCard} interactive={false} battleMode highlightStat={flashStat} /> : <Defeated who="You" />}
-        </div>
+      <motion.div
+        className="battle-arena panel"
+        data-combat-active={combat.active}
+        animate={!combat.reduced && combat.phase === 'impact' ? { x: [0, -4, 5, -3, 0] } : { x: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        onClick={combat.active ? combat.skip : undefined}
+      >
+        <motion.div
+          className="battle-card-wrap battle-card-player"
+          data-active={battle.attacker === 'player' && !over && !combat.active}
+          data-win={combat.fxRound?.round.winner === 'player' && combat.phase === 'resolve'}
+          animate={battleCardMotion('player', combat.phase, combat.fxRound, combat.reduced)}
+          transition={{ duration: 0.26, ease: combat.phase === 'lockIn' ? 'anticipate' : 'easeOut' }}
+        >
+          <div className="battle-role-chip">{combat.fxRound?.round.attacker === 'player' || (battle.attacker === 'player' && !over && !combat.active) ? 'ATTACKING' : 'DEFENDING'}</div>
+          {pCard ? <Slab card={pCard} interactive={false} battleMode highlightStat={activeStat} /> : <Defeated who="You" />}
+        </motion.div>
 
         <div className="battle-center">
-          {over ? (
+          {over && !combat.active ? (
             <div className={battle.status === 'player_win' ? 'anim-win' : 'anim-loss'}>
               <div className="battle-clash-title">{battle.status === 'player_win' ? 'VICTORY' : 'DEFEAT'}</div>
             </div>
           ) : (
             <>
-              <div className="battle-clash-title">{flashStat ? `${STAT_LABEL[flashStat]} CLASH` : 'VS'}</div>
+              <div className="battle-clash-title">{activeStat ? `${STAT_LABEL[activeStat]} CLASH` : 'VS'}</div>
               {pCard && oCard && <TypeArrow p={pCard} o={oCard} />}
               {lastRound && (
                 <div className="battle-last-hit">
@@ -105,14 +127,22 @@ export function Battle() {
           )}
         </div>
 
-        <div className="battle-card-wrap battle-card-opponent" data-active={battle.attacker === 'opponent' && !over} data-win={lastRound?.winner === 'opponent' && !!flashStat}>
-          <div className="battle-role-chip">{battle.attacker === 'opponent' && !over ? 'ATTACKING' : 'DEFENDING'}</div>
-          {oCard ? <Slab card={oCard} interactive={false} battleMode highlightStat={flashStat} /> : <Defeated who="Opponent" />}
-        </div>
-      </div>
+        <motion.div
+          className="battle-card-wrap battle-card-opponent"
+          data-active={battle.attacker === 'opponent' && !over && !combat.active}
+          data-win={combat.fxRound?.round.winner === 'opponent' && combat.phase === 'resolve'}
+          animate={battleCardMotion('opponent', combat.phase, combat.fxRound, combat.reduced)}
+          transition={{ duration: 0.26, ease: combat.phase === 'lockIn' ? 'anticipate' : 'easeOut' }}
+        >
+          <div className="battle-role-chip">{combat.fxRound?.round.attacker === 'opponent' || (battle.attacker === 'opponent' && !over && !combat.active) ? 'ATTACKING' : 'DEFENDING'}</div>
+          {oCard ? <Slab card={oCard} interactive={false} battleMode highlightStat={activeStat} /> : <Defeated who="Opponent" />}
+        </motion.div>
+
+        <BattleFx fxRound={combat.fxRound} phase={combat.phase} reduced={combat.reduced} onSkip={combat.skip} />
+      </motion.div>
 
       <div style={{ marginTop: 18 }}>
-        {over ? (
+        {showResultButton ? (
           <div style={{ textAlign: 'center' }}>
             <button className="btn btn-primary" style={{ padding: '13px 30px', fontSize: 16 }} onClick={() => dispatch({ type: 'END_BATTLE' })}>
               View result
@@ -132,7 +162,7 @@ export function Battle() {
                     key={s}
                     className="btn battle-stat-button"
                     data-win={win}
-                    onClick={() => dispatch({ type: 'BATTLE_STEP', stat: s })}
+                    onClick={() => playPlayerStat(s)}
                   >
                     <span className="battle-stat-name">{STAT_LABEL[s]}</span>
                     <span className="battle-stat-values tabnums">
@@ -148,7 +178,7 @@ export function Battle() {
           </div>
         ) : (
           <div style={{ textAlign: 'center', color: 'var(--text-sub)', fontSize: 13, padding: '10px' }}>
-            Opponent is choosing a move...
+            {combat.active ? 'Resolving clash... tap the arena to skip.' : 'Opponent is choosing a move...'}
           </div>
         )}
       </div>

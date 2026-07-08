@@ -163,7 +163,14 @@ a { color: inherit; }
 .slab-stat { text-align: center; }
 .slab-stat .k { font-size: 8px; letter-spacing: 0.1em; color: var(--text-dim); }
 .slab-stat .v { font-size: 15px; font-weight: 800; color: var(--text); }
-.slab-stat.hot .v { color: var(--accent); text-shadow: 0 0 10px rgba(229,192,123,0.6); }
+.slab-stat.hot {
+  transform: translateY(-2px) scale(1.08);
+  border-radius: 8px;
+  background: rgba(229, 192, 123, 0.1);
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+.slab-stat.hot .k { color: var(--accent); }
+.slab-stat.hot .v { color: var(--accent); text-shadow: 0 0 14px rgba(229,192,123,0.78); }
 .slab-power {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 6px 8px; border-top: 1px solid var(--hairline);
@@ -261,7 +268,7 @@ a { color: inherit; }
   filter: saturate(1.12);
 }
 .battle-card-wrap[data-win='true'] {
-  animation: battleStrike 0.7s ease both;
+  z-index: 3;
 }
 .battle-role-chip {
   position: absolute;
@@ -302,6 +309,154 @@ a { color: inherit; }
   background: rgba(255,255,255,0.05);
   color: var(--text-sub);
   font-size: 12px;
+}
+.battle-fx-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: auto;
+  overflow: hidden;
+  --fx-color: var(--accent);
+  --fx-tier-color: var(--accent);
+}
+.battle-fx-layer::before {
+  content: '';
+  position: absolute;
+  inset: 11% 16%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 58%);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.battle-fx-label {
+  position: absolute;
+  left: 50%;
+  top: 26%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--fx-color) 70%, transparent);
+  background: rgba(11, 14, 20, 0.82);
+  color: var(--fx-color);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--fx-color) 65%, transparent);
+}
+.battle-fx-beam {
+  position: absolute;
+  left: 33%;
+  top: 48%;
+  z-index: 3;
+  width: 34%;
+  height: 9px;
+  transform-origin: center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--fx-color), #fff, var(--fx-color), transparent);
+  filter: drop-shadow(0 0 10px var(--fx-color));
+  pointer-events: none;
+}
+.battle-fx-layer[data-attacker='opponent'] .battle-fx-beam {
+  background: linear-gradient(270deg, transparent, var(--fx-color), #fff, var(--fx-color), transparent);
+}
+.battle-fx-beam-atk {
+  height: 7px;
+  clip-path: polygon(0 42%, 82% 0, 100% 50%, 82% 100%, 0 58%);
+}
+.battle-fx-beam-def {
+  height: 12px;
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--fx-color) 60%, white), transparent),
+    repeating-linear-gradient(90deg, transparent 0 16px, rgba(255,255,255,0.7) 17px 19px, transparent 20px 34px);
+}
+.battle-fx-aura {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: 170px;
+  height: 170px;
+  margin: -85px 0 0 -85px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--fx-color) 75%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--fx-color) 22%, transparent), transparent 60%);
+  filter: drop-shadow(0 0 18px var(--fx-color));
+}
+.battle-fx-aura span {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--fx-color) 70%, transparent);
+}
+.battle-fx-aura span:last-child {
+  inset: 34%;
+}
+.battle-fx-shield {
+  position: absolute;
+  top: 34%;
+  z-index: 4;
+  width: 96px;
+  height: 148px;
+  border-radius: 48% 48% 42% 42%;
+  border: 2px solid color-mix(in srgb, var(--fx-color) 78%, white);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--fx-color) 24%, transparent), rgba(255,255,255,0.08));
+  filter: drop-shadow(0 0 18px var(--fx-color));
+  pointer-events: none;
+}
+.battle-fx-impact {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  width: 112px;
+  height: 112px;
+  margin: -56px 0 0 -56px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.95), color-mix(in srgb, var(--fx-color) 50%, transparent) 30%, transparent 68%);
+  filter: drop-shadow(0 0 24px var(--fx-color));
+  pointer-events: none;
+}
+.battle-fx-burst {
+  position: absolute;
+  top: 48%;
+  z-index: 5;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.battle-fx-burst span {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3px;
+  border-radius: 50%;
+  background: var(--fx-tier-color);
+  box-shadow: 0 0 12px var(--fx-tier-color);
+}
+.battle-fx-float {
+  position: absolute;
+  top: 45%;
+  z-index: 6;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(11, 14, 20, 0.82);
+  border: 1px solid currentColor;
+  font-size: 24px;
+  font-weight: 950;
+  text-shadow: 0 0 16px currentColor;
+  pointer-events: none;
+}
+.battle-fx-skip {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: 7;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .battle-stat-grid {
   display: grid;
@@ -348,6 +503,20 @@ a { color: inherit; }
   0% { transform: translateY(-8px) scale(1.04); }
   38% { transform: translateY(-14px) scale(1.08); }
   100% { transform: translateY(-8px) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-fx-layer::before,
+  .battle-fx-beam,
+  .battle-fx-aura,
+  .battle-fx-shield,
+  .battle-fx-impact,
+  .battle-fx-burst {
+    display: none;
+  }
+  .slab-stat.hot {
+    transform: none;
+  }
 }
 
 /* ============================ Passport modal =============================== */

@@ -133,6 +133,19 @@ try {
     const statBtns = page.locator('button', { hasText: /(wins|loses) round/ });
     if (await statBtns.count()) {
       await statBtns.first().click();
+      if (turn === 0) {
+        await page.locator('[data-testid="battle-fx"]').waitFor({ timeout: 1200 });
+        const combatPhase = await page.locator('[data-testid="battle-fx"]').getAttribute('data-combat-phase');
+        const statMotif = await page.locator('[data-testid="battle-fx"]').getAttribute('data-stat');
+        if (!combatPhase || combatPhase === 'idle') throw new Error('Battle FX should enter a visible non-idle combat phase after choosing a stat');
+        if (!statMotif || !['atk', 'def', 'aura'].includes(statMotif)) throw new Error(`Battle FX should expose the chosen stat motif, got ${statMotif}`);
+        if (await page.locator('[data-testid="battle-fx-beam"]').count() < 1) throw new Error('Battle FX should render a stat-specific beam or pulse');
+        await page.waitForFunction(() => {
+          const phase = document.querySelector('[data-testid="battle-fx"]')?.getAttribute('data-combat-phase');
+          return phase === 'clash' || phase === 'impact' || phase === 'resolve';
+        }, { timeout: 900 });
+        await page.screenshot({ path: `${OUT}/06-battle-fx.png` });
+      }
       await page.waitForTimeout(1200);
     } else {
       await page.waitForTimeout(1100);

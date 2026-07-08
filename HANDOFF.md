@@ -12,6 +12,43 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 battle FX timeline
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `a722544` — "feat: update gacha economy and battle ui"
+- Commit phiên này: chuẩn bị commit `feat: battle FX timeline (framer-motion)`
+
+### Đang làm gì
+Không còn code đang viết dở trong batch FX. Phiên này xử lý phản hồi user rằng màn battle chưa thấy hiệu ứng thẻ khi chiến đấu.
+
+### Đã xong
+- `features/battle/useCombatTimeline.ts`: thêm state machine trình diễn round tách khỏi battle engine: `idle -> lockIn -> clash -> impact -> resolve -> settle -> idle`, timing cấu hình một chỗ, hỗ trợ skip/tua nhanh bằng click/tap, tôn trọng `prefers-reduced-motion`.
+- `features/battle/BattleFx.tsx`: thêm lớp FX bằng Framer Motion/AnimatePresence: ATK slash beam, DEF shield motif, AURA radial pulse, impact flash, burst particles, floating damage number, label phase.
+- `features/battle/Battle.tsx`: tích hợp FX chỉ đọc `RoundResult` đã có; không sửa battle engine/kết quả/RNG. Trong lúc FX chạy, card hiển thị dùng `round.playerCard/opponentCard`, AI/player input chờ tới khi FX settle để tránh overlap.
+- `app/globals.css`: thêm styling premium-vault cho FX layer, stat glow, beam/shield/aura/burst/floating number và reduced-motion CSS.
+- `scripts/e2e.mjs`: thêm regression kiểm tra battle FX xuất hiện sau khi chọn stat (`data-testid="battle-fx"`, non-idle phase, stat motif, beam/pulse) và lưu screenshot `.e2e-output/06-battle-fx.png`.
+- `app/api/passport/narrate/route.ts`: thêm timeout server-side mặc định 12s cho AI provider để modal Passport không kẹt skeleton nếu provider chậm; fallback deterministic vẫn dùng dữ liệu validated như trước.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3024`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+- Visual spot-check screenshot: `.e2e-output/06-battle-fx.png`.
+
+### Tiếp theo
+1. Restart dev server `localhost:3001` để browser user thấy FX mới.
+2. Nếu muốn nâng thêm sau này: thêm nhiều frame particle hơn cho DEF/AURA hoặc sound cue, nhưng hiện tại không cần đổi battle logic.
+
+### Cảnh báo
+- Không có cảnh báo build/test mới.
+
+### Nhật ký
+- 2026-07-08 codex: Hoàn tất battle FX timeline bằng Framer Motion theo yêu cầu hướng 3, giữ determinism và engine untouched.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 07:20 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `10110a1` — "fix: collapse marketplace panel"
