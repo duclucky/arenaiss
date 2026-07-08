@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
-import { TierLegend } from '@/components/TierLegend';
 import { TIERS, type GameCard, type Tier } from '@/lib/game/stats';
 import type { Category } from '@/lib/client/api';
 
@@ -21,6 +20,10 @@ function filterCards(cards: GameCard[], filter: RosterFilter) {
   if (filter === 'ALL') return cards;
   if (filter === 'POKEMON' || filter === 'ONE_PIECE') return cards.filter((card) => card.category === filter);
   return cards.filter((card) => card.tier === filter);
+}
+
+function isTierFilter(filter: RosterFilter): filter is Tier {
+  return TIERS.includes(filter as Tier);
 }
 
 export function Roster() {
@@ -56,12 +59,17 @@ export function Roster() {
             <button
               key={item.id}
               className="btn btn-ghost"
-              data-tier={TIERS.includes(item.id as Tier) ? item.id : undefined}
+              data-tier={isTierFilter(item.id) ? item.id : undefined}
               style={{
                 padding: '6px 10px',
-                borderColor: filter === item.id ? (TIERS.includes(item.id as Tier) ? 'var(--tier)' : 'var(--accent)') : 'var(--hairline)',
-                color: filter === item.id ? (TIERS.includes(item.id as Tier) ? 'var(--tier)' : 'var(--accent)') : 'var(--text-sub)',
-                background: filter === item.id ? 'rgba(255,255,255,0.06)' : 'transparent',
+                borderColor: isTierFilter(item.id) ? 'rgba(from var(--tier) r g b / 0.5)' : filter === item.id ? 'var(--accent)' : 'var(--hairline)',
+                color: isTierFilter(item.id) ? 'var(--tier)' : filter === item.id ? 'var(--accent)' : 'var(--text-sub)',
+                background: isTierFilter(item.id)
+                  ? 'rgba(from var(--tier) r g b / 0.1)'
+                  : filter === item.id
+                    ? 'rgba(229,192,123,0.08)'
+                    : 'transparent',
+                boxShadow: filter === item.id && isTierFilter(item.id) ? '0 0 14px -8px var(--tier)' : 'none',
               }}
               onClick={() => setFilter(item.id)}
             >
@@ -71,12 +79,9 @@ export function Roster() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 18 }}><TierLegend /></div>
-
       {sorted.length === 0 ? (
         <div className="panel" style={{ padding: 50, textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 10 }}>PACK</div>
-          <p style={{ color: 'var(--text-sub)' }}>{state.roster.length === 0 ? 'No cards yet. Open your Welcome Pack or choose a simulated pack to start.' : 'No cards match this filter.'}</p>
+          <p style={{ color: 'var(--text-sub)', margin: 0 }}>{state.roster.length === 0 ? 'No cards yet. Open your Welcome Pack or choose a simulated pack to start.' : 'No cards match this filter.'}</p>
           <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Back to Gacha</button>
         </div>
       ) : (

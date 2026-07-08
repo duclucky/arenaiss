@@ -12,6 +12,34 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 roster filter polish
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `956a29b` — "feat: split gacha packs and arena lines"
+- Commit phiên này: chuẩn bị commit `fix: polish roster filters`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý feedback Roster: tier legend bị lặp và chữ `PACK` trong empty state không có ý nghĩa.
+
+### Đã xong
+- `features/roster/Roster.tsx`: bỏ dòng `TierLegend` dưới filter vì các tier đã nằm trong filter.
+- `features/roster/Roster.tsx`: tô màu các nút tier filter bằng đúng palette tier (`TOP/S/A/B/C/D`) giống legend.
+- `features/roster/Roster.tsx`: bỏ chữ `PACK` khỏi empty state; chỉ giữ thông báo có nghĩa và nút `Back to Gacha`.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+
+### Tiếp theo
+1. Reload `localhost:3001` để xem Roster filter polish.
+
+### Cảnh báo
+- Chưa chạy lại e2e vì thay đổi chỉ ở Roster presentation và lint/typecheck đã pass.
+
+### Nhật ký
+- 2026-07-08 codex: Polish Roster filter/empty state theo comment trực tiếp trên browser.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 gacha arena split
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `fb6d652` — "docs: handoff gacha arena scope"
