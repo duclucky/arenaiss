@@ -12,6 +12,35 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 battle action stat display
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `94da646` — "fix: polish roster filters"
+- Commit phiên này: chuẩn bị commit `fix: show base stats in battle actions`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý feedback battle: các nút ATK/DEF/AURA hiển thị số khác chỉ số trên thẻ vì đang show effective score sau type multiplier, gây hiểu nhầm là sai chỉ số.
+
+### Đã xong
+- `features/battle/Battle.tsx`: các nút hành động giờ hiển thị chỉ số gốc đang thấy trên thẻ (`card[stat]`) thay vì effective score.
+- `features/battle/Battle.tsx`: logic thắng/thua vẫn dùng `previewRound`/battle engine effective score như trước, không đổi kết quả trận.
+- `features/battle/Battle.tsx`: đổi copy lượt chơi thành `YOUR TURN - choose an action. Type advantage can swing the round.`
+- `features/battle/Battle.tsx`: rules panel đổi từ `Choose a stat` sang `Choose an action` để thống nhất copy.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+
+### Tiếp theo
+1. Reload `localhost:3001` để thấy battle action buttons hiển thị đúng base stat.
+
+### Cảnh báo
+- Chưa chạy lại e2e vì thay đổi chỉ ở presentation battle action labels; lint/typecheck đã pass.
+
+### Nhật ký
+- 2026-07-08 codex: Sửa battle action UI để không hiển thị effective score như chỉ số gốc.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 roster filter polish
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `956a29b` — "feat: split gacha packs and arena lines"

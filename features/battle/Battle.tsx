@@ -154,12 +154,14 @@ export function Battle() {
         ) : playerTurn && pCard && oCard ? (
           <div>
             <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-sub)', marginBottom: 10 }}>
-              YOUR TURN - choose the attack stat. Type advantage can swing the round.
+              YOUR TURN - choose an action. Type advantage can swing the round.
             </div>
             <div className="battle-stat-grid">
               {STAT_KEYS.map((s) => {
                 const pv = previewRound(battle, s);
                 const win = pv.pEff >= pv.oEff;
+                const playerBase = pCard[s];
+                const opponentBase = oCard[s];
                 return (
                   <button
                     key={s}
@@ -169,9 +171,9 @@ export function Battle() {
                   >
                     <span className="battle-stat-name">{STAT_LABEL[s]}</span>
                     <span className="battle-stat-values tabnums">
-                      <b>{pv.pEff}</b>
+                      <b>{playerBase}</b>
                       <span>vs</span>
-                      <b>{pv.oEff}</b>
+                      <b>{opponentBase}</b>
                     </span>
                     <span className="battle-stat-outcome">{win ? 'wins round' : 'loses round'}</span>
                   </button>
@@ -216,7 +218,7 @@ function BattleInfo({ rounds }: { rounds: RoundResult[] }) {
           </div>
         </div>
         <ul className="battle-rule-list">
-          <li><b>Choose a stat.</b> The attacker picks ATK, DEF, or AURA; both cards compare that same stat.</li>
+          <li><b>Choose an action.</b> Pick ATK, DEF, or AURA; both cards compare that same visible stat.</li>
           <li><b>Type advantage matters.</b> Element matchups can boost or reduce the effective score shown in the log.</li>
           <li><b>Higher score wins.</b> If scores tie, the current attacker wins the edge.</li>
           <li><b>Loser is KO.</b> The losing card leaves the lineup. Battle ends when one side has no cards left.</li>
