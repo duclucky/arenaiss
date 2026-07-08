@@ -55,8 +55,23 @@ For private repos, cPanel needs GitHub access:
 4. Run `npm ci` and `npm run build`.
 5. Restart the Node.js app.
 
-If cPanel Git cannot pull private repos cleanly, upload a zip of the committed
-project, extract it into the app root, then run the same install/build commands.
+If cPanel Git cannot pull private repos cleanly and Terminal is unavailable, use
+the GitHub Actions FTP deploy workflow added in `.github/workflows/deploy-namecheap.yml`.
+
+Create one GitHub repository secret named `FTP_ARENAISS` containing the FTP
+password for the FTP account `Arenaiss@arenaiss.xyz`.
+
+The workflow currently uses:
+
+```text
+FTP host: ftp.arenaiss.xyz
+FTP user: Arenaiss@arenaiss.xyz
+FTP dir:  /arenaiss/
+```
+
+The workflow builds `next.config.ts` with `output: "standalone"`, uploads the
+standalone production payload into the app root, then the cPanel Node.js app can
+start from `server.js`. After the first deploy, restart the Node.js app in cPanel.
 
 ## Domain and DNS
 
