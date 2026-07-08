@@ -75,9 +75,11 @@ FTP user: Arenaiss@arenaiss.xyz
 FTP dir:  /arenaiss/, or FTP_ARENAISS_DIR if set
 ```
 
-The workflow builds `next.config.ts` with `output: "standalone"`, uploads the
-standalone production payload into the app root, then the cPanel Node.js app can
-start from `server.js`. After the first deploy, restart the Node.js app in cPanel.
+The workflow builds `next.config.ts` with `output: "standalone"` and uploads a
+CloudLinux-compatible payload. The cPanel app root stays clean: it contains only a
+small `server.js` wrapper, a minimal `package.json`, and the real standalone app in
+the `app/` subfolder. This avoids CloudLinux's root `node_modules` restriction.
+After the first deploy, restart the Node.js app in cPanel.
 
 ## Manual upload without Terminal
 
@@ -89,12 +91,16 @@ Build the ZIP locally from the project root:
 ```powershell
 npm.cmd run build
 Remove-Item -Recurse -Force deploy -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force deploy | Out-Null
-Copy-Item -Recurse .next\standalone\* deploy\
-Remove-Item -Recurse -Force deploy\data -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force deploy\.next -ErrorAction SilentlyContinue | Out-Null
-Copy-Item -Recurse .next\static deploy\.next\static
-if (Test-Path public) { Copy-Item -Recurse public deploy\public }
+New-Item -ItemType Directory -Force deploy\app | Out-Null
+Copy-Item hosting\namecheap-server.js deploy\server.js
+@'
+{"name":"arenaiss-namecheap","private":true,"scripts":{"start":"node server.js"}}
+'@ | Set-Content deploy\package.json -Encoding ascii
+Copy-Item -Recurse .next\standalone\* deploy\app\
+Remove-Item -Recurse -Force deploy\app\data -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force deploy\app\.next -ErrorAction SilentlyContinue | Out-Null
+Copy-Item -Recurse .next\static deploy\app\.next\static
+if (Test-Path public) { Copy-Item -Recurse public deploy\app\public }
 Compress-Archive -Path deploy\* -DestinationPath arenaiss-namecheap-standalone.zip -Force
 ```
 
@@ -104,9 +110,7 @@ folder, extract it there, and confirm these files exist directly in the app root
 ```text
 package.json
 server.js
-.next/
-node_modules/
-public/
+app/
 ```
 
 Then set the cPanel Node.js app startup file to `server.js`, add the environment
