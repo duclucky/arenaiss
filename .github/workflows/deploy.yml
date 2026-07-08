@@ -79,5 +79,14 @@ jobs:
           echo "Remote app root listing:"
           curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER$FTP_SERVER_DIR" || true
           echo ""
+          echo "Remote app folder listing:"
+          curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER${FTP_SERVER_DIR%/}/app/" || true
+          echo ""
+          echo "Remote Next module listing:"
+          curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER${FTP_SERVER_DIR%/}/app/node_modules/next/" || true
+          echo ""
+          echo "Last boot.log lines:"
+          curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER${FTP_SERVER_DIR%/}/boot.log" | tail -n 120 || true
+          echo ""
           echo "Last cPanel stderr.log lines:"
           curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER${FTP_SERVER_DIR%/}/stderr.log" | tail -n 160 || true
