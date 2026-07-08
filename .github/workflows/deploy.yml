@@ -62,6 +62,13 @@ jobs:
           local-dir: ./deploy/
           server-dir: ${{ secrets.FTP_SERVER_DIR || secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
           protocol: ftp
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.env
+            **/*.env
+            **/data/**
+            **/*.log
 
       - name: Verify live site
         run: |
