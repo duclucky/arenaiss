@@ -62,3 +62,22 @@ jobs:
           local-dir: ./deploy/
           server-dir: ${{ secrets.FTP_SERVER_DIR || secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
           protocol: ftp
+
+      - name: Verify live site
+        run: |
+          curl -fsSI https://arenaiss.xyz
+          curl -fsSL https://arenaiss.xyz | grep -i "Arenaiss"
+
+      - name: Fetch cPanel error log after verify failure
+        if: failure()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER || secrets.FTP_ARENAISS_HOST || 'ftp.arenaiss.xyz' }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME || 'Arenaiss@arenaiss.xyz' }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD || secrets.FTP_ARENAISS }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR || secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
+        run: |
+          echo "Remote app root listing:"
+          curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER$FTP_SERVER_DIR" || true
+          echo ""
+          echo "Last cPanel stderr.log lines:"
+          curl --silent --show-error --fail --user "$FTP_USERNAME:$FTP_PASSWORD" "ftp://$FTP_SERVER${FTP_SERVER_DIR%/}/stderr.log" | tail -n 160 || true
