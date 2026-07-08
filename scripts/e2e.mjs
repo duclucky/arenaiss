@@ -134,17 +134,29 @@ try {
     if (passportText.includes('Reference price:') || passportText.includes('Custody:') || passportText.includes('Provenance:')) {
       throw new Error('Passport AI section should not repeat reference, custody, or provenance labels already shown elsewhere');
     }
-    const ownButtonBox = await passportDialog.locator('text=How to own it for real').first().boundingBox();
+    if (passportText.includes('How to own it for real')) {
+      throw new Error('Passport ownership CTA should use the new marketplace copy');
+    }
+    const ownButtonBox = await passportDialog.locator('text=Check on Renaiss Marketplace').first().boundingBox();
     const bodyBox = await passportDialog.locator('.passport-body').boundingBox();
     if (!ownButtonBox || !bodyBox || ownButtonBox.y > bodyBox.y + 260) {
       throw new Error('Ownership CTA should be visible near the top of the Passport modal body');
+    }
+    const referenceBulletCount = await passportDialog.locator('[data-testid="reference-meta-list"] li').count();
+    if (referenceBulletCount < 3) {
+      throw new Error('Reference estimate metadata should be rendered as bullet lines');
+    }
+    await passportDialog.locator('[data-testid="passport-ai-list"] li').first().waitFor({ timeout: 30000 });
+    const aiBulletCount = await passportDialog.locator('[data-testid="passport-ai-list"] li').count();
+    if (aiBulletCount < 2) {
+      throw new Error('Passport AI insight should be rendered as bullet lines');
     }
     if (passportText.includes('7d: —') && passportText.includes('30d: —') && passportText.includes('365d: —')) {
       throw new Error('Reference deltas should not render empty dash-only values');
     }
     await page.screenshot({ path: `${OUT}/07-passport.png` });
     // Open the real-ownership funnel.
-    const ownBtn = page.locator('text=How to own it for real');
+    const ownBtn = page.locator('text=Check on Renaiss Marketplace');
     if (await ownBtn.count()) {
       await ownBtn.click();
       await page.waitForTimeout(1500);

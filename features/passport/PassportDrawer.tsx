@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useArena, useArenaDispatch, cardByToken } from '@/app/arena/state';
 import {
   fetchCardDetail,
@@ -48,18 +49,47 @@ function usdtFromBaseUnits(input: string | number | null | undefined): string {
   }
 }
 
+const bulletListStyle: CSSProperties = {
+  margin: '0',
+  paddingLeft: 18,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+};
+
+const bulletItemStyle: CSSProperties = {
+  lineHeight: 1.45,
+};
+
+function sourceCountLabel(count: number | null | undefined): string {
+  if (count == null) return '';
+  return `${count} source${count === 1 ? '' : 's'}`;
+}
+
+function narrationItems(text: string): string[] {
+  const sentenceItems = text
+    .split(/\n{2,}|(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (sentenceItems.length > 1 || text.length < 140) return sentenceItems;
+  return text
+    .split(/;\s+|,\s+(?=(?:and|but|while|reflecting|according|based|currently|remember)\b)/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function Narr({ text }: { text: string }) {
   return (
-    <>
-      {text.split('\n\n').map((p, i) => {
+    <ul data-testid="passport-ai-list" style={bulletListStyle}>
+      {narrationItems(text).map((p, i) => {
         const html = p
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
           .replace(/_(.+?)_/g, '<em style="color:var(--text-dim)">$1</em>');
-        return <p key={i} style={{ margin: '0 0 10px', lineHeight: 1.55, fontSize: 13.5 }} dangerouslySetInnerHTML={{ __html: html }} />;
+        return <li key={i} style={{ ...bulletItemStyle, fontSize: 13.5 }} dangerouslySetInnerHTML={{ __html: html }} />;
       })}
-    </>
+    </ul>
   );
 }
 
@@ -213,18 +243,22 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
                       Recent trend unavailable: Renaiss OS Index did not return 7d/30d/365d deltas for this card.
                     </div>
                   )}
-                  <div className="caveat" style={{ marginTop: 10 }}>
-                    {idx.observationCount ?? '---'} observations{idx.sourceCount ? ` - ${idx.sourceCount} sources` : ''}
-                    {idx.lastSaleAt ? ` - last sale ${idx.lastSaleAt.slice(0, 10)}` : ''}.
-                    Source: <b>Renaiss OS Index</b>, as of {asOf.slice(0, 10)}.
-                    This estimate is not this token listing price.
-                    {idx.observationCount != null && idx.observationCount < 10 ? ' Thin data; treat as experimental reference.' : ''}
-                  </div>
+                  <ul data-testid="reference-meta-list" className="caveat" style={{ ...bulletListStyle, marginTop: 10 }}>
+                    <li style={bulletItemStyle}>
+                      {idx.observationCount ?? '---'} observations{idx.sourceCount ? ` - ${sourceCountLabel(idx.sourceCount)}` : ''}.
+                    </li>
+                    {idx.lastSaleAt && <li style={bulletItemStyle}>Last sale: {idx.lastSaleAt.slice(0, 10)}.</li>}
+                    <li style={bulletItemStyle}>Source: <b>Renaiss OS Index</b>, as of {asOf.slice(0, 10)}.</li>
+                    <li style={bulletItemStyle}>This estimate is not this token listing price.</li>
+                    {idx.observationCount != null && idx.observationCount < 10 && (
+                      <li style={bulletItemStyle}>Thin data; treat as experimental reference.</li>
+                    )}
+                  </ul>
                 </div>
               ) : (
                 <p className="caveat">
                   This card could not be matched to Renaiss OS Index, or no reference estimate is available. This section is not this token listing price;
-                  exact-token asks are shown under Own it for real when available.
+                  exact-token asks are shown under Check on Renaiss Marketplace when available.
                 </p>
               )}
             </section>
@@ -258,10 +292,10 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
           <div className="passport-column">
             <section>
               {!showReal ? (
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>How to own it for real</button>
+                <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>Check on Renaiss Marketplace</button>
               ) : (
                 <div className="panel" style={{ padding: 14 }}>
-                  <SectionLabel>Own it for real</SectionLabel>
+                  <SectionLabel>Renaiss Marketplace</SectionLabel>
                   <p className="caveat" style={{ marginBottom: 10 }}>
                     This section links to real Renaiss pages and is separate from the simulated game. Direct purchase uses the exact
                     card token id. The ask price here is the seller&apos;s current listing for this exact token, so it can differ from the Index estimate.

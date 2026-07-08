@@ -12,6 +12,33 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 03:34 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `ee5b907` — "feat: restore cached passport ai"
+- Commit phiên này: chuẩn bị commit "fix: polish passport bullet copy"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này xử lý browser comments về trình bày trong Passport modal: Reference metadata và Passport AI đang là đoạn văn dài khó đọc; CTA ownership cần đổi copy.
+
+### Đã xong
+- `features/passport/PassportDrawer.tsx`: Reference estimate metadata chuyển sang bullet list, mỗi ý một dòng: observations/source count, last sale, source/asOf, listing-price caveat, thin-data caveat.
+- `features/passport/PassportDrawer.tsx`: Passport AI renderer chuyển từ paragraph sang bullet list; nếu provider trả một paragraph dài thì tách thành nhiều bullet để dễ scan.
+- `features/passport/PassportDrawer.tsx`: CTA đổi từ `How to own it for real` sang `Check on Renaiss Marketplace`; section sau click đổi thành `Renaiss Marketplace`.
+- `scripts/e2e.mjs`: thêm regression cho CTA mới và bullet rendering; e2e đợi AI list render xong để không fail khi provider/cache chậm.
+- Verify mới nhất: `npm.cmd run lint` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua server tạm `http://127.0.0.1:3016` PASS, console errors none.
+
+### Tiếp theo
+1. Restart server đang chạy ở `localhost:3001` để browser thấy bản UI mới.
+2. Nếu muốn đổi naming trong README/video từ "Own it for real" sang "Check on Renaiss Marketplace", cập nhật docs/demo script riêng.
+
+### Cảnh báo
+- AI provider có thể mất vài giây; UI vẫn skeleton trong khi đợi. Cache server-side giảm quota sau lần generate đầu.
+
+### Nhật ký
+- 2026-07-08 codex: Polish Passport modal theo browser comments: bullet lists cho Reference/AI và CTA marketplace mới.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 03:05 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `a028856` — "fix: de-duplicate passport content"
