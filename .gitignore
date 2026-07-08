@@ -23,6 +23,7 @@ __pycache__/
 /build
 /deploy/
 /data/
+*.zip
 
 # misc
 .DS_Store

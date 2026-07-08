@@ -79,6 +79,39 @@ The workflow builds `next.config.ts` with `output: "standalone"`, uploads the
 standalone production payload into the app root, then the cPanel Node.js app can
 start from `server.js`. After the first deploy, restart the Node.js app in cPanel.
 
+## Manual upload without Terminal
+
+If FTP automation is not working and cPanel has no Terminal, upload a prebuilt
+standalone ZIP instead.
+
+Build the ZIP locally from the project root:
+
+```powershell
+npm.cmd run build
+Remove-Item -Recurse -Force deploy -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force deploy | Out-Null
+Copy-Item -Recurse .next\standalone\* deploy\
+Remove-Item -Recurse -Force deploy\data -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force deploy\.next -ErrorAction SilentlyContinue | Out-Null
+Copy-Item -Recurse .next\static deploy\.next\static
+if (Test-Path public) { Copy-Item -Recurse public deploy\public }
+Compress-Archive -Path deploy\* -DestinationPath arenaiss-namecheap-standalone.zip -Force
+```
+
+Upload `arenaiss-namecheap-standalone.zip` into the cPanel application root
+folder, extract it there, and confirm these files exist directly in the app root:
+
+```text
+package.json
+server.js
+.next/
+node_modules/
+public/
+```
+
+Then set the cPanel Node.js app startup file to `server.js`, add the environment
+variables listed above, and restart the app.
+
 ## Domain and DNS
 
 For `arenaiss.xyz` bought on Namecheap and hosted on Namecheap Stellar, either:
