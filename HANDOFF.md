@@ -12,6 +12,39 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-09 hero demo notice
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `b8d66d4` — "feat: add battle initiative and polish gacha"
+- Commit phiên này: chuẩn bị commit `fix: clarify gacha demo notice`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý feedback hero Gacha: chữ `RA` không rõ nghĩa và phần giới thiệu cần nói chuyên nghiệp hơn rằng đây là demo/mô phỏng, không tạo giá trị hay quyền sở hữu thật cho card.
+
+### Đã xong
+- `features/intro/Intro.tsx`: đổi label lớn `RA` thành `DEMO`.
+- `features/intro/Intro.tsx`: đổi headline thành `Renaiss Arena Simulation`.
+- `features/intro/Intro.tsx`: viết lại hero copy bằng tiếng Anh, nêu rõ đây là game-only simulation; card mở trong app là fictional in-app game items, không có real-world value/ownership/claim; demo dùng official Renaiss API data để mô phỏng metadata thẻ thật sát nhất có thể.
+- `scripts/e2e.mjs`: cập nhật regression kiểm tra copy mới: `Renaiss Arena Simulation`, `game-only simulation`, `no real-world value`, `official Renaiss API data`.
+
+### Verification mới nhất
+- E2E RED trước khi sửa: fail vì chưa thấy `Renaiss Arena Simulation`.
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3034`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+
+### Tiếp theo
+1. Reload `localhost:3001` nếu dev tab chưa tự cập nhật HMR.
+
+### Cảnh báo
+- Không đổi logic gacha/battle; chỉ đổi copy và e2e assertion.
+
+### Nhật ký
+- 2026-07-09 codex: Làm rõ hero notice theo feedback trực tiếp trên browser.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 battle initiative + gacha polish
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `2222ba0` — "fix: explain effective battle scores"

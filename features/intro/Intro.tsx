@@ -25,13 +25,15 @@ export function Intro() {
   return (
     <div className="anim-fade" style={{ maxWidth: 980, margin: '0 auto', padding: '34px 22px 60px' }}>
       <div style={{ textAlign: 'center', marginBottom: 30 }}>
-        <div className="anim-float" style={{ fontSize: 44, marginBottom: 8, fontWeight: 900, color: 'var(--accent)' }}>RA</div>
+        <div className="anim-float" style={{ fontSize: 34, marginBottom: 8, fontWeight: 900, color: 'var(--accent)', letterSpacing: '0.08em' }}>DEMO</div>
         <h1 style={{ fontSize: 34, margin: '0 0 8px', letterSpacing: '0' }}>
-          Build a <span style={{ color: 'var(--accent)' }}>Vault Lineup</span>
+          Renaiss Arena <span style={{ color: 'var(--accent)' }}>Simulation</span>
         </h1>
         <p style={{ color: 'var(--text-sub)', maxWidth: 660, margin: '0 auto', lineHeight: 1.6 }}>
-          Draft a dream lineup from simulated Renaiss pack vaults. Rip Pokemon and One Piece slabs,
-          then battle for virtual credits with every card linked to its real Card Passport.
+          This is a game-only simulation designed to demonstrate how Renaiss pack discovery,
+          roster building, and arena battles can work. Cards opened here are fictional in-app
+          game items with no real-world value, ownership, or claim. The demo uses official
+          Renaiss API data to mirror real graded-card metadata as closely as possible.
         </p>
       </div>
 

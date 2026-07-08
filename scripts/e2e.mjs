@@ -50,8 +50,10 @@ async function addCurrentPackToRoster() {
 
 try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 30000 });
-  await page.waitForSelector('text=Build a', { timeout: 15000 });
-  await page.waitForSelector('text=Draft a dream lineup from simulated Renaiss pack vaults.', { timeout: 5000 });
+  await page.waitForSelector('text=Renaiss Arena Simulation', { timeout: 15000 });
+  await page.waitForSelector('text=game-only simulation', { timeout: 5000 });
+  await page.waitForSelector('text=no real-world value', { timeout: 5000 });
+  await page.waitForSelector('text=official Renaiss API data', { timeout: 5000 });
   await page.waitForSelector('text=Log in to sync progress on the server.', { timeout: 5000 });
   if (await page.locator('header >> text=Reset').count()) throw new Error('Header should not expose Reset progress control');
   if (await page.locator('header >> text=Read-only').count()) throw new Error('Header still shows Read-only chip');
