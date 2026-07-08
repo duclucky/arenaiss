@@ -622,6 +622,23 @@ a { color: inherit; }
   color: var(--text-dim);
   font-size: 10px;
 }
+.battle-effective-help {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.battle-effective-help [data-tone='boost'],
+.battle-effective-score[data-tone='boost'] {
+  color: var(--win);
+}
+.battle-effective-help [data-tone='nerf'],
+.battle-effective-score[data-tone='nerf'] {
+  color: var(--loss);
+}
+.battle-effective-score[data-tone='flat'] {
+  color: var(--text);
+}
 .battle-info-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.85fr);

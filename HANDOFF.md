@@ -12,6 +12,36 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 effective score explanation
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `3354aae` — "fix: show base stats in battle actions"
+- Commit phiên này: chuẩn bị commit `fix: explain effective battle scores`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý feedback: user thích concept effective score nhưng cần giải thích rõ trong UI và tô màu điểm effective theo buff/nerf/neutral.
+
+### Đã xong
+- `features/battle/Battle.tsx`: thêm dòng giải thích ngay dưới `YOUR TURN`: `Effective score = visible stat x type multiplier`; xanh = boosted, đỏ = reduced, trắng = unchanged.
+- `features/battle/Battle.tsx`: action buttons chỉ hiển thị điểm effective của hai bên, tô màu theo so sánh với chỉ số gốc; bỏ chỉ số gốc trong nút để đỡ rối.
+- `features/battle/Battle.tsx`: Battle Log cũng tô màu effective score bằng cùng quy tắc.
+- `features/battle/Battle.tsx`: rules panel giải thích effective score thay vì chỉ nói chung về type advantage.
+- `app/globals.css`: thêm style cho `.battle-effective-help` và `.battle-effective-score`.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+
+### Tiếp theo
+1. Reload `localhost:3001` nếu HMR chưa tự cập nhật.
+
+### Cảnh báo
+- Chưa chạy lại e2e vì thay đổi chỉ ở presentation/label battle; lint/typecheck đã pass.
+
+### Nhật ký
+- 2026-07-08 codex: Làm rõ effective score trong action buttons và battle log.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 battle action stat display
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `94da646` — "fix: polish roster filters"

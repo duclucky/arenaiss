@@ -153,8 +153,13 @@ export function Battle() {
           </div>
         ) : playerTurn && pCard && oCard ? (
           <div>
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-sub)', marginBottom: 10 }}>
-              YOUR TURN - choose an action. Type advantage can swing the round.
+            <div style={{ textAlign: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
+                YOUR TURN - choose an action.
+              </div>
+              <div className="battle-effective-help">
+                Effective score = visible stat x type multiplier. <span data-tone="boost">Green</span> is boosted, <span data-tone="nerf">red</span> is reduced, white is unchanged.
+              </div>
             </div>
             <div className="battle-stat-grid">
               {STAT_KEYS.map((s) => {
@@ -171,9 +176,9 @@ export function Battle() {
                   >
                     <span className="battle-stat-name">{STAT_LABEL[s]}</span>
                     <span className="battle-stat-values tabnums">
-                      <b>{playerBase}</b>
+                      <EffectiveScore base={playerBase} value={pv.pEff} />
                       <span>vs</span>
-                      <b>{opponentBase}</b>
+                      <EffectiveScore base={opponentBase} value={pv.oEff} />
                     </span>
                     <span className="battle-stat-outcome">{win ? 'wins round' : 'loses round'}</span>
                   </button>
@@ -219,13 +224,27 @@ function BattleInfo({ rounds }: { rounds: RoundResult[] }) {
         </div>
         <ul className="battle-rule-list">
           <li><b>Choose an action.</b> Pick ATK, DEF, or AURA; both cards compare that same visible stat.</li>
-          <li><b>Type advantage matters.</b> Element matchups can boost or reduce the effective score shown in the log.</li>
+          <li><b>Type advantage matters.</b> Effective score = visible stat x type multiplier. Boosted scores are green; reduced scores are red.</li>
           <li><b>Higher score wins.</b> If scores tie, the current attacker wins the edge.</li>
           <li><b>Loser is KO.</b> The losing card leaves the lineup. Battle ends when one side has no cards left.</li>
           <li><b>Virtual stake.</b> Starting costs {BATTLE_STAKE} credits; a win pays {WIN_REWARD}. Credits are not real money.</li>
         </ul>
       </section>
     </div>
+  );
+}
+
+function effectiveTone(base: number, value: number) {
+  if (value > base) return 'boost';
+  if (value < base) return 'nerf';
+  return 'flat';
+}
+
+function EffectiveScore({ base, value }: { base: number; value: number }) {
+  return (
+    <b className="battle-effective-score" data-tone={effectiveTone(base, value)}>
+      {value}
+    </b>
   );
 }
 
@@ -244,9 +263,9 @@ function RoundLogRow({ round }: { round: RoundResult }) {
           <span className={playerWon ? 'battle-log-win' : 'battle-log-loss'}>{winnerLabel} won</span>
         </div>
         <div className="battle-log-score tabnums">
-          <span>You {round.playerEff}</span>
+          <span>You <EffectiveScore base={round.playerBase} value={round.playerEff} /></span>
           <span>vs</span>
-          <span>Opponent {round.opponentEff}</span>
+          <span>Opponent <EffectiveScore base={round.opponentBase} value={round.opponentEff} /></span>
           <span className="battle-log-ko">{loserLabel} card KO</span>
         </div>
         <div className="battle-log-note mono">{round.typeNote}</div>
