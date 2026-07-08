@@ -47,9 +47,9 @@ jobs:
       - name: Upload to Namecheap FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ftp.arenaiss.xyz
+          server: ${{ secrets.FTP_ARENAISS_HOST || 'ftp.arenaiss.xyz' }}
           username: Arenaiss@arenaiss.xyz
           password: ${{ secrets.FTP_ARENAISS }}
           local-dir: ./deploy/
-          server-dir: /arenaiss/
+          server-dir: ${{ secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
           protocol: ftp

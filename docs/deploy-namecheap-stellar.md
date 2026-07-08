@@ -61,12 +61,18 @@ the GitHub Actions FTP deploy workflow added in `.github/workflows/deploy-namech
 Create one GitHub repository secret named `FTP_ARENAISS` containing the FTP
 password for the FTP account `Arenaiss@arenaiss.xyz`.
 
+If `ftp.arenaiss.xyz` has not propagated yet, also create `FTP_ARENAISS_HOST`
+with the cPanel FTP server name or shared IP address.
+
+If your FTP root does not expose `/arenaiss/`, also create `FTP_ARENAISS_DIR`
+with the correct remote app directory.
+
 The workflow currently uses:
 
 ```text
-FTP host: ftp.arenaiss.xyz
+FTP host: ftp.arenaiss.xyz, or FTP_ARENAISS_HOST if set
 FTP user: Arenaiss@arenaiss.xyz
-FTP dir:  /arenaiss/
+FTP dir:  /arenaiss/, or FTP_ARENAISS_DIR if set
 ```
 
 The workflow builds `next.config.ts` with `output: "standalone"`, uploads the
