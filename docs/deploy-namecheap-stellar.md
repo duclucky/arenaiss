@@ -78,8 +78,9 @@ FTP dir:  /arenaiss/, or FTP_ARENAISS_DIR if set
 The workflow builds `next.config.ts` with `output: "standalone"` and uploads a
 CloudLinux-compatible payload. The cPanel app root stays clean: it contains only a
 small `server.js` wrapper, a minimal `package.json`, and the real standalone app in
-the `app/` subfolder. This avoids CloudLinux's root `node_modules` restriction.
-After the first deploy, restart the Node.js app in cPanel.
+the `app/` subfolder. The standalone runtime dependencies stay inside `app/node_modules`;
+do not create or upload a root `node_modules` folder. The workflow also updates
+`tmp/restart.txt` so Passenger/CloudLinux reloads the app after FTP upload.
 
 ## Manual upload without Terminal
 
@@ -91,7 +92,7 @@ Build the ZIP locally from the project root:
 ```powershell
 npm.cmd run build
 Remove-Item -Recurse -Force deploy -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force deploy\app | Out-Null
+New-Item -ItemType Directory -Force deploy\app, deploy\tmp | Out-Null
 Copy-Item hosting\namecheap-server.js deploy\server.js
 @'
 {"name":"arenaiss-namecheap","private":true,"scripts":{"start":"node server.js"}}
@@ -101,6 +102,7 @@ Remove-Item -Recurse -Force deploy\app\data -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force deploy\app\.next -ErrorAction SilentlyContinue | Out-Null
 Copy-Item -Recurse .next\static deploy\app\.next\static
 if (Test-Path public) { Copy-Item -Recurse public deploy\app\public }
+(Get-Date).ToUniversalTime().ToString("s") + "Z" | Set-Content deploy\tmp\restart.txt -Encoding ascii
 Compress-Archive -Path deploy\* -DestinationPath arenaiss-namecheap-standalone.zip -Force
 ```
 
@@ -111,10 +113,13 @@ folder, extract it there, and confirm these files exist directly in the app root
 package.json
 server.js
 app/
+tmp/restart.txt
 ```
 
 Then set the cPanel Node.js app startup file to `server.js`, add the environment
-variables listed above, and restart the app.
+variables listed above, and restart the app. Do not click `Run NPM Install` for
+the standalone ZIP path unless you intentionally switch back to repo-source
+deployment; the runtime modules are already inside `app/node_modules`.
 
 ## Domain and DNS
 

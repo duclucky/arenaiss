@@ -38,13 +38,14 @@ jobs:
       - name: Prepare FTP payload
         run: |
           rm -rf deploy
-          mkdir -p deploy/app
+          mkdir -p deploy/app deploy/tmp
           cp hosting/namecheap-server.js deploy/server.js
           node -e "require('node:fs').writeFileSync('deploy/package.json', JSON.stringify({ name: 'arenaiss-namecheap', private: true, scripts: { start: 'node server.js' } }, null, 2) + '\n')"
           cp -R .next/standalone/. deploy/app/
           mkdir -p deploy/app/.next
           cp -R .next/static deploy/app/.next/static
           if [ -d public ]; then cp -R public deploy/app/public; fi
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy/tmp/restart.txt
 
       - name: Upload to Namecheap FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

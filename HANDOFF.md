@@ -824,6 +824,14 @@ không render nút phụ này.
   `approvePermit2Usdt`/`deploySafeWallet`.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-09 codex: Debug Namecheap 503 từ `stderr.log`: lỗi hiện tại là
+  `Cannot find module 'next'` trong `/home/fundvmbn/arenaiss/app/server.js`, tức
+  server thấy root wrapper nhưng thiếu runtime module trong `app/node_modules`.
+  Chốt hướng tự động: GitHub Actions build Next standalone, upload payload qua FTP
+  với root sạch (`server.js`, minimal `package.json`, `app/`, `tmp/restart.txt`),
+  giữ dependencies bên trong `app/node_modules`, và chạm `tmp/restart.txt` để
+  app reload; không dùng manual ZIP/Run NPM Install làm đường chính. Verify local:
+  `npm.cmd run build` PASS; `node deploy/server.js` trên port 3010 trả HTTP 200.
 - 2026-07-07 codex: Xử lý browser comment Deck: bỏ nút `Passport` overlay phụ trong
   `features/deck-builder/DeckBuilder.tsx`; giữ CTA duy nhất là `View Passport` trong
   `components/Slab.tsx`. `scripts/e2e.mjs` thêm assertion không còn `.card-grid`
