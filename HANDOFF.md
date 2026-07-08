@@ -824,6 +824,12 @@ không render nút phụ này.
   `approvePermit2Usdt`/`deploySafeWallet`.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-09 codex: Workflow `Deploy` đã chạy tới bước FTP, tức lint/typecheck/unit
+  tests/build/syntax checks đều qua trên GitHub Actions. Run `28982198568` fail ở
+  `Upload to Namecheap FTP` với `Input required and not supplied: password`.
+  `gh secret list` cho thấy repo hiện chỉ có `FTP_ARENAISS_HOST`; cần thêm
+  `FTP_PASSWORD` (và nên thêm đủ `FTP_SERVER`, `FTP_USERNAME`, `FTP_SERVER_DIR`)
+  trước khi chạy lại workflow.
 - 2026-07-09 codex: Đồng bộ workflow với mô hình CI/CD tự động chủ dự án yêu cầu:
   đổi workflow thành `.github/workflows/deploy.yml`, trigger `main` và `master`,
   runner Node 20, thêm `node --check` cho startup wrapper + deploy payload, dùng
