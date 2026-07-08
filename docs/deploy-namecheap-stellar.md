@@ -56,23 +56,21 @@ For private repos, cPanel needs GitHub access:
 5. Restart the Node.js app.
 
 If cPanel Git cannot pull private repos cleanly and Terminal is unavailable, use
-the GitHub Actions FTP deploy workflow added in `.github/workflows/deploy-namecheap.yml`.
+the GitHub Actions FTP deploy workflow added in `.github/workflows/deploy.yml`.
 
-Create one GitHub repository secret named `FTP_ARENAISS` containing the FTP
-password for the FTP account `Arenaiss@arenaiss.xyz`.
+Create these GitHub repository secrets:
 
-If `ftp.arenaiss.xyz` has not propagated yet, also create `FTP_ARENAISS_HOST`
-with the cPanel FTP server name or shared IP address.
-
-If your FTP root does not expose `/arenaiss/`, also create `FTP_ARENAISS_DIR`
-with the correct remote app directory.
+- `FTP_SERVER` — cPanel FTP server, for example `ftp.fundline.xyz`
+- `FTP_USERNAME` — FTP account, for example `Arenaiss@arenaiss.xyz`
+- `FTP_PASSWORD` — FTP password
+- `FTP_SERVER_DIR` — remote app directory, for example `/arenaiss/`
 
 The workflow currently uses:
 
 ```text
-FTP host: ftp.arenaiss.xyz, or FTP_ARENAISS_HOST if set
-FTP user: Arenaiss@arenaiss.xyz
-FTP dir:  /arenaiss/, or FTP_ARENAISS_DIR if set
+FTP host: FTP_SERVER, or ftp.arenaiss.xyz as a fallback
+FTP user: FTP_USERNAME, or Arenaiss@arenaiss.xyz as a fallback
+FTP dir:  FTP_SERVER_DIR, or /arenaiss/ as a fallback
 ```
 
 The workflow builds `next.config.ts` with `output: "standalone"` and uploads a
@@ -81,6 +79,21 @@ small `server.js` wrapper, a minimal `package.json`, and the real standalone app
 the `app/` subfolder. The standalone runtime dependencies stay inside `app/node_modules`;
 do not create or upload a root `node_modules` folder. The workflow also updates
 `tmp/restart.txt` so Passenger/CloudLinux reloads the app after FTP upload.
+
+Deployment flow:
+
+```text
+git push -> main/master
+  -> GitHub Actions on ubuntu-latest
+  -> npm ci
+  -> node --check startup wrapper
+  -> lint, typecheck, unit tests
+  -> next build
+  -> prepare standalone payload
+  -> node --check deploy/server.js and deploy/app/server.js
+  -> write tmp/restart.txt
+  -> FTP-Deploy-Action uploads to cPanel
+```
 
 ## Manual upload without Terminal
 

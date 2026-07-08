@@ -824,6 +824,15 @@ không render nút phụ này.
   `approvePermit2Usdt`/`deploySafeWallet`.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-09 codex: Đồng bộ workflow với mô hình CI/CD tự động chủ dự án yêu cầu:
+  đổi workflow thành `.github/workflows/deploy.yml`, trigger `main` và `master`,
+  runner Node 20, thêm `node --check` cho startup wrapper + deploy payload, dùng
+  GitHub Secrets chuẩn `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`,
+  `FTP_SERVER_DIR` (vẫn fallback secret cũ nếu còn). Lỗi Actions trước đó là lint
+  chặn CommonJS wrapper; đã thêm disable hẹp trong `hosting/namecheap-server.js`
+  và ignore `deploy/**` trong ESLint. Verify local: `npm.cmd run lint` PASS,
+  `node --check hosting/namecheap-server.js`, `deploy/server.js`,
+  `deploy/app/server.js` PASS.
 - 2026-07-09 codex: Debug Namecheap 503 từ `stderr.log`: lỗi hiện tại là
   `Cannot find module 'next'` trong `/home/fundvmbn/arenaiss/app/server.js`, tức
   server thấy root wrapper nhưng thiếu runtime module trong `app/node_modules`.

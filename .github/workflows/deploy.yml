@@ -1,8 +1,8 @@
-name: Deploy to Namecheap Stellar
+name: Deploy
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -17,11 +17,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Syntax check startup wrapper
+        run: node --check hosting/namecheap-server.js
 
       - name: Lint
         run: npm run lint
@@ -47,12 +50,15 @@ jobs:
           if [ -d public ]; then cp -R public deploy/app/public; fi
           date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy/tmp/restart.txt
 
+      - name: Syntax check deploy payload
+        run: node --check deploy/server.js && node --check deploy/app/server.js
+
       - name: Upload to Namecheap FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_ARENAISS_HOST || 'ftp.arenaiss.xyz' }}
-          username: Arenaiss@arenaiss.xyz
-          password: ${{ secrets.FTP_ARENAISS }}
+          server: ${{ secrets.FTP_SERVER || secrets.FTP_ARENAISS_HOST || 'ftp.arenaiss.xyz' }}
+          username: ${{ secrets.FTP_USERNAME || 'Arenaiss@arenaiss.xyz' }}
+          password: ${{ secrets.FTP_PASSWORD || secrets.FTP_ARENAISS }}
           local-dir: ./deploy/
-          server-dir: ${{ secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR || secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
           protocol: ftp
