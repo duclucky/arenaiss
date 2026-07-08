@@ -2,32 +2,32 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useArena, useArenaDispatch, cardByToken } from '@/app/arena/state';
-import {
-  fetchCardDetail, searchIndex, fetchIndexCardByHref, fetchPacks, narratePassport,
-  type NarrationResult,
-} from '@/lib/client/api';
+import { fetchCardDetail, searchIndex, fetchIndexCardByHref, fetchPacks } from '@/lib/client/api';
 import type { CardDetail, IndexCard, CardPack, Activity } from '@/lib/renaiss/schemas';
 import { renaissCardUrl, renaissGachaPackUrl, renaissGachaUrl } from '@/lib/renaiss/links';
 import { STAT_FORMULA_NOTES, ELEMENT_GLYPH, type GameCard } from '@/lib/game/stats';
 
 function fmtDate(ts: string | number | null | undefined): string {
-  if (ts == null) return '—';
+  if (ts == null) return '---';
   const n = Number(ts);
   if (!Number.isFinite(n)) return String(ts);
   const ms = n < 1e12 ? n * 1000 : n;
   return new Date(ms).toISOString().slice(0, 10);
 }
+
 function cents(c: number | null | undefined): string {
-  return c == null ? '—' : '$' + (c / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return c == null ? '---' : '$' + (c / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
+
 function moneyFromCents(input: string | number | null | undefined): string {
-  if (input == null || input === '') return '—';
+  if (input == null || input === '') return '---';
   const n = Number(input);
   if (!Number.isFinite(n)) return String(input);
   return '$' + (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
+
 function usdtFromBaseUnits(input: string | number | null | undefined): string {
-  if (input == null || input === '') return '—';
+  if (input == null || input === '') return '---';
   try {
     const raw = BigInt(String(input));
     const scale = BigInt('1000000000000000000');
@@ -40,20 +40,6 @@ function usdtFromBaseUnits(input: string | number | null | undefined): string {
     return Number.isFinite(n) ? `$${n.toLocaleString('en-US')}` : String(input);
   }
 }
-// Minimal markdown renderer for narration paragraphs, bold, and emphasis.
-function Narr({ text }: { text: string }) {
-  return (
-    <>
-      {text.split('\n\n').map((p, i) => {
-        const html = p
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/_(.+?)_/g, '<em style="color:var(--text-dim)">$1</em>');
-        return <p key={i} style={{ margin: '0 0 10px', lineHeight: 1.6, fontSize: 13.5 }} dangerouslySetInnerHTML={{ __html: html }} />;
-      })}
-    </>
-  );
-}
 
 export function PassportDrawer() {
   const state = useArena();
@@ -63,7 +49,7 @@ export function PassportDrawer() {
 
   if (!tokenId || !card) return null;
   return (
-    <PassportDrawerContent
+    <PassportModal
       key={tokenId}
       tokenId={tokenId}
       card={card}
@@ -72,13 +58,11 @@ export function PassportDrawer() {
   );
 }
 
-function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; card: GameCard; onClose: () => void }) {
+function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: GameCard; onClose: () => void }) {
   const [detail, setDetail] = useState<CardDetail | null>(null);
   const [idx, setIdx] = useState<IndexCard | null>(null);
-  const [narr, setNarr] = useState<NarrationResult | null>(null);
   const [packs, setPacks] = useState<CardPack[]>([]);
   const [loading, setLoading] = useState(true);
-  const [narrLoading, setNarrLoading] = useState(true);
   const [showReal, setShowReal] = useState(false);
   const asOf = useMemo(() => new Date().toISOString(), []);
 
@@ -86,12 +70,10 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
     let alive = true;
 
     (async () => {
-      // 1) Card detail: on-chain activity, custody, and image.
       const d = await fetchCardDetail(tokenId);
       if (!alive) return;
       setDetail(d);
 
-      // 2) Reference price from Index: resolve name -> href -> detail.
       const q = card.pokemonName || card.name;
       const results = await searchIndex(q);
       let indexCard: IndexCard | null = null;
@@ -101,45 +83,6 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
       if (!alive) return;
       setIdx(indexCard);
       setLoading(false);
-
-      // 3) AI narration: server-side, with deterministic fallback.
-      const collectible = d?.collectible;
-      const activities: Activity[] = d?.activities?.activities ?? [];
-      const input = {
-        card: {
-          name: card.name, setName: card.setName, grade: card.grade,
-          gradingCompany: card.gradingCompany, year: card.year, tokenId: card.tokenId,
-        },
-        custody: {
-          vaultLocation: collectible?.vaultLocation ?? card.vaultLocation ?? null,
-          countryCode: collectible?.vaultRegionCountryCode ?? null,
-        },
-        onchain: {
-          activities: activities.slice(0, 8).map((a) => ({
-            type: a.type, timestamp: a.timestamp != null ? String(a.timestamp) : null,
-            txHash: a.txHash ?? null, amount: a.amount ?? null,
-          })),
-          lastSale: null,
-        },
-        reference: indexCard
-          ? {
-              source: 'Renaiss OS Index',
-              priceUsd: indexCard.priceUsdCents != null ? indexCard.priceUsdCents / 100 : null,
-              confidence: indexCard.confidence ?? null,
-              observationCount: indexCard.observationCount ?? null,
-              lastSaleAt: indexCard.lastSaleAt ?? null,
-              deltas: indexCard.deltas ?? null,
-              sourceBreakdown: (indexCard.sourceBreakdown ?? []).map((s) => ({
-                bucket: s.bucket ?? null, medianUsd: s.medianUsdCents != null ? s.medianUsdCents / 100 : null,
-              })),
-            }
-          : null,
-        asOf,
-      };
-      const n = await narratePassport(input);
-      if (!alive) return;
-      setNarr(n);
-      setNarrLoading(false);
     })();
 
     return () => { alive = false; };
@@ -161,16 +104,8 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
 
   return (
     <>
-      <div
-        onClick={onClose}
-        className="passport-backdrop"
-      />
-      <aside
-        role="dialog"
-        aria-label="Card Passport"
-        className="passport-modal"
-      >
-        {/* Cleaner, data-oriented header. */}
+      <div onClick={onClose} className="passport-backdrop" />
+      <aside role="dialog" aria-label="Card Passport" className="passport-modal">
         <div className="passport-header">
           <div data-tier={card.tier} style={{ width: 66, flex: 'none', aspectRatio: '2.5/3.5', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(from var(--tier) r g b / 0.5)', background: '#0d1016' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -179,171 +114,148 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{card.name}</div>
             <div className="mono" style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-              {card.gradingCompany ?? 'RAW'} {card.grade ?? ''} · {ELEMENT_GLYPH[card.element]} {card.element} · #{card.tokenId.slice(0, 10)}…
+              {card.gradingCompany ?? 'RAW'} {card.grade ?? ''} - {ELEMENT_GLYPH[card.element]} {card.element} - #{card.tokenId.slice(0, 10)}...
             </div>
-            <div className="chip" style={{ marginTop: 6, fontSize: 10 }}>Card Passport · real reference data</div>
+            <div className="chip" style={{ marginTop: 6, fontSize: 10 }}>Card Passport - real reference data</div>
           </div>
-          <button className="btn btn-ghost" style={{ padding: '4px 10px', alignSelf: 'flex-start' }} onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" style={{ padding: '4px 10px', alignSelf: 'flex-start' }} onClick={onClose}>x</button>
         </div>
 
         <div className="passport-body">
           <div className="passport-column">
-          {/* Reference price (Index) */}
-          <section>
-            <SectionLabel>Reference estimate · Renaiss OS Index</SectionLabel>
-            {loading ? <Skeleton /> : idx ? (
-              <div className="panel" style={{ padding: 14, background: '#202734' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span className="tabnums" style={{ fontSize: 26, fontWeight: 900 }}>{cents(idx.priceUsdCents)}</span>
-                  {idx.confidence && (
-                    <span className="chip" style={{ borderColor: idx.confidence === 'high' ? 'var(--win)' : idx.confidence === 'low' ? 'var(--loss)' : 'var(--hairline-strong)' }}>
-                      confidence: {idx.confidence}
-                    </span>
-                  )}
-                </div>
-                {hasDeltas ? (
-                  <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12 }}>
-                    <Delta label="7d" v={deltas!.d7} /><Delta label="30d" v={deltas!.d30} /><Delta label="365d" v={deltas!.d365} />
+            <section>
+              <SectionLabel>Reference estimate - Renaiss OS Index</SectionLabel>
+              {loading ? <Skeleton /> : idx ? (
+                <div className="panel" style={{ padding: 14, background: '#202734' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                    <span className="tabnums" style={{ fontSize: 26, fontWeight: 900 }}>{cents(idx.priceUsdCents)}</span>
+                    {idx.confidence && (
+                      <span className="chip" style={{ borderColor: idx.confidence === 'high' ? 'var(--win)' : idx.confidence === 'low' ? 'var(--loss)' : 'var(--hairline-strong)' }}>
+                        confidence: {idx.confidence}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <div className="caveat" style={{ marginTop: 8 }}>
-                    Recent trend unavailable: Renaiss OS Index did not return 7d/30d/365d deltas for this card.
-                  </div>
-                )}
-                <div className="caveat" style={{ marginTop: 10 }}>
-                  {idx.observationCount ?? '—'} observations{idx.sourceCount ? ` · ${idx.sourceCount} sources` : ''}
-                  {idx.lastSaleAt ? ` · last sale ${idx.lastSaleAt.slice(0, 10)}` : ''}.
-                  Source: <b>Renaiss OS Index</b>, as of {asOf.slice(0, 10)}.
-                  {idx.observationCount != null && idx.observationCount < 10 ? ' Thin data — treat as experimental reference.' : ''}
-                </div>
-              </div>
-            ) : (
-              <p className="caveat">
-                This card could not be matched to Renaiss OS Index, or no reference price is available. This section is not this token listing price;
-                exact-token asks are shown under Own it for real when available.
-              </p>
-            )}
-            <p className="caveat passport-section-note">
-              Index estimates are based on Renaiss OS Index observations, not this token listing price. Exact-token seller asks appear under Own it for real.
-            </p>
-          </section>
-
-          {/* Custody */}
-          <section>
-            <SectionLabel>CUSTODY</SectionLabel>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span className="chip">🏛 {collectible?.vaultLocation ?? card.vaultLocation ?? 'unknown vault'}</span>
-              <span className="chip">🌍 {collectible?.vaultRegionCountryCode ?? 'unknown country'}</span>
-            </div>
-          </section>
-
-          {/* Provenance on-chain */}
-          <section>
-            <SectionLabel>PROVENANCE ON-CHAIN</SectionLabel>
-            {loading ? <Skeleton /> : activities.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {activities.slice(0, 6).map((a, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
-                    <span className="chip" style={{ minWidth: 62, justifyContent: 'center', textTransform: 'uppercase', fontSize: 10 }}>{a.type}</span>
-                    <span style={{ color: 'var(--text-sub)' }}>{fmtDate(a.timestamp)}</span>
-                    {a.txHash && <a className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--tier-a)' }} href={`https://bscscan.com/tx/${a.txHash}`} target="_blank" rel="noreferrer">{a.txHash.slice(0, 10)}…</a>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="caveat">No on-chain activity data is available.</p>
-            )}
-          </section>
-
-          </div>
-          <div className="passport-column">
-          {/* AI narration */}
-          <section>
-            <SectionLabel>
-              PASSPORT AI {narr && <span className="chip" style={{ marginLeft: 8, fontSize: 9 }}>{narr.mode === 'ai' ? '🤖 LLM' : '📄 data summary'}</span>}
-            </SectionLabel>
-            <div className="panel" style={{ padding: 14, background: '#202734' }}>
-              {narrLoading ? <Skeleton lines={4} /> : narr ? (
-                <>
-                  <Narr text={narr.text} />
-                  {narr.mode === 'fallback' && <p className="caveat" style={{ marginTop: 6, fontStyle: 'italic' }}>AI narration is running in data-summary mode.</p>}
-                </>
-              ) : <p className="caveat">Narration could not be generated.</p>}
-            </div>
-          </section>
-
-          {/* Fictional game stats */}
-          <section>
-            <SectionLabel>FICTIONAL GAME STATS</SectionLabel>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <Stat k="ATK" v={card.atk} /><Stat k="DEF" v={card.def} /><Stat k="AURA" v={card.aura} />
-              <Stat k="POWER" v={card.power} accent /><Stat k="TIER" v={card.tier} />
-            </div>
-            <p className="caveat">{STAT_FORMULA_NOTES.power} Fictional gameplay stats only — not asset valuation or investment advice.</p>
-          </section>
-
-          {/* Real ownership funnel */}
-          <section>
-            {!showReal ? (
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>How to own it for real</button>
-            ) : (
-              <div className="panel" style={{ padding: 14 }}>
-                <SectionLabel>OWN IT FOR REAL</SectionLabel>
-                <p className="caveat" style={{ marginBottom: 10 }}>
-                  This section links to real Renaiss pages and is separate from the simulated game. Direct purchase uses the exact
-                  card token id; packs come from <b>Renaiss /v0/packs</b> via this app&apos;s read-only <b>/api/packs</b> proxy.
-                  The ask price here is the seller&apos;s current listing for this exact token, so it can differ from the Index estimate.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                  {isListed ? (
-                    <a className="btn btn-primary" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
-                      Buy exact listed card · Ask {usdtFromBaseUnits(askPrice)}
-                    </a>
+                  {hasDeltas ? (
+                    <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12 }}>
+                      <Delta label="7d" v={deltas!.d7} /><Delta label="30d" v={deltas!.d30} /><Delta label="365d" v={deltas!.d365} />
+                    </div>
                   ) : (
-                    <div className="panel" style={{ padding: '10px 12px', background: '#202734' }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>This exact card is not currently listed.</div>
-                      <div className="caveat">Token #{card.tokenId.slice(0, 10)} has no active ask price in the marketplace API. You can still open its Renaiss card page or try real packs below.</div>
-                      <a className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 10 }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
-                        Open exact card page ↗
+                    <div className="caveat" style={{ marginTop: 8 }}>
+                      Recent trend unavailable: Renaiss OS Index did not return 7d/30d/365d deltas for this card.
+                    </div>
+                  )}
+                  <div className="caveat" style={{ marginTop: 10 }}>
+                    {idx.observationCount ?? '---'} observations{idx.sourceCount ? ` - ${idx.sourceCount} sources` : ''}
+                    {idx.lastSaleAt ? ` - last sale ${idx.lastSaleAt.slice(0, 10)}` : ''}.
+                    Source: <b>Renaiss OS Index</b>, as of {asOf.slice(0, 10)}.
+                    This estimate is not this token listing price.
+                    {idx.observationCount != null && idx.observationCount < 10 ? ' Thin data; treat as experimental reference.' : ''}
+                  </div>
+                </div>
+              ) : (
+                <p className="caveat">
+                  This card could not be matched to Renaiss OS Index, or no reference estimate is available. This section is not this token listing price;
+                  exact-token asks are shown under Own it for real when available.
+                </p>
+              )}
+            </section>
+
+            <section>
+              <SectionLabel>Custody</SectionLabel>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span className="chip">vault: {collectible?.vaultLocation ?? card.vaultLocation ?? 'unknown'}</span>
+                <span className="chip">region: {collectible?.vaultRegionCountryCode ?? 'unknown'}</span>
+              </div>
+            </section>
+
+            <section>
+              <SectionLabel>Provenance on-chain</SectionLabel>
+              {loading ? <Skeleton /> : activities.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {activities.slice(0, 6).map((a, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
+                      <span className="chip" style={{ minWidth: 62, justifyContent: 'center', textTransform: 'uppercase', fontSize: 10 }}>{a.type}</span>
+                      <span style={{ color: 'var(--text-sub)' }}>{fmtDate(a.timestamp)}</span>
+                      {a.txHash && <a className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--tier-a)' }} href={`https://bscscan.com/tx/${a.txHash}`} target="_blank" rel="noreferrer">{a.txHash.slice(0, 10)}...</a>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="caveat">No on-chain activity data is available.</p>
+              )}
+            </section>
+          </div>
+
+          <div className="passport-column">
+            <section>
+              {!showReal ? (
+                <button className="btn btn-primary" style={{ width: '100%' }} onClick={loadReal}>How to own it for real</button>
+              ) : (
+                <div className="panel" style={{ padding: 14 }}>
+                  <SectionLabel>Own it for real</SectionLabel>
+                  <p className="caveat" style={{ marginBottom: 10 }}>
+                    This section links to real Renaiss pages and is separate from the simulated game. Direct purchase uses the exact
+                    card token id. The ask price here is the seller&apos;s current listing for this exact token, so it can differ from the Index estimate.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    {isListed ? (
+                      <a className="btn btn-primary" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
+                        Buy exact listed card · Ask {usdtFromBaseUnits(askPrice)}
+                      </a>
+                    ) : (
+                      <div className="panel" style={{ padding: '10px 12px', background: '#202734' }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>This exact card is not currently listed.</div>
+                        <div className="caveat">Token #{card.tokenId.slice(0, 10)} has no active ask price in the marketplace API. You can still open its Renaiss card page or try real packs below.</div>
+                        <a className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 10 }} href={renaissCardUrl(card.tokenId)} target="_blank" rel="noreferrer">
+                          Open exact card page
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  <SectionLabel>Real Renaiss packs</SectionLabel>
+                  <p className="caveat" style={{ marginBottom: 10 }}>
+                    Real packs use real USDT and a wallet. Renaiss pack pages currently state each pack contains 1 card.
+                  </p>
+                  {packs.length === 0 ? <Skeleton /> : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {packs.filter((p) => p.stage === 'active').slice(0, 4).map((p) => (
+                        <a
+                          key={p.slug}
+                          className="panel"
+                          href={renaissGachaPackUrl(p.slug)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: '#202734', textDecoration: 'none' }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+                            <div className="caveat">
+                              {p.packType ?? ''}
+                              {p.priceInUsdt ? ` - ${usdtFromBaseUnits(p.priceInUsdt)}/pack` : ''}
+                              {p.expectedValueInUsd ? ` - EV ${moneyFromCents(p.expectedValueInUsd)}` : ''}
+                              {p.featuredCardFmvInUsd ? ` - top ${moneyFromCents(p.featuredCardFmvInUsd)}` : ''}
+                            </div>
+                          </div>
+                          <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 800 }}>Open</span>
+                        </a>
+                      ))}
+                      <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissGachaUrl()} target="_blank" rel="noreferrer">
+                        View all Renaiss packs
                       </a>
                     </div>
                   )}
                 </div>
-                <SectionLabel>REAL RENAISS PACKS</SectionLabel>
-                <p className="caveat" style={{ marginBottom: 10 }}>
-                  Real packs use real USDT and a wallet. Renaiss pack pages currently state each pack contains 1 card.
-                </p>
-                {packs.length === 0 ? <Skeleton /> : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {packs.filter((p) => p.stage === 'active').slice(0, 4).map((p) => (
-                      <a
-                        key={p.slug}
-                        className="panel"
-                        href={renaissGachaPackUrl(p.slug)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, background: '#202734', textDecoration: 'none' }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-                          <div className="caveat">
-                            {p.packType ?? ''}
-                            {p.priceInUsdt ? ` · ${usdtFromBaseUnits(p.priceInUsdt)}/pack` : ''}
-                            {p.expectedValueInUsd ? ` · EV ${moneyFromCents(p.expectedValueInUsd)}` : ''}
-                            {p.featuredCardFmvInUsd ? ` · top ${moneyFromCents(p.featuredCardFmvInUsd)}` : ''}
-                          </div>
-                        </div>
-                        <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 800 }}>Open ↗</span>
-                      </a>
-                    ))}
-                    <a className="btn" style={{ textAlign: 'center', textDecoration: 'none' }} href={renaissGachaUrl()} target="_blank" rel="noreferrer">
-                      View all Renaiss packs ↗
-                    </a>
-                  </div>
-                )}
+              )}
+            </section>
+
+            <section>
+              <SectionLabel>Fictional game stats</SectionLabel>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <Stat k="ATK" v={card.atk} /><Stat k="DEF" v={card.def} /><Stat k="AURA" v={card.aura} />
+                <Stat k="POWER" v={card.power} accent /><Stat k="TIER" v={card.tier} />
               </div>
-            )}
-          </section>
+              <p className="caveat">{STAT_FORMULA_NOTES.power} Fictional gameplay stats only; not asset valuation or investment advice.</p>
+            </section>
           </div>
         </div>
       </aside>
@@ -352,8 +264,9 @@ function PassportDrawerContent({ tokenId, card, onClose }: { tokenId: string; ca
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center' }}>{children}</div>;
+  return <div style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', textTransform: 'uppercase' }}>{children}</div>;
 }
+
 function Skeleton({ lines = 2 }: { lines?: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -363,10 +276,12 @@ function Skeleton({ lines = 2 }: { lines?: number }) {
     </div>
   );
 }
+
 function Delta({ label, v }: { label: string; v: number | null | undefined }) {
   const color = v == null ? 'var(--text-dim)' : v >= 0 ? 'var(--win)' : 'var(--loss)';
-  return <span style={{ color }}>{label}: {v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}</span>;
+  return <span style={{ color }}>{label}: {v == null ? '---' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}</span>;
 }
+
 function Stat({ k, v, accent }: { k: string; v: number | string; accent?: boolean }) {
   return (
     <span className="chip" style={{ fontWeight: 700, color: accent ? 'var(--accent)' : 'var(--text)' }}>

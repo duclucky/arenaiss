@@ -12,6 +12,34 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 01:44 UTC
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `5a91b77` — "feat: make passport a wide modal"
+- Commit phiên này: chuẩn bị commit "fix: de-duplicate passport content"
+
+### Đang làm gì
+Không có code đang viết dở. Phiên này xử lý browser comments mới trong Passport modal: các vùng Reference/Index note/AI summary bị lặp cùng thông tin, và CTA ownership bị nằm quá thấp.
+
+### Đã xong
+- `features/passport/PassportDrawer.tsx`: bỏ panel Passport AI khỏi UI để không lặp lại card/provenance/custody/reference price đã có ở các section chuyên trách.
+- `features/passport/PassportDrawer.tsx`: bỏ note riêng bên ngoài Reference panel; giữ giải thích `not this token listing price` ngay trong panel Reference estimate.
+- `features/passport/PassportDrawer.tsx`: đưa `How to own it for real` lên đầu cột phải của modal, trước Fictional game stats.
+- `features/passport/PassportDrawer.tsx`: rewrite sạch component về ASCII để tránh mojibake cũ trong JSX, giữ UI copy tiếng Anh.
+- `scripts/e2e.mjs`: thêm regression checks: không lặp note Index, AI panel không lặp Reference/Custody/Provenance, ownership CTA phải nằm gần đầu modal body; e2e đợi dữ liệu async thay vì sleep cứng.
+- Verify mới nhất: `npm.cmd run lint` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; `npm.cmd run e2e` PASS trên production server tạm, console errors none; `npm.cmd run test:unit` PASS; bundle scan `.next/static` không có secret/write-SDK symbols.
+
+### Tiếp theo
+1. Refresh/rerun local server để kiểm tra trực quan modal sau khi de-duplicate.
+2. Nếu muốn vẫn giữ AI, cần thiết kế lại thành 1 câu insight không lặp dữ liệu; hiện UI ưu tiên không trùng thông tin.
+
+### Cảnh báo
+- `/api/passport/narrate` route vẫn còn trong codebase, nhưng Passport modal hiện không gọi nó để tránh trùng lặp nội dung.
+
+### Nhật ký
+- 2026-07-08 codex: De-duplicate Passport modal, chuyển ownership CTA lên cao, e2e đỏ-xanh cho comment 1/2/3/4.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-07 22:24 UTC
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `4979fa7` — "feat: add rainbow slab hover"

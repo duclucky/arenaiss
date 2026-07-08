@@ -111,8 +111,12 @@ try {
     if (!dialogBox || dialogBox.width < 780 || dialogBox.x < 120) {
       throw new Error(`Passport should render as a centered wide modal, got ${dialogBox ? JSON.stringify(dialogBox) : 'no box'}`);
     }
+    await page.waitForFunction(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-label="Card Passport"]');
+      return !!dialog?.textContent?.includes('not this token listing price');
+    }, { timeout: 20000 });
     const passportText = await passportDialog.innerText();
-    if (!passportText.includes('Reference estimate')) {
+    if (!/reference estimate/i.test(passportText)) {
       throw new Error('Passport should label the index value as a Reference estimate');
     }
     if (!passportText.includes('not this token listing price')) {
@@ -120,6 +124,17 @@ try {
     }
     if (passportText.includes('ANTHROPIC_API_KEY')) {
       throw new Error('Passport UI should not expose technical environment variable names');
+    }
+    if (passportText.includes('Index estimates are based on')) {
+      throw new Error('Passport should not repeat the index/listing explanation outside the reference panel');
+    }
+    if (passportText.includes('Reference price:') || passportText.includes('Custody:') || passportText.includes('Provenance:')) {
+      throw new Error('Passport AI panel should not repeat reference, custody, or provenance data already shown elsewhere');
+    }
+    const ownButtonBox = await passportDialog.locator('text=How to own it for real').first().boundingBox();
+    const bodyBox = await passportDialog.locator('.passport-body').boundingBox();
+    if (!ownButtonBox || !bodyBox || ownButtonBox.y > bodyBox.y + 260) {
+      throw new Error('Ownership CTA should be visible near the top of the Passport modal body');
     }
     if (passportText.includes('7d: —') && passportText.includes('30d: —') && passportText.includes('365d: —')) {
       throw new Error('Reference deltas should not render empty dash-only values');
