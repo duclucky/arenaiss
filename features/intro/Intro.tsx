@@ -27,7 +27,7 @@ export function Intro() {
       <div style={{ textAlign: 'center', marginBottom: 30 }}>
         <div className="anim-float" style={{ fontSize: 34, marginBottom: 8, fontWeight: 900, color: 'var(--accent)', letterSpacing: '0.08em' }}>DEMO</div>
         <h1 style={{ fontSize: 34, margin: '0 0 8px', letterSpacing: '0' }}>
-          Renaiss Arena <span style={{ color: 'var(--accent)' }}>Simulation</span>
+          Arenaiss <span style={{ color: 'var(--accent)' }}>Simulation</span>
         </h1>
         <p style={{ color: 'var(--text-sub)', maxWidth: 660, margin: '0 auto', lineHeight: 1.6 }}>
           This is a game-only simulation designed to demonstrate how Renaiss pack discovery,

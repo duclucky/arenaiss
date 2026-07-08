@@ -12,6 +12,40 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-09 Arenaiss brand
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `fa12a7f` — "fix: clarify gacha demo notice"
+- Commit phiên này: chuẩn bị commit `fix: rename product brand to Arenaiss`
+
+### Đang làm gì
+Không còn code đang viết dở. User chốt brand mới là `Arenaiss`; phiên này đổi brand hiển thị trong app, nhưng giữ `Renaiss API`, `Renaiss marketplace`, `Renaiss OS Index` khi nói về nguồn dữ liệu thật.
+
+### Đã xong
+- `components/Hud.tsx`: header brand đổi từ `RENAISS ARENA` thành `Arenaiss`.
+- `features/intro/Intro.tsx`: hero headline đổi thành `Arenaiss Simulation`.
+- `app/layout.tsx`: metadata title/description đổi sang brand `Arenaiss`.
+- `scripts/e2e.mjs`: regression kiểm tra header `Arenaiss`, không còn `RENAISS ARENA`, và hero headline `Arenaiss Simulation`.
+
+### Verification mới nhất
+- E2E RED trước khi sửa: fail vì header chưa có `Arenaiss`.
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3035`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+
+### Tiếp theo
+1. Reload `localhost:3001` nếu HMR chưa tự cập nhật.
+2. Nếu muốn đổi README/video script sang brand `Arenaiss`, xử lý trong một batch docs riêng.
+
+### Cảnh báo
+- Không đổi attribution nguồn dữ liệu từ Renaiss vì đó vẫn là tên API/marketplace/index thật.
+
+### Nhật ký
+- 2026-07-09 codex: Đổi product brand hiển thị sang Arenaiss theo browser comment.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-09 hero demo notice
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `b8d66d4` — "feat: add battle initiative and polish gacha"

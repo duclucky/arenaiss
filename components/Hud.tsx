@@ -28,7 +28,7 @@ export function Hud() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>
         <span style={{ fontSize: 22 }}>🃏</span>
         <div>
-          <div style={{ fontWeight: 800, letterSpacing: '0.06em', fontSize: 15 }}>RENAISS ARENA</div>
+          <div style={{ fontWeight: 800, letterSpacing: '0.06em', fontSize: 15 }}>Arenaiss</div>
           <div style={{ fontSize: 9.5, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>GACHA-AS-DRAFT · SIMULATED</div>
         </div>
       </div>

@@ -4,9 +4,9 @@ import './globals.css';
 // System font stack lives in globals.css to keep the app independent from font CDNs.
 
 export const metadata: Metadata = {
-  title: 'Renaiss Arena — Gacha-as-Draft Card Battler',
+  title: 'Arenaiss — Gacha-as-Draft Card Battler',
   description:
-    'A simulated gacha-as-draft card battler for Renaiss: open packs with reference odds, build a deck, battle with skill, and inspect real Card Passports. Virtual economy, fictional stats, read-only data.',
+    'Arenaiss is a simulated gacha-as-draft card battler: open packs with reference odds, build a deck, battle with skill, and inspect real Card Passports. Virtual economy, fictional stats, read-only data.',
 };
 
 export const viewport = { themeColor: '#0b0e14' };

@@ -50,7 +50,9 @@ async function addCurrentPackToRoster() {
 
 try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 30000 });
-  await page.waitForSelector('text=Renaiss Arena Simulation', { timeout: 15000 });
+  await page.waitForSelector('header >> text=Arenaiss', { timeout: 15000 });
+  if (await page.locator('header >> text=RENAISS ARENA').count()) throw new Error('Header should use the Arenaiss brand');
+  await page.waitForSelector('text=Arenaiss Simulation', { timeout: 15000 });
   await page.waitForSelector('text=game-only simulation', { timeout: 5000 });
   await page.waitForSelector('text=no real-world value', { timeout: 5000 });
   await page.waitForSelector('text=official Renaiss API data', { timeout: 5000 });
