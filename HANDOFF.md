@@ -12,6 +12,45 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 gacha/arena scope pause
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `a5d07cb` — "fix: split battle log and rules panels"
+- Commit phiên này: chưa có commit mới; user yêu cầu tạm lưu handoff trước khi triển khai.
+
+### Đang làm gì
+Tạm dừng trước khi sửa code. Yêu cầu mới của user cần làm tiếp:
+- Gacha: bỏ nút chọn `Pokemon` / `One Piece` ở panel `CARD LINE`; pack xếp dọc, mỗi pack có nền/màu riêng.
+- Click pack chỉ chọn pack và cập nhật bảng odds; bảng odds thêm nút `Rip a Pack` để mở pack đang chọn.
+- Mở pack theo logic Renaiss tạm thời dựa trên dữ liệu có thật: `/v0/packs` chỉ có metadata pack; docs ghi SDK/public odds chưa mở và `/v0/packs/{slug}` không trả full odds. Không được bịa odds thật; nếu map pack-game thì phải ghi minh bạch.
+- Lineup: khi click `Lineup`, user chọn arena `Pokemon` hoặc `One Piece`; arena Pokemon chỉ dùng thẻ Pokemon, arena One Piece chỉ dùng thẻ One Piece.
+- Roster: thêm filter `All`, `Pokemon`, `One Piece`, và từng tier; mặc định `All`.
+
+### Đã xong trong phiên tạm này
+- Đọc lại `CLAUDE.md`, `docs/art-direction.md`, `docs/api-reference.md`, `HANDOFF.md`.
+- Đối chiếu `git log --oneline -10` và `git status --short`; working tree sạch trước khi dừng.
+- Audit file liên quan: `lib/game/gacha.ts`, `app/arena/state.tsx`, `features/intro/Intro.tsx`, `components/PackChoices.tsx`, `features/roster/Roster.tsx`, `features/deck-builder/DeckBuilder.tsx`, `lib/game/opponent.ts`, `lib/game/save.ts`, `lib/client/api.ts`.
+- Kiểm tra `/api/packs` local: có `eden-pack`, `omega`, `renacrypt-pack`; `OMEGA` mô tả rõ Pokemon; `Eden Pack` mô tả treasure/paradise at sea; `RenaCrypt` là collab/perpetual vault pool. API list không có field category/odds.
+- Thử probe trực tiếp `/v0/packs/{slug}` bằng PowerShell/curl nhưng môi trường TLS/curl lỗi, chưa lấy được detail. Không có code thay đổi.
+
+### Tiếp theo
+1. Viết test trước cho `openPack`/pack definitions: pack có `categories`/`poolFilter`, paid pack mở 1 card, welcome mở 5 cards; pack One Piece không rút Pokemon; Pokemon pack không rút One Piece; mixed pack rút từ cả hai nếu pool có.
+2. Cân nhắc kiến trúc pool: hiện app chỉ load một `state.pool` theo `state.category`. Nên chuyển sang pool tổng hợp hoặc cache theo category (`poolsByCategory`) để gacha/roster/lineup có thể lọc cả Pokemon và One Piece mà không mất dữ liệu.
+3. Cập nhật save/state tối thiểu: thêm `selectedPackId` và `arenaCategory` nếu cần; giữ backward compatibility với save v1 hoặc bump version có migration.
+4. Sửa `Intro`/`PackChoices`: bỏ selector card line; pack list vertical; selected pack drives `oddsTable`; odds panel có `Rip a Pack`.
+5. Sửa `DeckBuilder`: trước khi chọn 5 thẻ, hiển thị arena chooser Pokemon/One Piece; lọc available/deck/opponent pool theo arena category; khi đổi arena, loại deck tokens sai category.
+6. Sửa `Roster`: filter local state `all | pokemon | one-piece | tier`; default `All`.
+7. Chạy `lint`, `typecheck`, `test:unit`, `build`, e2e, bundle secret scan; cập nhật handoff và commit.
+
+### Cảnh báo
+- Chưa sửa code cho yêu cầu mới.
+- `docs/api-reference.md` có mâu thuẫn lịch sử: phần reconciliation nói SDK odds thật chưa có, phần cuối vẫn mô tả logic gacha lai cũ. Khi làm tiếp, tin phần reconciliation mới nhất.
+- Không được dùng endpoint write/on-chain; chỉ GET/proxy server-side.
+
+### Nhật ký
+- 2026-07-08 codex: User yêu cầu tạm dừng; đã lưu scope và phát hiện hiện trạng code/data để phiên sau tiếp tục.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 battle log split panels
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `654c2d7` — "fix: strengthen battle fx visuals"
