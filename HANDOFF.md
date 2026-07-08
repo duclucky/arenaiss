@@ -12,6 +12,46 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-08 gacha arena split
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `fb6d652` — "docs: handoff gacha arena scope"
+- Commit phiên này: chuẩn bị commit `feat: split gacha packs and arena lines`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này tiếp tục yêu cầu gacha/arena từ handoff: pack chọn odds trước khi mở, Roster có filter, Lineup chọn arena Pokemon/One Piece và chỉ hiển thị đúng card line.
+
+### Đã xong
+- `lib/game/gacha.ts`: thêm metadata category/source cho pack; `Eden Pack` rút One Piece, `OMEGA Pack` rút Pokemon, `RenaCrypt Pack` và `Welcome Pack` rút mixed Pokemon + One Piece; `openPack` lọc eligible pool trước khi rút.
+- `lib/client/api.ts`: chuẩn hóa `GameCard.category` theo category request từ `/api/pool` để marketplace item thiếu `type` vẫn lọc đúng Pokemon/One Piece.
+- `app/arena/ArenaApp.tsx`, `app/arena/state.tsx`: load cả hai pool Pokemon/One Piece cùng lúc; thêm `poolsByCategory`, `selectedPackId`, `arenaCategory`; mở Welcome xong tự chuyển selected pack về Eden để không mở Welcome lần hai.
+- `features/intro/Intro.tsx`, `components/PackChoices.tsx`: bỏ selector `Pokemon`/`One Piece` ở Gacha; pack xếp dọc, mỗi pack có màu riêng; click pack chỉ chọn pack và cập nhật odds; odds panel có nút `Rip a Pack`.
+- `features/roster/Roster.tsx`: thêm filter `All`, `Pokemon`, `One Piece`, và từng tier; mặc định `All`; bỏ pack list khỏi Roster để màn này chỉ quản lý thẻ.
+- `features/deck-builder/DeckBuilder.tsx`: Lineup có bước chọn `Pokemon Arena` hoặc `One Piece Arena`; sau khi chọn chỉ thấy thẻ đúng category, opponent deck cũng lấy từ đúng pool.
+- `lib/game/save.ts`: lưu/parse thêm `selectedPackId` và `arenaCategory` với default tương thích save cũ.
+- `tests/economy-pack.test.mts`, `tests/credit-save.test.mts`: thêm unit test cho pack category rules và save fields.
+- `scripts/e2e.mjs`: cập nhật flow mới chọn pack → `Rip a Pack`, Roster filters, chọn Pokemon Arena trước khi battle.
+
+### Verification mới nhất
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run build` PASS.
+- Production e2e PASS qua server tạm `http://127.0.0.1:3030`; console errors: none.
+- Bundle scan `.next/static` cho secret/write-SDK symbols không có match.
+
+### Tiếp theo
+1. Reload `localhost:3001` để xem UI mới.
+2. Nếu muốn sát dữ liệu pack thật hơn nữa, cần lấy được detail `/v0/packs/{slug}` hoặc SDK odds public khi upstream mở; hiện implementation dùng metadata `/api/packs` + reconciliation trong `docs/api-reference.md`, không bịa odds thật.
+
+### Cảnh báo
+- `Eden/OMEGA/RenaCrypt` mapping dựa trên metadata pack hiện có trong `/api/packs` và handoff trước; upstream không trả full pack contents/odds trong môi trường này.
+- Vẫn tuyệt đối read-only; không dùng write SDK/on-chain.
+
+### Nhật ký
+- 2026-07-08 codex: Hoàn tất tách gacha pack selection, roster filters, arena-specific lineup/battle.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-08 gacha/arena scope pause
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `a5d07cb` — "fix: split battle log and rules panels"

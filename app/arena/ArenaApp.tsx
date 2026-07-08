@@ -10,24 +10,30 @@ import { DeckBuilder } from '@/features/deck-builder/DeckBuilder';
 import { Battle } from '@/features/battle/Battle';
 import { Result } from '@/features/result/Result';
 import { PassportDrawer } from '@/features/passport/PassportDrawer';
-import { loadPool } from '@/lib/client/api';
+import { loadPool, type Category } from '@/lib/client/api';
+
+const CATEGORIES: Category[] = ['POKEMON', 'ONE_PIECE'];
 
 function Screens() {
   const state = useArena();
   const dispatch = useArenaDispatch();
 
-  // Load pool on entry and when the card line changes.
+  // Load both card lines once so gacha, roster, and lineup can filter locally.
   useEffect(() => {
     let alive = true;
     dispatch({ type: 'POOL_LOADING' });
-    loadPool(state.category).then((pool) => {
+    Promise.all(CATEGORIES.map(async (category) => [category, await loadPool(category)] as const)).then((entries) => {
       if (!alive) return;
-      if (pool.length === 0) dispatch({ type: 'POOL_ERROR', error: 'marketplace pool could not be loaded' });
-      else dispatch({ type: 'POOL_LOADED', pool });
+      const pools = Object.fromEntries(entries) as Record<Category, Awaited<ReturnType<typeof loadPool>>>;
+      if (pools.POKEMON.length === 0 && pools.ONE_PIECE.length === 0) {
+        dispatch({ type: 'POOL_ERROR', error: 'marketplace pool could not be loaded' });
+      } else {
+        dispatch({ type: 'POOLS_LOADED', pools });
+      }
     });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.category]);
+  }, []);
 
   // Slab images are derived from serials in buildCards; no extra detail hydration needed.
 

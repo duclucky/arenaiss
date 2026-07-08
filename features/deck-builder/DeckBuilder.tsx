@@ -7,20 +7,28 @@ import { BATTLE_STAKE } from '@/lib/game/gacha';
 import { buildOpponentDeck } from '@/lib/game/opponent';
 import { makeBattleSeed } from '@/lib/client/pack';
 import type { Tier } from '@/lib/game/stats';
+import type { Category } from '@/lib/client/api';
 
 const RANK: Record<Tier, number> = { TOP: 0, S: 1, A: 2, B: 3, C: 4, D: 5 };
+const ARENAS: { id: Category; title: string; copy: string }[] = [
+  { id: 'POKEMON', title: 'Pokemon Arena', copy: 'Build and battle with Pokemon slabs only.' },
+  { id: 'ONE_PIECE', title: 'One Piece Arena', copy: 'Build and battle with One Piece slabs only.' },
+];
 
 export function DeckBuilder() {
   const state = useArena();
   const dispatch = useArenaDispatch();
-  const deck = deckCards(state);
+  const arenaCategory = state.arenaCategory;
+  const deck = arenaCategory ? deckCards(state).filter((card) => card.category === arenaCategory) : [];
   const teamPower = deck.reduce((s, c) => s + c.power, 0);
-  const full = deck.length === 5;
+  const full = arenaCategory !== null && deck.length === 5;
   const canStake = state.credits >= BATTLE_STAKE;
 
   const available = useMemo(
-    () => [...state.roster].sort((a, b) => RANK[a.tier] - RANK[b.tier] || b.power - a.power),
-    [state.roster],
+    () => [...state.roster]
+      .filter((card) => !arenaCategory || card.category === arenaCategory)
+      .sort((a, b) => RANK[a.tier] - RANK[b.tier] || b.power - a.power),
+    [state.roster, arenaCategory],
   );
 
   function move(idx: number, dir: -1 | 1) {
@@ -32,23 +40,79 @@ export function DeckBuilder() {
   }
 
   function startBattle() {
-    if (!full || !canStake) return;
+    if (!full || !canStake || !arenaCategory) return;
     const seed = makeBattleSeed(state.deckTokens);
-    const opponent = buildOpponentDeck(state.pool, deck, seed);
+    const opponentPool = state.poolsByCategory[arenaCategory].length > 0
+      ? state.poolsByCategory[arenaCategory]
+      : state.pool.filter((card) => card.category === arenaCategory);
+    const opponent = buildOpponentDeck(opponentPool, deck, seed);
     dispatch({ type: 'START_BATTLE', playerDeck: deck, opponentDeck: opponent, seed });
   }
 
   return (
     <div className="anim-fade" style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 22px 60px' }}>
+      {!arenaCategory ? (
+        <div className="panel" style={{ padding: 22, marginBottom: 22 }}>
+          <h2 style={{ margin: 0, fontSize: 24 }}>Choose arena</h2>
+          <p className="caveat" style={{ marginTop: 6 }}>Pick a card line before building your lineup. Each arena only shows matching cards.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14, marginTop: 18 }}>
+            {ARENAS.map((arena) => {
+              const count = state.roster.filter((card) => card.category === arena.id).length;
+              return (
+                <button
+                  key={arena.id}
+                  className="btn"
+                  style={{
+                    minHeight: 118,
+                    padding: 18,
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    background: arena.id === 'POKEMON' ? 'linear-gradient(135deg, rgba(245,179,1,0.14), var(--raised))' : 'linear-gradient(135deg, rgba(76,141,255,0.16), var(--raised))',
+                  }}
+                  onClick={() => dispatch({ type: 'SET_ARENA_CATEGORY', category: arena.id })}
+                >
+                  <span>
+                    <span style={{ display: 'block', fontSize: 18, fontWeight: 900 }}>{arena.title}</span>
+                    <span className="caveat" style={{ display: 'block', marginTop: 4 }}>{arena.copy}</span>
+                  </span>
+                  <span className="chip">{count} roster cards</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {arenaCategory ? (
+        <>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 24 }}>Build lineup</h2>
-          <p className="caveat">Choose 5 cards. Order matters: the first card fights first. Starting a battle stakes 100 virtual credits.</p>
+          <p className="caveat">Choose 5 {arenaCategory === 'POKEMON' ? 'Pokemon' : 'One Piece'} cards. Order matters: the first card fights first. Starting a battle stakes 100 virtual credits.</p>
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
           <div style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-dim)' }}>TEAM POWER</div>
           <div className="tabnums" style={{ fontSize: 32, fontWeight: 900, color: 'var(--accent)' }}>{teamPower}</div>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {ARENAS.map((arena) => (
+          <button
+            key={arena.id}
+            className="btn btn-ghost"
+            style={{
+              padding: '7px 12px',
+              borderColor: arenaCategory === arena.id ? 'var(--accent)' : 'var(--hairline)',
+              color: arenaCategory === arena.id ? 'var(--accent)' : 'var(--text-sub)',
+            }}
+            onClick={() => dispatch({ type: 'SET_ARENA_CATEGORY', category: arena.id })}
+          >
+            {arena.title}
+          </button>
+        ))}
       </div>
 
       <div className="panel" style={{ padding: 16, marginBottom: 22 }}>
@@ -91,11 +155,11 @@ export function DeckBuilder() {
       </div>
 
       <h3 style={{ fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)', margin: '0 0 12px' }}>
-        ROSTER ({available.length})
+        {arenaCategory === 'POKEMON' ? 'POKEMON' : 'ONE PIECE'} ROSTER ({available.length})
       </h3>
       {available.length === 0 ? (
         <div className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-sub)' }}>
-          No cards yet. <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Gacha</button>
+          No cards for this arena yet. <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Gacha</button>
         </div>
       ) : (
         <div className="card-grid">
@@ -116,6 +180,8 @@ export function DeckBuilder() {
           })}
         </div>
       )}
+        </>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { Category } from '@/lib/client/api';
+import { DEFAULT_PACK_ID, isPackId, type PackId } from './gacha';
 import type { GameCard } from './stats';
 
 export const STORAGE_KEY = 'renaiss-arena:anonymous-save';
@@ -23,6 +24,8 @@ export interface ArenaSave {
   lastCreditRefillAt: string | null;
   passportHintSeen: boolean;
   welcomePackOpened: boolean;
+  selectedPackId: PackId;
+  arenaCategory: Category | null;
 }
 
 export interface ArenaSaveInput {
@@ -35,6 +38,8 @@ export interface ArenaSaveInput {
   lastCreditRefillAt: string | null;
   passportHintSeen: boolean;
   welcomePackOpened: boolean;
+  selectedPackId?: PackId;
+  arenaCategory?: Category | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,6 +103,8 @@ export function serializeArenaSave(input: ArenaSaveInput, now: Date = new Date()
     lastCreditRefillAt: input.lastCreditRefillAt,
     passportHintSeen: input.passportHintSeen,
     welcomePackOpened: input.welcomePackOpened,
+    selectedPackId: input.selectedPackId ?? DEFAULT_PACK_ID,
+    arenaCategory: input.arenaCategory ?? null,
   };
 }
 
@@ -133,6 +140,8 @@ export function parseSavedArena(raw: string | null): ArenaSave | null {
       lastCreditRefillAt,
       passportHintSeen: value.passportHintSeen === true,
       welcomePackOpened: value.welcomePackOpened === true,
+      selectedPackId: isPackId(value.selectedPackId) ? value.selectedPackId : DEFAULT_PACK_ID,
+      arenaCategory: isCategory(value.arenaCategory) ? value.arenaCategory : null,
     },
     new Date(value.savedAt),
   );

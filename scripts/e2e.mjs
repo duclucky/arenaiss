@@ -24,6 +24,7 @@ async function visibleSlabCount() {
 }
 
 async function openPackByName(name) {
+  await page.locator('nav >> text=Gacha').click().catch(() => {});
   const button = page.locator('button', { hasText: name }).first();
   await button.waitFor({ timeout: 20000 });
   await page.waitForFunction((label) => {
@@ -31,6 +32,13 @@ async function openPackByName(name) {
     return b && !b.disabled;
   }, name, { timeout: 20000 });
   await button.click();
+  const rip = page.locator('button', { hasText: 'Rip a Pack' }).first();
+  await rip.waitFor({ timeout: 10000 });
+  await page.waitForFunction(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => (x.textContent || '').includes('Rip a Pack'));
+    return b && !b.disabled;
+  }, { timeout: 10000 });
+  await rip.click();
   await page.waitForSelector('text=RESULT', { timeout: 15000 });
   await page.waitForTimeout(3600);
 }
@@ -80,17 +88,19 @@ try {
   if (await page.locator('button', { hasText: 'Welcome Pack' }).count()) {
     throw new Error('Welcome Pack should disappear after it has been opened once');
   }
+  await page.locator('nav >> text=Gacha').click();
   await page.locator('button', { hasText: 'Eden Pack' }).waitFor({ timeout: 5000 });
-  await page.locator('button', { hasText: '300 credits' }).waitFor({ timeout: 5000 });
+  await page.waitForSelector('text=300 credits', { timeout: 5000 });
   await page.locator('button', { hasText: 'OMEGA Pack' }).waitFor({ timeout: 5000 });
-  await page.locator('button', { hasText: '500 credits' }).waitFor({ timeout: 5000 });
+  await page.waitForSelector('text=500 credits', { timeout: 5000 });
   await page.locator('button', { hasText: 'RenaCrypt Pack' }).waitFor({ timeout: 5000 });
-  await page.locator('button', { hasText: '800 credits' }).waitFor({ timeout: 5000 });
+  await page.waitForSelector('text=800 credits', { timeout: 5000 });
+  await page.waitForSelector('text=PACK VAULT', { timeout: 5000 });
+  await page.waitForSelector('text=ODDS', { timeout: 5000 });
+  await page.waitForSelector('text=Rip a Pack', { timeout: 5000 });
 
   // Paid packs cost credits and reveal exactly 1 card.
-  await page.locator('button', { hasText: 'Eden Pack' }).click();
-  await page.waitForSelector('text=RESULT', { timeout: 15000 });
-  await page.waitForTimeout(2600);
+  await openPackByName('Eden Pack');
   const edenSlabs = await visibleSlabCount();
   if (edenSlabs !== 1) throw new Error(`Paid Eden Pack should reveal 1 visible slab, got ${edenSlabs}`);
   await page.waitForSelector('text=9700', { timeout: 5000 });
@@ -98,12 +108,26 @@ try {
   await addCurrentPackToRoster();
   log('ok paid pack price and 1-card reveal verified');
 
+  // Add enough Pokemon cards for a deterministic Pokemon Arena lineup.
+  for (let i = 0; i < 5; i++) {
+    await openPackByName('OMEGA Pack');
+    await addCurrentPackToRoster();
+  }
+
   const rosterCount = await page.locator('.card-grid .slab').count();
-  if (rosterCount < 6) throw new Error(`Roster should have at least 6 cards after two packs, got ${rosterCount}`);
+  if (rosterCount < 10) throw new Error(`Roster should have at least 10 cards after paid packs, got ${rosterCount}`);
+  await page.waitForSelector('text=FILTER', { timeout: 5000 });
+  await page.locator('button', { hasText: /^All$/ }).click();
+  await page.locator('button', { hasText: /^Pokemon$/ }).click();
+  await page.locator('button', { hasText: /^One Piece$/ }).click();
+  await page.locator('button', { hasText: /^S$/ }).click();
+  await page.locator('button', { hasText: /^All$/ }).click();
   await page.screenshot({ path: `${OUT}/04-roster.png` });
 
   // Lineup builder: choose 5 cards and verify battle stake copy.
   await page.click('nav >> text=Lineup').catch(async () => { await page.click('text=Build lineup'); });
+  await page.waitForSelector('text=Choose arena', { timeout: 10000 });
+  await page.locator('button', { hasText: 'Pokemon Arena' }).click();
   await page.waitForSelector('text=Build lineup', { timeout: 10000 });
   await page.waitForTimeout(500);
   const rosterSlabs = page.locator('.card-grid .slab');
@@ -128,7 +152,7 @@ try {
   await page.waitForSelector('text=How battles work', { timeout: 5000 });
   await page.waitForSelector('text=Type advantage matters', { timeout: 5000 });
   await page.waitForSelector('text=ROUND', { timeout: 5000 });
-  await page.waitForSelector('text=9600', { timeout: 5000 });
+  await page.waitForSelector('text=7100', { timeout: 5000 });
   log('ok battle started and 100-credit stake deducted');
   for (let turn = 0; turn < 20; turn++) {
     if (await page.locator('text=View result').count()) break;

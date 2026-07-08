@@ -3,18 +3,24 @@
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { PackChoices } from '@/components/PackChoices';
 import { TierLegend } from '@/components/TierLegend';
-import { oddsTable } from '@/lib/game/gacha';
-import type { Category } from '@/lib/client/api';
-
-const CATEGORIES: { id: Category; label: string; glyph: string }[] = [
-  { id: 'POKEMON', label: 'Pokemon', glyph: 'P' },
-  { id: 'ONE_PIECE', label: 'One Piece', glyph: 'OP' },
-];
+import { eligibleCardsForPack, getPack, oddsTable, openPack, packCategoryLabel } from '@/lib/game/gacha';
+import { makePackSeed } from '@/lib/client/pack';
 
 export function Intro() {
   const state = useArena();
   const dispatch = useArenaDispatch();
-  const rows = oddsTable(state.pool);
+  const selectedPack = getPack(state.selectedPackId);
+  const rows = oddsTable(state.pool, selectedPack.id);
+  const eligibleCards = eligibleCardsForPack(state.pool, selectedPack.id);
+  const ready = eligibleCards.length > 0 && !state.poolLoading;
+  const enoughCredits = selectedPack.cost === 0 || state.credits >= selectedPack.cost;
+  const canRip = ready && enoughCredits;
+
+  function ripSelectedPack() {
+    if (!canRip) return;
+    const reveal = openPack(state.pool, makePackSeed(state.packCount), selectedPack.id);
+    dispatch({ type: 'OPEN_PACK', reveal, openedAt: new Date().toISOString() });
+  }
 
   return (
     <div className="anim-fade" style={{ maxWidth: 980, margin: '0 auto', padding: '34px 22px 60px' }}>
@@ -37,30 +43,10 @@ export function Intro() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
         <div className="panel" style={{ padding: 20 }}>
-          <h3 style={{ margin: '0 0 14px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>CARD LINE</h3>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                className="btn"
-                style={{
-                  flex: 1,
-                  flexDirection: 'column',
-                  display: 'flex',
-                  gap: 6,
-                  padding: '16px 10px',
-                  borderColor: state.category === c.id ? 'var(--accent)' : 'var(--hairline)',
-                  background: state.category === c.id ? 'var(--accent-soft)' : 'var(--raised)',
-                }}
-                onClick={() => dispatch({ type: 'SET_CATEGORY', category: c.id })}
-              >
-                <span style={{ fontSize: 18, fontWeight: 900 }}>{c.glyph}</span>
-                <span>{c.label}</span>
-              </button>
-            ))}
-          </div>
+          <h3 style={{ margin: '0 0 14px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>PACK VAULT</h3>
           <p className="caveat" style={{ marginTop: 14 }}>
-            Demo pool is built from the <b>real Renaiss marketplace</b> ({state.poolLoading ? 'loading...' : `${state.pool.length} cards`}).
+            Demo pools are built from the <b>real Renaiss marketplace</b> ({state.poolLoading ? 'loading...' : `${state.pool.length} cards`}).
+            Select a simulated pack to inspect its odds before ripping.
           </p>
           <div style={{ marginTop: 12 }}>
             <PackChoices compact />
@@ -69,10 +55,10 @@ export function Intro() {
         </div>
 
         <div className="panel" style={{ padding: 20 }}>
-          <h3 style={{ margin: '0 0 6px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>EDEN PACK ODDS</h3>
+          <h3 style={{ margin: '0 0 6px', fontSize: 14, letterSpacing: '0.08em', color: 'var(--text-sub)' }}>{selectedPack.name.toUpperCase()} ODDS</h3>
           <p className="caveat" style={{ marginBottom: 12 }}>
-            Odds are estimated from the real marketplace pool composition. Paid simulated packs reveal 1 card;
-            the one-time Welcome Pack reveals 5 cards.
+            Simulated draw pool: {packCategoryLabel(selectedPack)}. Odds are estimated from real marketplace pool composition because public
+            Renaiss pack odds are not exposed by the alpha read API here.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {rows.map((r) => (
@@ -88,6 +74,13 @@ export function Intro() {
           </div>
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--hairline)' }}>
             <TierLegend />
+          </div>
+          <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '13px 18px' }} disabled={!canRip} onClick={ripSelectedPack}>
+              Rip a Pack · {selectedPack.cost === 0 ? 'Free' : `${selectedPack.cost} credits`}
+            </button>
+            {!ready && <p className="caveat" style={{ color: 'var(--loss)' }}>This pack has no eligible cards loaded yet.</p>}
+            {ready && !enoughCredits && <p className="caveat" style={{ color: 'var(--loss)' }}>Not enough virtual credits for this pack.</p>}
           </div>
         </div>
       </div>

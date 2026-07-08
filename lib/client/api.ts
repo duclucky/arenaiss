@@ -39,7 +39,10 @@ export async function loadPool(category: Category): Promise<GameCard[]> {
   const raw = await getJson(`/api/pool?category=${category}`);
   const parsed = safeParse(MarketplaceResponseSchema, raw);
   if (!parsed.ok) return [];
-  return buildCards(parsed.data.collection);
+  return buildCards(parsed.data.collection).map((card) => ({
+    ...card,
+    category: card.category === 'POKEMON' || card.category === 'ONE_PIECE' ? card.category : category,
+  }));
 }
 
 export async function fetchCardDetail(tokenId: string): Promise<CardDetail | null> {

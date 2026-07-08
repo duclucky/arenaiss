@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useReducer, type ReactNode, type Dispatch } from 'react';
 import type { GameCard } from '@/lib/game/stats';
-import type { PackReveal } from '@/lib/game/gacha';
-import { BATTLE_STAKE, STARTING_CREDITS, WIN_REWARD, LOSS_REWARD, WELCOME_PACK_ID, settleBattleCredits } from '@/lib/game/gacha';
+import type { PackId, PackReveal } from '@/lib/game/gacha';
+import { BATTLE_STAKE, DEFAULT_PACK_ID, STARTING_CREDITS, WIN_REWARD, LOSS_REWARD, WELCOME_PACK_ID, settleBattleCredits } from '@/lib/game/gacha';
 import type { BattleState, StatKey } from '@/lib/game/battle';
 import { initBattle, stepRound, chooseStatGreedy } from '@/lib/game/battle';
 import type { Category } from '@/lib/client/api';
@@ -14,6 +14,7 @@ export type Screen = 'intro' | 'pack' | 'roster' | 'deck' | 'battle' | 'result';
 
 export interface ArenaState {
   category: Category;
+  poolsByCategory: Record<Category, GameCard[]>;
   pool: GameCard[];
   poolLoading: boolean;
   poolError: string | null;
@@ -32,10 +33,13 @@ export interface ArenaState {
   lastSavedAt: string | null;
   passportToken: string | null;
   welcomePackOpened: boolean;
+  selectedPackId: PackId;
+  arenaCategory: Category | null;
 }
 
 const initialState: ArenaState = {
   category: 'POKEMON',
+  poolsByCategory: { POKEMON: [], ONE_PIECE: [] },
   pool: [],
   poolLoading: false,
   poolError: null,
@@ -54,12 +58,17 @@ const initialState: ArenaState = {
   lastSavedAt: null,
   passportToken: null,
   welcomePackOpened: false,
+  selectedPackId: DEFAULT_PACK_ID,
+  arenaCategory: null,
 };
 
 export type Action =
   | { type: 'SET_CATEGORY'; category: Category }
+  | { type: 'SELECT_PACK'; packId: PackId }
+  | { type: 'SET_ARENA_CATEGORY'; category: Category }
   | { type: 'POOL_LOADING' }
   | { type: 'POOL_LOADED'; pool: GameCard[] }
+  | { type: 'POOLS_LOADED'; pools: Record<Category, GameCard[]> }
   | { type: 'POOL_ERROR'; error: string }
   | { type: 'HYDRATE_SAVE'; save: ArenaSave; credits: number; lastCreditRefillAt: string | null }
   | { type: 'SAVE_READY' }
@@ -91,10 +100,28 @@ function reducer(state: ArenaState, action: Action): ArenaState {
   switch (action.type) {
     case 'SET_CATEGORY':
       return { ...state, category: action.category };
+    case 'SELECT_PACK':
+      return { ...state, selectedPackId: action.packId };
+    case 'SET_ARENA_CATEGORY':
+      return {
+        ...state,
+        arenaCategory: action.category,
+        deckTokens: state.deckTokens.filter((token) => {
+          const card = state.roster.find((c) => c.tokenId === token);
+          return card?.category === action.category;
+        }),
+      };
     case 'POOL_LOADING':
       return { ...state, poolLoading: true, poolError: null };
     case 'POOL_LOADED':
       return { ...state, pool: action.pool, poolLoading: false };
+    case 'POOLS_LOADED':
+      return {
+        ...state,
+        poolsByCategory: action.pools,
+        pool: [...action.pools.POKEMON, ...action.pools.ONE_PIECE],
+        poolLoading: false,
+      };
     case 'POOL_ERROR':
       return { ...state, poolLoading: false, poolError: action.error };
     case 'HYDRATE_SAVE':
@@ -109,6 +136,8 @@ function reducer(state: ArenaState, action: Action): ArenaState {
         lastCreditRefillAt: action.lastCreditRefillAt,
         passportHintSeen: action.save.passportHintSeen,
         welcomePackOpened: action.save.welcomePackOpened,
+        selectedPackId: action.save.welcomePackOpened && action.save.selectedPackId === WELCOME_PACK_ID ? DEFAULT_PACK_ID : action.save.selectedPackId,
+        arenaCategory: action.save.arenaCategory,
         lastSavedAt: action.save.savedAt,
         saveReady: true,
       };
@@ -134,6 +163,7 @@ function reducer(state: ArenaState, action: Action): ArenaState {
           },
         ].slice(-100),
         welcomePackOpened: state.welcomePackOpened || action.reveal.packId === WELCOME_PACK_ID,
+        selectedPackId: action.reveal.packId === WELCOME_PACK_ID ? DEFAULT_PACK_ID : state.selectedPackId,
         screen: 'pack',
       };
     }
@@ -185,6 +215,7 @@ function reducer(state: ArenaState, action: Action): ArenaState {
       return {
         ...initialState,
         pool: state.pool,
+        poolsByCategory: state.poolsByCategory,
         category: state.category,
         saveReady: state.saveReady,
         lastSavedAt: null,
@@ -226,6 +257,8 @@ export function ArenaProvider({ children }: { children: ReactNode }) {
       lastCreditRefillAt: state.lastCreditRefillAt,
       passportHintSeen: state.passportHintSeen,
       welcomePackOpened: state.welcomePackOpened,
+      selectedPackId: state.selectedPackId,
+      arenaCategory: state.arenaCategory,
     });
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     dispatch({ type: 'SAVED', savedAt: saved.savedAt });
@@ -239,6 +272,8 @@ export function ArenaProvider({ children }: { children: ReactNode }) {
     state.lastCreditRefillAt,
     state.passportHintSeen,
     state.welcomePackOpened,
+    state.selectedPackId,
+    state.arenaCategory,
     state.saveReady,
   ]);
 

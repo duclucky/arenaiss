@@ -12,6 +12,7 @@ export const DRAW_REFUND = BATTLE_STAKE;
 export const WELCOME_PACK_ID = 'welcome';
 
 export type PackId = 'welcome' | 'eden' | 'omega' | 'renacrypt';
+export type PackCategory = 'POKEMON' | 'ONE_PIECE';
 
 export interface PackDefinition {
   id: PackId;
@@ -19,6 +20,9 @@ export interface PackDefinition {
   cost: number;
   size: number;
   description: string;
+  categories: PackCategory[];
+  sourceSlug?: string;
+  theme: string;
   tierOdds: Record<Tier, number>;
 }
 
@@ -29,6 +33,8 @@ export const PACKS: PackDefinition[] = [
     cost: 0,
     size: 5,
     description: 'One-time starter pack for a new player.',
+    categories: ['POKEMON', 'ONE_PIECE'],
+    theme: 'Starter mix from both arena lines.',
     tierOdds: TIER_ODDS,
   },
   {
@@ -36,7 +42,10 @@ export const PACKS: PackDefinition[] = [
     name: 'Eden Pack',
     cost: 300,
     size: 1,
-    description: 'Entry simulated pack with balanced odds.',
+    description: 'One Piece themed simulated pack inspired by the real Eden Pack.',
+    categories: ['ONE_PIECE'],
+    sourceSlug: 'eden-pack',
+    theme: 'One Piece',
     tierOdds: { TOP: 0.01, S: 0.04, A: 0.13, B: 0.27, C: 0.35, D: 0.2 },
   },
   {
@@ -44,7 +53,10 @@ export const PACKS: PackDefinition[] = [
     name: 'OMEGA Pack',
     cost: 500,
     size: 1,
-    description: 'Higher-risk simulated pack with stronger rare-card odds.',
+    description: 'Pokemon themed simulated pack inspired by the real OMEGA pack.',
+    categories: ['POKEMON'],
+    sourceSlug: 'omega',
+    theme: 'Pokemon',
     tierOdds: { TOP: 0.02, S: 0.07, A: 0.18, B: 0.3, C: 0.28, D: 0.15 },
   },
   {
@@ -52,7 +64,10 @@ export const PACKS: PackDefinition[] = [
     name: 'RenaCrypt Pack',
     cost: 800,
     size: 1,
-    description: 'Premium simulated pack with the best rare-card odds.',
+    description: 'Mixed simulated vault pack inspired by the real RenaCrypt perpetual pack.',
+    categories: ['POKEMON', 'ONE_PIECE'],
+    sourceSlug: 'renacrypt-pack',
+    theme: 'Mixed vault',
     tierOdds: { TOP: 0.04, S: 0.11, A: 0.25, B: 0.3, C: 0.2, D: 0.1 },
   },
 ];
@@ -82,10 +97,25 @@ export function getPack(id: PackId = DEFAULT_PACK_ID): PackDefinition {
   return PACKS.find((pack) => pack.id === id) ?? PACKS.find((pack) => pack.id === DEFAULT_PACK_ID)!;
 }
 
+export function isPackId(value: unknown): value is PackId {
+  return typeof value === 'string' && PACKS.some((pack) => pack.id === value);
+}
+
+export function eligibleCardsForPack(pool: GameCard[], packId: PackId = DEFAULT_PACK_ID): GameCard[] {
+  const pack = getPack(packId);
+  return pool.filter((card) => card.category === null || pack.categories.includes(card.category as PackCategory));
+}
+
+export function packCategoryLabel(pack: PackDefinition): string {
+  if (pack.categories.length === 2) return 'Pokemon + One Piece';
+  return pack.categories[0] === 'POKEMON' ? 'Pokemon' : 'One Piece';
+}
+
 export function oddsTable(pool: GameCard[], packId: PackId = DEFAULT_PACK_ID): OddsRow[] {
   const pack = getPack(packId);
+  const eligible = eligibleCardsForPack(pool, pack.id);
   const counts: Record<Tier, number> = { TOP: 0, S: 0, A: 0, B: 0, C: 0, D: 0 };
-  for (const c of pool) counts[c.tier]++;
+  for (const c of eligible) counts[c.tier]++;
   const labels: Record<Tier, string> = {
     TOP: 'Top - legendary',
     S: 'S - ultra rare',
@@ -118,9 +148,10 @@ function drawOne(rng: Rng, pool: GameCard[], byTier: Map<Tier, GameCard[]>, pack
 
 export function openPack(pool: GameCard[], seed: string, packId: PackId = DEFAULT_PACK_ID): PackReveal {
   const pack = getPack(packId);
+  const eligiblePool = eligibleCardsForPack(pool, pack.id);
   const rng = makeRng(seed);
   const byTier = new Map<Tier, GameCard[]>();
-  for (const c of pool) {
+  for (const c of eligiblePool) {
     const arr = byTier.get(c.tier) ?? [];
     arr.push(c);
     byTier.set(c.tier, arr);
@@ -128,12 +159,12 @@ export function openPack(pool: GameCard[], seed: string, packId: PackId = DEFAUL
 
   const picked: GameCard[] = [];
   const usedTokens = new Set<string>();
-  const targetSize = Math.min(pack.size, pool.length);
+  const targetSize = Math.min(pack.size, eligiblePool.length);
   const maxTries = targetSize * 12;
   let tries = 0;
   while (picked.length < targetSize && tries < maxTries) {
     tries++;
-    const card = drawOne(rng, pool, byTier, pack);
+    const card = drawOne(rng, eligiblePool, byTier, pack);
     if (usedTokens.has(card.tokenId)) continue;
     usedTokens.add(card.tokenId);
     picked.push(card);

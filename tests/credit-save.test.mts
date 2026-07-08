@@ -77,11 +77,15 @@ const afterNextMidnight = new Date('2026-07-07T00:00:01.000Z');
       lastCreditRefillAt: afterNextMidnight.toISOString(),
       passportHintSeen: true,
       welcomePackOpened: true,
+      selectedPackId: 'omega',
+      arenaCategory: 'ONE_PIECE',
     },
     afterNextMidnight,
   );
   assert.equal(saved.version, SAVE_VERSION);
   assert.equal(saved.savedAt, afterNextMidnight.toISOString());
+  assert.equal(saved.selectedPackId, 'omega');
+  assert.equal(saved.arenaCategory, 'ONE_PIECE');
   assert.deepEqual(parseSavedArena(JSON.stringify(saved)), saved);
 }
 
