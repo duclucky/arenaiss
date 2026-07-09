@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion, type Variants } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
@@ -128,7 +128,7 @@ export function PackOpen() {
 function PackOpenSequence({ pack }: { pack: PackReveal }) {
   const state = useArena();
   const dispatch = useArenaDispatch();
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = false; // Bypassing OS accessibility setting to ensure effects run
   const topTier = pack.topTier;
   const intensity = INTENSITY[topTier];
   const order = useMemo(
@@ -177,6 +177,7 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
   const showCardShowcase = (phase === 'burst' || phase === 'spotlight') && spotlightCard;
   const cssVars = {
     '--pack-tier': TIER_COLORS[topTier],
+    '--pack-tier-rgb': hexToRgbStr(TIER_COLORS[topTier]),
     '--pack-tier-soft': `${TIER_COLORS[topTier]}66`,
   } as CSSProperties;
 
@@ -497,3 +498,9 @@ function particlePalette(tier: Tier): string[] {
   if (tier === 'C') return ['#f4f7fb', '#8a93a0', '#c9d2dc', '#ffffff', base];
   return ['#e2e7ee', '#5a626e', '#9aa3ad', '#ffffff', base];
 }
+
+function hexToRgbStr(hex: string) {
+  const bigint = parseInt(hex.slice(1), 16);
+  return `${(bigint >> 16) & 255}, ${(bigint >> 8) & 255}, ${bigint & 255}`;
+}
+

@@ -12,6 +12,29 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Antigravity 2026-07-09 force pack opening fx
+- Agent: antigravity
+- Commit phiên này: `fix: ensure pack opening fx runs everywhere`
+
+### Đang làm gì
+Không còn code đang viết dở. Phiên này xử lý yêu cầu bắt buộc hiệu ứng mở Pack phải chạy trên mọi hệ điều hành (kể cả khi tắt Animation effects) và hiển thị đúng màu ánh sáng trên mọi trình duyệt cũ (không dùng rgba from).
+
+### Đã xong
+- `features/pack-open/PackOpen.tsx`: Ép `reducedMotion = false` để bỏ qua cài đặt Accessibility của OS, đảm bảo sequence FX luôn chạy. Thêm helper `hexToRgbStr` và css var `--pack-tier-rgb`.
+- `app/globals.css`: Đổi các biến CSS gốc thành dạng RGB (`--tier-top-rgb`, v.v.). Loại bỏ cú pháp `rgba(from var...)` bằng `rgba(var(--tier-rgb), alpha)` để hỗ trợ 100% trình duyệt. Xóa `@media (prefers-reduced-motion: reduce)` block.
+- Verification: Đã chạy `npm run typecheck` PASS.
+
+### Tiếp theo
+1. Push code lên repo.
+
+### Cảnh báo
+- Việc ép hiệu ứng chạy đi ngược lại nguyên tắc Accessibility nhưng là yêu cầu bắt buộc của dự án (wow factor).
+
+### Nhật ký
+- 2026-07-09 antigravity: Hoàn tất force FX, chuẩn bị commit và push.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-09 pack cinematic CSS FX layer animation
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `c2ad880` - "fx: show actual card during pack burst"
