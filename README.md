@@ -240,8 +240,8 @@ RENAISS_INDEX_API_SECRET=rsk_your_secret_here
 Optional OpenAI-compatible Passport AI provider:
 
 ```bash
-PASSPORT_AI_BASE_URL=https://v98store.com/v1
-PASSPORT_AI_MODEL=deepseek-v4-flash
+PASSPORT_AI_BASE_URL=https://.........../v1
+PASSPORT_AI_MODEL=.............
 PASSPORT_AI_API_KEY=your_provider_key_here
 ```
 
