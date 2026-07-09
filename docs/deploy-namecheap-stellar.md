@@ -23,7 +23,7 @@ Suggested cPanel app settings:
 
 - Application mode: `Production`
 - Application root: a folder outside `public_html`, for example `arenaiss`
-- Application URL: `arenaiss.xyz`
+- Application URL: `arena-card.xyz`
 - Application startup file: `server.js`
 - Environment:
   - `NODE_ENV=production`
@@ -61,16 +61,18 @@ the GitHub Actions FTP deploy workflow added in `.github/workflows/deploy.yml`.
 Create these GitHub repository secrets:
 
 - `FTP_SERVER` — cPanel FTP server, for example `ftp.fundline.xyz`
-- `FTP_USERNAME` — FTP account, for example `Arenaiss@arenaiss.xyz`
+- `FTP_USERNAME` — FTP account created in cPanel
 - `FTP_PASSWORD` — FTP password
 - `FTP_SERVER_DIR` — remote app directory, for example `/arenaiss/`
+- `SITE_URL` — optional live verification URL; defaults to `https://arena-card.xyz`
 
-The workflow currently uses:
+The workflow currently uses repository secrets only:
 
 ```text
-FTP host: FTP_SERVER, or ftp.arenaiss.xyz as a fallback
-FTP user: FTP_USERNAME, or Arenaiss@arenaiss.xyz as a fallback
-FTP dir:  FTP_SERVER_DIR, or /arenaiss/ as a fallback
+FTP host: FTP_SERVER
+FTP user: FTP_USERNAME
+FTP dir:  FTP_SERVER_DIR
+Live URL: SITE_URL, or https://arena-card.xyz as a fallback
 ```
 
 The workflow builds `next.config.ts` with `output: "standalone"` and uploads a
@@ -136,20 +138,20 @@ deployment; the runtime modules are already inside `app/node_modules`.
 
 ## Domain and DNS
 
-For `arenaiss.xyz` bought on Namecheap and hosted on Namecheap Stellar, either:
+For `arena-card.xyz` bought on Namecheap and hosted on Namecheap Stellar, either:
 
-1. Use Namecheap hosting nameservers for the domain, then add `arenaiss.xyz` as the
+1. Use Namecheap hosting nameservers for the domain, then add `arena-card.xyz` as the
    primary/addon domain in cPanel.
 2. Or keep existing DNS and point records to the hosting server IP from cPanel:
    - `A` record: `@` -> the hosting shared IP
-   - `CNAME` record: `www` -> `arenaiss.xyz`
+   - `CNAME` record: `www` -> `arena-card.xyz`
 
 The exact IP is shown in cPanel / hosting account details.
 
 After DNS resolves, enable SSL in cPanel:
 
 1. Open `SSL/TLS Status`.
-2. Run AutoSSL for `arenaiss.xyz` and `www.arenaiss.xyz`.
+2. Run AutoSSL for `arena-card.xyz` and `www.arena-card.xyz`.
 3. Force HTTPS if cPanel provides that option.
 
 ## Persistence warning

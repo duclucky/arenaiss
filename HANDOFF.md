@@ -14,16 +14,21 @@
 - `env.example.txt`: xoá bản duplicate không chuẩn.
 - `public/file.svg`, `public/globe.svg`, `public/next.svg`, `public/vercel.svg`, `public/window.svg`: xoá asset mặc định Next không được app tham chiếu.
 - Xoá file scratch untracked ở root: `debug_json.js`, `decoded_tsdtv.json`, `find_in_html.js`, `find_strings.js`, `parse_fb.js`, `parse_form.js`, `parse_wiz.js`, `patch.js`, `stripped_text.txt`, `test_parse.js`, `test_start.js`, `wiz_data.json`.
+- `.github/workflows/deploy.yml`: sửa bước live verification khỏi domain cũ `arenaiss.xyz`; dùng secret `SITE_URL` hoặc fallback `https://arena-card.xyz`.
+- `.github/workflows/deploy.yml`: bỏ fallback FTP hardcode cũ; workflow dùng `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`, `FTP_SERVER_DIR` từ GitHub Secrets.
+- `docs/deploy-namecheap-stellar.md`: cập nhật domain hiện tại `arena-card.xyz`, thêm `SITE_URL`, và bỏ ví dụ FTP username/domain cũ.
 
 ### Tiếp theo
-1. Chạy lint/typecheck và kiểm tra secret/tracked-file scan.
-2. Commit và push cleanup nếu verification sạch.
+1. Commit và push workflow verify fix.
+2. Theo dõi GitHub Actions run mới tới khi xanh.
 
 ### Cảnh báo
 - Các thư mục/file local ignored như `.next/`, `node_modules/`, `deploy/`, `data/`, `.env.local`, `.e2e-output/`, zip build vẫn có thể tồn tại trên máy nhưng không được track/publish.
 
 ### Nhật ký
 - 2026-07-10 codex: Bắt đầu cleanup public repo theo yêu cầu chuẩn bị publish GitHub.
+- 2026-07-10 codex: Run deploy `29040503946` fail ở bước verify vì workflow vẫn hardcode `https://arenaiss.xyz`; sửa sang `SITE_URL` fallback `https://arena-card.xyz`.
+- 2026-07-10 codex: Xác nhận repo có đủ FTP secrets chuẩn, nên bỏ fallback FTP hardcode khỏi workflow để phù hợp public repo.
 
 ---
 
