@@ -161,7 +161,8 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
   }
 
   const showCards = phase === 'reveal' || phase === 'settle';
-  const rareToken = order[order.length - 1]?.tokenId;
+  const spotlightCard = order[order.length - 1];
+  const rareToken = spotlightCard?.tokenId;
   const shellPhase = phase === 'burst' ? 'burst' : 'closed';
   const cssVars = {
     '--pack-tier': TIER_COLORS[topTier],
@@ -249,19 +250,40 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
               <div className="cinematic-pack-name">{pack.packName}</div>
             </motion.div>
             {phase === 'burst' && (
-              <motion.div
-                className="cinematic-burst pack-explosion"
-                initial={{ opacity: 0, scale: 0.22 }}
-                animate={{ opacity: [0, 1, 1, 0], scale: [0.28, 1, 1.08, 1.22] }}
-                transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
-              >
-                <span className="cinematic-burst-core" />
-                <span className="cinematic-shockwave" />
-                <span className="cinematic-flash-card" />
-                {Array.from({ length: 10 }).map((_, index) => (
-                  <span key={index} className="cinematic-foil-chip" style={{ '--chip': index } as CSSProperties} />
-                ))}
-              </motion.div>
+              <>
+                <motion.div
+                  className="cinematic-burst pack-explosion"
+                  initial={{ opacity: 0, scale: 0.22 }}
+                  animate={{ opacity: [0, 1, 1, 0], scale: [0.28, 1, 1.08, 1.22] }}
+                  transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
+                >
+                  <span className="cinematic-burst-core" />
+                  <span className="cinematic-shockwave" />
+                  <span className="cinematic-flash-card" />
+                  {Array.from({ length: 10 }).map((_, index) => (
+                    <span key={index} className="cinematic-foil-chip" style={{ '--chip': index } as CSSProperties} />
+                  ))}
+                </motion.div>
+                {spotlightCard && (
+                  <motion.div
+                    className="cinematic-emerge-card"
+                    data-tier={spotlightCard.tier}
+                    initial={{ opacity: 0, y: 128, scale: 0.42, rotateY: 78, rotateZ: -5 }}
+                    animate={{
+                      opacity: [0, 1, 1, 0.96],
+                      y: [128, -72, -92, -96],
+                      scale: [0.42, 1.04, 1.12, 1.08],
+                      rotateY: [78, 0, -4, 0],
+                      rotateZ: [-5, 1, -1, 0],
+                    }}
+                    transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
+                    aria-hidden="true"
+                  >
+                    <span className="cinematic-emerge-halo" />
+                    <Slab card={spotlightCard} reveal />
+                  </motion.div>
+                )}
+              </>
             )}
             {phase !== 'burst' && (
               <>

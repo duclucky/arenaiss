@@ -46,6 +46,7 @@ async function openPackByName(name) {
   await page.waitForSelector('.pack-visual', { timeout: 3000 });
   await page.waitForSelector('.pack-explosion', { timeout: 5000 });
   await page.waitForSelector('.cinematic-particle-canvas', { timeout: 1000 });
+  await page.waitForSelector('.cinematic-emerge-card .slab', { timeout: 1000 });
   await page.waitForSelector('text=RESULT', { timeout: 15000 });
   await page.waitForSelector('.cinematic-card-grid .pack-reveal-card', { timeout: 5000 });
   await page.waitForTimeout(3600);

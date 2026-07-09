@@ -1503,6 +1503,37 @@ a { color: inherit; }
     translateX(calc((var(--chip) - 5) * 18px));
   opacity: 0.9;
 }
+.cinematic-emerge-card {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  top: 50%;
+  width: 220px;
+  margin-left: -110px;
+  margin-top: -132px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 22px 34px rgba(0,0,0,0.58))
+    drop-shadow(0 0 28px rgba(from var(--tier) r g b / 0.48));
+}
+.cinematic-emerge-card .slab {
+  width: 220px;
+  min-height: 0;
+  transform: translateZ(0);
+}
+.cinematic-emerge-card .slab-passport-button {
+  display: none;
+}
+.cinematic-emerge-halo {
+  position: absolute;
+  z-index: -1;
+  inset: -42px -54px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.72), rgba(from var(--tier) r g b / 0.46) 32%, rgba(229,192,123,0.16) 54%, transparent 72%);
+  filter: blur(10px);
+}
 .cinematic-pack-copy,
 .cinematic-skip-copy {
   position: relative;

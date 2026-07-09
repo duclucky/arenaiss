@@ -1007,6 +1007,40 @@ No unfinished code is intentionally left. This batch replaces the previous neon/
 - 2026-07-09 codex: Reworked the pack reveal away from neon/godray into a premium vault-pack opening sequence and verified local production flow.
 
 ---
+# Codex update 2026-07-09 visible card emergence in pack reveal
+- Agent: codex
+- Latest commit before this update: `f3843a2` - "fx: replace pack reveal with premium vault sequence"
+- Session commit: preparing `fx: show actual card during pack burst`
+
+## Current work
+No unfinished code is intentionally left. User reported the new visual still looked like the old one because the burst did not clearly show a card. This batch makes the visual explicit: the actual highest-tier card from the pack emerges large in the center during the burst phase.
+
+## Done
+- `features/pack-open/PackOpen.tsx`: during `burst`, renders `cinematic-emerge-card` using the existing `Slab` component for the spotlight/highest-tier card.
+- `app/globals.css`: added `cinematic-emerge-card` and halo styling so the card visibly flies up from the pack.
+- `scripts/e2e.mjs`: now asserts `.cinematic-emerge-card .slab` appears during pack opening, preventing regressions back to a vague particle-only reveal.
+
+## Verification
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- Production local e2e against `http://127.0.0.1:3037` PASS; console errors none.
+- Manual screenshot confirming the real card appears during burst:
+  - `.e2e-output/pack-emerge-card-burst.png`
+- `git diff --check` PASS, only Windows line-ending warnings.
+
+## Next steps
+1. Commit and push this batch.
+2. Watch GitHub Actions deploy.
+3. Verify live bundle includes `cinematic-emerge-card`.
+
+## Warnings
+- Presentation layer only; no intended changes to gacha logic/RNG/credits/auth.
+
+## Log
+- 2026-07-09 codex: Added actual spotlight card emergence in pack burst because the previous vault visual still did not read clearly enough.
+
+---
 # Codex update 2026-07-09 hero cleanup + lineup filter
 - Agent: codex
 - Latest commit before this update: `9f34436` - "copy: add unofficial site disclaimer"
