@@ -28,7 +28,7 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
   const state = useArena();
   const dispatch = useArenaDispatch();
   const order = useMemo(() => [...pack.cards].sort((a, b) => RANK[b.tier] - RANK[a.tier]), [pack]);
-  const [phase, setPhase] = useState<'charging' | 'revealing' | 'done'>('charging');
+  const [phase, setPhase] = useState<'charging' | 'detonating' | 'revealing' | 'done'>('charging');
   const [revealed, setRevealed] = useState(0);
   const [flash, setFlash] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -37,10 +37,10 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
     timers.current.forEach(clearTimeout);
     timers.current = [];
 
-    const t0 = setTimeout(() => setPhase('revealing'), 650);
-    timers.current.push(t0);
+    timers.current.push(setTimeout(() => setPhase('detonating'), 650));
+    timers.current.push(setTimeout(() => setPhase('revealing'), 1350));
 
-    let acc = 780;
+    let acc = 1450;
     order.forEach((card, i) => {
       const isLast = i === order.length - 1;
       acc += isLast ? 620 : 300;
@@ -74,21 +74,30 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
         }} />
       )}
 
-      {phase === 'charging' ? (
-        <div className="pack-stage" data-tier={topTier}>
+      {phase === 'charging' || phase === 'detonating' ? (
+        <div className="pack-stage" data-tier={topTier} data-pack-phase={phase}>
+          {phase === 'detonating' && (
+            <div className="pack-explosion" aria-hidden="true">
+              <span className="pack-explosion-core" />
+              {Array.from({ length: 22 }).map((_, i) => (
+                <span key={i} className="pack-shard" style={{ '--i': i } as CSSProperties} />
+              ))}
+            </div>
+          )}
           <div
-            className="pack-visual anim-shake"
+            className={`pack-visual ${phase === 'detonating' ? 'pack-visual-detonating' : 'anim-shake'}`}
           >
             <span className="pack-burst-ring" />
             <span className="pack-crack pack-crack-a" />
             <span className="pack-crack pack-crack-b" />
             <span className="pack-crack pack-crack-c" />
+            <span className="pack-crack pack-crack-d" />
             <span className="pack-core">{pack.packName}</span>
-            {Array.from({ length: 12 }).map((_, i) => (
+            {Array.from({ length: 18 }).map((_, i) => (
               <span key={i} className="pack-spark" style={{ '--i': i } as CSSProperties} />
             ))}
           </div>
-          <p className="pack-stage-copy">The vault seal is breaking...</p>
+          <p className="pack-stage-copy">{phase === 'detonating' ? 'Energy overload - revealing now' : 'The vault seal is breaking...'}</p>
         </div>
       ) : (
         <>

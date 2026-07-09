@@ -908,6 +908,15 @@ a { color: inherit; }
   60% { transform: translate(-2px, 2px) rotate(-0.8deg); }
   80% { transform: translate(2px, -2px) rotate(0.8deg); }
 }
+@keyframes packMegaShake {
+  0%, 100% { transform: translate(0,0) rotate(0deg) scale(1.03); }
+  8% { transform: translate(-10px, 4px) rotate(-5deg) scale(1.08); }
+  18% { transform: translate(9px, -5px) rotate(4deg) scale(1.11); }
+  30% { transform: translate(-7px, -4px) rotate(-3deg) scale(1.12); }
+  44% { transform: translate(8px, 5px) rotate(5deg) scale(1.14); }
+  60% { transform: translate(-5px, 2px) rotate(-2deg) scale(1.1); }
+  78% { transform: translate(4px, -3px) rotate(2deg) scale(1.08); }
+}
 @keyframes riseReveal {
   0% { opacity: 0; transform: translateY(28px) scale(0.9); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -941,6 +950,27 @@ a { color: inherit; }
   0% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-56px) scale(0.35); }
   28% { opacity: 1; }
   100% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-156px) scale(1); }
+}
+@keyframes packExplosionCore {
+  0% { opacity: 0; transform: scale(0.18); filter: blur(12px); }
+  18% { opacity: 1; transform: scale(0.72); filter: blur(2px); }
+  100% { opacity: 0; transform: scale(2.8); filter: blur(18px); }
+}
+@keyframes packShardBurst {
+  0% {
+    opacity: 0;
+    transform: rotate(calc(var(--i) * 16.36deg)) translateY(0) scale(0.3);
+  }
+  18% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--i) * 16.36deg)) translateY(-250px) scale(1.15);
+  }
+}
+@keyframes packChromaticWave {
+  0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  24% { opacity: 0.92; }
+  100% { opacity: 0; transform: scale(2.35) rotate(160deg); }
 }
 @keyframes packResultPop {
   from { opacity: 0; transform: translateY(14px) scale(0.97); }
@@ -980,6 +1010,25 @@ a { color: inherit; }
   opacity: 0.72;
   animation: packSealPulse 1.1s ease-in-out infinite;
 }
+.pack-stage::after {
+  content: '';
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #ffdf5d, #ff5ee1, #7b61ff, #2f7cff, #2fd3a5, #ffdf5d);
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: blur(16px);
+  pointer-events: none;
+}
+.pack-stage[data-pack-phase='detonating']::before {
+  animation-duration: 0.32s;
+  opacity: 1;
+}
+.pack-stage[data-pack-phase='detonating']::after {
+  animation: packChromaticWave 0.68s cubic-bezier(0.1, 0.8, 0.2, 1) both;
+}
 .pack-visual {
   position: relative;
   z-index: 1;
@@ -997,6 +1046,10 @@ a { color: inherit; }
     inset 0 0 52px rgba(from var(--tier) r g b / 0.24),
     inset 0 1px 0 rgba(255,255,255,0.12);
   overflow: visible;
+}
+.pack-visual-detonating {
+  animation: packMegaShake 0.52s cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
+  filter: saturate(1.45) brightness(1.28);
 }
 .pack-core {
   width: 128px;
@@ -1022,6 +1075,15 @@ a { color: inherit; }
   box-shadow: 0 0 36px rgba(from var(--tier) r g b / 0.42);
   animation: packSealPulse 0.95s ease-in-out infinite;
 }
+.pack-stage[data-pack-phase='detonating'] .pack-burst-ring {
+  inset: -48px;
+  border-color: rgba(255,255,255,0.8);
+  box-shadow:
+    0 0 48px rgba(from var(--tier) r g b / 0.78),
+    0 0 96px rgba(255, 79, 216, 0.35),
+    0 0 120px rgba(47, 124, 255, 0.28);
+  animation-duration: 0.28s;
+}
 .pack-crack {
   position: absolute;
   top: 38px;
@@ -1036,6 +1098,13 @@ a { color: inherit; }
 .pack-crack-a { left: 50%; transform: rotate(8deg); }
 .pack-crack-b { left: 42%; height: 112px; transform: rotate(-24deg); animation-delay: -0.16s; }
 .pack-crack-c { left: 58%; height: 96px; transform: rotate(28deg); animation-delay: -0.28s; }
+.pack-crack-d { left: 52%; top: 58px; height: 124px; transform: rotate(78deg); animation-delay: -0.08s; }
+.pack-stage[data-pack-phase='detonating'] .pack-crack {
+  width: 3px;
+  opacity: 1;
+  background: linear-gradient(180deg, transparent, #fff 25%, var(--tier) 55%, #ff5ee1 78%, transparent);
+  animation-duration: 0.2s;
+}
 .pack-spark {
   position: absolute;
   left: 50%;
@@ -1076,6 +1145,37 @@ a { color: inherit; }
   border-radius: 50%;
   background: radial-gradient(circle, rgba(from var(--tier) r g b / 0.48), rgba(from var(--tier) r g b / 0.08) 42%, transparent 68%);
   animation: packCardFlare 0.75s ease-out both;
+}
+.pack-explosion {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.pack-explosion-core {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff 0 10%, rgba(from var(--tier) r g b / 0.95) 18%, rgba(255, 79, 216, 0.55) 42%, rgba(47, 124, 255, 0.25) 58%, transparent 72%);
+  box-shadow:
+    0 0 70px rgba(from var(--tier) r g b / 0.95),
+    0 0 120px rgba(255, 79, 216, 0.45),
+    0 0 140px rgba(47, 124, 255, 0.36);
+  animation: packExplosionCore 0.72s cubic-bezier(0.06, 0.9, 0.18, 1) both;
+}
+.pack-shard {
+  position: absolute;
+  width: 7px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff, var(--tier), #ff5ee1, transparent);
+  box-shadow: 0 0 14px var(--tier);
+  animation: packShardBurst 0.82s cubic-bezier(0.08, 0.78, 0.2, 1) both;
+  animation-delay: calc(var(--i) * 8ms);
 }
 
 .sweep-overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }

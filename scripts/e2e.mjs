@@ -42,6 +42,7 @@ async function openPackByName(name) {
   }, { timeout: 10000 });
   await rip.click();
   await page.waitForSelector('.pack-visual', { timeout: 3000 });
+  await page.waitForSelector('.pack-explosion', { timeout: 3000 });
   await page.waitForSelector('text=RESULT', { timeout: 15000 });
   await page.waitForTimeout(3600);
 }

@@ -947,3 +947,34 @@ No unfinished code is intentionally left. This batch removes the intro `DEMO` la
 - 2026-07-09 codex: Implemented requested hero cleanup, Lineup filter reuse, login-gated pack ripping, and improved pack reveal FX.
 
 ---
+# Codex update 2026-07-09 stronger pack reveal FX
+- Agent: codex
+- Latest commit before this update: `0e73930` - "ui: add lineup filter and pack reveal fx"
+- Session commit: preparing `fx: amplify pack reveal explosion`
+
+## Current work
+No unfinished code is intentionally left. This batch only strengthens pack-opening presentation; pack logic/RNG is unchanged.
+
+## Done
+- `features/pack-open/PackOpen.tsx`: added an explicit `detonating` phase between charge and reveal.
+- `app/globals.css`: added stronger shake, chromatic halo, explosion core, shards, brighter cracks, and stronger tier-colored burst visuals.
+- `scripts/e2e.mjs`: now waits for `.pack-explosion` before result reveal so the burst phase is regression-tested.
+
+## Verification
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- Production local e2e against `http://127.0.0.1:3037` PASS; console errors none.
+
+## Next
+1. Commit and push this batch.
+2. Confirm GitHub Actions deploy succeeds.
+3. Verify the live domain loads the CSS containing `pack-explosion`.
+
+## Warnings
+- None known.
+
+## Log
+- 2026-07-09 codex: Amplified pack reveal FX with stronger vibration, chromatic color, and pre-reveal explosion.
+
+---
