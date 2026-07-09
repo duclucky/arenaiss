@@ -110,7 +110,7 @@ Requires **Node ≥ 22** (SDK requires ≥ 24; this repo was built on Node 24).
 
 ```bash
 npm install
-# create .env.local (see env.example.txt) with the partner Index key/secret:
+# create .env.local (see .env.example) with the partner Index key/secret:
 #   RENAISS_INDEX_API_KEY=rk_...
 #   RENAISS_INDEX_API_SECRET=rsk_...
 #   RENAISS_INDEX_BASE=https://api.renaissos.com

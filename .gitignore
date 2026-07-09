@@ -39,6 +39,7 @@ hosting/boot.log
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -47,6 +48,17 @@ hosting/boot.log
 *.tsbuildinfo
 next-env.d.ts
 
-# local tooling / logs (không thuộc dự án Next.js)
+# local tooling / logs not required by the Next.js app
 .venv/
 .devlog
+
+# local scratch/debug files
+/debug_*.js
+/find_*.js
+/parse_*.js
+/test_parse.js
+/test_start.js
+/patch.js
+/decoded_*.json
+/wiz_data.json
+/stripped_text.txt

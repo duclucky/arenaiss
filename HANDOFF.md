@@ -1,4 +1,31 @@
 # HANDOFF — trạng thái bàn giao giữa các phiên / agent
+## Cập nhật phiên Codex 2026-07-10 public repo cleanup
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `17ca199` - "fix: ensure pack opening fx runs everywhere"
+- Commit phiên này: chuẩn bị `chore: clean public repo artifacts`
+
+### Đang làm gì
+Đang dọn repository trước khi publish GitHub: xoá file scratch, bỏ asset starter không dùng, và chuẩn hoá file env mẫu.
+
+### Đã xong
+- `.gitignore`: cho phép track `.env.example`, vẫn ignore `.env.local`/`.env*` thật; thêm pattern ignore cho scratch debug root.
+- `.env.example`: dùng làm file mẫu env chuẩn để publish; không chứa key thật.
+- `README.md`: đổi hướng dẫn từ `env.example.txt` sang `.env.example`.
+- `env.example.txt`: xoá bản duplicate không chuẩn.
+- `public/file.svg`, `public/globe.svg`, `public/next.svg`, `public/vercel.svg`, `public/window.svg`: xoá asset mặc định Next không được app tham chiếu.
+- Xoá file scratch untracked ở root: `debug_json.js`, `decoded_tsdtv.json`, `find_in_html.js`, `find_strings.js`, `parse_fb.js`, `parse_form.js`, `parse_wiz.js`, `patch.js`, `stripped_text.txt`, `test_parse.js`, `test_start.js`, `wiz_data.json`.
+
+### Tiếp theo
+1. Chạy lint/typecheck và kiểm tra secret/tracked-file scan.
+2. Commit và push cleanup nếu verification sạch.
+
+### Cảnh báo
+- Các thư mục/file local ignored như `.next/`, `node_modules/`, `deploy/`, `data/`, `.env.local`, `.e2e-output/`, zip build vẫn có thể tồn tại trên máy nhưng không được track/publish.
+
+### Nhật ký
+- 2026-07-10 codex: Bắt đầu cleanup public repo theo yêu cầu chuẩn bị publish GitHub.
+
+---
 
 File TRẠNG THÁI SỐNG, dùng chung cho MỌI agent (Claude Code, Codex) và mọi phiên.
 Đọc file này ĐẦU TIÊN để lấy bối cảnh, rồi ĐỐI CHIẾU với `git log --oneline -10`
@@ -644,7 +671,7 @@ Không có code đang viết dở. Phiên này khôi phục Passport AI sau khi 
 - `lib/passport/cache.ts`, `lib/passport/cache.server.ts`: thêm cache theo `tokenId` + fingerprint dữ liệu thật, TTL 7 ngày, lưu server-side ở `data/passport-ai-cache.json` (đã gitignore). Chỉ cache kết quả AI thật; fallback không cache để khi thêm key có thể generate AI ngay.
 - `lib/passport/prompt.ts`, `prompts/passport-narration.md`: đổi prompt sang insight ngắn 2-4 câu, không lặp nhãn `Reference price:`, `Custody:`, `Provenance:`.
 - `tests/passport-ai.test.mts`, `scripts/e2e.mjs`: thêm regression cho fallback insight, fingerprint bỏ qua `asOf`, fingerprint đổi khi data đổi, TTL 7 ngày, và modal phải render Passport AI.
-- `README.md`, `.env.example`, `env.example.txt`: cập nhật hướng dẫn `PASSPORT_AI_*` và ghi rõ server cache 7 ngày.
+- `README.md`, `.env.example`: cập nhật hướng dẫn `PASSPORT_AI_*` và ghi rõ server cache 7 ngày.
 - Verify mới nhất: `npm.cmd run test:unit` PASS; `npm.cmd run lint` PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua server tạm `http://127.0.0.1:3012` PASS, console errors none; bundle scan `.next/static` không có `rk_`/`rsk_`/`X-Api-Secret`/`PASSPORT_AI_API_KEY`/`ANTHROPIC_API_KEY`/write-SDK symbols.
 
 ### Tiếp theo
@@ -874,8 +901,8 @@ không render nút phụ này.
   `/api/cards/{tokenId}` hàng loạt (vd batch passport), nhớ giới hạn concurrency.
 - **`.venv/` là thư mục lạ** (Python venv, ~7MB) nằm ở gốc repo, không liên quan
   Next.js — đã thêm vào `.gitignore`, KHÔNG commit, KHÔNG xoá (không rõ nguồn gốc,
-  để an toàn). `env.example.txt` là bản sao y hệt `.env.example` — vô hại, không
-  cần sửa.
+  để an toàn). `.env.example` là file mẫu env chuẩn được track; `env.example.txt`
+  đã được xoá trong batch cleanup public-repo.
 - Verify mới nhất phiên Codex: `npm.cmd run lint` PASS; `npm.cmd run test:unit`
   PASS; `npm.cmd run typecheck` PASS; `npm.cmd run build` PASS; production e2e qua
   server tạm `http://127.0.0.1:3002` PASS toàn hero loop + browser-comment assertions,
