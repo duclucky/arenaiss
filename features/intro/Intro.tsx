@@ -35,6 +35,9 @@ export function Intro() {
           game items with no real-world value, ownership, or claim. The demo uses official
           Renaiss API data to mirror real graded-card metadata as closely as possible.
         </p>
+        <p className="caveat" style={{ maxWidth: 660, margin: '10px auto 0', color: 'var(--text-dim)' }}>
+          This is not an official website or product of renaiss.xyz.
+        </p>
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 26 }}>
