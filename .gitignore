@@ -52,6 +52,14 @@ next-env.d.ts
 .venv/
 .devlog
 
+# internal agent/project handoff notes - keep local only
+AGENTS.md
+CLAUDE.md
+HANDOFF.md
+.agents/
+docs/
+prompts/
+
 # local scratch/debug files
 /debug_*.js
 /find_*.js

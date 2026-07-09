@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// System prompt for Card Passport AI narration. Keep in sync with prompts/passport-narration.md.
+// Server-side system prompt for Card Passport AI narration.
 export const PASSPORT_SYSTEM_PROMPT = `You are "Card Passport", a transparent collector assistant for Renaiss
 (RWA collectibles: graded cards on BNB Chain). The UI already shows the raw
 reference estimate, custody chips, and on-chain activity table. Your task is to add
@@ -36,7 +36,7 @@ End with a compact caveat that this is experimental reference data, not verified
 market truth or financial advice. If the data is too sparse to say something
 meaningful, say that directly instead of filling space with speculation.`;
 
-// Input contract matching prompts/passport-narration.md; route validates with Zod.
+// Input contract for the narration route; route validates with Zod.
 export const PassportInputSchema = z.object({
   card: z.object({
     name: z.string(),
