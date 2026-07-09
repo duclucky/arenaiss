@@ -12,6 +12,44 @@ trung thực, kèm tên file cụ thể. Nếu để lại code viết dở/khô
 
 ---
 
+## Cập nhật phiên Codex 2026-07-09 pack cinematic CSS FX layer animation
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `c2ad880` - "fx: show actual card during pack burst"
+- Session commit: `e99ba84` - "fx(pack-cinematic): animate burst FX layers + add 5 keyframes (no JSX changes)"
+
+### Đang làm gì
+Không còn code pack FX đang viết dở. Phiên này xử lý yêu cầu đại tu visual các lớp FX pack-opening hiện có, tập trung vào CSS/motion presentation và không đổi gacha logic/RNG/credit/account/API.
+
+### Đã xong
+- `app/globals.css`: animate toàn bộ các lớp cinematic FX đã có thay vì để chúng chỉ là layer tĩnh.
+- `.cinematic-burst-core`: thêm explosion core motion và blend sáng hơn.
+- `.cinematic-shockwave`: thêm shockwave ring + dashed inner ring xoay.
+- `.cinematic-flash-card`: thêm flash-card sweep/pop/blur animation.
+- `.cinematic-foil-chip`: thêm chip burst stagger theo `--chip`.
+- `.cinematic-showcase-field`: thêm aura nền khi reveal kết quả.
+- `.cinematic-showcase-ring`: thêm rotating chromatic conic ring.
+- `.cinematic-light-lance`: thêm glow halo overlay.
+- Thêm keyframes mới: `packShockwave`, `packShockwaveSpin`, `packFlash`, `packChip`, `packShowcaseAura`.
+
+### Verification
+- `git log --oneline -3` xác nhận commit mới `e99ba84` trên `master`.
+- `git diff HEAD~1 HEAD --stat`: `app/globals.css` changed only.
+- Typecheck command đầu tiên lỗi do dùng `&&` trong PowerShell; lệnh sau không báo lỗi TypeScript trong output, nhưng chưa chạy full lint/build/e2e lại trong phiên này.
+
+### Tiếp theo
+1. Nếu cần deploy live, push `master` để GitHub Actions chạy deploy.
+2. Nếu muốn chắc tuyệt đối trước deploy, chạy lại `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, và e2e.
+3. Nếu user vẫn thấy FX chưa đủ mạnh, chỉ chỉnh `app/globals.css` / `features/pack-open/PackOpen.tsx`; không đổi game economy/RNG/API.
+
+### Cảnh báo
+- Thay đổi là CSS-only trong commit `e99ba84`, không có JSX change.
+- Diff CSS lớn vì block cinematic trong `app/globals.css` được rewrite/tăng cường mạnh; nên review bằng `git show --stat e99ba84` và visual browser nếu cần.
+
+### Nhật ký
+- 2026-07-09 codex: Hoàn tất batch animate cinematic pack FX layers, commit `e99ba84`; cập nhật handoff ở commit kế tiếp.
+
+---
+
 ## Cập nhật phiên Codex 2026-07-09 deploy prep Namecheap Stellar
 - Agent: codex
 - Commit gần nhất trước cập nhật này: `ca3d6a4` — "fix: rename product brand to Arenaiss"

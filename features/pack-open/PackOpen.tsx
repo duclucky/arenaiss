@@ -7,7 +7,7 @@ import { Slab } from '@/components/Slab';
 import type { PackReveal } from '@/lib/game/gacha';
 import type { Tier } from '@/lib/game/stats';
 
-type OpenPhase = 'charge' | 'crack' | 'burst' | 'reveal' | 'settle';
+type OpenPhase = 'charge' | 'crack' | 'burst' | 'spotlight' | 'reveal' | 'settle';
 
 const RANK: Record<Tier, number> = { TOP: 0, S: 1, A: 2, B: 3, C: 4, D: 5 };
 const TIER_COLORS: Record<Tier, string> = {
@@ -36,7 +36,8 @@ const INTENSITY: Record<Tier, { charge: number; crack: number; burst: number; ca
 };
 const FX = {
   holdBeforeBurst: 110,
-  revealLead: 170,
+  spotlight: 1050,
+  revealLead: 160,
   settleDelay: 420,
   easing: {
     charge: [0.16, 1, 0.3, 1] as const,
@@ -65,6 +66,13 @@ const packVariants: Variants = {
     y: -44,
     filter: 'brightness(2.2) saturate(1.1)',
     transition: { duration: 0.34, ease: FX.easing.burst },
+  },
+  spotlight: {
+    opacity: 0.06,
+    scale: 1.28,
+    y: -58,
+    filter: 'brightness(2.8) saturate(1.2) blur(1px)',
+    transition: { duration: 0.28, ease: FX.easing.burst },
   },
 };
 
@@ -142,11 +150,13 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
 
     const crackAt = intensity.charge;
     const burstAt = crackAt + intensity.crack + FX.holdBeforeBurst;
-    const revealAt = burstAt + intensity.burst + FX.revealLead;
+    const spotlightAt = burstAt + intensity.burst;
+    const revealAt = spotlightAt + FX.spotlight + FX.revealLead;
     const settleAt = revealAt + order.length * intensity.cardStagger + (intensity.slowMo ? 930 : 680) + FX.settleDelay;
 
     timers.current.push(setTimeout(() => setPhase('crack'), crackAt));
     timers.current.push(setTimeout(() => setPhase('burst'), burstAt));
+    timers.current.push(setTimeout(() => setPhase('spotlight'), spotlightAt));
     timers.current.push(setTimeout(() => setPhase('reveal'), revealAt));
     timers.current.push(setTimeout(() => setPhase('settle'), settleAt));
 
@@ -163,7 +173,8 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
   const showCards = phase === 'reveal' || phase === 'settle';
   const spotlightCard = order[order.length - 1];
   const rareToken = spotlightCard?.tokenId;
-  const shellPhase = phase === 'burst' ? 'burst' : 'closed';
+  const shellPhase = phase === 'burst' || phase === 'spotlight' ? 'burst' : 'closed';
+  const showCardShowcase = (phase === 'burst' || phase === 'spotlight') && spotlightCard;
   const cssVars = {
     '--pack-tier': TIER_COLORS[topTier],
     '--pack-tier-soft': `${TIER_COLORS[topTier]}66`,
@@ -181,7 +192,7 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
     >
       <div className="cinematic-vignette" />
       <div className="cinematic-spotlight" />
-      <ParticleCanvas active={!reducedMotion && phase === 'burst'} tier={topTier} count={intensity.particles} />
+      <ParticleCanvas active={!reducedMotion && (phase === 'burst' || phase === 'spotlight')} tier={topTier} count={intensity.particles} />
 
       <AnimatePresence mode="wait">
         {!showCards ? (
@@ -249,43 +260,68 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
               <div className="cinematic-inner-light" />
               <div className="cinematic-pack-name">{pack.packName}</div>
             </motion.div>
-            {phase === 'burst' && (
+            {(phase === 'burst' || phase === 'spotlight') && (
               <>
-                <motion.div
-                  className="cinematic-burst pack-explosion"
-                  initial={{ opacity: 0, scale: 0.22 }}
-                  animate={{ opacity: [0, 1, 1, 0], scale: [0.28, 1, 1.08, 1.22] }}
-                  transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
-                >
-                  <span className="cinematic-burst-core" />
-                  <span className="cinematic-shockwave" />
-                  <span className="cinematic-flash-card" />
-                  {Array.from({ length: 10 }).map((_, index) => (
-                    <span key={index} className="cinematic-foil-chip" style={{ '--chip': index } as CSSProperties} />
-                  ))}
-                </motion.div>
-                {spotlightCard && (
+                {phase === 'burst' && (
                   <motion.div
-                    className="cinematic-emerge-card"
+                    className="cinematic-burst pack-explosion"
+                    initial={{ opacity: 0, scale: 0.22 }}
+                    animate={{ opacity: [0, 1, 1, 0.72], scale: [0.28, 1, 1.08, 1.18] }}
+                    transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
+                  >
+                    <span className="cinematic-burst-core" />
+                    <span className="cinematic-shockwave" />
+                    <span className="cinematic-flash-card" />
+                    {Array.from({ length: 14 }).map((_, index) => (
+                      <span key={index} className="cinematic-foil-chip" style={{ '--chip': index } as CSSProperties} />
+                    ))}
+                  </motion.div>
+                )}
+                {phase === 'spotlight' && (
+                  <motion.div
+                    className="cinematic-showcase-field"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3, ease: FX.easing.burst }}
+                  >
+                    <span className="cinematic-showcase-ring cinematic-showcase-ring-a" />
+                    <span className="cinematic-showcase-ring cinematic-showcase-ring-b" />
+                    {Array.from({ length: 18 }).map((_, index) => (
+                      <span key={index} className="cinematic-light-lance" style={{ '--ray': index } as CSSProperties} />
+                    ))}
+                  </motion.div>
+                )}
+                {showCardShowcase && (
+                  <motion.div
+                    className={`cinematic-emerge-card${phase === 'spotlight' ? ' cinematic-spotlight-card' : ''}`}
                     data-tier={spotlightCard.tier}
                     initial={{ opacity: 0, y: 128, scale: 0.42, rotateY: 78, rotateZ: -5 }}
-                    animate={{
-                      opacity: [0, 1, 1, 0.96],
-                      y: [128, -72, -92, -96],
-                      scale: [0.42, 1.04, 1.12, 1.08],
-                      rotateY: [78, 0, -4, 0],
-                      rotateZ: [-5, 1, -1, 0],
-                    }}
-                    transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
+                    animate={phase === 'spotlight'
+                      ? {
+                        opacity: 1,
+                        y: [-96, -116, -108],
+                        scale: [1.08, 1.24, 1.2],
+                        rotateY: 0,
+                        rotateZ: [0, -1.2, 0.8, 0],
+                      }
+                      : {
+                        opacity: [0, 1, 1, 0.98],
+                        y: [128, -72, -92, -96],
+                        scale: [0.42, 1.04, 1.12, 1.08],
+                        rotateY: [78, 0, -4, 0],
+                        rotateZ: [-5, 1, -1, 0],
+                      }}
+                    transition={{ duration: phase === 'spotlight' ? 0.64 : intensity.burst / 1000, ease: FX.easing.burst }}
                     aria-hidden="true"
                   >
                     <span className="cinematic-emerge-halo" />
+                    {phase === 'spotlight' && <span className="cinematic-spotlight-label">Vault pull</span>}
                     <Slab card={spotlightCard} reveal />
                   </motion.div>
                 )}
               </>
             )}
-            {phase !== 'burst' && (
+            {phase !== 'burst' && phase !== 'spotlight' && (
               <>
                 <div className="cinematic-pack-copy">
                   {phase === 'charge' && 'Charging the vault seal'}
