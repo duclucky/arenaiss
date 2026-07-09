@@ -48,6 +48,21 @@ async function openPackByName(name) {
   await page.waitForSelector('.cinematic-particle-canvas', { timeout: 1000 });
   await page.waitForSelector('.cinematic-emerge-card .slab', { timeout: 1000 });
   await page.waitForSelector('.cinematic-spotlight-card .slab', { timeout: 2500 });
+  const spotlightClipping = await page.evaluate(() => {
+    const stage = document.querySelector('.cinematic-pack-stage');
+    const card = document.querySelector('.cinematic-spotlight-card .slab');
+    if (!stage || !card) return { ok: false, reason: 'missing spotlight card or stage' };
+    const stageStyle = getComputedStyle(stage);
+    const stageBox = stage.getBoundingClientRect();
+    const cardBox = card.getBoundingClientRect();
+    return {
+      ok: stageStyle.overflowY !== 'hidden' && stageStyle.overflowX !== 'hidden',
+      reason: `stage overflow=${stageStyle.overflow}; stage=${Math.round(stageBox.top)}-${Math.round(stageBox.bottom)} card=${Math.round(cardBox.top)}-${Math.round(cardBox.bottom)}`,
+    };
+  });
+  if (!spotlightClipping.ok) {
+    throw new Error(`Pack spotlight card can be clipped: ${spotlightClipping.reason}`);
+  }
   await page.waitForSelector('text=RESULT', { timeout: 15000 });
   await page.waitForSelector('.cinematic-card-grid .pack-reveal-card', { timeout: 5000 });
   await page.waitForTimeout(3600);

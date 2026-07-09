@@ -2023,7 +2023,7 @@ a {
   display: grid;
   place-items: center;
   text-align: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cinematic-pack-stage::before {
