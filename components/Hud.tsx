@@ -51,14 +51,16 @@ export function Hud() {
       </nav>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div
-          className="chip"
-          style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)', borderColor: 'rgba(229,192,123,0.4)' }}
-          title="Virtual credits earned by playing. Not money and not redeemable."
-        >
-          <span className="tabnums">{state.credits}</span>
-          <span style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>VIRTUAL CREDITS</span>
-        </div>
+        {state.signedIn && (
+          <div
+            className="chip"
+            style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)', borderColor: 'rgba(229,192,123,0.4)' }}
+            title="Virtual credits earned by playing. Not money and not redeemable."
+          >
+            <span className="tabnums">{state.credits}</span>
+            <span style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>VIRTUAL CREDITS</span>
+          </div>
+        )}
         <AuthPanel />
       </div>
     </header>

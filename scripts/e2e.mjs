@@ -68,6 +68,9 @@ try {
   await page.waitForSelector('text=no real-world value', { timeout: 5000 });
   await page.waitForSelector('text=official Renaiss API data', { timeout: 5000 });
   await page.waitForSelector('text=Log in to sync progress on the server.', { timeout: 5000 });
+  if (await page.locator('header >> text=VIRTUAL CREDITS').count()) {
+    throw new Error('Signed-out header should not show the virtual credit balance');
+  }
   const gatedRip = page.locator('button', { hasText: 'Log in to rip packs' }).first();
   await gatedRip.waitFor({ timeout: 10000 });
   if (await gatedRip.isEnabled()) throw new Error('Pack ripping should be disabled until the user logs in');
@@ -80,6 +83,16 @@ try {
   await page.locator('input[placeholder="password"]').fill(accountPassword);
   await page.locator('.auth-panel-row').locator('button', { hasText: /^Login$/ }).click();
   await page.waitForSelector(`text=Signed in as ${accountUsername}`, { timeout: 15000 });
+  await page.waitForSelector('header >> text=VIRTUAL CREDITS', { timeout: 5000 });
+  await page.locator('button', { hasText: 'Logout' }).click();
+  await page.waitForSelector('text=Signed out. Log in to sync progress on the server.', { timeout: 8000 });
+  if (await page.locator('header >> text=VIRTUAL CREDITS').count()) {
+    throw new Error('Signed-out header should hide the virtual credit balance after logout');
+  }
+  await page.locator('input[placeholder="password"]').fill(accountPassword);
+  await page.locator('.auth-panel-row').locator('button', { hasText: /^Login$/ }).click();
+  await page.waitForSelector(`text=Signed in as ${accountUsername}`, { timeout: 15000 });
+  await page.waitForSelector('header >> text=VIRTUAL CREDITS', { timeout: 5000 });
   await page.waitForSelector('button:has-text("Rip a Pack")', { timeout: 10000 });
   if (await page.locator('header >> text=Reset').count()) throw new Error('Header should not expose Reset progress control');
   if (await page.locator('header >> text=Read-only').count()) throw new Error('Header still shows Read-only chip');

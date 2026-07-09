@@ -32,6 +32,30 @@
 
 ---
 
+## Cập nhật phiên Codex 2026-07-10 signed-out credit chip
+- Agent: codex
+- Commit gần nhất trước cập nhật này: `c9afafa` - "ci: verify deployed arena card domain"
+- Commit phiên này: chuẩn bị `fix: hide credits while signed out`
+
+### Đang làm gì
+Sửa feedback live `arena-card.xyz`: sau logout header vẫn hiện `0 VIRTUAL CREDITS`, gây hiểu nhầm vì credit chỉ có ý nghĩa khi tài khoản đang đăng nhập/sync server.
+
+### Đã xong
+- `components/Hud.tsx`: chỉ render chip `VIRTUAL CREDITS` khi `state.signedIn` là `true`.
+- `scripts/e2e.mjs`: thêm regression chưa login không thấy credit, login thì thấy, logout thì credit biến mất, rồi login lại để tiếp tục flow.
+
+### Tiếp theo
+1. Commit/push fix.
+2. Theo dõi GitHub Actions deploy xanh và kiểm live header sau logout.
+
+### Cảnh báo
+- Không xoá credit trong state khi logout; chỉ ẩn khỏi UI. Đây là chủ đích để không phá local state/hydration, còn các hành động dùng credit vẫn bị login-gate ở Gacha.
+
+### Nhật ký
+- 2026-07-10 codex: Root cause là `Hud` luôn render `state.credits` bất kể signed-in state; sửa thành signed-in only.
+
+---
+
 File TRẠNG THÁI SỐNG, dùng chung cho MỌI agent (Claude Code, Codex) và mọi phiên.
 Đọc file này ĐẦU TIÊN để lấy bối cảnh, rồi ĐỐI CHIẾU với `git log --oneline -10`
 và `git status` (git là nguồn sự thật về code; file này là nguồn sự thật về Ý
