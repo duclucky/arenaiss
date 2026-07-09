@@ -70,7 +70,6 @@ jobs:
           exclude: |
             **/.git*
             **/.git*/**
-            **/node_modules/**
             **/.env
             **/*.env
             **/data/**
