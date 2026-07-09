@@ -911,6 +911,54 @@ không render nút phụ này.
   chưa có key), README nộp bài. Verify bằng headless e2e (Playwright) chạy hết
   vòng lặp 0 lỗi console, và quét bundle production xác nhận không lộ key/SDK
   giao dịch/localStorage.
+# Codex update 2026-07-09 cinematic pack-opening FX
+- Agent: codex
+- Latest commit before this update: `67e052d` - "fx: amplify pack reveal explosion"
+- Session commit: preparing `feat: cinematic pack-opening FX`
+
+## Current work
+No unfinished code is intentionally left. This batch completes the new "AAA gacha reveal" pack-opening FX from attachment
+`C:\Users\TBC\.codex\attachments\654a82a0-b272-4cd4-b7ee-246fcdb6a0a4\pasted-text.txt`.
+
+## Done
+- `features/pack-open/PackOpen.tsx`: replaced the old lightweight pack reveal with a cinematic Framer Motion sequence.
+  - Phase model: `charge -> crack -> burst -> reveal -> settle`.
+  - Reads the already-created `PackReveal` only; no changes to pack RNG/gacha logic.
+  - Uses tier intensity map, tier colors, ordered card reveal, skip-on-tap, `prefers-reduced-motion`, and a `ParticleCanvas`.
+  - Uses the existing `Slab` component for the revealed cards.
+- `app/globals.css`: added cinematic pack CSS classes:
+  - `.cinematic-pack-shell`
+  - `.cinematic-particle-canvas`
+  - `.cinematic-pack-stage`
+  - `.cinematic-pack-object`
+  - `.cinematic-burst`
+  - `.cinematic-card-grid`
+  - `.cinematic-card-reveal`
+  - related aura/crack/half/godray/tier-badge styles.
+- `scripts/e2e.mjs`: pack-opening helper now asserts the cinematic shell, stage, explosion, particle canvas, and reveal card grid.
+
+## Verification
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- `npm.cmd run test:unit` PASS.
+- Production local e2e against `http://127.0.0.1:3037` PASS; console errors none.
+- `git diff --check` PASS, only Windows line-ending warnings.
+
+## Next steps
+1. Commit exactly: `feat: cinematic pack-opening FX`.
+2. Push to `master`, watch GitHub Actions deploy, then verify live `https://arena-card.xyz/`.
+
+## Warnings
+- Product UI/copy must remain English.
+- Do not change gacha logic, RNG, credits, account logic, or Renaiss API behavior for this FX task.
+- Visual particle randomness is presentation-only; it must not feed back into game state.
+
+## Log
+- 2026-07-09 codex: Started full cinematic pack-opening FX rewrite, added Framer Motion phase orchestration and canvas particles, then paused per user request before typecheck was green.
+- 2026-07-09 codex: Resumed, fixed TypeScript easing/context issues, added e2e assertions for cinematic FX, and completed local verification.
+
+---
 # Codex update 2026-07-09 hero cleanup + lineup filter
 - Agent: codex
 - Latest commit before this update: `9f34436` - "copy: add unofficial site disclaimer"

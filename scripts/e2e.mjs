@@ -41,9 +41,13 @@ async function openPackByName(name) {
     return b && !b.disabled;
   }, { timeout: 10000 });
   await rip.click();
+  await page.waitForSelector('.cinematic-pack-shell', { timeout: 3000 });
+  await page.waitForSelector('.cinematic-pack-stage', { timeout: 3000 });
   await page.waitForSelector('.pack-visual', { timeout: 3000 });
-  await page.waitForSelector('.pack-explosion', { timeout: 3000 });
+  await page.waitForSelector('.pack-explosion', { timeout: 5000 });
+  await page.waitForSelector('.cinematic-particle-canvas', { timeout: 1000 });
   await page.waitForSelector('text=RESULT', { timeout: 15000 });
+  await page.waitForSelector('.cinematic-card-grid .pack-reveal-card', { timeout: 5000 });
   await page.waitForTimeout(3600);
 }
 
