@@ -29,6 +29,22 @@ Instead of explaining the platform with a static page, the project lets a user:
 The result is both a demo game and an onboarding funnel for the Renaiss
 ecosystem.
 
+## Official Product Direction
+
+The hackathon version is intentionally a safe simulation: users log in with a
+demo account, open simulated packs, and battle with fictional in-app cards.
+
+The production direction is different. Arenaiss is designed to evolve into a
+wallet-native arena where users sign in with a real wallet and use the real
+graded-card assets held in that wallet to enter battles. In that version, the
+lineup would be built from verified wallet inventory, the Card Passport would
+act as the source of truth for each playable card, and the arena would become a
+new utility layer for real Renaiss collectibles rather than only a simulated
+onboarding game.
+
+This README describes the current hackathon implementation first, then frames
+that implementation as a prototype for the wallet-based official version.
+
 ## Core Loop
 
 ```text
@@ -293,5 +309,7 @@ tests/               Unit tests for core behavior
   and direct Passport inspection.
 - Safety: read-only architecture, virtual economy, fictional stats, and
   server-side secrets only.
+- Product direction: the same loop can graduate from simulated cards to
+  wallet-verified real Renaiss cards in the official arena.
 - Technical execution: Next.js App Router, TypeScript, Zod validation, pure game
   engines, server-side proxies, and automated CI/CD deployment.
