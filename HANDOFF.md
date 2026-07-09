@@ -963,6 +963,50 @@ No unfinished code is intentionally left. This batch completes, commits, pushes,
 - 2026-07-09 codex: Committed and pushed `a326832`; GitHub Actions deploy succeeded and live CSS verification passed on `arena-card.xyz`.
 
 ---
+# Codex update 2026-07-09 premium vault pack reveal
+- Agent: codex
+- Latest commit before this update: `19d52bd` - "docs: update cinematic FX handoff"
+- Session commit: preparing `fx: replace pack reveal with premium vault sequence`
+
+## Current work
+No unfinished code is intentionally left. This batch replaces the previous neon/godray pack-opening style because the user judged it ugly. The new direction is Premium Vault Pack Reveal: clearer pack object, vault seal, foil sweep, crack, short flash-card burst, and cleaner card reveal.
+
+## Done
+- `features/pack-open/PackOpen.tsx`:
+  - Reduced particle counts and lengthened the visible burst phase so the reveal reads as a pack opening rather than a brief neon blink.
+  - Changed pack motion to calmer hover/wind-up, crack, and split-open behavior.
+  - Added pack face layers, vault seal, lock bar, side cracks, flash-card silhouette, and foil chips.
+  - Hid the phase copy during burst so the visual is not cluttered by text.
+- `app/globals.css`:
+  - Replaced godray/blob-heavy styling with darker premium-vault spotlight, foil pack face, RA seal, lock rail, controlled tier glow, flash card, and foil chips.
+  - Added `vaultFoilSweep` keyframes.
+  - Brightened the stage enough that the pack/result no longer disappears into the dark background.
+
+## Verification
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run test:unit` PASS.
+- `npm.cmd run build` PASS.
+- Production local e2e against `http://127.0.0.1:3037` PASS; console errors none.
+- `git diff --check` PASS, only Windows line-ending warnings.
+- Manual visual screenshots captured locally:
+  - `.e2e-output/pack-vault2-charge.png`
+  - `.e2e-output/pack-vault2-burst.png`
+  - `.e2e-output/pack-vault2-result.png`
+
+## Next steps
+1. Commit and push this batch.
+2. Watch GitHub Actions deploy.
+3. Verify live `https://arena-card.xyz/` CSS contains the updated vault classes and the site returns HTTP 200.
+
+## Warnings
+- This is still a CSS/Framer presentation layer only. Gacha logic/RNG/credits/auth were not intentionally touched.
+- Product copy remains English.
+
+## Log
+- 2026-07-09 codex: Reworked the pack reveal away from neon/godray into a premium vault-pack opening sequence and verified local production flow.
+
+---
 # Codex update 2026-07-09 hero cleanup + lineup filter
 - Agent: codex
 - Latest commit before this update: `9f34436` - "copy: add unofficial site disclaimer"

@@ -27,12 +27,12 @@ const TIER_SHOUT: Record<Tier, string> = {
   D: 'Starter pull secured.',
 };
 const INTENSITY: Record<Tier, { charge: number; crack: number; burst: number; cardStagger: number; particles: number; slowMo: boolean }> = {
-  TOP: { charge: 1050, crack: 620, burst: 540, cardStagger: 190, particles: 120, slowMo: true },
-  S: { charge: 980, crack: 580, burst: 520, cardStagger: 175, particles: 104, slowMo: true },
-  A: { charge: 860, crack: 520, burst: 470, cardStagger: 150, particles: 78, slowMo: false },
-  B: { charge: 780, crack: 480, burst: 430, cardStagger: 130, particles: 58, slowMo: false },
-  C: { charge: 650, crack: 390, burst: 330, cardStagger: 105, particles: 36, slowMo: false },
-  D: { charge: 560, crack: 330, burst: 280, cardStagger: 90, particles: 28, slowMo: false },
+  TOP: { charge: 960, crack: 560, burst: 720, cardStagger: 190, particles: 64, slowMo: true },
+  S: { charge: 900, crack: 520, burst: 680, cardStagger: 175, particles: 56, slowMo: true },
+  A: { charge: 820, crack: 470, burst: 620, cardStagger: 150, particles: 42, slowMo: false },
+  B: { charge: 740, crack: 430, burst: 560, cardStagger: 130, particles: 34, slowMo: false },
+  C: { charge: 640, crack: 360, burst: 500, cardStagger: 105, particles: 24, slowMo: false },
+  D: { charge: 560, crack: 320, burst: 450, cardStagger: 90, particles: 20, slowMo: false },
 };
 const FX = {
   holdBeforeBurst: 110,
@@ -47,24 +47,24 @@ const FX = {
 
 const packVariants: Variants = {
   charge: {
-    y: [0, -5, 2, -7, 3, -9],
-    x: [0, -3, 4, -5, 5, -6],
-    rotate: [0, -1.5, 1.8, -2.6, 2.8, -3.4],
-    scale: [1, 1.03, 1.04, 1.07, 1.08, 1.1],
-    transition: { duration: 0.95, ease: FX.easing.charge, repeat: Infinity, repeatType: 'mirror' },
+    y: [0, -7, 0],
+    rotate: [0, -0.8, 0.8, 0],
+    scale: [1, 1.035, 1],
+    transition: { duration: 1.35, ease: FX.easing.charge, repeat: Infinity, repeatType: 'mirror' },
   },
   crack: {
-    y: [0, -10, 4, -7, 0],
-    x: [0, 10, -9, 6, 0],
-    rotate: [0, 4, -5, 3, 0],
-    scale: [1.08, 1.16, 1.12, 1.2],
-    transition: { duration: 0.5, ease: 'anticipate' },
+    y: [0, -12, -6, -14, 0],
+    x: [0, -3, 4, -2, 0],
+    rotate: [0, -1.5, 1.8, -1, 0],
+    scale: [1.04, 1.1, 1.08, 1.13, 1.1],
+    transition: { duration: 0.58, ease: 'anticipate' },
   },
   burst: {
-    opacity: 0,
-    scale: 1.5,
-    filter: 'brightness(2) saturate(1.5)',
-    transition: { duration: 0.22, ease: FX.easing.burst },
+    opacity: 0.14,
+    scale: 1.18,
+    y: -44,
+    filter: 'brightness(2.2) saturate(1.1)',
+    transition: { duration: 0.34, ease: FX.easing.burst },
   },
 };
 
@@ -75,35 +75,35 @@ const halfVariants: Variants = {
     opacity: 1,
   }),
   burst: (side: 'left' | 'right') => ({
-    x: side === 'left' ? -220 : 220,
-    y: -70,
-    rotate: side === 'left' ? -34 : 34,
+    x: side === 'left' ? -165 : 165,
+    y: side === 'left' ? -42 : -58,
+    rotate: side === 'left' ? -18 : 18,
     opacity: 0,
-    transition: { duration: 0.5, ease: FX.easing.burst },
+    transition: { duration: 0.42, ease: FX.easing.burst },
   }),
 };
 
 const cardVariants: Variants = {
   hidden: (custom: { index: number; total: number }) => ({
     opacity: 0,
-    x: (custom.index - (custom.total - 1) / 2) * -80,
-    y: 120,
-    scale: 0.42,
-    rotate: (custom.index - (custom.total - 1) / 2) * -10,
-    rotateY: 68,
-    filter: 'brightness(1.8) blur(2px)',
+    x: (custom.index - (custom.total - 1) / 2) * -42,
+    y: 170,
+    scale: 0.58,
+    rotate: (custom.index - (custom.total - 1) / 2) * -5,
+    rotateY: 76,
+    filter: 'brightness(1.55) blur(1.6px)',
   }),
   show: (custom: { index: number; total: number; delay: number; rare: boolean }) => ({
     opacity: 1,
     x: 0,
     y: 0,
-    scale: custom.rare ? [0.66, 1.14, 1] : [0.72, 1.05, 1],
+    scale: custom.rare ? [0.66, 1.08, 1] : [0.72, 1.03, 1],
     rotate: 0,
     rotateY: 0,
     filter: 'brightness(1) blur(0px)',
     transition: {
       delay: custom.delay / 1000,
-      duration: custom.rare ? 0.82 : 0.58,
+      duration: custom.rare ? 0.78 : 0.56,
       ease: FX.easing.card,
     },
   }),
@@ -197,12 +197,35 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
               variants={packVariants}
               animate={phase}
             >
-              <motion.div className="cinematic-pack-aura" animate={{ scale: phase === 'crack' ? 1.28 : 1, opacity: phase === 'charge' ? 0.58 : 0.92 }} />
+              <motion.div className="cinematic-pack-aura" animate={{ scale: phase === 'crack' ? 1.14 : 1, opacity: phase === 'charge' ? 0.42 : 0.76 }} />
+              <div className="cinematic-pack-shadow" />
+              <div className="cinematic-pack-face">
+                <span className="cinematic-pack-foil cinematic-pack-foil-a" />
+                <span className="cinematic-pack-foil cinematic-pack-foil-b" />
+                <span className="cinematic-pack-foil cinematic-pack-foil-c" />
+                <span className="cinematic-pack-rail cinematic-pack-rail-top" />
+                <span className="cinematic-pack-rail cinematic-pack-rail-bottom" />
+              </div>
               <motion.div className="cinematic-pack-half cinematic-pack-half-left" custom="left" variants={halfVariants} animate={shellPhase} />
               <motion.div className="cinematic-pack-half cinematic-pack-half-right" custom="right" variants={halfVariants} animate={shellPhase} />
+              <motion.div
+                className="cinematic-vault-seal"
+                animate={{
+                  rotate: phase === 'charge' ? [0, 360] : phase === 'crack' ? [0, 18, -12, 0] : 0,
+                  scale: phase === 'crack' ? [1, 1.08, 0.98, 1.12] : 1,
+                }}
+                transition={phase === 'charge' ? { duration: 4.8, ease: 'linear', repeat: Infinity } : { duration: 0.48, ease: 'anticipate' }}
+              >
+                <span className="cinematic-seal-core">RA</span>
+              </motion.div>
+              <motion.div
+                className="cinematic-lock-bar"
+                animate={{ scaleX: phase === 'charge' ? [0.2, 1, 0.2] : phase === 'crack' ? [1, 0.45, 1] : 1 }}
+                transition={{ duration: phase === 'charge' ? 1.6 : 0.42, ease: 'easeInOut', repeat: phase === 'charge' ? Infinity : 0 }}
+              />
               <motion.svg className="cinematic-crack" viewBox="0 0 120 180" aria-hidden="true">
                 <motion.path
-                  d="M63 8 L52 35 L67 57 L48 88 L61 111 L43 142 L56 174"
+                  d="M62 10 L54 34 L68 52 L49 80 L64 105 L46 136 L56 170"
                   fill="none"
                   stroke="white"
                   strokeWidth="3"
@@ -210,6 +233,16 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
                   initial={{ pathLength: 0, opacity: 0 }}
                   animate={{ pathLength: phase === 'charge' ? 0.18 : 1, opacity: phase === 'charge' ? 0.28 : 1 }}
                   transition={{ duration: phase === 'charge' ? 0.7 : 0.42, ease: 'easeOut' }}
+                />
+                <motion.path
+                  d="M63 66 L83 82 M58 116 L78 130 M55 38 L38 55"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: phase === 'charge' ? 0 : 1, opacity: phase === 'charge' ? 0 : 0.9 }}
+                  transition={{ duration: 0.3, delay: 0.16, ease: 'easeOut' }}
                 />
               </motion.svg>
               <div className="cinematic-inner-light" />
@@ -219,22 +252,26 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
               <motion.div
                 className="cinematic-burst pack-explosion"
                 initial={{ opacity: 0, scale: 0.22 }}
-                animate={{ opacity: [0, 1, 0], scale: [0.22, 1, 2.7] }}
+                animate={{ opacity: [0, 1, 1, 0], scale: [0.28, 1, 1.08, 1.22] }}
                 transition={{ duration: intensity.burst / 1000, ease: FX.easing.burst }}
               >
                 <span className="cinematic-burst-core" />
                 <span className="cinematic-shockwave" />
-                <span className="cinematic-godray cinematic-godray-a" />
-                <span className="cinematic-godray cinematic-godray-b" />
-                <span className="cinematic-godray cinematic-godray-c" />
+                <span className="cinematic-flash-card" />
+                {Array.from({ length: 10 }).map((_, index) => (
+                  <span key={index} className="cinematic-foil-chip" style={{ '--chip': index } as CSSProperties} />
+                ))}
               </motion.div>
             )}
-            <div className="cinematic-pack-copy">
-              {phase === 'charge' && 'Charging the vault seal'}
-              {phase === 'crack' && 'Cracking the inner light'}
-              {phase === 'burst' && 'Burst reveal'}
-            </div>
-            <div className="cinematic-skip-copy">Tap to skip</div>
+            {phase !== 'burst' && (
+              <>
+                <div className="cinematic-pack-copy">
+                  {phase === 'charge' && 'Charging the vault seal'}
+                  {phase === 'crack' && 'Cracking the inner light'}
+                </div>
+                <div className="cinematic-skip-copy">Tap to skip</div>
+              </>
+            )}
           </motion.div>
         ) : (
           <motion.div
