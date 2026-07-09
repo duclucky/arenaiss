@@ -35,6 +35,7 @@ export interface ArenaState {
   welcomePackOpened: boolean;
   selectedPackId: PackId;
   arenaCategory: Category | null;
+  signedIn: boolean;
 }
 
 const initialState: ArenaState = {
@@ -60,12 +61,14 @@ const initialState: ArenaState = {
   welcomePackOpened: false,
   selectedPackId: DEFAULT_PACK_ID,
   arenaCategory: null,
+  signedIn: false,
 };
 
 export type Action =
   | { type: 'SET_CATEGORY'; category: Category }
   | { type: 'SELECT_PACK'; packId: PackId }
   | { type: 'SET_ARENA_CATEGORY'; category: Category }
+  | { type: 'SET_SIGNED_IN'; signedIn: boolean }
   | { type: 'POOL_LOADING' }
   | { type: 'POOL_LOADED'; pool: GameCard[] }
   | { type: 'POOLS_LOADED'; pools: Record<Category, GameCard[]> }
@@ -111,6 +114,8 @@ function reducer(state: ArenaState, action: Action): ArenaState {
           return card?.category === action.category;
         }),
       };
+    case 'SET_SIGNED_IN':
+      return { ...state, signedIn: action.signedIn };
     case 'POOL_LOADING':
       return { ...state, poolLoading: true, poolError: null };
     case 'POOL_LOADED':

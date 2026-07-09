@@ -48,6 +48,7 @@ export function AuthPanel() {
     fetchSession().then(async (sessionUser) => {
       if (!sessionUser) return;
       setUser(sessionUser);
+      dispatch({ type: 'SET_SIGNED_IN', signedIn: true });
       const accountSave = await fetchAccountSave();
       if (accountSave) {
         suppressNextSync.current = true;
@@ -104,6 +105,7 @@ export function AuthPanel() {
       return;
     }
     setUser(result.user);
+    dispatch({ type: 'SET_SIGNED_IN', signedIn: true });
     setPassword('');
     setConfirmPassword('');
     const accountSave = await fetchAccountSave();
@@ -125,6 +127,7 @@ export function AuthPanel() {
   async function logout() {
     await logoutAccount();
     setUser(null);
+    dispatch({ type: 'SET_SIGNED_IN', signedIn: false });
     setPassword('');
     setConfirmPassword('');
     setMessage('Signed out. Log in to sync progress on the server.');

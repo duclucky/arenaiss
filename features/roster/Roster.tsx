@@ -2,36 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
+import { CardFilterBar, filterCardsByFilter, type CardFilter } from '@/components/CardFilterBar';
 import { Slab } from '@/components/Slab';
-import { TIERS, type GameCard, type Tier } from '@/lib/game/stats';
-import type { Category } from '@/lib/client/api';
+import type { Tier } from '@/lib/game/stats';
 
 const RANK: Record<Tier, number> = { TOP: 0, S: 1, A: 2, B: 3, C: 4, D: 5 };
-type RosterFilter = 'ALL' | Category | Tier;
-
-const FILTERS: { id: RosterFilter; label: string }[] = [
-  { id: 'ALL', label: 'All' },
-  { id: 'POKEMON', label: 'Pokemon' },
-  { id: 'ONE_PIECE', label: 'One Piece' },
-  ...TIERS.map((tier) => ({ id: tier, label: tier })),
-];
-
-function filterCards(cards: GameCard[], filter: RosterFilter) {
-  if (filter === 'ALL') return cards;
-  if (filter === 'POKEMON' || filter === 'ONE_PIECE') return cards.filter((card) => card.category === filter);
-  return cards.filter((card) => card.tier === filter);
-}
-
-function isTierFilter(filter: RosterFilter): filter is Tier {
-  return TIERS.includes(filter as Tier);
-}
 
 export function Roster() {
   const state = useArena();
   const dispatch = useArenaDispatch();
-  const [filter, setFilter] = useState<RosterFilter>('ALL');
+  const [filter, setFilter] = useState<CardFilter>('ALL');
   const sorted = useMemo(
-    () => filterCards([...state.roster], filter).sort((a, b) => RANK[a.tier] - RANK[b.tier] || b.power - a.power),
+    () => filterCardsByFilter([...state.roster], filter).sort((a, b) => RANK[a.tier] - RANK[b.tier] || b.power - a.power),
     [state.roster, filter],
   );
 
@@ -52,32 +34,7 @@ export function Roster() {
         </div>
       </div>
 
-      <div className="panel" style={{ padding: 14, marginBottom: 18 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, letterSpacing: '0.12em', color: 'var(--text-dim)', marginRight: 4 }}>FILTER</span>
-          {FILTERS.map((item) => (
-            <button
-              key={item.id}
-              className="btn btn-ghost"
-              data-tier={isTierFilter(item.id) ? item.id : undefined}
-              style={{
-                padding: '6px 10px',
-                borderColor: isTierFilter(item.id) ? 'rgba(from var(--tier) r g b / 0.5)' : filter === item.id ? 'var(--accent)' : 'var(--hairline)',
-                color: isTierFilter(item.id) ? 'var(--tier)' : filter === item.id ? 'var(--accent)' : 'var(--text-sub)',
-                background: isTierFilter(item.id)
-                  ? 'rgba(from var(--tier) r g b / 0.1)'
-                  : filter === item.id
-                    ? 'rgba(229,192,123,0.08)'
-                    : 'transparent',
-                boxShadow: filter === item.id && isTierFilter(item.id) ? '0 0 14px -8px var(--tier)' : 'none',
-              }}
-              onClick={() => setFilter(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <CardFilterBar value={filter} onChange={setFilter} />
 
       {sorted.length === 0 ? (
         <div className="panel" style={{ padding: 50, textAlign: 'center' }}>

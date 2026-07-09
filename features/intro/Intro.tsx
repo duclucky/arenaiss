@@ -14,7 +14,7 @@ export function Intro() {
   const eligibleCards = eligibleCardsForPack(state.pool, selectedPack.id);
   const ready = eligibleCards.length > 0 && !state.poolLoading;
   const enoughCredits = selectedPack.cost === 0 || state.credits >= selectedPack.cost;
-  const canRip = ready && enoughCredits;
+  const canRip = state.signedIn && ready && enoughCredits;
 
   function ripSelectedPack() {
     if (!canRip) return;
@@ -25,7 +25,6 @@ export function Intro() {
   return (
     <div className="anim-fade" style={{ maxWidth: 980, margin: '0 auto', padding: '34px 22px 60px' }}>
       <div style={{ textAlign: 'center', marginBottom: 30 }}>
-        <div className="anim-float" style={{ fontSize: 34, marginBottom: 8, fontWeight: 900, color: 'var(--accent)', letterSpacing: '0.08em' }}>DEMO</div>
         <h1 style={{ fontSize: 34, margin: '0 0 8px', letterSpacing: '0' }}>
           Arenaiss <span style={{ color: 'var(--accent)' }}>Simulation</span>
         </h1>
@@ -82,8 +81,9 @@ export function Intro() {
           </div>
           <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
             <button className="btn btn-primary" style={{ width: '100%', padding: '13px 18px' }} disabled={!canRip} onClick={ripSelectedPack}>
-              Rip a Pack · {selectedPack.cost === 0 ? 'Free' : `${selectedPack.cost} credits`}
+              {state.signedIn ? 'Rip a Pack' : 'Log in to rip packs'} - {selectedPack.cost === 0 ? 'Free' : `${selectedPack.cost} credits`}
             </button>
+            {!state.signedIn && <p className="caveat" style={{ color: 'var(--accent)' }}>Create an account or log in to open simulated packs and save progress on the server.</p>}
             {!ready && <p className="caveat" style={{ color: 'var(--loss)' }}>This pack has no eligible cards loaded yet.</p>}
             {ready && !enoughCredits && <p className="caveat" style={{ color: 'var(--loss)' }}>Not enough virtual credits for this pack.</p>}
           </div>

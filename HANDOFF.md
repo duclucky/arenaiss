@@ -824,6 +824,12 @@ không render nút phụ này.
   `approvePermit2Usdt`/`deploySafeWallet`.
 
 ## Nhật ký ngắn (mới nhất lên đầu)
+- 2026-07-09 codex: Thêm disclaimer tiếng Anh dưới hero intro:
+  "This is not an official website or product of renaiss.xyz." trong
+  `features/intro/Intro.tsx`; thêm `hosting/boot.log` vào `.gitignore` để tránh
+  commit log diagnostic. Verify local `npm.cmd run lint` PASS, `npm.cmd run build`
+  PASS. Deploy GitHub Actions run `29002679171` SUCCESS; `curl -I
+  https://arenaiss.xyz` trả HTTP 200 và HTML thật có disclaimer mới.
 - 2026-07-09 codex: Workflow `Deploy` đã chạy tới bước FTP, tức lint/typecheck/unit
   tests/build/syntax checks đều qua trên GitHub Actions. Run `28982198568` fail ở
   `Upload to Namecheap FTP` với `Input required and not supplied: password`.
@@ -905,3 +911,39 @@ không render nút phụ này.
   chưa có key), README nộp bài. Verify bằng headless e2e (Playwright) chạy hết
   vòng lặp 0 lỗi console, và quét bundle production xác nhận không lộ key/SDK
   giao dịch/localStorage.
+# Codex update 2026-07-09 hero cleanup + lineup filter
+- Agent: codex
+- Latest commit before this update: `9f34436` - "copy: add unofficial site disclaimer"
+- Session commit: preparing `ui: add lineup filter, login-gated ripping, and pack reveal fx`
+
+## Current work
+No unfinished code is intentionally left. This batch removes the intro `DEMO` label, adds the Roster-style filter bar to Lineup, gates pack ripping behind login, and improves the pack reveal FX.
+
+## Done
+- `features/intro/Intro.tsx`: removed the standalone `DEMO` label above `Arenaiss Simulation`.
+- `components/CardFilterBar.tsx`: extracted the shared `All / Pokemon / One Piece / TOP / S / A / B / C / D` filter UI and card filtering helper.
+- `features/roster/Roster.tsx`: switched to the shared filter bar, preserving existing roster behavior and tier colors.
+- `features/deck-builder/DeckBuilder.tsx`: added the same filter bar to Lineup. `Pokemon` / `One Piece` switch the active arena; tier buttons filter the active arena roster.
+- `app/arena/state.tsx` + `components/AuthPanel.tsx`: track signed-in state globally so gameplay screens can enforce login-only actions.
+- `features/intro/Intro.tsx`: disables `Rip a Pack` until the user is signed in and shows login guidance.
+- `features/pack-open/PackOpen.tsx` + `app/globals.css`: added vault-seal crack, halo, sparks, flare, and staged card reveal visuals for pack opening.
+- `scripts/e2e.mjs`: added regression checks that intro no longer shows `DEMO`, pack ripping is disabled before login, Lineup renders/uses the filter bar, and pack FX appears during opening.
+
+## Verification
+- `npm.cmd run lint` PASS.
+- `npm.cmd run typecheck` PASS.
+- `npm.cmd run build` PASS.
+- Production local e2e against `http://127.0.0.1:3037` PASS; console errors none.
+
+## Next
+1. Commit and push this batch.
+2. Confirm GitHub Actions deploy succeeds.
+3. Verify live `https://arenaiss.xyz/` no longer shows the `DEMO` label, keeps the unofficial-site disclaimer, disables pack ripping before login, and deploys the pack reveal FX.
+
+## Warnings
+- None known.
+
+## Log
+- 2026-07-09 codex: Implemented requested hero cleanup, Lineup filter reuse, login-gated pack ripping, and improved pack reveal FX.
+
+---

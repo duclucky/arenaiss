@@ -16,6 +16,8 @@ const baseUrl = process.env.E2E_BASE_URL || 'http://localhost:3000';
 const browser = await chromium.launch({ executablePath: exe, headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const errors = [];
+const accountUsername = `e2e_${Date.now().toString(36)}`;
+const accountPassword = 'Testpass123!';
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
@@ -39,6 +41,7 @@ async function openPackByName(name) {
     return b && !b.disabled;
   }, { timeout: 10000 });
   await rip.click();
+  await page.waitForSelector('.pack-visual', { timeout: 3000 });
   await page.waitForSelector('text=RESULT', { timeout: 15000 });
   await page.waitForTimeout(3600);
 }
@@ -53,10 +56,24 @@ try {
   await page.waitForSelector('header >> text=Arenaiss', { timeout: 15000 });
   if (await page.locator('header >> text=RENAISS ARENA').count()) throw new Error('Header should use the Arenaiss brand');
   await page.waitForSelector('text=Arenaiss Simulation', { timeout: 15000 });
+  if (await page.locator('main >> text=/^DEMO$/').count()) throw new Error('Intro hero should not show the DEMO label');
   await page.waitForSelector('text=game-only simulation', { timeout: 5000 });
   await page.waitForSelector('text=no real-world value', { timeout: 5000 });
   await page.waitForSelector('text=official Renaiss API data', { timeout: 5000 });
   await page.waitForSelector('text=Log in to sync progress on the server.', { timeout: 5000 });
+  const gatedRip = page.locator('button', { hasText: 'Log in to rip packs' }).first();
+  await gatedRip.waitFor({ timeout: 10000 });
+  if (await gatedRip.isEnabled()) throw new Error('Pack ripping should be disabled until the user logs in');
+  await page.locator('button', { hasText: /^Register$/ }).click();
+  await page.locator('input[placeholder="username"]').fill(accountUsername);
+  await page.locator('input[placeholder="password"]').fill(accountPassword);
+  await page.locator('input[placeholder="confirm"]').fill(accountPassword);
+  await page.locator('.auth-panel-row').locator('button', { hasText: /^Register$/ }).click();
+  await page.waitForSelector('text=Account created', { timeout: 10000 });
+  await page.locator('input[placeholder="password"]').fill(accountPassword);
+  await page.locator('.auth-panel-row').locator('button', { hasText: /^Login$/ }).click();
+  await page.waitForSelector(`text=Signed in as ${accountUsername}`, { timeout: 15000 });
+  await page.waitForSelector('button:has-text("Rip a Pack")', { timeout: 10000 });
   if (await page.locator('header >> text=Reset').count()) throw new Error('Header should not expose Reset progress control');
   if (await page.locator('header >> text=Read-only').count()) throw new Error('Header still shows Read-only chip');
   if (await page.locator('header >> text=Local save').count()) throw new Error('Header still shows Local save chip');
@@ -135,6 +152,11 @@ try {
   await page.waitForSelector('text=Choose arena', { timeout: 10000 });
   await page.locator('button', { hasText: 'Pokemon Arena' }).click();
   await page.waitForSelector('text=Build lineup', { timeout: 10000 });
+  await page.waitForSelector('text=FILTER', { timeout: 5000 });
+  await page.locator('button', { hasText: /^All$/ }).click();
+  await page.locator('button', { hasText: /^Pokemon$/ }).click();
+  await page.locator('button', { hasText: /^TOP$/ }).click();
+  await page.locator('button', { hasText: /^All$/ }).click();
   await page.waitForTimeout(500);
   const rosterSlabs = page.locator('.card-grid .slab');
   const n = Math.min(5, await rosterSlabs.count());

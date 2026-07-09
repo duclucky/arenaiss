@@ -925,6 +925,32 @@ a { color: inherit; }
 }
 @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes packSealPulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.88); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@keyframes packCoreCharge {
+  0%, 100% { transform: translateY(0) scale(1); filter: brightness(1); }
+  45% { transform: translateY(-8px) scale(1.04); filter: brightness(1.28); }
+}
+@keyframes packCrackFlash {
+  0%, 100% { opacity: 0.28; transform: scaleY(0.55); }
+  45% { opacity: 1; transform: scaleY(1.08); }
+}
+@keyframes packSpark {
+  0% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-56px) scale(0.35); }
+  28% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-156px) scale(1); }
+}
+@keyframes packResultPop {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes packCardFlare {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.45); }
+  34% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+}
 
 .anim-rise { animation: riseReveal 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .anim-shake { animation: packShake 0.5s ease-in-out infinite; }
@@ -932,6 +958,125 @@ a { color: inherit; }
 .anim-loss { animation: hshake 0.4s ease both; }
 .anim-float { animation: floaty 3.2s ease-in-out infinite; }
 .anim-fade { animation: fadeIn 0.4s ease both; }
+
+.pack-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  min-height: 360px;
+  padding: 70px 0;
+  overflow: hidden;
+}
+.pack-stage::before {
+  content: '';
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(from var(--tier) r g b / 0.24), transparent 58%),
+    conic-gradient(from 90deg, transparent, rgba(from var(--tier) r g b / 0.35), transparent 40%, rgba(255,255,255,0.16), transparent 70%);
+  opacity: 0.72;
+  animation: packSealPulse 1.1s ease-in-out infinite;
+}
+.pack-visual {
+  position: relative;
+  z-index: 1;
+  width: 172px;
+  height: 226px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  border: 1px solid var(--tier);
+  background:
+    linear-gradient(145deg, rgba(from var(--tier) r g b / 0.16), transparent 42%),
+    linear-gradient(160deg, var(--raised), #0d1016);
+  box-shadow:
+    0 0 68px rgba(from var(--tier) r g b / 0.68),
+    inset 0 0 52px rgba(from var(--tier) r g b / 0.24),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  overflow: visible;
+}
+.pack-core {
+  width: 128px;
+  min-height: 128px;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.24);
+  color: var(--tier);
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 1.08;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  animation: packCoreCharge 0.82s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.pack-burst-ring {
+  position: absolute;
+  inset: -28px;
+  border-radius: 26px;
+  border: 1px solid rgba(from var(--tier) r g b / 0.5);
+  box-shadow: 0 0 36px rgba(from var(--tier) r g b / 0.42);
+  animation: packSealPulse 0.95s ease-in-out infinite;
+}
+.pack-crack {
+  position: absolute;
+  top: 38px;
+  width: 2px;
+  height: 152px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, #fff, var(--tier), transparent);
+  transform-origin: center;
+  animation: packCrackFlash 0.48s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px var(--tier));
+}
+.pack-crack-a { left: 50%; transform: rotate(8deg); }
+.pack-crack-b { left: 42%; height: 112px; transform: rotate(-24deg); animation-delay: -0.16s; }
+.pack-crack-c { left: 58%; height: 96px; transform: rotate(28deg); animation-delay: -0.28s; }
+.pack-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 18px;
+  margin-left: -2px;
+  margin-top: -9px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff, var(--tier), transparent);
+  box-shadow: 0 0 12px var(--tier);
+  animation: packSpark 0.95s ease-out infinite;
+  animation-delay: calc(var(--i) * -70ms);
+}
+.pack-stage-copy {
+  position: relative;
+  z-index: 1;
+  color: var(--text-sub);
+  margin-top: 24px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.pack-result-title {
+  animation: packResultPop 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.pack-reveal-card {
+  animation: riseReveal 0.62s cubic-bezier(0.16, 0.9, 0.2, 1) both;
+}
+.pack-card-flare {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  left: 50%;
+  top: 45%;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(from var(--tier) r g b / 0.48), rgba(from var(--tier) r g b / 0.08) 42%, transparent 68%);
+  animation: packCardFlare 0.75s ease-out both;
+}
 
 .sweep-overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
 .sweep-overlay::after {

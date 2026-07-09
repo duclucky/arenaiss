@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useArena, useArenaDispatch, deckCards } from '@/app/arena/state';
+import { CardFilterBar, filterCardsByFilter, type CardFilter } from '@/components/CardFilterBar';
 import { Slab } from '@/components/Slab';
 import { BATTLE_STAKE } from '@/lib/game/gacha';
 import { buildOpponentDeck } from '@/lib/game/opponent';
@@ -18,6 +19,7 @@ const ARENAS: { id: Category; title: string; copy: string }[] = [
 export function DeckBuilder() {
   const state = useArena();
   const dispatch = useArenaDispatch();
+  const [filter, setFilter] = useState<CardFilter>('ALL');
   const arenaCategory = state.arenaCategory;
   const deck = arenaCategory ? deckCards(state).filter((card) => card.category === arenaCategory) : [];
   const teamPower = deck.reduce((s, c) => s + c.power, 0);
@@ -25,11 +27,18 @@ export function DeckBuilder() {
   const canStake = state.credits >= BATTLE_STAKE;
 
   const available = useMemo(
-    () => [...state.roster]
-      .filter((card) => !arenaCategory || card.category === arenaCategory)
+    () => filterCardsByFilter([...state.roster]
+      .filter((card) => !arenaCategory || card.category === arenaCategory), filter)
       .sort((a, b) => RANK[a.tier] - RANK[b.tier] || b.power - a.power),
-    [state.roster, arenaCategory],
+    [state.roster, arenaCategory, filter],
   );
+
+  function changeFilter(next: CardFilter) {
+    setFilter(next);
+    if (next === 'POKEMON' || next === 'ONE_PIECE') {
+      dispatch({ type: 'SET_ARENA_CATEGORY', category: next });
+    }
+  }
 
   function move(idx: number, dir: -1 | 1) {
     const tokens = [...state.deckTokens];
@@ -108,12 +117,17 @@ export function DeckBuilder() {
               borderColor: arenaCategory === arena.id ? 'var(--accent)' : 'var(--hairline)',
               color: arenaCategory === arena.id ? 'var(--accent)' : 'var(--text-sub)',
             }}
-            onClick={() => dispatch({ type: 'SET_ARENA_CATEGORY', category: arena.id })}
+            onClick={() => {
+              setFilter(arena.id);
+              dispatch({ type: 'SET_ARENA_CATEGORY', category: arena.id });
+            }}
           >
             {arena.title}
           </button>
         ))}
       </div>
+
+      <CardFilterBar value={filter} onChange={changeFilter} />
 
       <div className="panel" style={{ padding: 16, marginBottom: 22 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
@@ -159,7 +173,7 @@ export function DeckBuilder() {
       </h3>
       {available.length === 0 ? (
         <div className="panel" style={{ padding: 40, textAlign: 'center', color: 'var(--text-sub)' }}>
-          No cards for this arena yet. <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Gacha</button>
+          No cards match this lineup filter. <button className="btn btn-ghost" onClick={() => dispatch({ type: 'GOTO', screen: 'intro' })}>Gacha</button>
         </div>
       ) : (
         <div className="card-grid">

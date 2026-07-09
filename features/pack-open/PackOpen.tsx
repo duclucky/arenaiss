@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useArena, useArenaDispatch } from '@/app/arena/state';
 import { Slab } from '@/components/Slab';
 import type { PackReveal } from '@/lib/game/gacha';
@@ -75,32 +75,24 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
       )}
 
       {phase === 'charging' ? (
-        <div style={{ textAlign: 'center', padding: '70px 0' }}>
+        <div className="pack-stage" data-tier={topTier}>
           <div
-            className="anim-shake"
-            data-tier={topTier}
-            style={{
-              width: 150,
-              height: 210,
-              margin: '0 auto',
-              borderRadius: 16,
-              background: 'linear-gradient(160deg, var(--raised), #0d1016)',
-              border: '1px solid var(--tier)',
-              boxShadow: '0 0 50px rgba(from var(--tier) r g b / 0.6), inset 0 0 40px rgba(from var(--tier) r g b / 0.2)',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 26,
-              fontWeight: 900,
-              color: 'var(--tier)',
-            }}
+            className="pack-visual anim-shake"
           >
-            {pack.packName}
+            <span className="pack-burst-ring" />
+            <span className="pack-crack pack-crack-a" />
+            <span className="pack-crack pack-crack-b" />
+            <span className="pack-crack pack-crack-c" />
+            <span className="pack-core">{pack.packName}</span>
+            {Array.from({ length: 12 }).map((_, i) => (
+              <span key={i} className="pack-spark" style={{ '--i': i } as CSSProperties} />
+            ))}
           </div>
-          <p style={{ color: 'var(--text-sub)', marginTop: 22, letterSpacing: '0.1em' }}>The pack is cracking open...</p>
+          <p className="pack-stage-copy">The vault seal is breaking...</p>
         </div>
       ) : (
         <>
-          <div style={{ textAlign: 'center', marginBottom: 22 }}>
+          <div className="pack-result-title" style={{ textAlign: 'center', marginBottom: 22 }}>
             <div data-tier={topTier} style={{ display: 'inline-block' }}>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>{pack.packName.toUpperCase()} RESULT</div>
               <h2 style={{ margin: '6px 0 0', color: 'var(--tier)', fontSize: 22 }}>{TIER_SHOUT[topTier]}</h2>
@@ -110,7 +102,20 @@ function PackOpenSequence({ pack }: { pack: PackReveal }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${order.length}, minmax(0, 1fr))`, gap: 14, alignItems: 'stretch' }}>
             {order.map((card, i) => (
-              <div key={card.tokenId} style={{ visibility: i < revealed ? 'visible' : 'hidden', position: 'relative', maxWidth: pack.size === 1 ? 260 : undefined, margin: '0 auto', width: '100%' }}>
+              <div
+                key={card.tokenId}
+                className="pack-reveal-card"
+                data-tier={card.tier}
+                style={{
+                  visibility: i < revealed ? 'visible' : 'hidden',
+                  position: 'relative',
+                  maxWidth: pack.size === 1 ? 260 : undefined,
+                  margin: '0 auto',
+                  width: '100%',
+                  animationDelay: `${i * 90}ms`,
+                }}
+              >
+                {i < revealed && <span className="pack-card-flare" />}
                 {i < revealed && (card.tier === 'TOP' || card.tier === 'S') && <span className="sweep-overlay" />}
                 <Slab
                   card={card}
