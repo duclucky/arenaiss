@@ -914,10 +914,10 @@ không render nút phụ này.
 # Codex update 2026-07-09 cinematic pack-opening FX
 - Agent: codex
 - Latest commit before this update: `67e052d` - "fx: amplify pack reveal explosion"
-- Session commit: preparing `feat: cinematic pack-opening FX`
+- Session commit: `a326832` - "feat: cinematic pack-opening FX"
 
 ## Current work
-No unfinished code is intentionally left. This batch completes the new "AAA gacha reveal" pack-opening FX from attachment
+No unfinished code is intentionally left. This batch completes, commits, pushes, and deploys the new "AAA gacha reveal" pack-opening FX from attachment
 `C:\Users\TBC\.codex\attachments\654a82a0-b272-4cd4-b7ee-246fcdb6a0a4\pasted-text.txt`.
 
 ## Done
@@ -944,10 +944,13 @@ No unfinished code is intentionally left. This batch completes the new "AAA gach
 - `npm.cmd run test:unit` PASS.
 - Production local e2e against `http://127.0.0.1:3037` PASS; console errors none.
 - `git diff --check` PASS, only Windows line-ending warnings.
+- GitHub Actions Deploy run `29020512939` PASS.
+- Live `https://arena-card.xyz/` PASS: HTTP 200, HTML contains `Arenaiss`, production CSS contains
+  `cinematic-pack-shell`, `cinematic-particle-canvas`, `cinematic-burst`, and `cinematic-card-grid`.
 
 ## Next steps
-1. Commit exactly: `feat: cinematic pack-opening FX`.
-2. Push to `master`, watch GitHub Actions deploy, then verify live `https://arena-card.xyz/`.
+1. User should hard-refresh `https://arena-card.xyz/` before judging the new FX, because browser cache may keep the old CSS for a short time.
+2. If the user still wants more spectacle, tune only `features/pack-open/PackOpen.tsx` timing/intensity and the cinematic CSS block; do not change gacha logic.
 
 ## Warnings
 - Product UI/copy must remain English.
@@ -957,6 +960,7 @@ No unfinished code is intentionally left. This batch completes the new "AAA gach
 ## Log
 - 2026-07-09 codex: Started full cinematic pack-opening FX rewrite, added Framer Motion phase orchestration and canvas particles, then paused per user request before typecheck was green.
 - 2026-07-09 codex: Resumed, fixed TypeScript easing/context issues, added e2e assertions for cinematic FX, and completed local verification.
+- 2026-07-09 codex: Committed and pushed `a326832`; GitHub Actions deploy succeeded and live CSS verification passed on `arena-card.xyz`.
 
 ---
 # Codex update 2026-07-09 hero cleanup + lineup filter
