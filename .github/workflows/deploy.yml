@@ -43,7 +43,12 @@ jobs:
           rm -rf deploy
           mkdir -p deploy/app deploy/tmp
           cp hosting/namecheap-server.js deploy/server.js
-          node -e "require('node:fs').writeFileSync('deploy/package.json', JSON.stringify({ name: 'arenaiss-namecheap', private: true, scripts: { start: 'node server.js' } }, null, 2) + '\n')"
+          
+          # Sử dụng package.json của Next.js standalone vì nó chứa ĐÚNG danh sách dependencies cần thiết cho production.
+          # Thêm script start để cPanel UI hiển thị (dù Passenger dùng server.js).
+          cp .next/standalone/package.json deploy/package.json
+          node -e "const fs = require('node:fs'); const pkg = JSON.parse(fs.readFileSync('deploy/package.json')); pkg.scripts = pkg.scripts || {}; pkg.scripts.start = 'node server.js'; fs.writeFileSync('deploy/package.json', JSON.stringify(pkg, null, 2) + '\n');"
+          
           cp -R .next/standalone/. deploy/app/
           mkdir -p deploy/app/.next
           cp -R .next/static deploy/app/.next/static
@@ -60,11 +65,12 @@ jobs:
           username: ${{ secrets.FTP_USERNAME || 'Arenaiss@arenaiss.xyz' }}
           password: ${{ secrets.FTP_PASSWORD || secrets.FTP_ARENAISS }}
           local-dir: ./deploy/
-          server-dir: ${{ secrets.FTP_SERVER_DIR || secrets.FTP_ARENAISS_DIR || '/arenaiss/' }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR || '/' }}
           protocol: ftp
           exclude: |
             **/.git*
             **/.git*/**
+            **/node_modules/**
             **/.env
             **/*.env
             **/data/**
