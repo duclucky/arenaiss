@@ -357,14 +357,7 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
               </SectionLabel>
               <div className="panel" style={{ padding: 14, background: '#202734' }}>
                 {narrLoading ? <Skeleton lines={4} /> : narr ? (
-                  <>
-                    <Narr text={narr.text} />
-                    {narr.mode === 'fallback' && (
-                      <p className="caveat" style={{ marginTop: 6, fontStyle: 'italic' }}>
-                        Live AI is not configured on this server, so this insight uses the same validated data deterministically.
-                      </p>
-                    )}
-                  </>
+                  <Narr text={narr.text} />
                 ) : (
                   <p className="caveat">Passport AI insight could not be generated.</p>
                 )}
