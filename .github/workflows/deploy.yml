@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -79,8 +79,8 @@ jobs:
         env:
           SITE_URL: ${{ secrets.SITE_URL || 'https://arena-card.xyz' }}
         run: |
-          curl -fsSI "$SITE_URL"
-          curl -fsSL "$SITE_URL" | grep -i "Arenaiss"
+          curl --connect-timeout 10 --max-time 25 --retry 2 --retry-delay 5 -fsSI "$SITE_URL"
+          curl --connect-timeout 10 --max-time 25 --retry 2 --retry-delay 5 -fsSL "$SITE_URL" | grep -i "Arenaiss"
 
       - name: Fetch cPanel error log after verify failure
         if: failure()
