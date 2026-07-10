@@ -115,7 +115,8 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
   const [idx, setIdx] = useState<IndexCard | null>(null);
   const [narr, setNarr] = useState<NarrationResult | null>(null);
   const [packs, setPacks] = useState<CardPack[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [idxLoading, setIdxLoading] = useState(true);
   const [narrLoading, setNarrLoading] = useState(true);
   const [showReal, setShowReal] = useState(false);
   const asOf = useMemo(() => new Date().toISOString(), []);
@@ -123,66 +124,86 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
   useEffect(() => {
     let alive = true;
 
-    (async () => {
-      const d = await fetchCardDetail(tokenId);
-      if (!alive) return;
-      setDetail(d);
-
-      const q = card.pokemonName || card.name;
-      const results = await searchIndex(q);
-      let indexCard: IndexCard | null = null;
-      if (results.length > 0 && results[0].href) {
-        indexCard = await fetchIndexCardByHref(results[0].href);
+    // Chuỗi A và B chạy SONG SONG; mỗi mục hiện ngay khi dữ liệu của nó về.
+    // Chuỗi A: card detail (provenance on-chain + custody).
+    const detailP = fetchCardDetail(tokenId).then((d) => {
+      if (alive) {
+        setDetail(d);
+        setDetailLoading(false);
       }
-      if (!alive) return;
-      setIdx(indexCard);
-      setLoading(false);
+      return d;
+    });
 
-      const collectible = d?.collectible;
-      const activities: Activity[] = d?.activities?.activities ?? [];
-      const input = {
-        card: {
-          name: card.name,
-          setName: card.setName,
-          grade: card.grade,
-          gradingCompany: card.gradingCompany,
-          year: card.year,
-          tokenId: card.tokenId,
-        },
-        custody: {
-          vaultLocation: collectible?.vaultLocation ?? card.vaultLocation ?? null,
-          countryCode: collectible?.vaultRegionCountryCode ?? null,
-        },
-        onchain: {
-          activities: activities.slice(0, 8).map((a) => ({
-            type: a.type,
-            timestamp: a.timestamp != null ? String(a.timestamp) : null,
-            txHash: a.txHash ?? null,
-            amount: a.amount ?? null,
-          })),
-          lastSale: null,
-        },
-        reference: indexCard
-          ? {
-              source: 'Renaiss OS Index',
-              priceUsd: indexCard.priceUsdCents != null ? indexCard.priceUsdCents / 100 : null,
-              confidence: indexCard.confidence ?? null,
-              observationCount: indexCard.observationCount ?? null,
-              lastSaleAt: indexCard.lastSaleAt ?? null,
-              deltas: indexCard.deltas ?? null,
-              sourceBreakdown: (indexCard.sourceBreakdown ?? []).map((s) => ({
-                bucket: s.bucket ?? null,
-                medianUsd: s.medianUsdCents != null ? s.medianUsdCents / 100 : null,
-              })),
-            }
-          : null,
-        asOf,
-      };
-      const n = await narratePassport(input);
-      if (!alive) return;
-      setNarr(n);
-      setNarrLoading(false);
-    })();
+    // Chuỗi B: Renaiss OS Index (search -> card).
+    const q = card.pokemonName || card.name;
+    const indexP = searchIndex(q)
+      .then((results) => (results.length > 0 && results[0].href ? fetchIndexCardByHref(results[0].href) : null))
+      .then((indexCard) => {
+        if (alive) {
+          setIdx(indexCard);
+          setIdxLoading(false);
+        }
+        return indexCard;
+      });
+
+    // Narration chờ CẢ HAI đầu vào rồi mới chạy (không chặn hiển thị các mục trên).
+    Promise.all([detailP, indexP])
+      .then(([d, indexCard]) => {
+        if (!alive) return null;
+        const collectible = d?.collectible;
+        const activities: Activity[] = d?.activities?.activities ?? [];
+        const input = {
+          card: {
+            name: card.name,
+            setName: card.setName,
+            grade: card.grade,
+            gradingCompany: card.gradingCompany,
+            year: card.year,
+            tokenId: card.tokenId,
+          },
+          custody: {
+            vaultLocation: collectible?.vaultLocation ?? card.vaultLocation ?? null,
+            countryCode: collectible?.vaultRegionCountryCode ?? null,
+          },
+          onchain: {
+            activities: activities.slice(0, 8).map((a) => ({
+              type: a.type,
+              timestamp: a.timestamp != null ? String(a.timestamp) : null,
+              txHash: a.txHash ?? null,
+              amount: a.amount ?? null,
+            })),
+            lastSale: null,
+          },
+          reference: indexCard
+            ? {
+                source: 'Renaiss OS Index',
+                priceUsd: indexCard.priceUsdCents != null ? indexCard.priceUsdCents / 100 : null,
+                confidence: indexCard.confidence ?? null,
+                observationCount: indexCard.observationCount ?? null,
+                lastSaleAt: indexCard.lastSaleAt ?? null,
+                deltas: indexCard.deltas ?? null,
+                sourceBreakdown: (indexCard.sourceBreakdown ?? []).map((s) => ({
+                  bucket: s.bucket ?? null,
+                  medianUsd: s.medianUsdCents != null ? s.medianUsdCents / 100 : null,
+                })),
+              }
+            : null,
+          asOf,
+        };
+        return narratePassport(input);
+      })
+      .then((n) => {
+        if (!alive) return;
+        setNarr(n);
+        setNarrLoading(false);
+      })
+      .catch(() => {
+        if (alive) {
+          setDetailLoading(false);
+          setIdxLoading(false);
+          setNarrLoading(false);
+        }
+      });
 
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,7 +245,7 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
           <div className="passport-column">
             <section>
               <SectionLabel>Reference estimate - Renaiss OS Index</SectionLabel>
-              {loading ? <Skeleton /> : idx ? (
+              {idxLoading ? <Skeleton /> : idx ? (
                 <div className="panel" style={{ padding: 14, background: '#202734' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                     <span className="tabnums" style={{ fontSize: 26, fontWeight: 900 }}>{cents(idx.priceUsdCents)}</span>
@@ -273,7 +294,7 @@ function PassportModal({ tokenId, card, onClose }: { tokenId: string; card: Game
 
             <section>
               <SectionLabel>Provenance on-chain</SectionLabel>
-              {loading ? <Skeleton /> : activities.length > 0 ? (
+              {detailLoading ? <Skeleton /> : activities.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {activities.slice(0, 6).map((a, i) => (
                     <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
