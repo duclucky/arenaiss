@@ -128,6 +128,25 @@ export type AgentProfile = {
 
 export type OwnedRegistration = Pick<EntrantRegistration, 'tournamentId' | 'entrantId'>;
 
+export type ManagedAccount = {
+  userId: string;
+  principal: string;
+  identity: { kind: 'WALLET' | 'EMAIL' };
+  managedWallet: {
+    state: 'READY'; userId: string; walletId: string; address: string;
+    blockchain: 'ARC-TESTNET'; accountType: 'EOA';
+  };
+};
+
+export interface ManagedIdentityAdapter {
+  capabilities(): Promise<{ wallet: true; email: boolean; managedWallet: boolean }>;
+  restore(): Promise<ManagedAccount | null>;
+  signInWithWallet(address: string, signMessage: (message: string) => Promise<string>): Promise<ManagedAccount>;
+  requestEmailCode(email: string): Promise<void>;
+  verifyEmail(email: string, code: string): Promise<ManagedAccount>;
+  logout(): Promise<void>;
+}
+
 export interface AgentApiAdapter {
   listOwnedAgents(): Promise<AgentProfile[]>;
   listOwnedRegistrations(): Promise<OwnedRegistration[]>;

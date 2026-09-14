@@ -3,7 +3,7 @@ import test from 'node:test';
 import { once } from 'node:events';
 import { privateKeyToAccount } from 'viem/accounts';
 
-import { createArenaServer } from '../src/server.ts';
+import { createArenaServer, managedIdentityFromEnvironment } from '../src/server.ts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 
 test('Node HTTP boundary performs signed session and private agent lifecycle', async () => {
@@ -105,4 +105,15 @@ test('Node HTTP boundary rate limits mutation bursts and emits secret-free struc
     server.close();
     await once(server, 'close');
   }
+});
+
+test('managed identity configuration is optional but rejects every partial secret set', () => {
+  const database = new SqliteRuntimeStore(':memory:');
+  try {
+    assert.equal(managedIdentityFromEnvironment(database, {}), undefined);
+    assert.throws(
+      () => managedIdentityFromEnvironment(database, { CIRCLE_API_KEY: 'secret-value' }),
+      /configuration is incomplete: CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_SET_ID, ARENA_IDENTITY_PEPPER, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM/,
+    );
+  } finally { database.close(); }
 });

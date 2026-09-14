@@ -39,4 +39,5 @@ Thumbs.db
 *.key
 *.pem
 wallet*.json
+*recovery-file*.json
 docs/evidence/local/

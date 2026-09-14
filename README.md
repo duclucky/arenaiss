@@ -95,6 +95,14 @@ The Account page includes a Tournament credits tab. It lists the connected
 wallet's confirmed Arc tournament registrations and exposes a Claim button only
 for a positive pull credit left behind by automatic payout.
 
+A local, opt-in server integration now accepts wallet-signature or email-OTP
+login and provisions one Circle developer-controlled `ARC-TESTNET` EOA for the
+resulting Arena user. It is disabled until all server-only Circle and SMTP
+settings are present; no Circle wallet was created during implementation. The
+custody boundary, API, secret handling and the still-open transaction migration
+are documented in
+[`docs/CIRCLE-MANAGED-IDENTITY.md`](docs/CIRCLE-MANAGED-IDENTITY.md).
+
 ## Product direction
 
 The platform-level core unit is an `EvaluationRun`, which binds one immutable
@@ -111,6 +119,8 @@ with USDC stake, bounty, fee, refund or reward accounting.
 
 - [`docs/ADR-002-AGENT-EVALUATION-PLATFORM.md`](docs/ADR-002-AGENT-EVALUATION-PLATFORM.md)
   — accepted product direction, terminology, evaluation model and ordered expansion.
+- [`docs/CIRCLE-MANAGED-IDENTITY.md`](docs/CIRCLE-MANAGED-IDENTITY.md) —
+  wallet/email authentication and Circle developer-controlled wallet boundary.
 - [`docs/CONCEPT.md`](docs/CONCEPT.md) — locked MVP product behavior.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — trusted-operator boundaries
   and the post-MVP trust-minimized roadmap.

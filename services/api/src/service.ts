@@ -46,6 +46,7 @@ export type PublicEvaluationPack = { schema: "arena-public-evaluation-pack-v1"; 
 export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number }> };
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const USER_PRINCIPAL = /^usr_[0-9a-f]{64}$/;
 const PUBLIC_TOURNAMENT_STATES = new Set<PublicTournamentStatus>(["UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED"]);
 const PUBLIC_MATCH_STATES = new Set<PublicMatchState>(["SCHEDULED", "WAITING_FOR_OUTPUTS", "JUDGING", "ACCEPTED", "FAILED", "RETRYABLE", "FINALIZED", "TIE", "RETRY", "WINNER_ADVANCED"]);
 const TERMINAL_PUBLIC_MATCH_STATES = new Set<PublicMatchState>(["FINALIZED", "WINNER_ADVANCED", "TIE"]);
@@ -83,7 +84,7 @@ export class ArenaApiService {
   }
 
   createAgent(caller: string, name: string, agentsMd: string): PublicAgent {
-    const owner = this.address(caller); this.validateAgentText(name, agentsMd);
+    const owner = this.principal(caller); this.validateAgentText(name, agentsMd);
     this.nonce = this.runtime ? this.runtime.increment("api-counters", "agent-sequence", 1) : this.nonce + 1;
     const agentId = sha(`arena-agent-v1|${owner}|${this.nonce}|${name}`);
     const version = this.version(agentId, agentsMd, 1);
@@ -111,11 +112,11 @@ export class ArenaApiService {
 
   getPublicAgent(agentId: Digest): PublicAgent { const agent = this.agents.get(agentId); if (!agent) throw new Error("agent not found"); return this.publicView(agent); }
   listOwnedAgents(caller: string): PublicAgent[] {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     return [...this.agents.values()].filter((agent) => agent.owner === owner).map((agent) => this.publicView(agent));
   }
   listOwnedRegistrations(caller: string): OwnedRegistration[] {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     return [...this.registrations.values()]
       .filter((registration) => this.agents.get(`sha256:${registration.agentId.slice(2)}` as Digest)?.owner === owner)
       .map(({ tournamentId, entrantId }) => ({ tournamentId, entrantId }))
@@ -187,7 +188,7 @@ export class ArenaApiService {
     return record ? this.publicEvaluationView(record) : null;
   }
   getPrivateEvaluationRun(caller: string, runId: Digest): PrivateEvaluationRun {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     if (!isDigest(runId)) throw new Error("invalid evaluation run ID");
     const record = this.runtime?.get<EvaluationRunRecord>("evaluation-runs", runId);
     if (!record) throw new Error("evaluation run not found");
@@ -195,13 +196,13 @@ export class ArenaApiService {
     return this.privateEvaluationView(record);
   }
   listOwnedEvaluationRuns(caller: string): PrivateEvaluationRun[] {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     return (this.runtime?.list<EvaluationRunRecord>("evaluation-runs") ?? [])
       .filter((record) => this.ownerForAgentVersion(record.input.agent.version_id) === owner)
       .map((record) => this.privateEvaluationView(record));
   }
   createEvaluationPack(caller: string, input: { packId: Digest; version: string; name: string; scenarios: EvaluationScenario[] }): PublicEvaluationPack {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     if (!isDigest(input?.packId) || typeof input.version !== "string" || !input.version || input.version.length > 64 || typeof input.name !== "string" || !input.name.trim() || input.name.length > 96 || !Array.isArray(input.scenarios) || input.scenarios.length < 1 || input.scenarios.length > 32) throw new Error("invalid evaluation pack");
     const scenarios = input.scenarios.map(validateEvaluationScenario);
     if (new Set(scenarios.map((scenario) => scenario.scenarioId)).size !== scenarios.length) throw new Error("evaluation pack scenarios contain duplicates");
@@ -218,7 +219,7 @@ export class ArenaApiService {
     return this.publicPack(record);
   }
   createSoloCampaign(caller: string, input: { campaignId: Digest; agentId: Digest; agentsVersion: Digest; packId: Digest; packVersion: string; runtimePolicy: { model: string; maxOutputTokens: number; temperature: number; maxProviderAttempts: number } }): PublicEvaluationCampaign {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     if (!isDigest(input?.campaignId)) throw new Error("invalid evaluation campaign ID");
     const agent = this.requireOwner(owner, input.agentId);
     const version = agent.versions.find((candidate) => candidate.agentsVersion === input.agentsVersion);
@@ -249,11 +250,11 @@ export class ArenaApiService {
     return campaign ? this.publicCampaign(campaign) : null;
   }
   listOwnedEvaluationCampaigns(caller: string): PublicEvaluationCampaign[] {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     return [...this.evaluationCampaigns.values()].filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
   }
   prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest): PreparedRegistration {
-    const owner = this.address(caller);
+    const owner = this.principal(caller);
     if (!isDigest(tournamentId) || !isDigest(agentId)) throw new Error("invalid registration identity");
     const tournament = this.tournaments.get(tournamentId);
     if (!tournament || !/^[1-9][0-9]*$/.test(tournament.stakeAmount || "")) throw new Error("tournament registration is unavailable");
@@ -339,7 +340,8 @@ export class ArenaApiService {
     return { resultClass, overallScore, dimensions, actionsExecuted: false };
   }
   private requireOperator(caller: string): void { if (this.address(caller) !== this.operator) throw new Error("unauthorized operator"); }
-  private requireOwner(caller: string, agentId: Digest): Agent { const agent = this.agents.get(agentId); if (!agent || agent.owner !== this.address(caller)) throw new Error("unauthorized agent access"); return agent; }
+  private requireOwner(caller: string, agentId: Digest): Agent { const agent = this.agents.get(agentId); if (!agent || agent.owner !== this.principal(caller)) throw new Error("unauthorized agent access"); return agent; }
+  private principal(value: string): string { if (ADDRESS.test(value)) return value.toLowerCase(); if (USER_PRINCIPAL.test(value)) return value; throw new Error("invalid principal"); }
   private address(value: string): string { if (!ADDRESS.test(value)) throw new Error("invalid address"); return value.toLowerCase(); }
   private validateAgentText(name: string, agentsMd: string): void { if (!name.trim() || name.length > 96 || !agentsMd || Buffer.byteLength(agentsMd, "utf8") > 32_768) throw new Error("invalid agent profile"); }
   private version(agentId: Digest, agentsMd: string, number: number): AgentVersion { return { agentId, agentsVersion: sha(`arena-agents-version-v1|${agentId}|${number}|${sha(agentsMd)}`), agentsCommitment: sha(agentsMd), agentsMd, createdAt: Date.now() }; }

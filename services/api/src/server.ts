@@ -7,6 +7,9 @@ import { ArenaHttpApi } from './http.ts';
 import { ArenaApiService } from './service.ts';
 import { viemSignatureVerifier } from './viem-verifier.ts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
+import { circleManagedWalletFromSecrets } from './circle-managed-wallet.ts';
+import { SmtpEmailLoginSender } from './smtp-email.ts';
+import type { ManagedIdentityOptions } from './managed-identity.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -18,7 +21,8 @@ type ServerOptions = {
 };
 
 export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore, options: ServerOptions = {}) {
-  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier);
+  const managedIdentity = runtime ? managedIdentityFromEnvironment(runtime) : undefined;
+  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier, managedIdentity);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
@@ -65,6 +69,21 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
+}
+
+export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
+  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'] as const;
+  const values = Object.fromEntries(names.map((name) => [name, environment[name]?.trim() || ''])) as Record<typeof names[number], string>;
+  if (names.every((name) => !values[name])) return undefined;
+  const missing = names.filter((name) => !values[name]);
+  if (missing.length) throw new Error(`managed identity configuration is incomplete: ${missing.join(', ')}`);
+  const smtpPort = Number(values.SMTP_PORT);
+  return {
+    runtime,
+    identityPepper: values.ARENA_IDENTITY_PEPPER,
+    circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
+    emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
+  };
 }
 
 class FixedWindowRateLimiter {

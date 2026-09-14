@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAppContext } from '../context';
 import { WalletModal } from './WalletModal';
+import { EmailLoginModal } from './EmailLoginModal';
 
 const navItems = [
   ['/tournaments', 'Tournaments'],
@@ -12,10 +13,11 @@ const navItems = [
 ] as const;
 
 export function Layout() {
-  const { account, disconnectWallet } = useAppContext();
+  const { account, disconnectWallet, managedIdentityEnabled } = useAppContext();
   const location = useLocation();
   const isHome = location.pathname === '/';
   const [walletOpen, setWalletOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -69,7 +71,10 @@ export function Layout() {
             <Link role="menuitem" to="/account">View account</Link>
             <button role="menuitem" onClick={disconnect}>Disconnect</button>
           </div>}
-        </> : <button onClick={() => setWalletOpen(true)} className="header-cta">Connect Wallet</button>}
+        </> : <>
+          <button onClick={() => setWalletOpen(true)} className="header-cta wallet-login-trigger" aria-label="Connect Wallet">Connect Wallet</button>
+          <button onClick={() => setEmailOpen(true)} disabled={!managedIdentityEnabled} className="header-cta email-login-trigger" aria-label={managedIdentityEnabled ? 'Sign in with email' : 'Email sign-in is not configured'}>{managedIdentityEnabled ? 'Sign in with email' : 'Email unavailable'}</button>
+        </>}
         <button
           onClick={() => setMenuOpen((open) => !open)}
           className="menu-toggle"
@@ -84,5 +89,6 @@ export function Layout() {
 
     <main className={isHome ? 'home-main' : 'editorial-main'}><Outlet /></main>
     {walletOpen && <WalletModal onClose={() => setWalletOpen(false)} />}
+    {emailOpen && <EmailLoginModal onClose={() => setEmailOpen(false)} />}
   </div>;
 }
