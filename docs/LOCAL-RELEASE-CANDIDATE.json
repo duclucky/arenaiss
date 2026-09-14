@@ -3,7 +3,7 @@
   "createdAt": "2026-09-14",
   "scope": "LOCAL_ONLY",
   "fileCount": 228,
-  "sourceBundleSha256": "b915cd230e13b2fbc2ad1ca6a0fb6e57408a63a0441abe2aa4e850229058bd50",
+  "sourceBundleSha256": "68ea526df0bb9e3265d0e1ffdfad6092f101dbed2cc96c89b20cb7ab67070220",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -51,10 +51,10 @@
     "packages/evaluation/src/provider.ts": "807c265348686b53da87ed535527048e10466d3ea9f4d2c1cd15f45867d918cd",
     "packages/evaluation/src/solo-runner.ts": "bfa6e1e8089ff708bee8c357cff843e453e28ace768c3bb32055ca5a891e8433",
     "packages/evaluation/test/solo-runner.test.ts": "2e544a4c0a3d51f9094438f565f93d0e83ab307476eea61b556340de17312217",
-    "services/api/src/http.ts": "82192a29977dac0e0bbd949a7b64f5112bd664ecad849e66e83062fa4bcfdfc1",
-    "services/api/src/service.ts": "f70a89688c099e25ebcc6f56526514248352722fdfc4e7a993732ac70d78797d",
-    "services/api/test/http.test.ts": "071fe0458aa7d9e1b501dcc7dd878fed795a35c7b0ab275f7ab3e2947d9ed362",
-    "services/api/test/service.test.ts": "91412ae1cfb74ed97cfd83091d331c7c453ae74c26095cf40e7b499bccb007d7",
+    "services/api/src/http.ts": "296dd1a4de9422e4e11cc627bcf81b1fed5941b3000de03c758adcaecfd814a1",
+    "services/api/src/service.ts": "acf7fe9313c5dde5ee09fb50fc5506249864ba91bc8a6d928e51a7ac7eba13f4",
+    "services/api/test/http.test.ts": "2d8ff5ed2876a1f6b72d98dd919c803c6db9376bd3c0be986cef511b8f362fd3",
+    "services/api/test/service.test.ts": "6e6e25562c3401976429e5cca56a2fea37ef5515e716dcb5f049d2985a1b2a52",
     "scripts/run-studionet-agent-evaluation.mjs": "85f80a0dedf8db2e0064e0c4a551584b38e9c985b009b38e887ed30c387ca5ef",
     "requirements-dev.txt": "43641e48e6c1e7e5c1f2c3cbc42cc7574f7df7ce73f3ec518f1c30949285eaf1",
     "gltest.config.yaml": "de9ffbb6bd5722186b1148337ed5e54d1297923d9357373d294418859fe41cc8",
@@ -66,9 +66,9 @@
   },
   "verification": {
     "pythonDirectTests": 79,
-    "typescriptTests": 161,
+    "typescriptTests": 162,
     "foundryTests": 14,
-    "frontendTests": 43
+    "frontendTests": 44
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

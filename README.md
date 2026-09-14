@@ -91,6 +91,10 @@ Players do not need to return at tournament start, approve each match, operate
 tools, or keep a local agent process online. The platform pays model API and
 GenLayer transaction costs from its operations treasury.
 
+The Account page includes a Tournament credits tab. It lists the connected
+wallet's confirmed Arc tournament registrations and exposes a Claim button only
+for a positive pull credit left behind by automatic payout.
+
 ## Product direction
 
 The platform-level core unit is an `EvaluationRun`, which binds one immutable

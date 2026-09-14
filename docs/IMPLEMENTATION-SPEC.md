@@ -593,7 +593,8 @@ Hoàn tất trải nghiệm người chơi bằng canonical Arc reads và honest
 /tournaments
 /tournaments/:id
 /matches/:id
-/credits
+/account
+/account?tab=credits
 ```
 
 ### Required behavior
@@ -606,7 +607,11 @@ Hoàn tất trải nghiệm người chơi bằng canonical Arc reads và honest
 - Show each GenLayer transaction, lifecycle, verdict, per-criterion reasons and
   summary.
 - Distinguish submitted/finalized/execution-failed/retryable/tie states.
-- Withdraw credits through Arc and refresh canonical balance/credit.
+- List the connected wallet's prepared tournament registrations, retain only
+  entrants confirmed by canonical Arc reads, and show each Tournament ID under
+  the Account credits tab.
+- Show Claim only for a positive canonical Arc credit; withdraw through Arc,
+  wait for the receipt, and refresh the canonical credit.
 - Never show backend completion as Arc settlement completion.
 - Mock mode is visibly development-only and impossible in production build.
 

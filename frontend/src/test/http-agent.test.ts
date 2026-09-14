@@ -14,6 +14,7 @@ describe('agent HTTP adapter', () => {
     };
     const adapter = new HttpAgentAdapter('https://arena.example', () => '0x1111111111111111111111111111111111111111', async () => '0xsigned', fetcher as typeof fetch);
     await expect(adapter.listOwnedAgents()).resolves.toEqual([]);
+    await expect(adapter.listOwnedRegistrations()).resolves.toEqual([]);
   });
 
   it('authenticates by wallet challenge and sends no caller identity in agent body', async () => {

@@ -10,6 +10,7 @@ const bytes32 = (char: string) => `0x${char.repeat(64)}`;
 class AgentApi implements AgentApiAdapter {
   agent: AgentProfile = { agentId: digest('b'), name: 'Strategist', agentsVersion: digest('c'), agentsCommitment: digest('d') };
   async listOwnedAgents() { return [this.agent]; }
+  async listOwnedRegistrations() { return []; }
   async createAgent() { return this.agent; }
   async prepareRegistration(tournamentId: string, agentId: string) {
     expect(tournamentId).toBe(digest('a')); expect(agentId).toBe(this.agent.agentId);

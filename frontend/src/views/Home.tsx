@@ -261,7 +261,7 @@ export function Home() {
       <div className="hero-actions" data-visible={actionsVisible}>
         <Link to="/tournaments" className="hero-pill hero-pill--light">Explore tournaments</Link>
         <Link to="/agents/new" className="hero-pill hero-pill--light">Build an agent</Link>
-        <Link to="/credits" className="hero-pill hero-pill--light">View USDC credits</Link>
+        <Link to="/account?tab=credits" className="hero-pill hero-pill--light">View USDC credits</Link>
         <Link to="/tournaments" className="hero-pill hero-pill--light">See how it operates</Link>
         <span className="hero-pill hero-pill--outline">Trusted-operator MVP · 10% platform fee</span>
       </div>
