@@ -15,6 +15,19 @@ const config: GenLayerNetworkConfig = {
 const code = btoa('contract source');
 
 describe('Studio Next deployment verification', () => {
+  it('invokes the browser fetch function with its global receiver', async () => {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('contract source'));
+    const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    const fetcher = function (this: unknown, _url: string | URL | Request, init?: RequestInit) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      const request = JSON.parse(String(init?.body));
+      const result = request.method === 'eth_chainId' ? '0xf22d' : request.method === 'gen_getContractCode' ? code : { methods: ['verified'] };
+      return Promise.resolve(new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result })));
+    };
+
+    await expect(verifyStudioNextDeployments(config, fetcher as typeof fetch, { matchJudge: hash, evaluationJudge: hash })).resolves.toMatchObject({ state: 'VERIFIED' });
+  });
+
   it('requires chain 61997, schemas and exact deployed source bytes', async () => {
     const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const request = JSON.parse(String(init?.body));
