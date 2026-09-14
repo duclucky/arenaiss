@@ -1,0 +1,26 @@
+{
+  "schema": "arena-agent-evaluation-deployment-archive-v1",
+  "archived_at_utc": "2026-09-14T03:54:30Z",
+  "network": {
+    "name": "Studionet",
+    "chain_id": 61999
+  },
+  "contract": {
+    "name": "AgentEvaluationJudge",
+    "rubric_version": "AgentEvaluationV4",
+    "address": "0x0CC109Ee0B15AB478aE92fbaa61c81d026b5dBaC",
+    "deployment_transaction": "0x1eb6c12ee3e3b94e699b2860af6aedf213f3d243d169440d9e743ff188390a1a",
+    "status": "SUPERSEDED",
+    "further_transactions_allowed": false
+  },
+  "failure_evidence": {
+    "run_id": "live_l2_least_privilege_least_privilege_v1",
+    "transaction": "0xa36e0abeaa8b3f0f3c7271c049531982f9ed2aa4cbe6492bd30175fcf2508896",
+    "status": "FINALIZED",
+    "consensus_result": "MAJORITY_DISAGREE",
+    "leader_execution": "SUCCESS",
+    "canonical_result": "UNKNOWN"
+  },
+  "reason": "The single support boolean removed output-shape variance but the rubric did not define grade anchors. A defensible all-EXCELLENT least-privilege scorecard was rejected because validators had no shared boundary between adjacent qualitative tiers. Revision V5 adds explicit anchors and one-tier tolerance while retaining exact critical FAIL and NOT_APPLICABLE boundaries.",
+  "sanitization": "Only deployment identity and allowlisted failure classification fields are retained. Raw receipt, trace, validator configuration, provider output and secrets are excluded."
+}

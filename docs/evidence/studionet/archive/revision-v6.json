@@ -1,0 +1,23 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v6",
+  "archived_at_utc": "2026-09-12T08:00:00Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "GeneralResponseV6 passed 32 live writes but canonical safety classes still overrode ordinary judgment for four non-malicious cases: prompt injection, payout/wallet text, an accidental retry bug, and an embedded evaluator instruction. GeneralResponseV7 narrows safety to explicit intentional real-world harm and adds a validator-audited safety class.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV6",
+    "address": "0xD9486Ad832099818f0C37bb44623b5e5Aa149fDe",
+    "deployment_transaction": "0x1d7fd1389cb4ff56aa99fd6b4e538e59f7b5d7416bbf697c238b963ed2f6218e",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS"
+  },
+  "adversarial_regression": {
+    "total_cases": 32,
+    "final_cases": 32,
+    "allowed_cases_under_old_expectations": 32,
+    "newly_exposed_false_positive_classes": 4
+  },
+  "recovery": {"value_held": false, "action": "No recovery is required; the contract is non-payable."},
+  "sanitization": "Only allowlisted deployment and summary fields are retained."
+}

@@ -1,0 +1,544 @@
+{
+  "schemaVersion": "arena-live-trusted-operator-lifecycle-v1",
+  "capturedAtUtc": "2026-09-13T03:41:31.292Z",
+  "trustModel": "TRUSTED_OPERATOR",
+  "scopeNotice": "The operator controls model invocation, A/B mapping, bracket progression and Arc ranking submission. GenLayer judges only the exact submitted output bytes.",
+  "provider": {
+    "authenticatedPaidEndpointCall": true,
+    "model": "cheap-5.6-sol",
+    "successfulCalls": 27,
+    "failedCalls": 3,
+    "abandonedAttemptCount": 3,
+    "totalTokens": 108751,
+    "providerReportedMonetaryCost": false,
+    "accountingNote": "The provider omitted monetary cost fields. Budget accounting reserved 1000 micros per successful call; this is a conservative configured reservation, not a claimed invoice amount."
+  },
+  "genLayer": {
+    "network": "Studionet",
+    "chainId": 61999,
+    "judgeAddress": "0xeb599721b9A1ABbaa80BF3867D53551eF33B5955",
+    "bracketMatchCount": 11,
+    "finalizedMatchTransactions": 12,
+    "verdicts": [
+      {
+        "matchId": "sha256:243d7ccd124f2cad80a7a1a5edf1d289f13b5ae36ba40d4ddfaf7e8f0ccb00e2",
+        "attemptId": "sha256:0eaeb6684fefa99ce67f918d17acf5dedbc3f2b74613c52ac4777712adfedaba",
+        "transactionHash": "0xe4b114fd8b093cfa56cb1253ed5e48494abe6ff29205fe8331289baf67d10a21",
+        "result": "A_WIN",
+        "scoreA": 100,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "A is complete and clear while B is unusable garbled text",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "A fully explains idempotency keys for retrying paid requests with examples; B is garbled and does not address the topic",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "A delivers a complete correct explanation; B fails to produce any usable response",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "A uses logical steps and concrete HTTP example; B has no reasoning",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "A is structured and readable; B contains unreadable control characters",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates harm",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:3d7319a3d5d60dc0fe3a8bdc561048b1ec230d0bbdf638a9bab93f470d3a8253",
+        "attemptId": "sha256:bf3c0349d4bb558ef76432ffd817c4a97495c5dc6766c72ac774eafd8a24bcd6",
+        "transactionHash": "0x1fd8922ba398bd89863bbc08b74da2b5588de5db6864916d2acddf12fd045a24",
+        "result": "B_WIN",
+        "scoreA": 0,
+        "scoreB": 40,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Both outputs are relevant, correct explanations of idempotency keys for paid API retries. B has a small edge in task completion and clarity due to its concrete retry instructions and example, while relevance, reasoning quality, and safety are ties.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Both directly explain why idempotency keys matter for retrying paid API requests, focusing on duplicate-charge prevention after network or response failures.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Both answer the question correctly, but B more completely covers client behavior during retries with a concrete example and explicitly contrasts same-key retries versus new-key new payments.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Both give sound, internally consistent reasoning: retries can follow ambiguous failures, and idempotency lets the server return the original result instead of repeating payment effects.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "B is slightly easier to follow because it presents the retry flow step by step and adds a short HTTP example clarifying how the key is reused.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates wrongdoing or harm; both provide benign API design guidance.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:5a68c77fa88cf8b3b502210f8a524cff5192a0ff59392926f118244bc941151d",
+        "attemptId": "sha256:9eaca389877e17c93dfb7a4623dffffb7b3291ba0cf5a5d3266bfe48e579dce2",
+        "transactionHash": "0xd33369981abb951057f86075eb13e6056c59cd3e6773619a737a03932ec0b9eb",
+        "result": "A_WIN",
+        "scoreA": 90,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Output A is the stronger response, providing richer definitions, a meaningful distinction between probabilistic and deterministic finality, and a concrete illustrative example. Output B is accurate but brief and lacks the depth needed to fully satisfy the topic's explanatory scope.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Output A directly addresses both concepts with explicit definitions, types of finality, and a concrete Bitcoin example, staying fully on topic. Output B covers the same topic but more superficially, omitting the important distinction between probabilistic and deterministic finality.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A fulfills the task more completely by explaining both acceptance and finality, distinguishing probabilistic vs. deterministic finality, and providing an illustrative example. Output B only gives brief definitions without elaborating on finality types or providing examples.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A supports its claims with a concrete example (Bitcoin, six confirmations) and distinguishes finality subtypes with named mechanisms (proof-of-stake checkpoints, orphaned blocks). Output B's reasoning is correct but thin, lacking supporting detail or nuance.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Both outputs are clearly written and well organized. Output A uses bullet points and bold headers for structure; Output B is concise prose. Neither has a meaningful clarity advantage over the other.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates any real-world harm; both are straightforward educational explanations of blockchain concepts.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:74d8562774669017b035e2af229a0490b2ed29e5cb29f61b79ecb49ed2ba6b98",
+        "attemptId": "sha256:680ac59f4e8b106c5605460be2fe4cfbd000a4058293f0b0ee0fa06ff56c3beb",
+        "transactionHash": "0x525aa0ac24ce7cf8962d859d38ceb7ad32ca7235aa2eee296cb38f32ee07a44b",
+        "result": "B_WIN",
+        "scoreA": 0,
+        "scoreB": 100,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "B is materially superior across all substantive criteria. A contains a fundamental factual error—claiming escrow 'duplicates prize funds'—which undermines its relevance, task completion, and reasoning quality. B accurately explains the escrow mechanism using correct concepts like atomicity, idempotency, unique identifiers, and locked fund release, making it the clear winner.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "B directly and accurately describes how an escrow prevents double settlement through finalization, unique identifiers, and idempotency. A's claim that escrow 'duplicates prize funds for each valid claim' is factually incorrect and contradicts the concept of escrow, making it less relevant to the actual mechanism.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "B fully addresses the mechanism: fund locking, authorized single settlement, unique identifiers, atomicity, idempotency, and dispute handling. A gives an incomplete and factually wrong account, claiming escrow duplicates funds rather than preventing duplicate payouts from a single locked pool.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "B's reasoning is internally consistent and technically sound, explaining atomicity and idempotency as the basis for preventing double settlement. A's reasoning is self-contradictory—claiming escrow 'duplicates prize funds' while supposedly preventing double settlement undermines its own logic.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "B is clearly organized with a logical flow from locking to settlement to rejection of duplicates. A is brief but its factually contradictory language ('duplicates the prize funds') creates confusion about what it is actually describing.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates intentional real-world harm; both are explanatory descriptions of escrow mechanics.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:98782b0a0e904d70f37e20cc1d0f085fac35242b0b6cc972d1289dcf61376cc9",
+        "attemptId": "sha256:7a8cfe48f078d4b376c3a2ed1b74f342856a3fbd14b8766c51020e8b9dd17991",
+        "transactionHash": "0xc6b161e2e08c247de1dcec9f725257b9f26ff885045a3c58ccc553146a94e15e",
+        "result": "TIE",
+        "scoreA": 0,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Nearly identical explanations; both satisfy the topic equally well with no meaningful advantage on any criterion.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Both outputs directly explain Merkle-tree verification for light clients using proofs and a trusted root.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Both fully cover verification steps, proof size, and root matching without downloading the full set.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Both provide internally consistent, technically accurate step-by-step descriptions of the same process.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Both are plainly written, logically sequenced, and easy to follow with no meaningful organization difference.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output addresses or facilitates any form of harm, theft, or abuse.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:98782b0a0e904d70f37e20cc1d0f085fac35242b0b6cc972d1289dcf61376cc9",
+        "attemptId": "sha256:7b153dced77f576f3e2d6ffe1977088fbd2519ad12c3438de4df37760afb2aef",
+        "transactionHash": "0x2a4cabf3889127b349f37278a57c8a5cfe8442ad4cfb0563145ed6491734dfad",
+        "result": "A_WIN",
+        "scoreA": 100,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Output A comprehensively and correctly answers the topic about idempotency keys in paid API retries, covering the mechanism, the ambiguity of timeouts, and the risk of duplicate charges. Output B is entirely off-topic, describing rainy weather with no connection to the question. Output A wins decisively on all relevant criteria.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Output A directly addresses idempotency keys and their role in retrying paid API requests. Output B is entirely about rainy weather and has zero relevance to the topic.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A fully explains why idempotency keys matter, covering the mechanism, the timeout ambiguity problem, and the risk of duplicate charges. Output B does not address the task at all.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A provides sound, internally consistent reasoning: unique key sent by client, server recognizes retries, returns existing result, preventing duplicate irreversible actions. Output B offers no reasoning relevant to the topic.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Output A is clearly organized and easy to follow. Output B, while grammatically clear prose, is completely off-topic and thus provides no useful clarity for the requested subject.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates intentional real-world harm; both are safe under NEITHER_UNSAFE classification.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:b315727547a4a23d5e39f5fb954f9adae3de2afa139eae18170f86938908685b",
+        "attemptId": "sha256:d4ae7e786cbd70410ea3a697a224c1f87ebbfeb7ddfe5f357c5fb6964fbfaa6e",
+        "transactionHash": "0x62329d7efadde80e94f42fd71c6f336582a88c124621380a805d2b2544467050",
+        "result": "A_WIN",
+        "scoreA": 50,
+        "scoreB": 10,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Both models provide high-quality explanations of Merkle inclusion proofs. Output A is slightly superior for including an important limitation about trust assumptions and a more concrete step-by-step example, although Output B has slightly better formatting.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Both outputs directly and accurately explain how Merkle trees facilitate inclusion proofs for light clients.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A includes a specific limitation regarding the necessity of a trusted root, which provides a more complete picture of the verification process.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A provides a more detailed example (A, B, C, D) that explicitly shows how siblings are combined, whereas Output B is more general.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Output B uses a numbered list for the requirements, which makes the information slightly easier to parse at a glance.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates any harm; both provide standard technical explanations.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:b57a9cde05e728c44e11a60f36b02093357dcd7d469537a3bf0590dddcc91573",
+        "attemptId": "sha256:edf88bd9f7068c4452561d52f44c65179b818dd895143e041eb456c40552f91c",
+        "transactionHash": "0x056560bf90b70a9b9464c5d8a2e635a1dc58f58a48381da3fbd214ad73481cff",
+        "result": "A_WIN",
+        "scoreA": 90,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Output A provides a more comprehensive and detailed explanation of idempotency keys, addressing the topic's scope and requirements thoroughly. Output B is relevant and clear but lacks depth and task completion. Neither output raises safety concerns.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Output A directly addresses the topic by explaining the purpose, mechanism, and usage of idempotency keys in the context of retrying paid API requests. Output B is relevant but only provides a high-level summary without depth.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A fulfills all requested parts of the task by detailing why idempotency keys matter, how they work, and their practical usage (e.g., new keys for new payments, reusing keys for retries). Output B only partially fulfills the task with a brief explanation.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A provides sound, internally consistent reasoning by explaining the mechanism (server recognition of keys), the problem it solves (duplicate charges), and practical guidance. Output B lacks depth and supporting reasoning.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Both outputs are clearly written and understandable. Output A is more detailed, but Output B is concise and plainly written, making neither meaningfully clearer than the other.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates wrongdoing, credential theft, privacy invasion, abuse, or physical harm. Both are safe in the context of the topic.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:bd84b8abb89d3de42d6e5aaae68fd1c4cd9631472bf4e954256bddf93995c453",
+        "attemptId": "sha256:3bdb7ce91331adc5d02d87f2ec1905d6c596d0b6aea7c158327c2c58cb03f765",
+        "transactionHash": "0x65e999d5059f8b83145a72e5c6de9a7a92f80897846ad3e8a47c0ab7bbe58f1d",
+        "result": "A_WIN",
+        "scoreA": 50,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Output A is the winner because it provides a more comprehensive explanation of the mechanism and the efficiency of Merkle proofs, whereas Output B is a very brief summary.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Both outputs directly address the topic of Merkle tree inclusion proofs for light clients.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A provides a more complete explanation, detailing the structure of the tree, the specific process of hashing with siblings, and the logarithmic efficiency (log2N) which is central to why a light client doesn't need all records.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A explains the 'how' more thoroughly by describing the path from leaf to root and providing a concrete numerical example (1,024 records -> 10 hashes).",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Both are well-written and easy to understand; A is more detailed while B is more concise.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "No safety concerns present.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:beda5c19a8372a26b26475b2301be5de4fc03f70228d2e2de260914100da8d3b",
+        "attemptId": "sha256:9e50f617995fc0eeb35fd35303d64abf0b51d7bffc2fa27b3fb424a906bae8de",
+        "transactionHash": "0x38d049bed9696cfa6934f3bd3abb8a19599148afd96bdb79a091c04207df6dc2",
+        "result": "A_WIN",
+        "scoreA": 50,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Both outputs are relevant and clear. Output A wins task completion and reasoning quality due to greater comprehensiveness and detail, including an example and a limitation discussion. Output B is correct but slightly less thorough. Safety is tied.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Both outputs directly address the topic of explaining how a Merkle tree enables a light client to verify inclusion without downloading all records.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A fulfills all requested parts more thoroughly, including an explicit explanation of the verification process, an example with 1,024 records, and a discussion of limitations. Output B is correct but slightly less comprehensive.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A provides more detailed, internally consistent support, including a step-by-step breakdown of the proof components and a clear explanation of the O(log n) efficiency. It also correctly notes a key limitation (what inclusion does and does not prove). Output B's reasoning is sound but less elaborated.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Both outputs are well-organized and plainly written, making the concept understandable. Stylistic differences are marginal; neither has a meaningful advantage in clarity.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates intentional real-world harm; both provide neutral technical explanations.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:d5b91f2a138b43117ff16b069b2ec6c5aa972c807b98093069eba60ad9504262",
+        "attemptId": "sha256:e240ee657a1d080e30a6b619b4ac5707c9cc7469392567eb4bf6706842521473",
+        "transactionHash": "0xdadb72d0ff30ec8bdf1aab739b3b28e19806b5bc067dfa008f300f84779e309f",
+        "result": "B_WIN",
+        "scoreA": 0,
+        "scoreB": 100,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "B correctly and coherently explains that idempotency keys prevent duplicate charges when retrying paid API requests, covering mechanism and practical use cases. A contains a critical factual inversion—claiming idempotency keys guarantee repeated charges—which undermines relevance, correctness, and reasoning quality. B wins on all substantive criteria.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "B correctly explains that idempotency keys prevent duplicate charges on retries, which is the core purpose. A incorrectly states they 'guarantee that every retry charges the customer again,' which is the opposite of the topic's intent and thus fails to address the subject accurately.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "B fulfills all parts of the request: it explains the purpose (preventing duplicates), the mechanism (recognizing repeated attempts as the same operation), and practical contexts (timeouts, network failures). A contains a factual inversion that makes it fail the correctness requirement.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "B's reasoning is internally consistent and sound: retries are safe because the service deduplicates them. A's reasoning is self-contradictory—it claims idempotency keys cause duplicate charges while also claiming they prevent confusion between retries and originals, which are incompatible claims.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "B is clearly organized and easy to follow. A is also plainly written, but its contradictory framing creates confusion even at the surface level, giving B a meaningful clarity advantage.",
+            "winner": "B"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates intentional real-world harm; both are straightforward technical explanations.",
+            "winner": "TIE"
+          }
+        ]
+      },
+      {
+        "matchId": "sha256:e5e09188cdaf19ddcf154c89df6be5acc3a5db45495ae2e535f6962127b10fb6",
+        "attemptId": "sha256:d201743b6bb45f8e4584c2cb606d69dc6b130117d2acd2263b7644832d50da66",
+        "transactionHash": "0x3463a2ed16b1bdd0191f946e200c9549f7541b9349e6356d8a77551e06e1d626",
+        "result": "A_WIN",
+        "scoreA": 90,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "summary": "Output A meaningfully outperforms B across relevance, task completion, and reasoning quality by providing a concrete example, explaining the atomic status-change mechanism, and acknowledging limitations. B is a correct but shallow summary that lacks the depth needed to fully satisfy the topic. Clarity is a tie as both are well written.",
+        "criteria": [
+          {
+            "criterion_id": "relevance",
+            "reason": "Output A directly addresses the tournament escrow scenario with specific details about tournament identifiers, settlement status transitions, and the atomicity requirement, while B covers the same topic but more superficially.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "task_completion",
+            "reason": "Output A fulfills the description more completely by including a concrete numeric example (Alice and Bob each depositing $50), explaining the status lifecycle (unsettled→paid), and noting important limitations about trusted oracles and atomic operations. B omits these details.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "reasoning_quality",
+            "reason": "Output A provides internally consistent reasoning about why double settlement is prevented (atomic status change + trusted result source) and acknowledges edge cases where the protection could fail. B asserts the conclusion without explaining the mechanism in depth.",
+            "winner": "A"
+          },
+          {
+            "criterion_id": "clarity",
+            "reason": "Both outputs are clearly written and well organized. A is longer but not harder to follow; B is more concise but both are equally understandable.",
+            "winner": "TIE"
+          },
+          {
+            "criterion_id": "safety",
+            "reason": "Neither output facilitates intentional real-world harm; both describe a protective financial mechanism in straightforward terms.",
+            "winner": "TIE"
+          }
+        ]
+      }
+    ]
+  },
+  "arc": {
+    "network": "Arc Testnet",
+    "chainId": 5042002,
+    "escrowAddress": "0x2875BeA04e01EdaAA762987431ad5a87CF11445d",
+    "usdcAddress": "0x3600000000000000000000000000000000000000",
+    "tournamentId": "0x3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61",
+    "stakeMicroUsdc": "1000",
+    "entrantCount": 8,
+    "grossPoolMicroUsdc": "8000",
+    "netPayoutMicroUsdc": "7200",
+    "platformFeeMicroUsdc": "800",
+    "payoutAmountsMicroUsdc": [
+      "2880",
+      "1800",
+      "1080",
+      "720",
+      "720"
+    ],
+    "platformFeeBps": 1000,
+    "feeRecipient": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+    "payoutBps": [
+      4000,
+      2500,
+      1500,
+      1000,
+      1000
+    ],
+    "transactionHashes": {
+      "create-tournament": "0xa73870f42dc36dca45ecf1d1349532557ae4c11fc07fbb773f656bf562c97fcc",
+      "fund-helper-1": "0xa92b06d545b53574e1affeef718c367ccb6044172f089ab6ed4a909ec6056d83",
+      "fund-helper-2": "0xdf06143ad3e0966cd78f3178b73991e10b33d62825fa84e5fdf18c5e86594b71",
+      "fund-helper-3": "0x97e7803de2aa19c42ac748dd3f9f24d40e60d5ed9ac9f9796899c8dd1a109cb5",
+      "fund-helper-4": "0x8f2ed4add6e03b0fa534e952919ea85a0c3d7c44eaaf70fad798cef055fd0ee5",
+      "fund-helper-5": "0x932cdb096548057154f80f413287549a2373e2421a38718307bf428f25757f05",
+      "fund-helper-6": "0x02e02239df266493d43409169e5770546023ad171cbe8612c39f48a548f12594",
+      "fund-helper-7": "0xffdd30be647b75f8bca06fc86d6e69a2aa9d91fef290de8371290b29d691224e",
+      "approve-0": "0x8207f0bd0347c767e738893e5e3a5af95bd5bd0279015a80fdce9385690e3f3c",
+      "register-0": "0xa04b193a25f87865cf13b33b7b11c7c7afe31cd11c32d31f3cc0fc4e873c3008",
+      "approve-1": "0xe3e2fd48d75d409884da4c29ab409fbd4a4f353576afeb43dda60d343c7fe22e",
+      "register-1": "0x35f025ac1576e9ebc8487b0844f8441762d8448bf39d37c6f59d59bad4d716f2",
+      "approve-2": "0xb5fdf534814647f64ff0069cdd1d390e021767e80ed056d4bd8d9956ba23c6e0",
+      "register-2": "0x3d83a5823e6d248a8e0e98f72da83e8000cce5aef2e0f20fe7172fa3a8871603",
+      "approve-3": "0x11397a621b06c7334392120c5e445cec72763c9c19abf10885453c4133e375f1",
+      "register-3": "0x8c130a3be568aadb97ce9b3ddd08f7f94546dd2e38212b5f60a83f91d7c1ff92",
+      "approve-4": "0x0069418c4b14d47225cd4f87c03ad1658decf609129bca941b21863a9e4ae375",
+      "register-4": "0xc086a7aa788a677c574a8b3440c2f7f5f0f764f9ed6ff1cd480ad3e41452dc05",
+      "approve-5": "0x567587e620018ed0f2001f796782b9598357d0d3356b80790a5c4a65ad539168",
+      "register-5": "0x6ea3ef88705ff16da9c11664fe91f083f5a7e1811fc0ee063dfbfa98934463e6",
+      "approve-6": "0x8812555fffc3e2588a76ca29af39905eff1c0aedb6f01ea5547bfded8e4b3cf7",
+      "register-6": "0x096f2a5eb97d9d0f91ccd4e14424e396a2e3787144fc16fa859ba33828698dfd",
+      "approve-7": "0x99e24cc4a26e04eb7a531de7b9f4f279513d13c537fa9e1f3cb68db123590768",
+      "register-7": "0xfca7b60757336d995fe9d78818ee4996ac5e4ae4c1190763bebbe7c43cc495e8",
+      "close-registration": "0x6a7fa81fa33775c1c67b6d0487d4eb7b6c428d270c636ae1be03f2d9d4e2025b",
+      "mark-running": "0xe67f9f6546f4f356c82b567ff6527be9768c812f5b31ae2d443ca1419df3547d",
+      "settle": "0x4112548427f3b31566532d2bf86aaec31963a57cc8d7bda3607912a5947fab38",
+      "withdraw-rank-1": "0x8ee778957d742de61c496d63c8c15f207b00329f5cd91f745e6787b5699c948c",
+      "withdraw-rank-2": "0x3c15dc05665794119f18275c470b85c4ff0ac7f1ef652e8031fe0a8e6e7daab4",
+      "withdraw-rank-3": "0xbc2e5ce93b589bf7ee2f804535ac4bbe18a9454c182072aebb9112a00251fa50",
+      "withdraw-rank-4": "0xa001fba82f0e90322b9d2a01e74e0fffcf58798064144c15d327b1759317e09d",
+      "withdraw-rank-5": "0x3218ab9a3b3e6a352648dc34fc808e72f1fd6ac7f2bb26f9f5e25c206ab06986",
+      "withdraw-platform-fee": "0x6939de11b7699bdbfef353c86d40890019598c73e6bd6cb9aef698fe03dedd67",
+      "close-tournament": "0x652cf7309bb6e8d0b954dff9bb98ca9ccb735bf18db3204f2fa221d2f9a868f9"
+    },
+    "terminalState": "CLOSED",
+    "totalLiabilityMicroUsdc": "0",
+    "totalLockedStakesMicroUsdc": "0"
+  },
+  "ranking": [
+    "sha256:ee794542d9da7f855810de55546d520549b43fff07c755e1059b9a48d5a6feca",
+    "sha256:b8d4cd708b52c5a4e79480d9191084479c97216c90c16cbef9531eed46f9919f",
+    "sha256:74cb08cd71a8804ef462ce0cdab4b6c59a878654c73fb9624333b9a6d176542f",
+    "sha256:81f32c5e4e83b9dfb88541c96a4acbe1639ae1ce5305f38936e6bdb80af3ca6e",
+    "sha256:15b75921f1053a3da16ce2ac37ea518b60d1dcd8327fc342da5450accc53a2b9"
+  ],
+  "sanitization": "No API keys, private keys, raw provider outputs, raw GenLayer receipts, traces, validator configuration, stdout or stderr are retained."
+}

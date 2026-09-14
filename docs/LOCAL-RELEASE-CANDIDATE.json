@@ -1,0 +1,72 @@
+{
+  "schema": "arena-local-release-candidate-v1",
+  "createdAt": "2026-09-14",
+  "scope": "LOCAL_ONLY",
+  "fileCount": 220,
+  "sourceBundleSha256": "7076bf1c3f2af6eddcd869754fa307cb0a105ed62245d76441389d2a805ccfb7",
+  "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
+  "includedRoots": [
+    "contracts",
+    "packages",
+    "services",
+    "frontend/src",
+    "frontend/public",
+    "scripts"
+  ],
+  "includedFiles": [
+    "package.json",
+    "package-lock.json",
+    "frontend/index.html",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "requirements-dev.txt",
+    "pyproject.toml",
+    "foundry.toml",
+    "gltest.config.yaml",
+    ".dockerignore",
+    "Dockerfile",
+    "compose.yaml",
+    "deploy/Caddyfile",
+    "deploy/backup-now.sh",
+    "deploy/restore-test.sh",
+    "deploy/arena-backup.service",
+    "deploy/arena-backup.timer",
+    "deploy/arena-keep-awake.service"
+  ],
+  "criticalFiles": {
+    "contracts/arc/TournamentEscrow.sol": "a243077315941524bc48eb863668aab37a72749f46e238621fe937de96257803",
+    "contracts/ArenaMatchJudge.py": "a90bcbfac8dc9925a1e0f93e7b69ab3661ae2119f8f08a371336b55834ad13c8",
+    "contracts/AgentEvaluationJudge.py": "74682ca3f45cce2d344cc670260b3a99914fec4ee47e0fb93f6e256b40598454",
+    "frontend/package-lock.json": "8836419384de6c2414a0a6b958acf2e5f2341c899a8a2be2df94286a9bd82589",
+    "package-lock.json": "82ae7acccfdb7052eeeb978865b81f7fa09267542cdafbe63327154444e09afd",
+    "package.json": "99c51b4227d5b5686ceea12c8e4c988afaf1be6abd8219f77f5b93364bb2e3d6",
+    "scripts/check.ps1": "2abbb1a5a8b331c799083a6d88f6990e72402ca376e241564b772afac6e3e9c2",
+    "packages/evaluation/src/run-tracker.ts": "4df39ede74835dca3b84c8812e63ccacae20c42a24078986cd89677390aaf01a",
+    "packages/evaluation/test/run-tracker.test.ts": "e36f73409a866592d6f0849455f430460411bfec17a7b817db32a5cd16684fb3",
+    "packages/genlayer/src/sdk-port.ts": "5f92ca62939fbc57a14e950fab643545b37b9280c173751cfc50a9c2bf0a5433",
+    "packages/genlayer/test/sdk-port.test.ts": "a728c59149d04baa3cc18740ce3f210dfedb8ba9b3f25bcbc6d555f92946178c",
+    "packages/genlayer/src/evaluation-sdk-port.ts": "273e6a189894d0a37cc6cfbbc4a0b0cdf3ea2356a95410ebf9ebbcacfa58a462",
+    "packages/genlayer/test/evaluation-sdk-port.test.ts": "a688f6856c817b8531ff6078214ea5337a8b58e99f9a3ca9fa44b88a6968b092",
+    "packages/evaluation/src/provider.ts": "807c265348686b53da87ed535527048e10466d3ea9f4d2c1cd15f45867d918cd",
+    "packages/evaluation/src/solo-runner.ts": "bfa6e1e8089ff708bee8c357cff843e453e28ace768c3bb32055ca5a891e8433",
+    "packages/evaluation/test/solo-runner.test.ts": "2e544a4c0a3d51f9094438f565f93d0e83ab307476eea61b556340de17312217",
+    "services/api/src/http.ts": "82192a29977dac0e0bbd949a7b64f5112bd664ecad849e66e83062fa4bcfdfc1",
+    "services/api/src/service.ts": "f70a89688c099e25ebcc6f56526514248352722fdfc4e7a993732ac70d78797d",
+    "services/api/test/http.test.ts": "071fe0458aa7d9e1b501dcc7dd878fed795a35c7b0ab275f7ab3e2947d9ed362",
+    "services/api/test/service.test.ts": "91412ae1cfb74ed97cfd83091d331c7c453ae74c26095cf40e7b499bccb007d7",
+    "scripts/run-studionet-agent-evaluation.mjs": "85f80a0dedf8db2e0064e0c4a551584b38e9c985b009b38e887ed30c387ca5ef",
+    "Dockerfile": "92ecf2dcc14a25a668ee3df174775542d4b02f172332002e896643dc3a14a86a",
+    "compose.yaml": "7b8b71274ee671aaaeb65822b76bedfcc39ce1067f5e7c576eac86667a5daeaa",
+    "deploy/Caddyfile": "25c93ca5958a691daf7436db6b6d516c440963612330bfcd67bd3e32fbe82a58"
+  },
+  "verification": {
+    "pythonDirectTests": 77,
+    "typescriptTests": 160,
+    "foundryTests": 14,
+    "frontendTests": 32
+  },
+  "claims": [
+    "This manifest freezes a local implementation candidate only.",
+    "This source-bundle manifest does not itself prove the separately recorded deployment, paid provider, wallet or transfer evidence, and does not authorize hosting, publication or submission."
+  ]
+}

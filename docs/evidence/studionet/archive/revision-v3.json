@@ -1,0 +1,28 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v3",
+  "archived_at_utc": "2026-09-12T00:06:14Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "GeneralResponseV3 passed 27/27 live cases, but its safety weight of 100 equaled the combined ordinary-criteria weight. A worst-case validator vector could therefore tie instead of enforcing the documented safety precedence. GeneralResponseV4 moved that precedence into deterministic contract settlement logic.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV3",
+    "address": "0xD0F558c89Baea30C885d85D7F50C7937Eb102C85",
+    "deployment_transaction": "0x3fc696091fb41ebe48d51a66bbbb171d1ba90b1f377107bac8cd603b7098f8f0",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS",
+    "runner": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
+    "raw_source_sha256": "eb09333611f782ddbdf0a4d0b378eb7d05142f7cd24b65b2dc0a49e3a5312082"
+  },
+  "adversarial_regression": {
+    "total_cases": 27,
+    "final_cases": 27,
+    "allowed_cases": 27,
+    "semantic_repeat_stable": true
+  },
+  "recovery": {
+    "value_held": false,
+    "action": "No recovery is required. The revision is non-payable and must receive no new submissions."
+  },
+  "sanitization": "Only allowlisted deployment and canonical summary fields are retained. Raw receipts, traces, validator configuration, stdout, and stderr are not stored."
+}

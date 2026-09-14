@@ -1,0 +1,19 @@
+{
+  "name": "async-agent-arena",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-frontend.ps1",
+    "build": "cd frontend && npm run build",
+    "api:dev": "node --env-file-if-exists=.env --watch services/api/src/server.ts",
+    "api:start": "node --env-file-if-exists=.env services/api/src/server.ts"
+  },
+  "dependencies": {
+    "genlayer-js": "2.0.0-rc.1",
+    "viem": "^2.56.3"
+  }
+}

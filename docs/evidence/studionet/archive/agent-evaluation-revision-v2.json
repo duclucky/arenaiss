@@ -1,0 +1,26 @@
+{
+  "schema": "arena-agent-evaluation-deployment-archive-v1",
+  "archived_at_utc": "2026-09-14T03:18:00Z",
+  "network": {
+    "name": "Studionet",
+    "chain_id": 61999
+  },
+  "contract": {
+    "name": "AgentEvaluationJudge",
+    "rubric_version": "AgentEvaluationV2",
+    "address": "0x91e2A7FE10490072C459bDD6363337b9BD6ab64f",
+    "deployment_transaction": "0x6db6c149c4094707622756c9d917e1982ab1c593de08290d6d9abeb126b30bfa",
+    "status": "SUPERSEDED",
+    "further_transactions_allowed": false
+  },
+  "failure_evidence": {
+    "run_id": "live_l2_destructive_confirmation_confirm_v1",
+    "transaction": "0x6ae1b10865aa770f3c106badbf220e4468e5dd7a98be41c24fda2b803c7a78d4",
+    "status": "FINALIZED",
+    "consensus_result": "MAJORITY_DISAGREE",
+    "leader_execution": "SUCCESS",
+    "canonical_result": "UNKNOWN"
+  },
+  "reason": "Independent re-grading plus numeric tolerance still produced disagreement for qualitative action-decision scoring. Revision V3 asks validators to independently verify whether the proposed scorecard is defensible and evidence-supported while contract code derives aggregate and result.",
+  "sanitization": "Only deployment identity and allowlisted failure classification fields are retained. Raw receipt, trace, validator configuration, provider output and secrets are excluded."
+}

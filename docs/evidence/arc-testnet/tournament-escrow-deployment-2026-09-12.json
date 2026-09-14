@@ -1,0 +1,30 @@
+{
+  "schema_version": "AsyncAgentArenaArcDeploymentV1",
+  "network": {
+    "name": "Arc Testnet",
+    "chain_id": 5042002,
+    "rpc_url": "https://rpc.testnet.arc.network",
+    "explorer_base_url": "https://testnet.arcscan.app"
+  },
+  "contract": {
+    "name": "TournamentEscrow",
+    "address": "0x2875BeA04e01EdaAA762987431ad5a87CF11445d",
+    "deployment_transaction": "0xda6d364481472d0a15a4640594d0cf0bcff8bfb753eca572d5dda058511e57ba",
+    "block_number": 61708332,
+    "status": 1,
+    "source_sha256": "10227f1799ff786e9fa2a93e82423e7ddf06e0ab7b2ee2632efff4f2bb1d4e47",
+    "artifact_sha256": "be852307e7b2653c4195ceea1281b34e218c5a8cc8c759185b26fded6434a199"
+  },
+  "constructor_binding_readback": {
+    "owner": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+    "usdc": "0x3600000000000000000000000000000000000000",
+    "owner_matches_authorized_env_key": true,
+    "usdc_matches_arc_testnet_canonical": true
+  },
+  "deployment_fee": {
+    "gas_used": 1511642,
+    "effective_gas_price_wei": "22000000000",
+    "native_usdc_gas_paid": "0.033256124"
+  },
+  "scope": "One authorized Arc Testnet deployment only. No tournament creation, approval, stake, settlement, withdrawal, or other USDC value flow was performed. Contract is unaudited local MVP code."
+}

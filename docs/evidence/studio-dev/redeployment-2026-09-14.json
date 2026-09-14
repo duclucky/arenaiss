@@ -1,0 +1,105 @@
+{
+  "schema": "arena-genlayer-studio-dev-redeployment-v1",
+  "capturedAtUtc": "2026-09-14T09:34:07.2441261Z",
+  "network": {
+    "name": "GenLayer Studio Devnet",
+    "studioVersion": "v0.123.0-rc.6",
+    "genvmVersion": "v0.3.0-rc7",
+    "chainId": 61997,
+    "rpc": "https://studio-dev.genlayer.com/api",
+    "explorer": "https://explorer-studio-dev.genlayer.com",
+    "stability": "release-candidate; may reset"
+  },
+  "operator": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+  "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+  "runtimeFix": {
+    "oldApi": "gl.vm.run_nondet_unsafe",
+    "newApi": "gl.vm.run_nondet",
+    "semantics": "GenVM v0.3 custom validator execution without the default validator sandbox",
+    "changedCallSites": [
+      "contracts/ArenaMatchJudge.py:464",
+      "contracts/AgentEvaluationJudge.py:409"
+    ],
+    "focusedRegression": "2 passed after 2 expected RED failures"
+  },
+  "contracts": [
+    {
+      "name": "ArenaMatchJudge",
+      "rubricVersion": "GeneralResponseV7",
+      "address": "0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679",
+      "deploymentTransaction": "0x647f2c2662f1123a541a3025189ab04ddf88a17ff96b4c13de758a2d678a1f81",
+      "deploymentStatus": "FINALIZED",
+      "deploymentConsensusResult": "MAJORITY_AGREE",
+      "deploymentExecutionResult": "FINISHED_WITH_RETURN",
+      "sourceSha256": "a90bcbfac8dc9925a1e0f93e7b69ab3661ae2119f8f08a371336b55834ad13c8",
+      "deployedSourceMatchesLocal": true,
+      "deploymentFeeDepositWei": "100000000000010352",
+      "deploymentExecutionFeeConsumedWei": "78789000000000",
+      "semanticSmoke": {
+        "transaction": "0x5b3560faa387827d09607ce899a922a9d197b21dd1e5887e6c983bd4abdb432a",
+        "status": "FINALIZED",
+        "consensusResult": "MAJORITY_AGREE",
+        "executionResult": "FINISHED_WITH_RETURN",
+        "feeDepositWei": "636624000010352",
+        "executionFeeConsumedWei": "82875500000000",
+        "storedStatus": "FINAL",
+        "storedResult": "A_WIN",
+        "scoreA": 100,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "criteriaCount": 5
+      }
+    },
+    {
+      "name": "AgentEvaluationJudge",
+      "rubricVersion": "AgentEvaluationV5",
+      "address": "0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d",
+      "deploymentTransaction": "0x67f1acfffab81e3db71cd892370db6cfa4846ffa5a1db858148ff65e7f55b2ed",
+      "deploymentStatus": "FINALIZED",
+      "deploymentConsensusResult": "MAJORITY_AGREE",
+      "deploymentExecutionResult": "FINISHED_WITH_RETURN",
+      "sourceSha256": "74682ca3f45cce2d344cc670260b3a99914fec4ee47e0fb93f6e256b40598454",
+      "deployedSourceMatchesLocal": true,
+      "deploymentFeeDepositWei": "100000000000010352",
+      "deploymentExecutionFeeConsumedWei": "78811250000000",
+      "failedInputAttempt": {
+        "transaction": "0x16268ab5e80dbd73669df8666b37ac22e9b212344076bba3d0f703bc12fcf739",
+        "status": "FINALIZED",
+        "executionResult": "FINISHED_WITH_ERROR",
+        "stateApplied": false,
+        "publicError": "scenario must be text",
+        "cause": "CLI inferred a JSON object argument instead of the ABI string"
+      },
+      "semanticSmoke": {
+        "transaction": "0xdd4e5fb13609ecd82576e62517ecf849738d6f0b382426de92923d7ac301637d",
+        "status": "FINALIZED",
+        "consensusResult": "MAJORITY_AGREE",
+        "executionResult": "FINISHED_WITH_RETURN",
+        "feeDepositWei": "646473600010352",
+        "executionFeeConsumedWei": "83989500000000",
+        "storedStatus": "FINAL",
+        "resultClass": "STRONG",
+        "overallScore": 100,
+        "dimensionCount": 6,
+        "actionsExecuted": false,
+        "policyFindingCount": 0
+      }
+    }
+  ],
+  "regression": {
+    "genvmAstLint": "PASS: 3 checks per contract",
+    "pythonRuntimeCompatibility": "PASS: 2 focused AST cases",
+    "pythonDirectSemanticSuite": "UNAVAILABLE: published v0.3.0-rc7 and v0.2.16 bundles do not contain the Studio-hosted 5jyc runner",
+    "rootCheck": "BLOCKED at SDK validation for the same missing 5jyc runner archive; its remaining suites were executed separately",
+    "typescript": "PASS: 160 tests excluding the manifest check, which passed separately after refresh",
+    "foundry": "PASS: 14 tests",
+    "frontend": "PASS: 32 tests, typecheck and production build",
+    "releaseManifest": "PASS: 220 files"
+  },
+  "toolchain": {
+    "genlayerCli": "0.40.0-rc.3",
+    "genlayerJs": "2.0.0-rc.1",
+    "genvmLinter": "0.11.0"
+  },
+  "sanitization": "Only allowlisted network, source hash, transaction status, fee summary, public canonical result, and minimal public error fields are retained. Raw receipts, traces, validator/provider configuration, output bytes, prompts, and credentials are excluded."
+}

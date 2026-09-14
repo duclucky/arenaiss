@@ -1,0 +1,15 @@
+{
+  "active": false,
+  "network": "arc-testnet",
+  "chain_id": 5042002,
+  "contract": "TournamentEscrow",
+  "version": "TournamentEscrowV1",
+  "address": "0x2875BeA04e01EdaAA762987431ad5a87CF11445d",
+  "deployment_transaction": "0xda6d364481472d0a15a4640594d0cf0bcff8bfb753eca572d5dda058511e57ba",
+  "block_number": 61708332,
+  "owner": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "source_sha256": "10227f1799ff786e9fa2a93e82423e7ddf06e0ab7b2ee2632efff4f2bb1d4e47",
+  "status": "SUPERSEDED_LIVE_LIFECYCLE_PROVEN",
+  "reason": "Superseded by V2 automatic relayer payout entrypoints. Historical lifecycle and refund evidence remain bound to this address."
+}

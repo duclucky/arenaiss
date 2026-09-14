@@ -1,0 +1,102 @@
+{
+  "profile": "AsyncAgentArenaACI/1",
+  "source": {
+    "kind": "synthetic-profile-vector",
+    "basis": "ACI aci/1 draft at revision 19daf2b7152eeaf1f8be3fd66d261b8c1ce8eac5",
+    "warning": "This fixture proves verifier behavior, not a deployed TEE or model execution."
+  },
+  "trust_anchor": {
+    "key_id": "receipt-1",
+    "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+    "workload_keyset_digest": "sha256:53a5cd44b30dcc51999754c719f2628a041f174ecbf9662a6f8e898a10cd9371",
+    "session_id": "95ad1cb4dd25445808c2e9d116caf420b05703730b506395e8fc1ca6faeae28f",
+    "quote_verified": true,
+    "report_data_keyset_bound": true,
+    "attestation_nonce_fresh": true,
+    "tls_spki_bound": true,
+    "workload_measurement": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_workload_measurement": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "key_custody_verified": true,
+    "key_custody_policy_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "expected_key_custody_policy_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "policy": {
+    "now": 1750000100,
+    "max_age_seconds": 600,
+    "max_future_skew_seconds": 30,
+    "endpoint": "/v1/arena/matches",
+    "model": "demo-model",
+    "arc_chain_id": 5042002,
+    "arc_manager": "0x3434343434343434343434343434343434343434",
+    "model_policy_digest": "0x03d09062162a459bc3ea4fa307ec8b94cf1e4cf50e6f585252ef49ffc09ddf21",
+    "generation_policy_digest": "0xfe5afbef52bdbe43827e375c96aa9804ef661b8b29b6fbf1633da3964a1cadae"
+  },
+  "request": {
+    "schema_version": "MatchInferenceRequestV1",
+    "arc_chain_id": 5042002,
+    "arc_manager": "0x3434343434343434343434343434343434343434",
+    "tournament_id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "round_id": "0x2222222222222222222222222222222222222222222222222222222222222222",
+    "match_id": "0x3333333333333333333333333333333333333333333333333333333333333333",
+    "attempt_id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+    "entrant_a_id": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "entrant_b_id": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "prompt_version_a": 1,
+    "prompt_version_b": 4,
+    "prompt_a": "Answer as a careful systems architect.",
+    "prompt_b": "Answer as a concise product strategist.",
+    "prompt_commitment_a": "0x2187c0f8d14b78091ff390ad79591aae06cc87980feef0f399ba54e450fd782f",
+    "prompt_commitment_b": "0x2a79c820d1c8c0bfda431e652ce7ec578655c8c7943574b78a63a42603c0eaf0",
+    "topic": "Design a resilient public-goods funding mechanism.",
+    "topic_digest": "0x810d7c301de7bb2ce81c77078eecd6b690bb9b6c608804489278a087a9a47210",
+    "system_wrapper": "Follow the contestant prompt, address the topic, and return one bounded answer.",
+    "system_wrapper_digest": "0xcd54f10de9baf961ca4fc23b2028118821077c702355d1c434042e6869a1e164",
+    "model": "demo-model",
+    "model_policy_digest": "0x03d09062162a459bc3ea4fa307ec8b94cf1e4cf50e6f585252ef49ffc09ddf21",
+    "generation_policy": {"max_tokens": 64, "temperature_milli": 0},
+    "generation_policy_digest": "0xfe5afbef52bdbe43827e375c96aa9804ef661b8b29b6fbf1633da3964a1cadae",
+    "request_nonce": 9,
+    "issued_at": 1750000090,
+    "expires_at": 1750000400
+  },
+  "provider_requests": {
+    "A": {"max_tokens": 64, "messages": [{"content": "Follow the contestant prompt, address the topic, and return one bounded answer.", "role": "system"}, {"content": "Answer as a careful systems architect.\n\nTOPIC: Design a resilient public-goods funding mechanism.", "role": "user"}], "model": "demo-model", "temperature": 0},
+    "B": {"max_tokens": 64, "messages": [{"content": "Follow the contestant prompt, address the topic, and return one bounded answer.", "role": "system"}, {"content": "Answer as a concise product strategist.\n\nTOPIC: Design a resilient public-goods funding mechanism.", "role": "user"}], "model": "demo-model", "temperature": 0}
+  },
+  "provider_responses": {
+    "A": {"choices": [{"message": {"content": "Use milestone escrow, transparent matching, and public outcome audits."}}], "id": "arena-a-1"},
+    "B": {"choices": [{"message": {"content": "Pool recurring contributions and let verified communities rank impact."}}], "id": "arena-b-1"}
+  },
+  "response": {
+    "schema_version": "MatchInferenceResponseV1",
+    "match_id": "0x3333333333333333333333333333333333333333333333333333333333333333",
+    "attempt_id": "0x4444444444444444444444444444444444444444444444444444444444444444",
+    "model": "demo-model",
+    "outputs": {
+      "A": {"digest": "0x0bd652ce625c30dd1d45b7bbe731a87da834e3beaf65e0eeed6dedbf3cc3be3d", "text": "Use milestone escrow, transparent matching, and public outcome audits."},
+      "B": {"digest": "0x2d4ca2af0f56bd180ea1da96e9fc2ee0a1e660f48fe3642c8a4896da556f0d19", "text": "Pool recurring contributions and let verified communities rank impact."}
+    }
+  },
+  "receipt": {
+    "api_version": "aci/1",
+    "chat_id": "arena-match-1",
+    "endpoint": "/v1/arena/matches",
+    "event_log": [
+      {"body_hash": "sha256:89484460473de6a67562a1bad9cffc3b4fe3458f644558807f322d88cba45be2", "type": "request.received"},
+      {"body_hash": "sha256:de718f4f1910b38707dbe68a6bd6fe24a3145549c42c549d113d2ca02af6a67d", "type": "request.forwarded"},
+      {"body_hash": "sha256:9dbc0427cb009ecafe8f00b99fffcd22b2665956e1e9b27734b255c89f509029", "slot": "A", "type": "arena.request.forwarded"},
+      {"body_hash": "sha256:ec4c86ee5b507251c7d211063ec42573209034cbe0092fef6ba2a90b4bbfa16b", "slot": "B", "type": "arena.request.forwarded"},
+      {"model_id": "demo-model", "required": true, "result": "verified", "session_id": "95ad1cb4dd25445808c2e9d116caf420b05703730b506395e8fc1ca6faeae28f", "type": "upstream.verified"},
+      {"body_hash": "sha256:d53cef9bce39b56b2f142522985b5bb7e6975d87e549510be03bb955311a48eb", "output_digest": "0x0bd652ce625c30dd1d45b7bbe731a87da834e3beaf65e0eeed6dedbf3cc3be3d", "slot": "A", "type": "arena.response.returned"},
+      {"body_hash": "sha256:0b05ee09dcda64c0fd6f2834080c21744c395aa85a94c60d4609adb17ddb8778", "output_digest": "0x2d4ca2af0f56bd180ea1da96e9fc2ee0a1e660f48fe3642c8a4896da556f0d19", "slot": "B", "type": "arena.response.returned"},
+      {"body_hash": "sha256:9cea4d515041f7ed550bf36c7dc5132273a48995bcbbe0f77dc373b26fa98a76", "type": "response.returned"}
+    ],
+    "key_id": "receipt-1",
+    "method": "POST",
+    "model": "demo-model",
+    "receipt_id": "arena-rcpt-0001",
+    "served_at": 1750000100,
+    "signature": "4c4289425e480d00c9b35f47cce6e049ce72e774457e7cbdbd0825d28e1bb5f80b55b28d75807c8e29ef6bfcd100ef8065db9a663d67517b6cca1e918153cf0a",
+    "workload_keyset_digest": "sha256:53a5cd44b30dcc51999754c719f2628a041f174ecbf9662a6f8e898a10cd9371"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v4",
+  "archived_at_utc": "2026-09-12T00:06:14Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "GeneralResponseV4 made safety precedence deterministic, but the expanded live corpus produced A_WIN 20-0 for semantically equivalent code solely from reasoning_quality. GeneralResponseV5 raises the inclusive tie margin from 10 to 20 so one low-weight criterion cannot decide tournament progression.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV4",
+    "address": "0x7A56ef7A884f533f1FfE627a402e6E92Be22Ba9E",
+    "deployment_transaction": "0x820b472c1ef3d697427852e61ac331ab2277d735ff5bb9b8b0f71475a565444d",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS",
+    "runner": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
+    "normalized_readback_source_sha256": "81c6a13a97228caeb4a6abf5df019fef5a30ba26dc4d6879db474d662c78b5c8"
+  },
+  "adversarial_regression": {
+    "total_cases": 28,
+    "final_cases": 28,
+    "allowed_cases": 27,
+    "failed_case_ids": ["adv_equivalent_code"],
+    "failure": {
+      "result": "A_WIN",
+      "score_a": 20,
+      "score_b": 0,
+      "decision_vector": "TIE|TIE|A|TIE|TIE"
+    },
+    "semantic_repeat_stable": true
+  },
+  "recovery": {
+    "value_held": false,
+    "action": "No recovery is required. The revision is non-payable and must receive no new submissions."
+  },
+  "sanitization": "Only allowlisted deployment and canonical summary fields are retained. Raw receipts, traces, validator configuration, stdout, and stderr are not stored."
+}

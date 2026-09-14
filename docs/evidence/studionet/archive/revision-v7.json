@@ -1,0 +1,20 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v7",
+  "archived_at_utc": "2026-09-12T07:35:58Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "GeneralResponseV7 judge superseded by a source-equivalent revision that exposes the immutable operator through a public read view.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV7",
+    "address": "0xAE7C6db638af1006FF41722f1514671493b61B51",
+    "deployment_transaction": "0xe3821f034f6c3b29b1b1a8578225ff84b3edd1b9988ae6ba94b04a853efec833",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS"
+  },
+  "recovery": {
+    "value_held": false,
+    "action": "No recovery is required; the contract is non-payable."
+  },
+  "sanitization": "Only allowlisted deployment and summary fields are retained."
+}

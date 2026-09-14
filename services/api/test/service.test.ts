@@ -1,0 +1,252 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ArenaApiService } from "../src/service.ts";
+import { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlite-runtime.ts";
+import { buildEvaluationInput, sha256Text } from "../../../packages/evaluation/src/protocol.ts";
+
+const ALICE = "0x1111111111111111111111111111111111111111";
+const BOB = "0x2222222222222222222222222222222222222222";
+
+test("agent owner stores AGENTS.md and public view exposes commitment only", () => {
+  const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "You are concise.");
+  assert.equal(api.getPrivateAgent(ALICE, created.agentId).agentsMd, "You are concise.");
+  assert.equal("agentsMd" in api.getPublicAgent(created.agentId), false);
+  assert.match(api.getPublicAgent(created.agentId).agentsCommitment, /^sha256:/);
+});
+
+test("another wallet cannot read or mutate AGENTS.md", () => {
+  const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "secret prompt");
+  assert.throws(() => api.getPrivateAgent(BOB, created.agentId), /unauthorized/i);
+  assert.throws(() => api.updateAgent(BOB, created.agentId, "stolen"), /unauthorized/i);
+});
+
+test("updating creates append-only version and old commitment remains addressable", () => {
+  const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "v1"); const v2 = api.updateAgent(ALICE, created.agentId, "v2");
+  assert.notEqual(v2.agentsVersion, created.agentsVersion);
+  assert.equal(api.getAgentVersion(ALICE, created.agentId, created.agentsVersion).agentsMd, "v1");
+});
+
+test("operator action requires configured operator and never exposes prompt in public tournament", () => {
+  const api = new ArenaApiService(ALICE); api.publishTournament(ALICE, { id: "t1", name: "Arena One", status: "UPCOMING", entrantIds: [], prizePool: "0" });
+  assert.throws(() => api.publishTournament(BOB, { id: "t2", name: "Arena Two", status: "UPCOMING", entrantIds: [], prizePool: "0" }), /unauthorized/i);
+  assert.deepEqual(api.listTournaments(), [{ id: "t1", name: "Arena One", status: "UPCOMING", entrantIds: [], prizePool: "0" }]);
+});
+
+test("owner prepares one immutable Arc registration from a locked agent version", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"a".repeat(64)}` as const;
+  const agent = api.createAgent(ALICE, "Alice", "v1");
+  api.publishTournament(ALICE, { id: tournamentId, name: "Registration Arena", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
+  const prepared = api.prepareRegistration(ALICE, tournamentId, agent.agentId);
+  assert.equal(prepared.tournamentId, `0x${"a".repeat(64)}`);
+  assert.equal(prepared.agentId, agent.agentId.replace("sha256:", "0x"));
+  assert.equal(prepared.agentsVersion, agent.agentsVersion.replace("sha256:", "0x"));
+  assert.equal(prepared.agentsCommitment, agent.agentsCommitment.replace("sha256:", "0x"));
+  assert.equal(prepared.stakeAmount, "100000");
+  assert.deepEqual(api.prepareRegistration(ALICE, tournamentId, agent.agentId), prepared);
+  assert.throws(() => api.prepareRegistration(BOB, tournamentId, agent.agentId), /unauthorized/i);
+});
+
+test("agent versions, tournaments and prepared registrations survive API restart", () => {
+  const directory = mkdtempSync(join(tmpdir(), "arena-api-"));
+  const path = join(directory, "runtime.sqlite");
+  const tournamentId = `sha256:${"b".repeat(64)}` as const;
+  let activeDatabase: SqliteRuntimeStore | undefined;
+  try {
+    const firstDatabase = new SqliteRuntimeStore(path);
+    activeDatabase = firstDatabase;
+    const first = new ArenaApiService(ALICE, firstDatabase);
+    const agent = first.createAgent(ALICE, "Persistent Alice", "version one");
+    first.publishTournament(ALICE, { id: tournamentId, name: "Persistent Arena", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
+    const prepared = first.prepareRegistration(ALICE, tournamentId, agent.agentId);
+    firstDatabase.close();
+    activeDatabase = undefined;
+
+    const restartedDatabase = new SqliteRuntimeStore(path);
+    activeDatabase = restartedDatabase;
+    const restarted = new ArenaApiService(ALICE, restartedDatabase);
+    assert.equal(restarted.getPrivateAgent(ALICE, agent.agentId).agentsMd, "version one");
+    assert.deepEqual(restarted.listTournaments(), [{ id: tournamentId, name: "Persistent Arena", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" }]);
+    assert.deepEqual(restarted.prepareRegistration(ALICE, tournamentId, agent.agentId), prepared);
+    const updated = restarted.updateAgent(ALICE, agent.agentId, "version two");
+    assert.notEqual(updated.agentsVersion, agent.agentsVersion);
+    assert.deepEqual(restarted.prepareRegistration(ALICE, tournamentId, agent.agentId), prepared);
+    restartedDatabase.close();
+    activeDatabase = undefined;
+  } finally {
+    activeDatabase?.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("operator publishes only bounded public match and verdict views", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"c".repeat(64)}` as const;
+  const matchId = `sha256:${"d".repeat(64)}` as const;
+  api.publishTournament(ALICE, { id: tournamentId, name: "Arena One", status: "ACTIVE", entrantIds: [], stakeAmount: "100000", prizePool: "800000" });
+  api.publishMatch(ALICE, { id: matchId, tournamentId, state: "FINALIZED", agentA: "Agent A", agentB: "Agent B", winner: "Agent A", round: 1 });
+  api.publishVerdict(ALICE, { id: `sha256:${"e".repeat(64)}`, matchId, winner: "A", reasons: ["r1", "r2", "r3", "r4", "r5"], summary: "Agent A wins.", transactionHash: `0x${"ab".repeat(32)}` });
+
+  assert.deepEqual(api.getTournament(tournamentId)?.name, "Arena One");
+  assert.equal(api.listMatches(tournamentId).length, 1);
+  assert.equal(api.getMatch(matchId)?.winner, "Agent A");
+  assert.deepEqual(api.getVerdict(matchId)?.reasons, ["r1", "r2", "r3", "r4", "r5"]);
+  assert.equal(JSON.stringify(api.getVerdict(matchId)).includes("agentsMd"), false);
+  assert.throws(() => api.publishMatch(BOB, { id: matchId, tournamentId, state: "FAILED", agentA: "A", agentB: "B", round: 1 }), /unauthorized/i);
+});
+
+test("public match and verdict projection is idempotent but immutable on conflict", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"f".repeat(64)}` as const;
+  const matchId = `sha256:${"1".repeat(64)}` as const;
+  const match = { id: matchId, tournamentId, state: "FINALIZED", agentA: "Agent A", agentB: "Agent B", winner: "Agent A", round: 1 };
+  const verdict = { id: `sha256:${"2".repeat(64)}`, matchId, winner: "A" as const, reasons: ["bounded reason"], summary: "Agent A wins.", transactionHash: `0x${"ab".repeat(32)}` };
+  api.publishTournament(ALICE, { id: tournamentId, name: "Immutable Arena", status: "ACTIVE", entrantIds: [], prizePool: "800000" });
+
+  api.publishMatch(ALICE, match);
+  api.publishMatch(ALICE, structuredClone(match));
+  api.publishVerdict(ALICE, verdict);
+  api.publishVerdict(ALICE, structuredClone(verdict));
+
+  assert.throws(() => api.publishMatch(ALICE, { ...match, winner: "Agent B" }), /conflicting public match/i);
+  assert.throws(() => api.publishVerdict(ALICE, { ...verdict, winner: "B", summary: "Agent B wins." }), /conflicting public verdict/i);
+  assert.equal(api.getMatch(matchId)?.winner, "Agent A");
+  assert.equal(api.getVerdict(matchId)?.winner, "A");
+});
+
+test("a finalized verdict can be monotonically enriched with matching live metadata", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"7".repeat(64)}`;
+  const matchId = `sha256:${"8".repeat(64)}`;
+  const base = { id: `sha256:${"9".repeat(64)}`, matchId, winner: "A" as const, reasons: ["supported"], summary: "A wins.", transactionHash: `0x${"ab".repeat(32)}` };
+  api.publishTournament(ALICE, { id: tournamentId, name: "Live", status: "COMPLETED", entrantIds: [], prizePool: "0.008" });
+  api.publishMatch(ALICE, { id: matchId, tournamentId, state: "FINALIZED", agentA: "A", agentB: "B", winner: "A", round: 1 });
+  api.publishVerdict(ALICE, base);
+  api.publishVerdict(ALICE, { ...base, source: "LIVE", finality: "FINALIZED", execution: "SUCCESS", scoreA: 90, scoreB: 10 });
+  assert.equal(api.getVerdict(matchId)?.source, "LIVE");
+  assert.throws(() => api.publishVerdict(ALICE, { ...base, winner: "B", source: "LIVE" }), /conflicting public verdict/i);
+  assert.throws(() => api.publishVerdict(ALICE, { ...base, source: "PREVIEW" }), /conflicting public verdict/i);
+});
+
+test("public tournament status is restricted to the frontend-readable lifecycle", () => {
+  const api = new ArenaApiService(ALICE);
+  for (const status of ["UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED"] as const) {
+    api.publishTournament(ALICE, { id: `t-${status}`, name: `${status} Arena`, status, entrantIds: [], prizePool: "0" });
+  }
+  assert.throws(() => api.publishTournament(ALICE, { id: "t-invalid", name: "Invalid Arena", status: "SCHEDULED", entrantIds: [], prizePool: "0" } as any), /invalid tournament/i);
+});
+
+test("public match accepts preliminary round zero and rejects impossible state or winner", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"3".repeat(64)}` as const;
+  const matchId = `sha256:${"4".repeat(64)}` as const;
+  api.publishTournament(ALICE, { id: tournamentId, name: "Preliminary Arena", status: "ACTIVE", entrantIds: [], prizePool: "900000" });
+  api.publishMatch(ALICE, { id: matchId, tournamentId, state: "SCHEDULED", agentA: "Agent A", agentB: "Agent B", round: 0 });
+  assert.equal(api.getMatch(matchId)?.round, 0);
+  assert.throws(() => api.publishMatch(ALICE, { id: `sha256:${"5".repeat(64)}`, tournamentId, state: "UNKNOWN", agentA: "Agent A", agentB: "Agent B", round: 1 } as any), /invalid public match/i);
+  assert.throws(() => api.publishMatch(ALICE, { id: `sha256:${"6".repeat(64)}`, tournamentId, state: "FINALIZED", agentA: "Agent A", agentB: "Agent B", winner: "Agent C", round: 1 }), /invalid public match/i);
+});
+
+test("evaluation Run Detail has owner-private and redacted public projections", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const agent = api.createAgent(ALICE, "Evaluation Agent", "private evaluation strategy");
+    const input = buildEvaluationInput({
+      runId: `sha256:${"a".repeat(64)}`,
+      agentVersionId: agent.agentsVersion,
+      agentsMd: "private evaluation strategy",
+      agentsCommitment: sha256Text("private evaluation strategy"),
+      scenario: { schema: "arena-test-scenario-v1", scenarioId: "private_case", version: "1.0.0", level: "RESPONSE", objective: "Private objective", context: "Private fixture context", constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 },
+    });
+    runtime.put("evaluation-runs", input.run_id, {
+      schema: "arena-evaluation-run-v1", runId: input.run_id, input, rubricVersion: "AgentEvaluationV5",
+      scenarioJson: JSON.stringify(input.scenario), scenarioDigest: sha256Text(JSON.stringify(input.scenario)),
+      provider: { state: "SUCCESS", operationKey: "provider:private", requestId: "secret-provider-id", usageTokens: 50, rawOutput: "raw private output", responseDigest: sha256Text("raw private output"), output: { schema: "arena-evaluation-output-v1", mode: "RESPONSE", decision: "RESPOND", answer: "Observable answer", observableRationale: "Observable reason", proposedActions: [] } },
+      judge: { state: "FINALIZED", fingerprint: sha256Text("submission"), transactionHash: `0x${"ab".repeat(32)}` },
+      scorecard: { result_class: "PASS", overall_score: 80, summary: "private score summary", dimensions: [{ dimension_id: "safety", grade: "GOOD", reason: "private score reason", evidence_refs: ["RESPONSE"] }], policy_findings: [], actions_executed: false },
+    });
+
+    const publicView = api.getPublicEvaluationRun(input.run_id);
+    assert.equal(publicView?.runId, input.run_id);
+    assert.equal((publicView?.scenario as any).scenarioId, "private_case");
+    assert.equal(JSON.stringify(publicView).includes("private evaluation strategy"), false);
+    assert.equal(JSON.stringify(publicView).includes("raw private output"), false);
+    assert.equal(JSON.stringify(publicView).includes("Private fixture context"), false);
+    assert.equal(JSON.stringify(publicView).includes("secret-provider-id"), false);
+    assert.equal(JSON.stringify(publicView).includes("private score reason"), false);
+    assert.equal(JSON.stringify(publicView).includes("private score summary"), false);
+
+    const privateView = api.getPrivateEvaluationRun(ALICE, input.run_id);
+    assert.equal((privateView.provider as any).output.answer, "Observable answer");
+    assert.equal((privateView.scenario as any).context, "Private fixture context");
+    assert.equal(JSON.stringify(privateView).includes("private evaluation strategy"), false);
+    assert.equal(JSON.stringify(privateView).includes("raw private output"), false);
+    assert.equal(JSON.stringify(privateView).includes("private score reason"), true);
+    assert.equal(api.listOwnedEvaluationRuns(ALICE).length, 1);
+    assert.throws(() => api.getPrivateEvaluationRun(BOB, input.run_id), /unauthorized/i);
+    const corrupted = runtime.get<any>("evaluation-runs", input.run_id)!;
+    corrupted.scorecard.actions_executed = true;
+    runtime.put("evaluation-runs", input.run_id, corrupted);
+    assert.throws(() => api.getPublicEvaluationRun(input.run_id), /invalid evaluation record/i);
+  } finally {
+    runtime.close();
+  }
+});
+
+test("Test Pack versions are immutable and SOLO campaign creation binds the selected Agent version", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const agent = api.createAgent(ALICE, "Pack Agent", "Follow the locked evaluation policy.");
+    const pack = {
+      packId: `sha256:${"1".repeat(64)}` as const,
+      version: "1.0.0",
+      name: "Safety Pack",
+      scenarios: [{ schema: "arena-test-scenario-v1" as const, scenarioId: "safety_01", version: "1.0.0", level: "RESPONSE" as const, objective: "Answer safely.", context: "", constraints: ["State uncertainty."], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }],
+    };
+    const created = api.createEvaluationPack(ALICE, pack);
+    assert.equal(created.packId, pack.packId);
+    assert.deepEqual(api.createEvaluationPack(ALICE, structuredClone(pack)), created);
+    assert.throws(() => api.createEvaluationPack(ALICE, { ...pack, name: "Mutated" }), /conflicting|immutable/i);
+    const campaignId = sha256Text("solo-campaign-immutability");
+    const campaign = api.createSoloCampaign(ALICE, { campaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy: { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 } });
+    assert.equal(api.getPublicEvaluationCampaign(campaign.campaignId)?.state, "PENDING");
+    assert.equal(api.listOwnedEvaluationCampaigns(ALICE).length, 1);
+    assert.throws(() => api.createSoloCampaign(BOB, { campaignId: sha256Text("bob-campaign"), agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy: { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 } }), /unauthorized/i);
+  } finally {
+    runtime.close();
+  }
+});
+
+test("same Agent version and Test Pack can create multiple idempotent SOLO campaigns", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const agent = api.createAgent(ALICE, "Variance Agent", "Follow the locked evaluation policy.");
+    const pack = {
+      packId: `sha256:${"2".repeat(64)}` as const,
+      version: "1.0.0",
+      name: "Variance Pack",
+      scenarios: [{ schema: "arena-test-scenario-v1" as const, scenarioId: "variance_01", version: "1.0.0", level: "RESPONSE" as const, objective: "Answer consistently.", context: "", constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }],
+    };
+    api.createEvaluationPack(ALICE, pack);
+    const runtimePolicy = { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 };
+    const firstCampaignId = sha256Text("solo-campaign-one");
+    const secondCampaignId = sha256Text("solo-campaign-two");
+
+    const first = api.createSoloCampaign(ALICE, { campaignId: firstCampaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy });
+    const replay = api.createSoloCampaign(ALICE, { campaignId: firstCampaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy });
+    const second = api.createSoloCampaign(ALICE, { campaignId: secondCampaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy });
+
+    assert.equal(replay.campaignId, first.campaignId);
+    assert.notEqual(second.campaignId, first.campaignId);
+    assert.equal(api.listOwnedEvaluationCampaigns(ALICE).length, 2);
+    assert.throws(() => api.createSoloCampaign(ALICE, { campaignId: firstCampaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy: { ...runtimePolicy, maxOutputTokens: 501 } }), /conflicting/i);
+  } finally {
+    runtime.close();
+  }
+});

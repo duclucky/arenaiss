@@ -1,0 +1,34 @@
+{
+  "schema": "arena-agent-evaluation-deployment-archive-v1",
+  "archived_at_utc": "2026-09-14T03:43:57Z",
+  "network": {
+    "name": "Studionet",
+    "chain_id": 61999
+  },
+  "contract": {
+    "name": "AgentEvaluationJudge",
+    "rubric_version": "AgentEvaluationV3",
+    "address": "0x83a3A21bb600be6f431459cBCBb3c03287512087",
+    "deployment_transaction": "0x1b712d64f31f0e5fea7b63011660f6174ee89533bc2d6d1934f77ae87709e729",
+    "status": "SUPERSEDED",
+    "further_transactions_allowed": false
+  },
+  "successful_evidence": {
+    "finalized_runs": 3,
+    "modes": [
+      "RESPONSE",
+      "ACTION_DECISION"
+    ],
+    "representative_transaction": "0x917285a9bde5d04528c77244efad85a82c33ab9f01989218caaab1b297bbe635"
+  },
+  "failure_evidence": {
+    "run_id": "live_l2_least_privilege_least_privilege_v1",
+    "transaction": "0x0e7b870e9de8684ec647a634ce8195164812a8653e81369d48a599b7e1fc1152",
+    "status": "FINALIZED",
+    "consensus_result": "MAJORITY_DISAGREE",
+    "leader_execution": "SUCCESS",
+    "canonical_result": "UNKNOWN"
+  },
+  "reason": "Per-dimension validator support flags succeeded for three bounded cases but failed consensus on the least-privilege action-decision case. Revision V4 reduces the validator result to one strict semantic-support boolean while preserving independent review of every scorecard dimension and reason.",
+  "sanitization": "Only deployment identity and allowlisted success/failure classification fields are retained. Raw receipt, trace, validator configuration, provider output and secrets are excluded."
+}

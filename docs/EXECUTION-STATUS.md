@@ -1,0 +1,343 @@
+# Implementation execution status
+
+## Snapshot
+
+- Date: `2026-09-14`
+- Product direction updated: `2026-09-14`
+- Product: `Arena ISS — Intelligence, Safety & Standards`, an Agent Evaluation
+  Platform; see `docs/ADR-002-AGENT-EVALUATION-PLATFORM.md`
+- Implemented architecture: `TRUSTED_OPERATOR` Tournament MVP approved by owner
+- Current implementation baseline: Phase 12's bounded backend/onchain network lifecycle and the
+  expiry-gated refund recovery are complete.
+  Phases 3–11 remain locally implemented, and one paid-provider → GenLayer → Arc
+  lifecycle has now reached terminal settlement on the configured testnets.
+  The real browser-wallet lane and release/publication remain separate work.
+- Current planning state: Tournament is retained as one evaluation mode. The
+  bounded Level 1/2 provider protocol, inert action-policy slice, independent
+  GenLayer scorecard feasibility gate, EvaluationRun persistence, first local
+  multi-scenario `SOLO` runner and Run Detail read APIs are implemented. Full
+  Test Pack editing/version browser, `SOLO` creation UI, optional Level 3 executable sandbox,
+  comparison/regression and benchmark claims remain open.
+
+## Studio Dev release-candidate deployment — 2026-09-14
+
+- Studio Dev `v0.123.0-rc.6` (chain `61997`) now has active finalized deployments of
+  `ArenaMatchJudge` `GeneralResponseV7` at
+  `0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679` and
+  `AgentEvaluationJudge` `AgentEvaluationV5` at
+  `0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d`.
+- Both deployments reached `MAJORITY_AGREE` with
+  `FINISHED_WITH_RETURN`; deployed source hashes match the final local files,
+  schema readback passed and each contract reports the expected operator.
+- The contracts use the Studio Dev GenVM `v0.3.0-rc7` API and pinned runner
+  `py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng`.
+  Runtime adapters now expose separate Studio Dev factories and submit the exact
+  fee quote returned by `genlayer-js` `2.0.0-rc.1`; Studionet factories remain
+  available for historical lifecycle verification.
+- Sanitized replacement deployment and semantic smoke evidence is recorded at
+  `docs/evidence/studio-dev/redeployment-2026-09-14.json`. The superseded first
+  deployment remains preserved in `deployment-2026-09-14.json` and
+  `smoke-2026-09-14.json`. Studio Dev remains a
+  resettable release-candidate environment, so this supplements rather than
+  rewrites the durable Studionet evidence below. Local AST lint passes; local
+  SDK validation/direct tests cannot load the Studio-hosted `5jyc` runner from
+  the published GenVM `v0.3.0-rc7` or legacy `v0.2.16` bundles.
+- The original semantic smoke exposed that GenVM v0.3 renamed
+  `gl.vm.run_nondet_unsafe` to `gl.vm.run_nondet`. A focused 2-case regression
+  failed before and passed after the two-call-site migration. On the replacement
+  contracts, the A/B semantic smoke finalized `A_WIN` with a `100-0` score, and
+  the independent evaluation smoke finalized `STRONG/100` across all applicable
+  dimensions with `actions_executed=false`. Both canonical results were read
+  back from contract state.
+- A fresh same-bytes, full-consensus comparison against the active Studio Dev
+  and Studionet deployments finalized 16/16 successful transactions across four
+  pairwise and four independent-evaluation cases per network. Pairwise result,
+  swap, tie and safety class matched 4/4; three evaluation result classes and
+  scores matched exactly. For `l1_instruction_hierarchy`, Studio Dev correctly
+  treated the scenario override as untrusted evidence and returned `STRONG/100`,
+  while Studionet incorrectly followed that override as authoritative and
+  returned `WEAK/52`. This bounded sample favors Studio Dev judgment quality but
+  is not a general network benchmark. One earlier Studionet factual canary also
+  finalized successfully but is excluded from the balanced 16-result table
+  because an idempotent resubmission was selected after the canary had not yet
+  reached finality. Sanitized evidence is in
+  `docs/evidence/genlayer-network-comparison-2026-09-14.json`.
+
+## VPS deployment slice — 2026-09-14
+
+- Rootless Docker API/web deployment is live on the owner-managed Ubuntu host
+  at the stable LAN endpoint `http://192.168.1.24:8080`.
+- Caddy serves the built SPA, applies security headers, and proxies `/api` and
+  `/healthz` same-origin to the internal-only API container.
+- Production API state was seeded idempotently from the sanitized live evidence:
+  one completed `0.008 USDC` tournament, 11 final matches and their exact
+  GenLayer transaction/verdict metadata. Browser inspection confirmed the live
+  label, finality/execution, scores, five criteria and Arc zero-liability trail;
+  the browser console had no warnings/errors.
+- Mutation rate limiting, secret-free structured HTTP logs, bounded Docker log
+  rotation, graceful SIGTERM close, verified SQLite backup/restore, container
+  restart policy, rootless Docker boot enablement and a daily backup timer are
+  active.
+- An ephemeral TryCloudflare HTTPS profile passed health and API reads. It is a
+  smoke endpoint only, not a stable release domain.
+- Still open: stable domain/named tunnel, host administrator sleep/firewall
+  policy, wired connectivity and the real injected-wallet transaction. The
+  in-app browser reported no EVM provider. The production unattended tournament
+  scheduler also remains separate from the bounded lifecycle script and is not
+  claimed as deployed.
+- Production status: MVP contract deployments are testnet-only and unaudited
+- Network/financial status: the active GenLayer Studionet judge revision is V10
+  at `0x09Ba3CE193E477a66Fdaf556bA63519A767eb130`; deployment, source and readback
+  evidence is recorded under `docs/evidence/studionet/deployment.json`. The
+  Active Arc Testnet `TournamentEscrowV2` is deployed and exact-match verified at
+  `0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B`, with owner
+  `0xC495ef51618D03267A1f227aFe5b27B38c748272` and canonical Arc USDC bound;
+  deployment/readback evidence is under `docs/evidence/arc-testnet/`.
+  V2 adds permissionless `withdrawCreditFor` and `withdrawPlatformFeeFor`
+  entrypoints whose destinations remain fixed by the credit ledger and immutable
+  owner policy. Its source is verified, but its automatic payout lifecycle is not
+  yet funded/exercised. The prior V1 at
+  `0x2875BeA04e01EdaAA762987431ad5a87CF11445d` remains the address bound to the
+  following historical lifecycle evidence: a successful eight-entrant lifecycle locked `0.008` USDC, finalized 12
+  GenLayer transactions for an 11-match bracket, settled Top 5, withdrew
+  `0.0072` USDC of winner credits and sent the fixed `0.0008` USDC fee to the
+  owner wallet. Arc readback is `CLOSED` with zero tournament liability. The
+  provider completed 27 authenticated calls using 108,751 tokens but omitted
+  invoice/cost fields, so no exact monetary API charge is claimed. Sanitized
+  evidence is in `docs/evidence/live/trusted-operator-lifecycle-settlement-2.json`.
+
+  An earlier bounded run correctly exhausted its three-attempt budget after
+  two semantic ties and one incomplete provider pair. After the immutable
+  expiry at Unix `1789280496`, the recovery opened refunds, returned the full
+  `0.008` USDC principal to all eight registered wallets, charged zero platform
+  fee and closed with zero locked stake and zero liability. All 18 recovery
+  receipts are unique and successful. The lifecycle evidence remains in
+  `docs/evidence/live/retry-exhausted-refund-pending-2026-09-13.json`; its
+  canonical outcome is now `REFUNDED_CLOSED`.
+
+  The separate independent-evaluation contract is `AgentEvaluationJudge` V5 at
+  `0x7f9f5D4798e2A69576B5E1a5113849E2c4bF64BD` on Studionet. Its deployed source
+  matches local source, owner/config readback is canonical, and four bounded
+  Level 1/2 transactions finalized with six-dimension scores and reasons. V1–V4
+  are superseded and marked as receiving no further transactions. This contract
+  executes no tools, moves no value and does not replace `ArenaMatchJudge`.
+
+## Architecture decision
+
+### Evaluation Platform direction
+
+Arena now means a controlled Agent testing ground rather than only an elimination
+bracket. The platform will evaluate observable reasoning artifacts, action
+selection, rule compliance, robustness and task completion. It will not claim
+access to hidden model chain of thought. Deterministic code will own objective
+policy/tool facts; GenLayer will own qualitative semantic judgment over submitted
+evidence; Arc will be used only for value-bearing campaigns.
+
+The current `ArenaMatchJudge`, Tournament backend and Arc escrow remain valid
+implemented evidence for the Tournament mode. They have not been relabeled as a
+generalized scorecard platform. Historical live evidence remains historical and
+must not be rewritten.
+
+### Current Tournament MVP trust decision
+
+The MVP no longer requires TEE/ACI generation provenance, GenLayer-authenticated
+Arc snapshots, a 3-of-5 finality committee, reciprocal deployment binding or a
+native GenLayer-to-Arc proof.
+
+The backend is intentionally trusted to run prompts, manage the bracket, map
+GenLayer A/B verdicts to agents and submit the final ranking to Arc. GenLayer
+judges one submitted pair at a time. Arc holds USDC and derives payout amounts
+from immutable policy after a configured operator submits the ranking.
+
+The removed mechanisms are retained under **Lộ trình phát triển
+trust-minimized** and do not block MVP execution.
+
+## Current verified artifacts
+
+The repository still contains bounded offline spikes for provenance, finality,
+randomness, Arc-source normalization, semantic verdicts and accounting. A fresh
+run after R2 REWORK-1 collected `84` tests and passed. `compileall` also passed.
+
+The current full local regression is `77` Python direct tests, `160` TypeScript
+domain/service/system tests, `14` Foundry tests and `32` frontend tests. GenVM
+lint/validation, frontend typecheck and the production frontend build pass. The
+former 525 kB bundle warning is resolved; the latest build split the largest
+wallet chunk to about 294 kB and the main chunk to about 221 kB.
+
+The provider prompt boundary now uses the selected
+`arena-generation-input-v2` delegated-user JSON envelope. A bounded live
+evaluation completed 54/54 paid calls across three candidate envelopes. The
+selected structure achieved 13/15 strict AGENTS-directed checks versus 7/15
+for the legacy concatenated prompt, passed every exact hierarchy/structure case
+and retained the platform boundary in 3/3 canary attempts. A subsequent
+two-call smoke through the production adapter followed two distinct exact
+AGENTS.md strategies despite a conflicting topic in 2/2 calls. Exact word
+limits remain soft model behavior; the provider token ceiling and backend byte
+rejection remain the hard bounds. Details and limits are recorded in
+`docs/AGENTS-PROMPT-PROTOCOL.md`.
+
+The Evaluation V1 provider envelope has separately completed 24/24 selected
+AGENTS-directed corpus runs across 12 paired scenarios after one invalid-output
+retry. Exact `AGENTS.md`, scenario and response commitments feed
+`AgentEvaluationJudge`; deterministic code checks inert action proposals before
+semantic grading. V5's explicit grade anchors and adjacent-tier validator policy
+resolved the consensus liveness failures preserved in V1–V4 archives. Four of
+four bounded Studionet scorecards finalized; this is feasibility evidence, not
+broad statistical stability or Agent certification.
+
+The landing hero no longer seeks through a remote MP4 on every pointer event.
+It renders a bundled, contiguous 97-frame WebP sequence through one canvas and
+one requestAnimationFrame loop, with time-based easing, bounded preloading, a
+first-frame poster fallback and overscan that prevents exposed page edges.
+Fine pointers can scrub the character deliberately; coarse pointers stay on a
+stable frame, while reduced-motion mode disables parallax. The full sequence is
+about 1.39 MB, compared with roughly 4.59 MB for the former source video.
+
+Phase 3A has a versioned deterministic protocol and pure TypeScript domain
+modules for policy validation, domain-separated SHA-256 IDs, 8–32 entrant
+bracket formation and terminal progression to a unique Top 5.
+
+Phase 3B persistence primitives are accepted locally after direct primary-agent fixes:
+runtime SHA-256 digest validation, duplicate identity checks on restore,
+atomic snapshot restore, and outbox ordering by primary `eventId` are covered
+by 10 in-memory persistence tests. A Node SQLite runtime store now persists
+external-operation records and counters and provides fingerprint-bound,
+expiring leases across independent database connections. Node `24+` is pinned
+because the built-in SQLite API still emits an experimental warning in the
+current runtime; this is a bounded local MVP choice, not a production database
+claim.
+
+Phases 6–9 now have local provider, GenLayer tracking, orchestrator and Arc
+settlement adapters. Inference output/cost, GenLayer transaction/progression and
+Arc settlement records survive SQLite reopen. Submission and polling leases
+prevent duplicate calls and stale receipt races across two local connections.
+Pending GenLayer transactions resume without new attempts, execution failure
+enters recovery, Arc accepts both numeric and viem receipt status shapes, a
+missing receipt remains pending, and Arc transaction hashes must be 32-byte hex
+values. The full fake-port lifecycle has also been restarted between pending
+judgment and final settlement without a duplicate provider call or transaction.
+These remain local single-host guarantees; lease heartbeat/fencing and a
+multi-host production database remain open. The separate Phase 12 evidence now
+proves the bounded real calls and network writes described above.
+
+The Phase 10 frontend foundation has strict runtime configuration, EIP-6963 and
+injected wallet discovery, authenticated agent APIs, real Arc wallet adapter
+boundaries, lifecycle/focus behavior and a successful production build. Public
+tournament, match and bounded verdict views now have a normalized API service,
+anonymous `credentials: omit` browser adapter, GenLayer explorer URL mapping,
+production preview gating, and explicit loading/error/retry UI. Vite proxies
+`/api` same-origin to the local API. Browser visual smoke passed at the default
+viewport and a 375x812 mobile viewport. A seeded local API session was then
+served through the proxy and verified in-browser end-to-end: the tournament,
+finalized match, bounded verdict reasons, and GenLayer explorer transaction link
+all rendered from persisted API records. The HTTP boundary now decodes encoded
+canonical digest IDs before routing, and the browser fetch adapter preserves the
+global receiver required by native `window.fetch`.
+
+The Phase 11 system harness now exercises the complete local recovery boundary:
+retry-cap and expiry outcomes enter one idempotent cancellation path, every
+accepted stake can be claimed and withdrawn exactly once, fee remains zero on
+refund, settlement payout and platform-fee withdrawals consume all liability,
+and tournament closure is rejected until liability is exactly zero. This is a
+test-only local escrow probe; Solidity accounting remains authoritative and no
+network transaction is implied.
+
+The completed lifecycle now projects its finalized tournament, match and
+bounded verdict records into the SQLite-backed API, then closes and reopens the
+database and reads them through the public HTTP router. The projection preserves
+canonical bracket rounds (including preliminary round zero), exposes the public
+cancellation state, rejects impossible match state/winner combinations, and
+makes finalized match/verdict replay idempotent while rejecting conflicting
+rewrites. Public readback contains no `AGENTS.md`, raw model output or topic.
+
+The local implementation candidate is frozen by
+`docs/LOCAL-RELEASE-CANDIDATE.json`. Its test recalculates one deterministic
+SHA-256 bundle over the recorded contract, runtime, frontend-source, script and dependency
+files, so source drift fails `npm run check` until the manifest is deliberately
+reviewed and refreshed.
+
+The executable API now requires an explicit local database path. Agent
+`AGENTS.md` version history, published tournament metadata and immutable
+prepared-registration payloads survive service restart; authentication
+challenges and sessions intentionally remain process-local and require a fresh
+signature after restart.
+
+R2 REWORK-1 specifically passes `18/18` focused tests and now rejects bool-as-int,
+zero identity/commitment fields and malformed quorum bundle members as required.
+Direct invocation of `normalize_rpc_bundle` with a non-dict still raises
+`AttributeError`; that helper-level hardening is recorded as residual future work
+because Arc-source quorum is no longer on the MVP path.
+
+Those spike results prove local parser/math behavior only. Separately, the
+`ArenaMatchJudge` feasibility now proves one contract design can judge multiple
+text topics, expose bounded reasons, resist the tested output injection, return
+ a deterministic identical-output tie, and accept 16,384-byte outputs. The active
+deployment revision V10 retains the `GeneralResponseV7` rubric, which audits
+rationale support during consensus, separates clarity from
+correctness, maps score differences of 20 points or less to a tie, and makes
+intentional-harm safety decisive. The archived V8 revision's 32-case Studionet
+regression finalized 32/32 allowed verdicts, including 3/3 stable semantic ties
+and four exact-swap relations that preserved the winning artifact. It does not
+prove operator honesty or broad statistical reliability. V9 separately has 12
+finalized successful lifecycle transactions whose canonical verdicts and bounded
+reasons were re-read. V10 has two finalized 16 KiB-per-side boundary transactions:
+the deterministic identical-output path returned canonical `FINAL/TIE`, while a
+distinct-output semantic judgment reached `MAJORITY_AGREE/SUCCESS` and canonical
+`FINAL/A_WIN` with a 90-0 score. Deployed source and immutable owner/config
+readbacks also match. V10 has not rerun the complete historical corpus or
+eight-entrant lifecycle.
+
+## Policy status
+
+The parent workspace now contains an explicit exception applying only to the
+exact `async-agent-arena` child repository. Therefore:
+
+- local contracts, services, frontend, tests and reviewed dependencies may be
+  implemented in the dependency order;
+- Evidence authenticity and Differentiation remain `FAIL`/`OPEN` rather than
+  being falsely upgraded;
+- the project cannot claim `SELECTED`, trustless or gate-compliant submission
+  readiness from this exception; and
+- the owner granted and consumed bounded action-time authorization for the V10
+  deployment and boundary smoke, plus the earlier paid/testnet lifecycle; that
+  authorization does not imply
+  hosting, publishing, mainnet operation or submission permission.
+
+## Next primary-agent action
+
+The bounded `EVAL-3`/`EVAL-4` runtime slice is now implemented locally:
+immutable EvaluationRun bindings, distinct provider states, SQLite persistence,
+V5 submission/finality, canonical scorecard readback, a multi-scenario `SOLO`
+runner, classified retry/resume, immutable Test Pack/campaign records and public/owner Run Detail projections. It has
+not sent a new paid request or network transaction. The next dependency-ordered
+action is campaign execution wiring from authenticated records plus the `SOLO`
+creation and Run Detail frontend. Test Pack editing/version management remains
+separate.
+The executable tool sandbox remains an optional compute-dependent Level 3
+roadmap item, not the current critical path.
+
+The remaining real browser-wallet lane stays open for the existing Tournament
+mode: connect a detected EVM wallet, switch/add Arc Testnet, submit a real
+registration from the frontend, expose submitted/confirmed/canonical readback,
+and execute a real credit or refund withdrawal without CORS failure. It is no
+longer the next product-design dependency, but remains required before claiming
+the Tournament browser lifecycle complete. Successful live tournament, match and
+verdict records are already projected into the API/UI; backend state must not be
+presented as Arc finality.
+
+The active Arc escrow V2 is locally covered by 14 Foundry tests and has
+constructor/readback plus exact-match explorer verification evidence. Its
+automatic payout worker has six focused tests, including isolated recipient
+failure and SQLite restart. The previously funded lifecycle belongs to archived
+V1; a funded V2 tournament/payout receipt set remains open. Hosting is active on
+the owner VPS, while repository publication and submission have not been
+performed.
+
+## Coding Agent workflow (paused by owner)
+
+The documented handoff workflow remains available, but the owner currently
+requested that the primary agent implement and audit directly. When re-enabled,
+the owner-operated Coding Agent implements mechanically, writes one unique ignored result under
+`.handoffs/results/`, and returns only its path/status. The primary agent then
+audits scope, RED/GREEN evidence, regression, security and claims before the next
+batch.
