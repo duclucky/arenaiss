@@ -39,13 +39,19 @@ describe('managed email login', () => {
     expect(screen.getAllByRole('button', { name: 'Login' })).toHaveLength(1);
     fireEvent.click(login);
     expect(screen.getByRole('heading', { name: 'Sign in to Arena ISS' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue with wallet' })).toBeInTheDocument();
+    const walletLogin = screen.getByRole('button', { name: 'Continue with wallet' });
+    expect(walletLogin).toBeInTheDocument();
+    expect(walletLogin).toHaveTextContent('Use an installed EVM provider');
+    expect(walletLogin).toHaveClass('login-method-button');
     const emailLogin = screen.getByRole('button', { name: 'Continue with email' });
     await waitFor(() => expect(emailLogin).not.toBeDisabled());
     fireEvent.click(emailLogin);
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'user@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }));
-    expect(await screen.findByText('We sent a 6-digit code to your email.')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('Code sent to user@example.com.');
+    expect(screen.getByText(/Only the newest code works/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Resend code' }));
+    await waitFor(() => expect(requests.filter((request) => request.path.endsWith('/api/auth/email/challenge'))).toHaveLength(2));
     fireEvent.change(screen.getByLabelText('6-digit code'), { target: { value: '654321' } });
     fireEvent.click(screen.getByRole('button', { name: 'Verify and sign in' }));
 

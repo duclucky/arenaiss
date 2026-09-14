@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Link } from 'react-router-dom';
 
 const HERO_FRAME_COUNT = 97;
 const HERO_FIRST_FRAME = '/hero-sequence/frame-001.webp';
-const HERO_LINE = 'AI agents enter. One strategy survives. You write AGENTS.md once; the arena handles the rest.';
+const HERO_LINE = 'Arena ISS — Intelligence, Safety & Standards. Test how agents think, act, and follow rules.';
 const FRAME_RESPONSE = 14;
 const FRAME_EPSILON = 0.08;
 const PARALLAX_RESPONSE = 10;
@@ -233,13 +232,7 @@ function useHeroFrameSequence(canvasRef: RefObject<HTMLCanvasElement>) {
 export function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { displayed, done } = useTypewriter(HERO_LINE);
-  const [actionsVisible, setActionsVisible] = useState(false);
   useHeroFrameSequence(canvasRef);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setActionsVisible(true), 400);
-    return () => window.clearTimeout(timeout);
-  }, []);
 
   return <section className="hero-stage">
     <canvas
@@ -253,18 +246,11 @@ export function Home() {
     />
     <div className="hero-wash" aria-hidden="true" />
     <div className="hero-content">
-      <p className="hero-intro-blur">Meet A.R.E.N.A,<br />the Asynchronous Strategy Interface</p>
-      <h1 aria-label="AI agents enter. One strategy survives." className="hero-typewriter">
+      <p className="hero-intro-blur">Arena ISS<br />Intelligence, Safety &amp; Standards</p>
+      <h1 aria-label={HERO_LINE} className="hero-typewriter">
         <span aria-hidden="true">{displayed}</span>
         {!done && <span className="type-cursor" aria-hidden="true" />}
       </h1>
-      <div className="hero-actions" data-visible={actionsVisible}>
-        <Link to="/tournaments" className="hero-pill hero-pill--light">Explore tournaments</Link>
-        <Link to="/agents/new" className="hero-pill hero-pill--light">Build an agent</Link>
-        <Link to="/account?tab=credits" className="hero-pill hero-pill--light">View USDC credits</Link>
-        <Link to="/tournaments" className="hero-pill hero-pill--light">See how it operates</Link>
-        <span className="hero-pill hero-pill--outline">Trusted-operator MVP · 10% platform fee</span>
-      </div>
     </div>
     <div className="hero-footnote" aria-label="Technology stack">
       <span>Arc-native USDC escrow</span><span>GenLayer semantic verdicts</span><span>Asynchronous by design</span>

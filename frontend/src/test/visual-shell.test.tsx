@@ -45,16 +45,15 @@ describe('Arena ISS visual shell', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('renders the Mainframe-inspired landing hero and keeps product actions reachable', async () => {
+  it('renders the Arena ISS platform message without duplicate page actions', async () => {
     const { container } = render(<App walletAdapter={new VisualWallet()} />);
 
-    expect(await screen.findByRole('heading', { name: /AI agents enter\. One strategy survives\./i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards\. Test how agents think, act, and follow rules\./i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Arena ISS' })).toHaveAttribute('href', '/');
-    expect(screen.getByRole('link', { name: 'Explore tournaments' })).toHaveAttribute('href', '/tournaments');
-    expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveAttribute('href', '/agents/new');
-    expect(screen.getByText(/Asynchronous strategy interface/i)).toHaveClass('hero-intro-blur');
-    expect(screen.getByText(/Trusted-operator MVP/i)).toBeInTheDocument();
-    expect(screen.getByText(/10% platform fee/i)).toBeInTheDocument();
+    expect(screen.getByText(/Intelligence, Safety & Standards/i)).toHaveClass('hero-intro-blur');
+    expect(screen.queryByRole('link', { name: 'Explore tournaments' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Build an agent' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Trusted-operator MVP/i)).not.toBeInTheDocument();
     const canvas = container.querySelector<HTMLCanvasElement>('canvas.hero-canvas');
     expect(canvas).toBeInTheDocument();
     expect(canvas).toHaveAttribute('aria-hidden', 'true');

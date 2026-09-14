@@ -293,7 +293,7 @@ describe('App Tests', () => {
     const spyFetch = vi.spyOn(globalThis, 'fetch');
     const testAdapter = new TestWalletAdapter();
     render(<App walletAdapter={testAdapter} />);
-    await screen.findByRole('heading', { name: /AI agents enter/i });
+    await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards/i });
     expect(spyFetch).not.toHaveBeenCalled();
   });
 
@@ -308,9 +308,10 @@ describe('App Tests', () => {
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
     fireEvent.click(providerBtn!);
 
-    // Go to account
-    const accountLink = await screen.findByText('Account');
-    fireEvent.click(accountLink);
+    // Account is intentionally available only from the signed-in address menu.
+    const accountMenu = await screen.findByRole('button', { name: /0xTest/i });
+    fireEvent.click(accountMenu);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'View account' }));
     
     // Since usdcAddress is missing, balance fails and shows Unavailable
     const unavailableSpan = await screen.findByText('Unavailable');
