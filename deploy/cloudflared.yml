@@ -1,0 +1,9 @@
+tunnel: 00633431-a418-422e-b2c5-06d5b043c56e
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: arenaiss.xyz
+    service: http://web:8080
+  - hostname: www.arenaiss.xyz
+    service: http://web:8080
+  - service: http_status:404

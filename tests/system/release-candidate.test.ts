@@ -10,7 +10,7 @@ const extra = [
   "package.json", "package-lock.json", "frontend/index.html", "frontend/package.json", "frontend/package-lock.json",
   "requirements-dev.txt", "pyproject.toml", "foundry.toml", "gltest.config.yaml", ".dockerignore", "Dockerfile", "compose.yaml",
   "deploy/Caddyfile", "deploy/backup-now.sh", "deploy/restore-test.sh", "deploy/arena-backup.service",
-  "deploy/arena-backup.timer", "deploy/arena-keep-awake.service",
+  "deploy/arena-backup.timer", "deploy/arena-keep-awake.service", "deploy/cloudflared.yml",
 ];
 
 function releaseFiles(): string[] {

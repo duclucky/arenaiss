@@ -2,8 +2,8 @@
   "schema": "arena-local-release-candidate-v1",
   "createdAt": "2026-09-14",
   "scope": "LOCAL_ONLY",
-  "fileCount": 220,
-  "sourceBundleSha256": "7076bf1c3f2af6eddcd869754fa307cb0a105ed62245d76441389d2a805ccfb7",
+  "fileCount": 221,
+  "sourceBundleSha256": "6e01cbdb3ed94be849266b653e12c4808c03a4000add1bb7a049f7047b0f797a",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -31,7 +31,8 @@
     "deploy/restore-test.sh",
     "deploy/arena-backup.service",
     "deploy/arena-backup.timer",
-    "deploy/arena-keep-awake.service"
+    "deploy/arena-keep-awake.service",
+    "deploy/cloudflared.yml"
   ],
   "criticalFiles": {
     "contracts/arc/TournamentEscrow.sol": "a243077315941524bc48eb863668aab37a72749f46e238621fe937de96257803",
@@ -56,8 +57,10 @@
     "services/api/test/service.test.ts": "91412ae1cfb74ed97cfd83091d331c7c453ae74c26095cf40e7b499bccb007d7",
     "scripts/run-studionet-agent-evaluation.mjs": "85f80a0dedf8db2e0064e0c4a551584b38e9c985b009b38e887ed30c387ca5ef",
     "Dockerfile": "92ecf2dcc14a25a668ee3df174775542d4b02f172332002e896643dc3a14a86a",
-    "compose.yaml": "7b8b71274ee671aaaeb65822b76bedfcc39ce1067f5e7c576eac86667a5daeaa",
-    "deploy/Caddyfile": "25c93ca5958a691daf7436db6b6d516c440963612330bfcd67bd3e32fbe82a58"
+    "compose.yaml": "c52ba2840f0cf20cafd4ff2ada9480851e8931d780a0db845cff707dfa3263ae",
+    "deploy/Caddyfile": "25c93ca5958a691daf7436db6b6d516c440963612330bfcd67bd3e32fbe82a58",
+    "deploy/arena-backup.service": "248f27166fc2b0f2b59ea716c27e5f04f7fb7e7f55ad7c651a1e3102c9399ce0",
+    "deploy/cloudflared.yml": "f58af160c3cf33ea034512f80a41b840fcd5c1f003bc5e7283feedeeda9d6a9f"
   },
   "verification": {
     "pythonDirectTests": 77,

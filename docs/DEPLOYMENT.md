@@ -9,19 +9,21 @@ deployment does **not** run the bounded live-lifecycle script as a daemon and
 does not claim an unattended production scheduler until the durable worker
 input/job model is implemented.
 
-The stable LAN endpoint is `http://192.168.1.24:8080`. The optional
-`public-tunnel` Compose profile creates an ephemeral HTTPS TryCloudflare URL for
-browser smoke tests only. It has no uptime or hostname guarantee and is not the
-release URL.
+The stable LAN endpoint is `http://192.168.1.24:8080`. The named Cloudflare
+Tunnel exposes the stable HTTPS hostnames `arenaiss.xyz` and
+`www.arenaiss.xyz` without depending on the host's public IP address.
 
 ## Layout and process model
 
-- Project: `/home/ducky/projects/async-agent-arena`
+- Service account: dedicated unprivileged user `arenaiss`
+- Project: `/home/arenaiss/projects/async-agent-arena`
 - Runtime DB: `data/arena-runtime.sqlite`
 - Verified backups: `backups/arena-runtime-*.sqlite`
 - API: Node 24, internal port 8787, no host port
 - Web: Caddy, host port 8080, SPA fallback and same-origin `/api` proxy
-- Containers: rootless Docker under `ducky`, `restart: unless-stopped`
+- Containers: rootless Docker under `arenaiss`, `restart: unless-stopped`
+- Tunnel: named Cloudflare Tunnel `arenaiss-vps`; credential file is ignored,
+  read-only in the container, and must be mode 0600 on the host
 - Logs: Docker JSON logs, 10 MB × 5 for API/web and 10 MB × 3 for tunnel
 - Daily backup: user timer at 02:15 UTC with a randomized delay
 
@@ -48,17 +50,17 @@ Create and verify a consistent SQLite backup:
 ./deploy/restore-test.sh arena-runtime-YYYYMMDDTHHMMSSZ.sqlite
 ```
 
-Start the temporary HTTPS smoke-test tunnel:
+Provision the tunnel credential once at
+`deploy/cloudflared-credentials.json`, set mode 0600, then start the stack:
 
 ```sh
-docker compose --profile public-tunnel up -d tunnel
+chmod 600 deploy/cloudflared-credentials.json
+docker compose up -d
 docker compose logs tunnel
 ```
 
 ## Remaining host work
 
-- Assign the final domain and Cloudflare tunnel/DNS credentials, then replace
-  the ephemeral tunnel with a named authenticated tunnel and stable HTTPS URL.
 - Disable host suspend/lid sleep with an administrator-authorized system policy.
   A user-level inhibitor was tested and rejected by host policy, then disabled.
 - Prefer wired Ethernet or otherwise provide redundant connectivity/power.
@@ -66,4 +68,3 @@ docker compose logs tunnel
   exposed directly instead of only through Cloudflare Tunnel.
 - Complete the real browser-wallet transaction lane in a browser that exposes
   an EIP-6963/injected wallet. The Codex in-app browser exposes no provider.
-

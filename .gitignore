@@ -29,6 +29,7 @@ out/
 *.sqlite-shm
 *.sqlite-wal
 deploy/runtime.env
+deploy/cloudflared-credentials.json
 data/
 backups/
 .DS_Store

@@ -4,7 +4,6 @@ After=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/ducky/projects/async-agent-arena
+WorkingDirectory=%h/projects/async-agent-arena
 Environment=DOCKER_HOST=unix://%t/docker.sock
-ExecStart=/home/ducky/projects/async-agent-arena/deploy/backup-now.sh
-
+ExecStart=%h/projects/async-agent-arena/deploy/backup-now.sh
