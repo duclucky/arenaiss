@@ -65,8 +65,10 @@
 
 ## VPS deployment slice — 2026-09-14
 
-- Rootless Docker API/web deployment is live on the owner-managed Ubuntu host
-  at the stable LAN endpoint `http://192.168.1.24:8080`.
+- Rootless Docker API/web deployment is live under the dedicated unprivileged
+  `arenaiss` account on the owner-managed Ubuntu host at the stable LAN endpoint
+  `http://192.168.1.24:8080`. The previous `ducky` Docker daemon has no Arena
+  containers; its two unrelated bot processes remain running.
 - Caddy serves the built SPA, applies security headers, and proxies `/api` and
   `/healthz` same-origin to the internal-only API container.
 - Production API state was seeded idempotently from the sanitized live evidence:
@@ -78,13 +80,15 @@
   rotation, graceful SIGTERM close, verified SQLite backup/restore, container
   restart policy, rootless Docker boot enablement and a daily backup timer are
   active.
-- An ephemeral TryCloudflare HTTPS profile passed health and API reads. It is a
-  smoke endpoint only, not a stable release domain.
-- Still open: stable domain/named tunnel, host administrator sleep/firewall
-  policy, wired connectivity and the real injected-wallet transaction. The
-  in-app browser reported no EVM provider. The production unattended tournament
-  scheduler also remains separate from the bounded lifecycle script and is not
-  claimed as deployed.
+- Named Cloudflare Tunnel `arenaiss-vps` is connected with four QUIC connections
+  and routes `arenaiss.xyz` plus `www.arenaiss.xyz` to the web service without a
+  stable public IP. Namecheap has the two assigned Cloudflare nameservers saved;
+  public HTTPS verification is pending `.xyz` registry/DNS propagation.
+- Still open: public-domain propagation verification, host administrator
+  sleep/firewall policy, wired connectivity and the real injected-wallet
+  transaction. The in-app browser reported no EVM provider. The production
+  unattended tournament scheduler also remains separate from the bounded
+  lifecycle script and is not claimed as deployed.
 - Production status: MVP contract deployments are testnet-only and unaudited
 - Network/financial status: the active GenLayer Studionet judge revision is V10
   at `0x09Ba3CE193E477a66Fdaf556bA63519A767eb130`; deployment, source and readback
