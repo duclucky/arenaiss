@@ -14,11 +14,13 @@ export class HttpAgentAdapter implements AgentApiAdapter {
     getAddress: () => string | null,
     signMessage: (message: string) => Promise<string>,
     fetcher: Fetcher = fetch,
+    authenticated = false,
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.getAddress = getAddress;
     this.signMessage = signMessage;
     this.fetcher = fetcher;
+    this.authenticated = authenticated;
   }
 
   async listOwnedAgents(): Promise<AgentProfile[]> {

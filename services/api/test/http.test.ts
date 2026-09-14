@@ -5,6 +5,7 @@ import { ArenaApiService } from '../src/service.ts';
 import { ArenaHttpApi } from '../src/http.ts';
 import { viemSignatureVerifier } from '../src/viem-verifier.ts';
 import { privateKeyToAccount } from 'viem/accounts';
+import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 
 const alice = '0x1111111111111111111111111111111111111111';
 const bob = '0x2222222222222222222222222222222222222222';
@@ -57,6 +58,116 @@ test('challenge is single-use and a failed signature cannot create a session', a
   assert.equal(failed.status, 401);
   const replay = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'bad' } });
   assert.equal(replay.status, 401);
+});
+
+test('authentication capabilities expose managed login only when server configuration is complete', async () => {
+  const legacy = new ArenaHttpApi(new ArenaApiService(operator), async () => true);
+  assert.deepEqual((await legacy.handle({ method: 'GET', path: '/api/auth/capabilities' })).body, { wallet: true, email: false, managedWallet: false });
+
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const managed = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      circleWallets: { createWallet: async () => ({ walletId: 'wallet-id', address: alice }) },
+      emailSender: { sendLoginCode: async () => undefined },
+    });
+    assert.deepEqual((await managed.handle({ method: 'GET', path: '/api/auth/capabilities' })).body, { wallet: true, email: true, managedWallet: true });
+  } finally { runtime.close(); }
+});
+
+test('logout invalidates the server session and expires the browser cookie', async () => {
+  const api = new ArenaHttpApi(new ArenaApiService(operator), async () => true);
+  await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+  const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+  const cookie = auth.headers['set-cookie'].split(';')[0];
+  assert.equal((await api.handle({ method: 'GET', path: '/api/agents', headers: { cookie } })).status, 200);
+  const logout = await api.handle({ method: 'POST', path: '/api/auth/logout', headers: { cookie } });
+  assert.equal(logout.status, 204);
+  assert.match(logout.headers['set-cookie'], /Max-Age=0/);
+  assert.equal((await api.handle({ method: 'GET', path: '/api/agents', headers: { cookie } })).status, 401);
+});
+
+test('wallet login provisions one persisted Circle wallet and exposes it through the session', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const provisions: any[] = [];
+    const managed = {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      circleWallets: { createWallet: async (input: any) => {
+        provisions.push(input);
+        return { walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' };
+      } },
+      emailSender: { sendLoginCode: async () => undefined },
+      generateEmailCode: () => '123456',
+    };
+    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    assert.equal(auth.status, 204);
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    const account = await api.handle({ method: 'GET', path: '/api/account', headers: { cookie } });
+    assert.equal(account.status, 200);
+    assert.equal(account.body.identity.kind, 'WALLET');
+    assert.equal(account.body.managedWallet.address, '0x3333333333333333333333333333333333333333');
+    assert.equal(account.body.managedWallet.blockchain, 'ARC-TESTNET');
+    assert.equal(provisions.length, 1);
+
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    assert.equal(provisions.length, 1);
+
+    const restarted = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
+    await restarted.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    assert.equal((await restarted.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } })).status, 204);
+    assert.equal(provisions.length, 1);
+  } finally { runtime.close(); }
+});
+
+test('email OTP login is bounded, stores no plaintext email, and provisions the same managed wallet once', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const deliveries: Array<{ email: string; code: string }> = [];
+    let provisions = 0;
+    let now = 1_000_000;
+    const managed = {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      circleWallets: { createWallet: async () => {
+        provisions += 1;
+        return { walletId: '22222222-2222-4222-8222-222222222222', address: '0x4444444444444444444444444444444444444444' };
+      } },
+      emailSender: { sendLoginCode: async (email: string, code: string) => { deliveries.push({ email, code }); } },
+      generateEmailCode: () => '654321',
+      now: () => now,
+    };
+    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => false, managed as any);
+    const challenge = await api.handle({ method: 'POST', path: '/api/auth/email/challenge', body: { email: ' User@Example.COM ' } });
+    assert.equal(challenge.status, 202);
+    assert.deepEqual(deliveries, [{ email: 'user@example.com', code: '654321' }]);
+    assert.equal(JSON.stringify(runtime.list('auth-identities')).includes('user@example.com'), false);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/auth/email/verify', body: { email: 'user@example.com', code: '000000' } })).status, 401);
+    const verified = await api.handle({ method: 'POST', path: '/api/auth/email/verify', body: { email: 'user@example.com', code: '654321' } });
+    assert.equal(verified.status, 204);
+    const cookie = verified.headers['set-cookie'].split(';')[0];
+    const account = await api.handle({ method: 'GET', path: '/api/account', headers: { cookie } });
+    assert.equal(account.body.identity.kind, 'EMAIL');
+    assert.equal('email' in account.body.identity, false);
+    assert.equal(account.body.managedWallet.address, '0x4444444444444444444444444444444444444444');
+    assert.equal(JSON.stringify(runtime.list('auth-identities')).includes('user@example.com'), false);
+    assert.equal(provisions, 1);
+
+    const agent = await api.handle({ method: 'POST', path: '/api/agents', headers: { cookie }, body: { name: 'Email Agent', agentsMd: 'private' } });
+    assert.equal(agent.status, 201);
+    assert.match(agent.body.owner, /^usr_[0-9a-f]{64}$/);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/auth/email/verify', body: { email: 'user@example.com', code: '654321' } })).status, 401);
+
+    await api.handle({ method: 'POST', path: '/api/auth/email/challenge', body: { email: 'second@example.com' } });
+    now += 601_000;
+    const expired = await api.handle({ method: 'POST', path: '/api/auth/email/verify', body: { email: 'second@example.com', code: '654321' } });
+    assert.equal(expired.status, 401);
+  } finally { runtime.close(); }
 });
 
 test('production verifier accepts only the address that signed the exact challenge', async () => {

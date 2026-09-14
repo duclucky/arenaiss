@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import type { ArenaApiService } from './service.ts';
+import { ManagedIdentityService, type LoginIdentityKind, type ManagedIdentityOptions } from './managed-identity.ts';
 
 type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
@@ -15,17 +16,32 @@ export class ArenaHttpApi {
   private service: ArenaApiService;
   private verifySignature: SignatureVerifier;
   private challenges = new Map<string, { message: string; expiresAt: number }>();
-  private sessions = new Map<string, { address: string; expiresAt: number }>();
+  private sessions = new Map<string, { principal: string; userId?: string; identityKind?: LoginIdentityKind; expiresAt: number }>();
+  private managedIdentity?: ManagedIdentityService;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions) {
     this.service = service;
     this.verifySignature = verifySignature;
+    this.managedIdentity = managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined;
   }
 
   async handle(request: ApiRequest): Promise<ApiResponse> {
     try {
       if (request.method === 'POST' && request.path === '/api/auth/challenge') return this.challenge(request.body);
+      if (request.method === 'GET' && request.path === '/api/auth/capabilities') return this.json(200, { wallet: true, email: Boolean(this.managedIdentity), managedWallet: Boolean(this.managedIdentity) });
       if (request.method === 'POST' && request.path === '/api/auth/verify') return await this.verify(request.body);
+      if (request.method === 'POST' && request.path === '/api/auth/email/challenge') {
+        if (!this.managedIdentity) throw new Error('email authentication unavailable');
+        await this.managedIdentity.requestEmailCode(requireString(request.body?.email));
+        return this.json(202, { status: 'code sent' });
+      }
+      if (request.method === 'POST' && request.path === '/api/auth/email/verify') return await this.verifyEmail(request.body);
+      if (request.method === 'POST' && request.path === '/api/auth/logout') return this.logout(request.headers);
+      if (request.method === 'GET' && request.path === '/api/account') {
+        const session = this.requireSessionRecord(request.headers);
+        if (!this.managedIdentity || !session.userId || !session.identityKind) throw new Error('managed wallet unavailable');
+        return this.json(200, this.managedIdentity.getAccount(session.userId, session.identityKind));
+      }
       if (request.method === 'GET' && request.path === '/api/tournaments') return this.json(200, this.service.listTournaments());
       const tournamentMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})$/);
       if (request.method === 'GET' && tournamentMatch) {
@@ -112,7 +128,7 @@ export class ArenaHttpApi {
       return this.json(404, { error: 'not found' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'request failed';
-      const status = message === 'unauthorized' ? 401 : 400;
+      const status = message === 'unauthorized' ? 401 : message.endsWith('unavailable') || message === 'managed wallet provisioning failed' ? 503 : 400;
       return this.json(status, { error: message });
     }
   }
@@ -132,24 +148,46 @@ export class ArenaHttpApi {
     this.challenges.delete(address);
     if (!challenge || challenge.expiresAt <= Date.now()) throw new Error('unauthorized');
     if (!await this.verifySignature({ address, message: challenge.message, signature })) throw new Error('unauthorized');
+    const account = this.managedIdentity ? await this.managedIdentity.loginWallet(address) : undefined;
+    return this.createSession(account?.principal ?? address, account?.userId, account?.identity.kind);
+  }
+
+  private async verifyEmail(body: Record<string, unknown> | undefined): Promise<ApiResponse> {
+    if (!this.managedIdentity) throw new Error('email authentication unavailable');
+    const account = await this.managedIdentity.loginEmail(requireString(body?.email), requireString(body?.code));
+    return this.createSession(account.principal, account.userId, account.identity.kind);
+  }
+
+  private createSession(principal: string, userId?: string, identityKind?: LoginIdentityKind): ApiResponse {
     const token = randomBytes(32).toString('base64url');
-    this.sessions.set(token, { address, expiresAt: Date.now() + SESSION_TTL_MS });
-    return {
-      status: 204,
-      headers: { 'set-cookie': `arena_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}` },
-    };
+    this.sessions.set(token, { principal, userId, identityKind, expiresAt: Date.now() + SESSION_TTL_MS });
+    return { status: 204, headers: { 'set-cookie': `arena_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}` } };
+  }
+
+  private logout(headers: Headers | undefined): ApiResponse {
+    const token = this.sessionToken(headers);
+    if (token) this.sessions.delete(token);
+    return { status: 204, headers: { 'set-cookie': 'arena_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' } };
   }
 
   private requireSession(headers: Headers | undefined): string {
-    const cookie = headers?.cookie || '';
-    const token = cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('arena_session='))?.slice(14);
+    return this.requireSessionRecord(headers).principal;
+  }
+
+  private requireSessionRecord(headers: Headers | undefined) {
+    const token = this.sessionToken(headers);
     if (!token) throw new Error('unauthorized');
     const session = this.sessions.get(token);
     if (!session || session.expiresAt <= Date.now()) {
       this.sessions.delete(token);
       throw new Error('unauthorized');
     }
-    return session.address;
+    return session;
+  }
+
+  private sessionToken(headers: Headers | undefined): string | undefined {
+    const cookie = headers?.cookie || '';
+    return cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('arena_session='))?.slice(14);
   }
 
   private json(status: number, body: any): ApiResponse {

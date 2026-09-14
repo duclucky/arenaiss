@@ -339,6 +339,19 @@ exact `async-agent-arena` child repository. Therefore:
 
 ## Next primary-agent action
 
+Wallet-signature and email-OTP authentication plus resumable Circle
+developer-controlled wallet provisioning are implemented locally behind a
+complete server-only configuration gate. The code pins
+`@circle-fin/developer-controlled-wallets` `10.8.0`, creates one
+`ARC-TESTNET` EOA per Arena identity, persists the UUID v4 idempotency key before
+the Circle call, does not persist raw email, and exposes only safe account
+metadata. The frontend now restores the managed session, offers wallet or email
+login, displays the managed address, and blocks Tournament writes instead of
+falling back to the sign-in wallet. No Circle API mutation, SMTP delivery,
+funding or Arc transaction was performed. Migration of Tournament registration
+and claim to Circle contract execution remains open and must not be represented
+as complete.
+
 The bounded `EVAL-3`/`EVAL-4` runtime slice is now implemented locally:
 immutable EvaluationRun bindings, distinct provider states, SQLite persistence,
 V5 submission/finality, canonical scorecard readback, a multi-scenario `SOLO`

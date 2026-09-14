@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-import { ArcWalletAdapter, ArcNetworkConfig, ArenaWriteAdapter, AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter } from './adapters/interfaces';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { ArcWalletAdapter, ArcNetworkConfig, ArenaWriteAdapter, AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, ManagedAccount, ManagedIdentityAdapter } from './adapters/interfaces';
 import { LazyBrowserArcWalletAdapter } from './adapters/wallet-lazy';
 import { HttpAgentAdapter } from './adapters/agent-api';
 import { createArenaReadAdapter } from './adapters/arena-read';
 import { HttpEvaluationAdapter } from './adapters/evaluation-api';
 import type { EvaluationApiAdapter } from './adapters/interfaces';
+import { HttpManagedIdentityAdapter } from './adapters/managed-identity';
 
 interface AppContextType {
   arenaRead: ArenaReadAdapter;
@@ -15,8 +16,12 @@ interface AppContextType {
   wallet: ArcWalletAdapter;
   networkConfig: ArcNetworkConfig | null;
   account: string | null;
+  managedAccount: ManagedAccount | null;
+  managedIdentityEnabled: boolean;
   connectWallet: (providerUuid: string) => Promise<void>;
-  disconnectWallet: () => void;
+  requestEmailCode: (email: string) => Promise<void>;
+  signInWithEmail: (email: string, code: string) => Promise<void>;
+  disconnectWallet: () => Promise<void>;
 }
 
 export function loadRuntimeConfig(env: Record<string, string | undefined>): ArcNetworkConfig | null {
@@ -120,22 +125,26 @@ interface AppProviderProps {
   evaluationApiAdapter?: EvaluationApiAdapter;
   arenaReadAdapter?: ArenaReadAdapter;
   genLayerReadAdapter?: GenLayerReadAdapter;
+  identityAdapter?: ManagedIdentityAdapter;
 }
 
-export function AppProvider({ children, config, env, walletAdapter, agentApiAdapter, evaluationApiAdapter, arenaReadAdapter, genLayerReadAdapter }: AppProviderProps) {
+export function AppProvider({ children, config, env, walletAdapter, agentApiAdapter, evaluationApiAdapter, arenaReadAdapter, genLayerReadAdapter, identityAdapter }: AppProviderProps) {
   const [account, setAccount] = useState<string | null>(null);
+  const [managedAccount, setManagedAccount] = useState<ManagedAccount | null>(null);
+  const [managedIdentityEnabled, setManagedIdentityEnabled] = useState(Boolean(identityAdapter));
   
   const networkConfig = config !== undefined 
     ? config 
     : loadRuntimeConfig(env || import.meta.env);
 
   const [wallet] = useState<ArcWalletAdapter>(() => walletAdapter || new LazyBrowserArcWalletAdapter());
+  const identity = useMemo(() => identityAdapter || (networkConfig?.apiUrl !== undefined ? new HttpManagedIdentityAdapter(networkConfig.apiUrl) : null), [identityAdapter, networkConfig?.apiUrl]);
   const liveRead = useMemo(() => createArenaReadAdapter(networkConfig?.apiUrl, import.meta.env.DEV, fetch, networkConfig?.genLayerExplorerUrl), [networkConfig?.apiUrl, networkConfig?.genLayerExplorerUrl]);
   const agentApi = useMemo(() => {
     if (agentApiAdapter) return agentApiAdapter;
     if (!account) return null;
-    return new HttpAgentAdapter(networkConfig?.apiUrl || '', () => account, (message) => wallet.signMessage(message));
-  }, [account, agentApiAdapter, networkConfig?.apiUrl, wallet]);
+    return new HttpAgentAdapter(networkConfig?.apiUrl || '', () => account, (message) => wallet.signMessage(message), fetch, Boolean(managedAccount));
+  }, [account, agentApiAdapter, managedAccount, networkConfig?.apiUrl, wallet]);
   const evaluationApi = useMemo(() => {
     if (evaluationApiAdapter) return evaluationApiAdapter;
     if (!account || !agentApi) return null;
@@ -148,13 +157,48 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
     }
     const address = await wallet.connect(providerUuid);
     await wallet.switchChain(networkConfig);
-    setAccount(address);
+    if (identity && managedIdentityEnabled) {
+      const authenticated = await identity.signInWithWallet(address, (message) => wallet.signMessage(message));
+      setManagedAccount(authenticated);
+      setAccount(authenticated.managedWallet.address);
+    } else {
+      setAccount(address);
+    }
+  };
+
+  const requestEmailCode = async (email: string) => {
+    if (!identity || !managedIdentityEnabled) throw new Error('EMAIL_AUTH_NOT_CONFIGURED');
+    await identity.requestEmailCode(email);
+  };
+
+  const signInWithEmail = async (email: string, code: string) => {
+    if (!identity || !managedIdentityEnabled) throw new Error('EMAIL_AUTH_NOT_CONFIGURED');
+    const authenticated = await identity.verifyEmail(email, code);
+    setManagedAccount(authenticated);
+    setAccount(authenticated.managedWallet.address);
   };
 
   const disconnectWallet = async () => {
+    if (identity && managedAccount) await identity.logout();
     await wallet.disconnect();
+    setManagedAccount(null);
     setAccount(null);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!identity) return () => { cancelled = true; };
+    identity.capabilities().then(async (capabilities) => {
+      if (cancelled) return;
+      setManagedIdentityEnabled(capabilities.email && capabilities.managedWallet);
+      if (!capabilities.managedWallet) return;
+      const restored = await identity.restore();
+      if (cancelled || !restored) return;
+      setManagedAccount(restored);
+      setAccount(restored.managedWallet.address);
+    }).catch(() => { if (!cancelled) setManagedIdentityEnabled(false); });
+    return () => { cancelled = true; };
+  }, [identity]);
 
   return (
     <AppContext.Provider
@@ -167,7 +211,11 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
         wallet,
         networkConfig,
         account,
+        managedAccount,
+        managedIdentityEnabled,
         connectWallet,
+        requestEmailCode,
+        signInWithEmail,
         disconnectWallet,
       }}
     >

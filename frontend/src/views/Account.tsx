@@ -7,7 +7,7 @@ type CreditRow = { tournamentId: string; credit: string };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
 
 export function Account() {
-  const { account, agentApi, networkConfig, disconnectWallet, wallet } = useAppContext();
+  const { account, managedAccount, agentApi, networkConfig, disconnectWallet, wallet } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'credits' ? 'credits' : 'overview';
   const [balanceState, setBalanceState] = useState<'loading' | 'unavailable' | string>('loading');
@@ -74,7 +74,7 @@ export function Account() {
   }
 
   async function claim(tournamentId: string) {
-    if (!account || !networkConfig) return;
+    if (!account || !networkConfig || managedAccount) return;
     setClaimState((current) => ({ ...current, [tournamentId]: 'submitting' }));
     try {
       const transaction = await wallet.withdrawCredit(tournamentId, networkConfig);
@@ -114,10 +114,11 @@ export function Account() {
         {account ? (
           <div className="space-y-6">
             <div>
-              <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-1">Connected Address</label>
+              <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-1">{managedAccount ? 'Circle-managed account address' : 'Connected address'}</label>
               <div className="retro-inset mt-2 break-all p-4 font-mono text-sm">
                 {account}
               </div>
+              {managedAccount && <p className="mt-3 text-sm text-neutral-700">Signed in with {managedAccount.identity.kind === 'EMAIL' ? 'email' : 'an external wallet'}. The sign-in credential is not used to custody account funds.</p>}
             </div>
 
             <div>
@@ -134,7 +135,7 @@ export function Account() {
                 onClick={disconnectWallet}
                 className="metal-button-ghost border-red-800/50 text-red-900"
               >
-                Disconnect Wallet
+                Sign out
               </button>
             </div>
           </div>
@@ -150,7 +151,8 @@ export function Account() {
         <div className="glass-panel flex flex-wrap items-start justify-between gap-4 rounded-[28px] p-6 md:p-8">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">Tournament credits</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Every confirmed tournament participation for this wallet is verified against the Arc escrow. Claim sends an Arc Testnet transaction and the contract pays the connected beneficiary.</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Every confirmed tournament participation for this account is verified against the Arc escrow. A positive credit is claimable only by its recorded beneficiary.</p>
+            {managedAccount && <p className="mt-3 text-sm font-semibold text-amber-900">Circle contract execution is not enabled yet. Arena will not fall back to your sign-in wallet for claims.</p>}
           </div>
           {account && <button type="button" className="metal-button-ghost" disabled={creditsState === 'loading'} onClick={() => setReload((value) => value + 1)}>Refresh</button>}
         </div>
@@ -173,7 +175,8 @@ export function Account() {
                 {state === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Claim confirmed.</p>}
                 {state === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Claim failed or was rejected. No payout was recorded.</p>}
               </div>
-              {claimable && <button type="button" className="metal-button-solid shrink-0" disabled={state === 'submitting'} onClick={() => claim(row.tournamentId)}>{state === 'submitting' ? 'Claiming…' : 'Claim'}</button>}
+              {claimable && !managedAccount && <button type="button" className="metal-button-solid shrink-0" disabled={state === 'submitting'} onClick={() => claim(row.tournamentId)}>{state === 'submitting' ? 'Claiming…' : 'Claim'}</button>}
+              {claimable && managedAccount && <span className="text-sm font-semibold text-amber-900">Claim unavailable until managed execution is enabled</span>}
             </li>;
           })}
         </ul>}
