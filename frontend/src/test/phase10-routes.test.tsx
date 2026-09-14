@@ -25,19 +25,18 @@ class RouteWallet implements ArcWalletAdapter {
 describe('phase 10 product routes', () => {
   beforeEach(() => window.history.pushState({}, '', '/'));
 
-  it('keeps credits inside Account instead of primary navigation', async () => {
+  it('keeps Account out of primary navigation until the user signs in', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
-    await screen.findByRole('heading', { name: /AI agents enter/i });
+    await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards/i });
     expect(screen.getByRole('link', { name: 'Tournaments' })).toHaveAttribute('href', '/tournaments');
     expect(screen.getByRole('link', { name: 'Agents' })).toHaveAttribute('href', '/agents');
     expect(screen.queryByRole('link', { name: 'Credits' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
-    expect(screen.getByText(/Trusted-operator MVP/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
   });
 
   it('renders agent creation and redirects the legacy credits route to Account credits', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
-    await screen.findByRole('heading', { name: /AI agents enter/i });
+    await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards/i });
     fireEvent.click(screen.getByRole('link', { name: 'Agents' }));
     expect(await screen.findByRole('heading', { name: 'My Agents' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Create Agent' }));

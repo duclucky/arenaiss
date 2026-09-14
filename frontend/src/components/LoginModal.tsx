@@ -96,10 +96,23 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError('');
     try {
-      await requestEmailCode(email);
+      const normalizedEmail = email.trim().toLowerCase();
+      await requestEmailCode(normalizedEmail);
+      setEmail(normalizedEmail);
       setEmailStep('code');
     } catch (reason) {
       setError(message(reason, 'Could not send the code. Check the address and try again.'));
+    } finally { setBusy(false); }
+  }
+
+  async function resendCode() {
+    setBusy(true);
+    setError('');
+    try {
+      await requestEmailCode(email);
+      setCode('');
+    } catch (reason) {
+      setError(message(reason, 'Could not resend the code. Check the address and try again.'));
     } finally { setBusy(false); }
   }
 
@@ -127,8 +140,8 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
       {method === 'choice' && <>
         <p className="mb-6 text-sm leading-relaxed text-neutral-700">Choose how you want to access your Arena account.</p>
         <div className="space-y-3">
-          <button type="button" aria-label="Continue with wallet" onClick={() => choose('wallet')} className="retro-control flex min-h-14 w-full items-center gap-3 p-4 text-left focus:outline-none focus:ring-2 focus:ring-black"><WalletCards size={21} aria-hidden="true" /><span><strong className="block">Continue with wallet</strong><span className="text-xs text-neutral-600">Use an installed Arc-compatible provider</span></span></button>
-          <button type="button" aria-label="Continue with email" onClick={() => choose('email')} disabled={!managedIdentityEnabled} className="retro-control flex min-h-14 w-full items-center gap-3 p-4 text-left focus:outline-none focus:ring-2 focus:ring-black disabled:cursor-not-allowed disabled:opacity-50"><Mail size={21} aria-hidden="true" /><span><strong className="block">Continue with email</strong><span className="text-xs text-neutral-600">{managedIdentityEnabled ? 'Verify by one-time code' : 'Not configured on this server yet'}</span></span></button>
+          <button type="button" aria-label="Continue with wallet" onClick={() => choose('wallet')} className="login-method-button retro-control flex min-h-14 w-full items-center gap-3 p-4 text-left focus:outline-none focus:ring-2 focus:ring-black"><WalletCards size={21} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block">Continue with wallet</strong><span className="text-xs text-neutral-600">Use an installed EVM provider</span></span></button>
+          <button type="button" aria-label="Continue with email" onClick={() => choose('email')} disabled={!managedIdentityEnabled} className="login-method-button retro-control flex min-h-14 w-full items-center gap-3 p-4 text-left focus:outline-none focus:ring-2 focus:ring-black disabled:cursor-not-allowed disabled:opacity-50"><Mail size={21} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block">Continue with email</strong><span className="text-xs text-neutral-600">{managedIdentityEnabled ? 'Verify by one-time code' : 'Not configured on this server yet'}</span></span></button>
         </div>
       </>}
 
@@ -139,7 +152,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
 
       {method === 'email' && <div className="mt-5">
         <p className="mb-5 text-sm leading-relaxed text-neutral-700">Arena verifies your email, then uses a separate Circle-managed wallet. Your email is not stored in plaintext.</p>
-        {emailStep === 'email' ? <form onSubmit={submitEmail} className="space-y-4"><div><label htmlFor="login-email" className="mb-2 block text-sm font-semibold">Email address</label><input id="login-email" className="field-control" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></div><button className="metal-button-solid w-full" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send code'}</button></form> : <form onSubmit={submitCode} className="space-y-4"><p role="status" className="text-sm text-emerald-800">We sent a 6-digit code to your email.</p><div><label htmlFor="login-code" className="mb-2 block text-sm font-semibold">6-digit code</label><input id="login-code" className="field-control font-mono" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></div><button className="metal-button-solid w-full" type="submit" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify and sign in'}</button><button className="metal-button-ghost w-full" type="button" disabled={busy} onClick={() => { setEmailStep('email'); setCode(''); setError(''); }}>Use another email</button></form>}
+        {emailStep === 'email' ? <form onSubmit={submitEmail} className="space-y-4"><div><label htmlFor="login-email" className="mb-2 block text-sm font-semibold">Email address</label><input id="login-email" className="field-control" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></div><button className="metal-button-solid w-full" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send code'}</button></form> : <form onSubmit={submitCode} className="space-y-4"><div role="status" className="text-sm leading-relaxed text-emerald-800"><p>Code sent to <strong className="break-all">{email}</strong>.</p><p className="mt-1 text-xs text-neutral-700">Check the spelling and your spam folder. Only the newest code works.</p></div><div><label htmlFor="login-code" className="mb-2 block text-sm font-semibold">6-digit code</label><input id="login-code" className="field-control font-mono" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></div><button className="metal-button-solid w-full" type="submit" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify and sign in'}</button><button className="metal-button-ghost w-full" type="button" disabled={busy} onClick={resendCode}>{busy ? 'Sending…' : 'Resend code'}</button><button className="metal-button-ghost w-full" type="button" disabled={busy} onClick={() => { setEmailStep('email'); setCode(''); setError(''); }}>Use another email</button></form>}
       </div>}
 
       {error && <p role="alert" className="mt-4 text-sm font-semibold text-destructive">{error}</p>}
