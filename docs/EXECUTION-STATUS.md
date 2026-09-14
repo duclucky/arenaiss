@@ -82,13 +82,15 @@
   active.
 - Named Cloudflare Tunnel `arenaiss-vps` is connected with four QUIC connections
   and routes `arenaiss.xyz` plus `www.arenaiss.xyz` to the web service without a
-  stable public IP. Namecheap has the two assigned Cloudflare nameservers saved;
-  public HTTPS verification is pending `.xyz` registry/DNS propagation.
-- Still open: public-domain propagation verification, host administrator
-  sleep/firewall policy, wired connectivity and the real injected-wallet
-  transaction. The in-app browser reported no EVM provider. The production
-  unattended tournament scheduler also remains separate from the bounded
-  lifecycle script and is not claimed as deployed.
+  stable public IP. The `.xyz` registry delegates to the assigned Cloudflare
+  nameservers, Cloudflare and Google DNS-over-HTTPS return both proxy addresses,
+  the managed Universal certificate is active, and root/www health plus the
+  public tournament API returned HTTP 200 through the Cloudflare edge. Recursive
+  caches may temporarily retain the previous registrar nameservers.
+- Still open: host administrator sleep/firewall policy, wired connectivity and
+  the real injected-wallet transaction. The in-app browser reported no EVM
+  provider. The production unattended tournament scheduler also remains
+  separate from the bounded lifecycle script and is not claimed as deployed.
 - Production status: MVP contract deployments are testnet-only and unaudited
 - Network/financial status: the active GenLayer Studionet judge revision is V10
   at `0x09Ba3CE193E477a66Fdaf556bA63519A767eb130`; deployment, source and readback
