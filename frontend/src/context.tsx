@@ -27,6 +27,11 @@ export function loadRuntimeConfig(env: Record<string, string | undefined>): ArcN
   const escrowAddress = env.VITE_ARC_ESCROW_ADDRESS;
   const apiUrl = env.VITE_ARENA_API_URL;
   const genLayerExplorerUrl = env.VITE_GENLAYER_EXPLORER_URL;
+  const genLayerChainId = env.VITE_GENLAYER_CHAIN_ID;
+  const genLayerRpcUrl = env.VITE_GENLAYER_RPC_URL;
+  const genLayerName = env.VITE_GENLAYER_NETWORK_NAME;
+  const matchJudgeAddress = env.VITE_GENLAYER_MATCH_JUDGE_ADDRESS;
+  const evaluationJudgeAddress = env.VITE_GENLAYER_EVALUATION_JUDGE_ADDRESS;
 
   if (!chainIdStr || !rpcUrl || !name || !name.trim()) {
     return null;
@@ -80,6 +85,25 @@ export function loadRuntimeConfig(env: Record<string, string | undefined>): ArcN
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
       config.genLayerExplorerUrl = genLayerExplorerUrl;
     } catch { return null; }
+  }
+
+  const genLayerValues = [genLayerChainId, genLayerRpcUrl, genLayerName, genLayerExplorerUrl, matchJudgeAddress, evaluationJudgeAddress];
+  if (genLayerValues.some((value) => value !== undefined && value !== '') && genLayerValues.some((value) => !value)) return null;
+  if (genLayerValues.every((value) => Boolean(value))) {
+    if (genLayerChainId !== '61997' || !genLayerName?.trim()) return null;
+    try {
+      if (new URL(genLayerRpcUrl!).protocol !== 'https:' || new URL(genLayerExplorerUrl!).protocol !== 'https:') return null;
+    } catch { return null; }
+    if (!addressPattern.test(matchJudgeAddress!) || /^0x0{40}$/i.test(matchJudgeAddress!)
+      || !addressPattern.test(evaluationJudgeAddress!) || /^0x0{40}$/i.test(evaluationJudgeAddress!)) return null;
+    config.genLayer = {
+      chainId: 61997,
+      rpcUrl: genLayerRpcUrl!,
+      name: genLayerName!,
+      explorerUrl: genLayerExplorerUrl!,
+      matchJudgeAddress: matchJudgeAddress! as `0x${string}`,
+      evaluationJudgeAddress: evaluationJudgeAddress! as `0x${string}`,
+    };
   }
 
   return config;

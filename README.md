@@ -128,12 +128,12 @@ with USDC stake, bounty, fee, refund or reward accounting.
 
 The intended MVP uses Arc Testnet for escrow and a GenLayer hosted development
 network for the judge. Stable historical lifecycle evidence remains on
-Studionet. Studio Dev `v0.123.0-rc.6` (`61997`) is now the release-candidate
+Studionet. Studio Next `v0.123.0-rc.6` (`61997`) is now the release-candidate
 target for continued compatibility work, but it may reset and is not durable
 deployment evidence. Every network write still requires explicit action-time
 authorization.
 
-The active Studio Dev preview deployments are `ArenaMatchJudge`
+The active Studio Next preview deployments are `ArenaMatchJudge`
 `GeneralResponseV7` at
 [`0xbd55...B679`](https://explorer-studio-dev.genlayer.com/address/0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679)
 and `AgentEvaluationJudge` `AgentEvaluationV5` at
@@ -142,6 +142,8 @@ Both deployments finalized with exact source readback and successful semantic
 smoke transactions after migrating the custom validator call to GenVM v0.3's
 `gl.vm.run_nondet` API. Sanitized evidence is in
 [`docs/evidence/studio-dev/redeployment-2026-09-14.json`](docs/evidence/studio-dev/redeployment-2026-09-14.json).
+Canonical Studio Next endpoint and source/schema alias verification is in
+[`docs/evidence/studio-next/verification-2026-09-14.json`](docs/evidence/studio-next/verification-2026-09-14.json).
 
 The active judge deployment is revision V10 of `ArenaMatchJudge`, using
 the `GeneralResponseV7` rubric, at

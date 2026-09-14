@@ -1,8 +1,9 @@
 networks:
-  default: studionet
-  studionet: {}
+  default: studio_devnet
+  studio_devnet:
+    id: 61997
+    url: "https://studio-next.genlayer.com/api"
 
 paths:
   contracts: contracts
   artifacts: artifacts
-

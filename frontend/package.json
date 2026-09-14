@@ -12,7 +12,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@genlayer/transaction-kit": "0.1.0-rc.2",
+    "@genlayer/transaction-kit-react": "0.1.0-rc.2",
     "clsx": "^2.1.1",
+    "genlayer-js": "2.0.0-rc.1",
     "lucide-react": "^1.45.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

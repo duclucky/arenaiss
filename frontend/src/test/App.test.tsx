@@ -118,6 +118,27 @@ describe('App Tests', () => {
     })).toBeNull();
   });
 
+  it('loads one complete Studio Next binding with both deployed judges', () => {
+    expect(loadRuntimeConfig({
+      VITE_ARC_CHAIN_ID: '5042002',
+      VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.network',
+      VITE_ARC_NETWORK_NAME: 'Arc Testnet',
+      VITE_GENLAYER_CHAIN_ID: '61997',
+      VITE_GENLAYER_RPC_URL: 'https://studio-next.genlayer.com/api',
+      VITE_GENLAYER_NETWORK_NAME: 'GenLayer Studio Next',
+      VITE_GENLAYER_EXPLORER_URL: 'https://explorer-studio-dev.genlayer.com',
+      VITE_GENLAYER_MATCH_JUDGE_ADDRESS: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
+      VITE_GENLAYER_EVALUATION_JUDGE_ADDRESS: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
+    })?.genLayer).toEqual({
+      chainId: 61997,
+      rpcUrl: 'https://studio-next.genlayer.com/api',
+      name: 'GenLayer Studio Next',
+      explorerUrl: 'https://explorer-studio-dev.genlayer.com',
+      matchJudgeAddress: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
+      evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
+    });
+  });
+
   it('5. distinct lifecycle fixtures and explicit preview badges', async () => {
     render(
       <MemoryRouter initialEntries={['/tournaments/1']}>
