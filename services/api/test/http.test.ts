@@ -81,6 +81,11 @@ test('authenticated owner can prepare an exact Arc registration payload', async 
   assert.equal(prepared.status, 200);
   assert.match(prepared.body.entrantId, /^0x[0-9a-f]{64}$/);
   assert.equal(prepared.body.stakeAmount, '100000');
+
+  const owned = await api.handle({ method: 'GET', path: '/api/registrations', headers: { cookie } });
+  assert.equal(owned.status, 200);
+  assert.deepEqual(owned.body, [{ tournamentId: prepared.body.tournamentId, entrantId: prepared.body.entrantId }]);
+  assert.equal((await api.handle({ method: 'GET', path: '/api/registrations' })).status, 401);
 });
 
 test('public read routes expose normalized tournament, match and verdict data anonymously', async () => {

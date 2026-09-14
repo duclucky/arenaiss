@@ -288,6 +288,14 @@ prepared-registration payloads survive service restart; authentication
 challenges and sessions intentionally remain process-local and require a fresh
 signature after restart.
 
+The Account screen now owns the Tournament credits experience instead of a
+top-level Credits route. Its authenticated registration index is owner-scoped
+and exposes only Tournament/entrant identifiers; the browser then verifies the
+entrant wallet and registration against Arc before listing it. A Claim action
+is offered only when `creditOf` is positive, waits for an Arc receipt and
+refreshes the canonical credit after confirmation. The legacy `/credits` URL
+redirects to `/account?tab=credits`.
+
 R2 REWORK-1 specifically passes `18/18` focused tests and now rejects bool-as-int,
 zero identity/commitment fields and malformed quorum bundle members as required.
 Direct invocation of `normalize_rpc_bundle` with a non-dict still raises

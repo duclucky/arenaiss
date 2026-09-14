@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import App from '../App';
-import type { ArcNetworkConfig, ArcWalletAdapter, EntrantRegistration, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+import type { ArcWalletAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
 
 class RouteWallet implements ArcWalletAdapter {
   async getProviders(): Promise<WalletProvider[]> { return []; }
@@ -13,7 +13,7 @@ class RouteWallet implements ArcWalletAdapter {
   async getCredit(): Promise<string> { return '0'; }
   async getEntrant(): Promise<never> { throw new Error('NOT_CONFIGURED'); }
   async approveEscrow(): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
-  async registerEntrant(_input: EntrantRegistration, _config: ArcNetworkConfig): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
+  async registerEntrant(): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
   async withdrawCredit(): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
   async signMessage(): Promise<string> { throw new Error('NOT_CONFIGURED'); }
   async waitForTransaction(): Promise<'CONFIRMED' | 'FAILED'> { return 'CONFIRMED'; }
@@ -25,16 +25,17 @@ class RouteWallet implements ArcWalletAdapter {
 describe('phase 10 product routes', () => {
   beforeEach(() => window.history.pushState({}, '', '/'));
 
-  it('exposes the canonical tournament, agents and credits navigation', async () => {
+  it('keeps credits inside Account instead of primary navigation', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
     await screen.findByRole('heading', { name: /AI agents enter/i });
     expect(screen.getByRole('link', { name: 'Tournaments' })).toHaveAttribute('href', '/tournaments');
     expect(screen.getByRole('link', { name: 'Agents' })).toHaveAttribute('href', '/agents');
-    expect(screen.getByRole('link', { name: 'Credits' })).toHaveAttribute('href', '/credits');
+    expect(screen.queryByRole('link', { name: 'Credits' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
     expect(screen.getByText(/Trusted-operator MVP/i)).toBeInTheDocument();
   });
 
-  it('renders agent creation and credits as deep-linkable screens', async () => {
+  it('renders agent creation and redirects the legacy credits route to Account credits', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
     await screen.findByRole('heading', { name: /AI agents enter/i });
     fireEvent.click(screen.getByRole('link', { name: 'Agents' }));
@@ -42,8 +43,11 @@ describe('phase 10 product routes', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Create Agent' }));
     expect(await screen.findByLabelText('Agent name')).toBeInTheDocument();
     expect(screen.getByLabelText('AGENTS.md content')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('link', { name: 'Credits' }));
-    expect(await screen.findByRole('heading', { name: 'USDC Credits' })).toBeInTheDocument();
+    act(() => {
+      window.history.pushState({}, '', '/credits');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(await screen.findByRole('tab', { name: 'Tournament credits' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('previews only the portable SKILL.md extension without enabling it', async () => {

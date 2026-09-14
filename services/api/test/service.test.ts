@@ -50,6 +50,23 @@ test("owner prepares one immutable Arc registration from a locked agent version"
   assert.throws(() => api.prepareRegistration(BOB, tournamentId, agent.agentId), /unauthorized/i);
 });
 
+test("owner registration listing is scoped and exposes only identifiers needed for onchain verification", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"9".repeat(64)}` as const;
+  api.publishTournament(ALICE, { id: tournamentId, name: "Owned registrations", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
+  const aliceAgent = api.createAgent(ALICE, "Alice", "v1");
+  const bobAgent = api.createAgent(BOB, "Bob", "v1");
+  const aliceRegistration = api.prepareRegistration(ALICE, tournamentId, aliceAgent.agentId);
+  api.prepareRegistration(BOB, tournamentId, bobAgent.agentId);
+
+  assert.deepEqual((api as any).listOwnedRegistrations(ALICE), [{
+    tournamentId: aliceRegistration.tournamentId,
+    entrantId: aliceRegistration.entrantId,
+  }]);
+  assert.equal(JSON.stringify((api as any).listOwnedRegistrations(ALICE)).includes("agentsCommitment"), false);
+  assert.equal((api as any).listOwnedRegistrations(BOB).length, 1);
+});
+
 test("agent versions, tournaments and prepared registrations survive API restart", () => {
   const directory = mkdtempSync(join(tmpdir(), "arena-api-"));
   const path = join(directory, "runtime.sqlite");
@@ -70,6 +87,7 @@ test("agent versions, tournaments and prepared registrations survive API restart
     const restarted = new ArenaApiService(ALICE, restartedDatabase);
     assert.equal(restarted.getPrivateAgent(ALICE, agent.agentId).agentsMd, "version one");
     assert.deepEqual(restarted.listTournaments(), [{ id: tournamentId, name: "Persistent Arena", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" }]);
+    assert.deepEqual(restarted.listOwnedRegistrations(ALICE), [{ tournamentId: prepared.tournamentId, entrantId: prepared.entrantId }]);
     assert.deepEqual(restarted.prepareRegistration(ALICE, tournamentId, agent.agentId), prepared);
     const updated = restarted.updateAgent(ALICE, agent.agentId, "version two");
     assert.notEqual(updated.agentsVersion, agent.agentsVersion);

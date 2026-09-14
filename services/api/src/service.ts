@@ -23,6 +23,7 @@ export type PublicVerdict = {
   arcTournamentId?: string; arcEscrowAddress?: string; grossPoolUsdc?: string; netPayoutUsdc?: string; platformFeeUsdc?: string; arcState?: string;
 };
 export type PreparedRegistration = { tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string; stakeAmount: string };
+export type OwnedRegistration = Pick<PreparedRegistration, "tournamentId" | "entrantId">;
 export type PublicEvaluationRun = {
   schema: "arena-public-evaluation-run-v1";
   runId: string;
@@ -112,6 +113,13 @@ export class ArenaApiService {
   listOwnedAgents(caller: string): PublicAgent[] {
     const owner = this.address(caller);
     return [...this.agents.values()].filter((agent) => agent.owner === owner).map((agent) => this.publicView(agent));
+  }
+  listOwnedRegistrations(caller: string): OwnedRegistration[] {
+    const owner = this.address(caller);
+    return [...this.registrations.values()]
+      .filter((registration) => this.agents.get(`sha256:${registration.agentId.slice(2)}` as Digest)?.owner === owner)
+      .map(({ tournamentId, entrantId }) => ({ tournamentId, entrantId }))
+      .sort((left, right) => left.tournamentId.localeCompare(right.tournamentId) || left.entrantId.localeCompare(right.entrantId));
   }
   publishTournament(caller: string, tournament: PublicTournament): void {
     if (this.address(caller) !== this.operator) throw new Error("unauthorized operator");

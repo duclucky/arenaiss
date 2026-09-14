@@ -8,7 +8,6 @@ const navItems = [
   ['/tournaments', 'Tournaments'],
   ['/agents', 'Agents'],
   ['/evaluations', 'Evaluations'],
-  ['/credits', 'Credits'],
   ['/account', 'Account'],
 ] as const;
 

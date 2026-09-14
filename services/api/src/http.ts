@@ -93,6 +93,10 @@ export class ArenaHttpApi {
         const owner = this.requireSession(request.headers);
         return this.json(200, this.service.listOwnedAgents(owner));
       }
+      if (request.method === 'GET' && request.path === '/api/registrations') {
+        const owner = this.requireSession(request.headers);
+        return this.json(200, this.service.listOwnedRegistrations(owner));
+      }
       if (request.method === 'POST' && request.path === '/api/agents') {
         const owner = this.requireSession(request.headers);
         const body = request.body || {};

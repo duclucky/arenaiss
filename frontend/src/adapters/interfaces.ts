@@ -126,8 +126,11 @@ export type AgentProfile = {
   agentsCommitment: string;
 };
 
+export type OwnedRegistration = Pick<EntrantRegistration, 'tournamentId' | 'entrantId'>;
+
 export interface AgentApiAdapter {
   listOwnedAgents(): Promise<AgentProfile[]>;
+  listOwnedRegistrations(): Promise<OwnedRegistration[]>;
   createAgent(name: string, agentsMd: string): Promise<AgentProfile>;
   prepareRegistration(tournamentId: string, agentId: string): Promise<EntrantRegistration & { stakeAmount: string }>;
 }

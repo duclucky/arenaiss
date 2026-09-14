@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context';
 import { Layout } from './components/Layout';
 import { Home } from './views/Home';
@@ -12,7 +12,6 @@ const SubmitEntry = lazy(() => import('./views/SubmitEntry').then((module) => ({
 const MatchDetail = lazy(() => import('./views/MatchDetail').then((module) => ({ default: module.MatchDetail })));
 const Agents = lazy(() => import('./views/Agents').then((module) => ({ default: module.Agents })));
 const NewAgent = lazy(() => import('./views/NewAgent').then((module) => ({ default: module.NewAgent })));
-const Credits = lazy(() => import('./views/Credits').then((module) => ({ default: module.Credits })));
 const Account = lazy(() => import('./views/Account').then((module) => ({ default: module.Account })));
 const NotFound = lazy(() => import('./views/NotFound').then((module) => ({ default: module.NotFound })));
 const Evaluations = lazy(() => import('./views/Evaluations').then((module) => ({ default: module.Evaluations })));
@@ -46,7 +45,7 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
             <Route path="matches/:id" element={deferred(<MatchDetail />)} />
             <Route path="agents" element={deferred(<Agents />)} />
             <Route path="agents/new" element={deferred(<NewAgent />)} />
-            <Route path="credits" element={deferred(<Credits />)} />
+            <Route path="credits" element={<Navigate to="/account?tab=credits" replace />} />
             <Route path="account" element={deferred(<Account />)} />
             <Route path="evaluations" element={deferred(<Evaluations />)} />
             <Route path="evaluations/:id" element={deferred(<EvaluationDetail />)} />
