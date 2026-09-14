@@ -1,0 +1,43 @@
+{
+  "evidence_schema": "AsyncAgentArenaLiveAciCheckV1",
+  "observed_at_utc": "2026-09-11T09:03:36Z",
+  "endpoint": "https://api.redpill.ai",
+  "verifier": {
+    "source_repository": "Dstack-TEE/private-ai-gateway",
+    "source_commit": "19daf2b7152eeaf1f8be3fd66d261b8c1ce8eac5",
+    "cli": "aci",
+    "cli_path": "src/bin/aci",
+    "target": "x86_64-unknown-linux-gnu via WSL Ubuntu-22.04",
+    "command": "cargo run --locked --quiet --bin aci -- verify https://api.redpill.ai --json"
+  },
+  "verdict": {
+    "verified": true,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 1,
+    "skipped_checks": ["id-5: custody policy not implemented in this CLI"]
+  },
+  "checks": {
+    "hardware_quote": "PASS: TDX quote verified to Intel root; TCB UpToDate",
+    "keyset_report_data_binding": "PASS",
+    "keyset_expiry": "PASS: not_after 2026-10-10T06:28:26Z",
+    "compose_measurement": "PASS: compose hash measured into RTMR3",
+    "channel_tls_spki": "PASS: observed SPKI matched attested keyset entry for api.redpill.ai"
+  },
+  "safe_bindings": {
+    "workload_keyset_digest": "sha256:5e4f4cc874e534e1fcb734a80ece7b7d852797e151f346442ea43deb25672bd7",
+    "nonce_digest": "9fece368fca0a62913bc51078c28601f15cf068b6643de953d5c21a01c2b3aa6",
+    "compose_hash": "91f4d217fd8ebbf42e7971eb092c10bd5a2a2ec2565067ba545fa84c95dc7e22",
+    "observed_tls_spki_sha256": "c68585e7dc00a55d3082a9c860cb916e1788c5daec51505e413d27ab94f7d4c7",
+    "source_provenance": {
+      "repo": "https://github.com/Dstack-TEE/private-ai-gateway.git",
+      "commit": "19daf2b7152eeaf1f8be3fd66d261b8c1ce8eac5"
+    }
+  },
+  "redaction": {
+    "raw_quote_saved": false,
+    "raw_attestation_report_saved": false,
+    "api_key_or_credential_saved": false,
+    "note": "This artifact records only the verifier allowlist and safe digests; it is not Arena pair-runner provenance evidence."
+  }
+}

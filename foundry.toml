@@ -1,0 +1,12 @@
+[profile.default]
+src = "contracts/arc"
+test = "contracts/arc/test"
+script = "contracts/arc/script"
+out = "artifacts/arc"
+cache_path = "cache/arc"
+libs = []
+evm_version = "paris"
+solc_version = "0.8.19"
+optimizer = true
+optimizer_runs = 200
+via_ir = true

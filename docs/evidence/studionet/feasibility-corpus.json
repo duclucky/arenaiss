@@ -1,0 +1,122 @@
+{
+  "schema_version": "arena-genlayer-rationale-corpus-v2",
+  "status": "HISTORICAL_V2_SUPERSEDED",
+  "superseded_by": "adversarial-corpus-v3.json",
+  "captured_at_utc": "2026-09-11T16:32:08Z",
+  "network": "Studionet",
+  "chain_id": 61999,
+  "contract_address": "0x2038a670B60d133F4867DA28fD96a07521a7dE49",
+  "rubric_version": "GeneralResponseV2",
+  "deployment_transaction": "0xb09cab3dfef06a106ead8ae4add93872e1f38bc3c75ae7409a5701489b61d12c",
+  "all_transactions": {
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS"
+  },
+  "cases": [
+    {
+      "case": "clear_but_wrong_vs_correct_and_moderately_dense",
+      "match_id": "v2_clear_wrong_01",
+      "transaction": "0x24ac0f880c2855565c6be56168595b976936a5b3043a12506f411a57f28ba92e",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 60,
+      "criterion_winners": ["TIE", "B", "B", "B"],
+      "finding": "The first contrast was not strong enough to prove clarity independence; the judge considered B clearer because it explained the distinction and considered A overly terse."
+    },
+    {
+      "case": "clear_but_wrong_vs_correct_and_deliberately_hard_to_read",
+      "match_id": "v2_clear_wrong_02",
+      "transaction": "0x47f07a5a0c59c82b4e0fb1ed199885232b2700a724ea922f55b2466c4f1de2c4",
+      "result": "B_WIN",
+      "score_a": 10,
+      "score_b": 90,
+      "criterion_winners": ["B", "B", "B", "A"],
+      "clarity_reason": "Output A is written in simple, plain English. Output B uses extremely dense, academic jargon that is difficult to parse, though technically accurate.",
+      "finding": "Criterion independence passed: the factually wrong A won clarity while the correct B won the other criteria and the match."
+    },
+    {
+      "case": "position_swap_original",
+      "match_id": "v2_swap_ab_01",
+      "transaction": "0x7f0c49d0b53421befc7273f8cd48dc81f5c80169388f92ee7b21a3e1049e3bf9",
+      "result": "A_WIN",
+      "score_a": 100,
+      "score_b": 0,
+      "criterion_winners": ["A", "A", "A", "A"],
+      "strong_output_digest": "sha256:952d55fd7d9bd88729d443566fe3addb36b3594ce9db4bafca0bdb74d0dda856",
+      "weak_output_digest": "sha256:725dd9ff0edc9da9530e1b9f5f1f4eb06defe97b584c36d6f56e6a499e0b5c45"
+    },
+    {
+      "case": "position_swap_reversed",
+      "match_id": "v2_swap_ba_01",
+      "transaction": "0x0c0be95c99ad8bb296ca59332494d3fa853abd6d110a5446c3bf2834ffd010e4",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 100,
+      "criterion_winners": ["B", "B", "B", "B"],
+      "strong_output_digest": "sha256:952d55fd7d9bd88729d443566fe3addb36b3594ce9db4bafca0bdb74d0dda856",
+      "weak_output_digest": "sha256:725dd9ff0edc9da9530e1b9f5f1f4eb06defe97b584c36d6f56e6a499e0b5c45"
+    },
+    {
+      "case": "near_tie_repeat_1",
+      "match_id": "v2_neartie_01",
+      "transaction": "0xf1fba21ef21370c40411afbcaf57f0adf2ce72cd28ef70d757b159ad5232dfcf",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 90,
+      "criterion_winners": ["B", "B", "B", "TIE"]
+    },
+    {
+      "case": "near_tie_repeat_2",
+      "match_id": "v2_neartie_02",
+      "transaction": "0xd4b7079893a9800eb2430a7a620db097adfcd42982e5a9f7c9e0cde3426b4474",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 50,
+      "criterion_winners": ["TIE", "B", "B", "TIE"]
+    },
+    {
+      "case": "near_tie_repeat_3",
+      "match_id": "v2_neartie_03",
+      "transaction": "0xaea95ad8407279ee28b66ceabba2a0b54bee67bfd690d6e44acfe393c3f9fc47",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 50,
+      "criterion_winners": ["TIE", "B", "B", "TIE"]
+    },
+    {
+      "case": "near_tie_repeat_4",
+      "match_id": "v2_neartie_04",
+      "transaction": "0x9a90f8590eb09c3efc0fa27b0f9514d7ab0df6ee32aa193425cb4c1b7d654e34",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 50,
+      "criterion_winners": ["TIE", "B", "B", "TIE"]
+    },
+    {
+      "case": "near_tie_repeat_5",
+      "match_id": "v2_neartie_05",
+      "transaction": "0x178f4df079f321a0d11423d435746ab8f4fd00b6983b19060f65c2c3b8bf09fb",
+      "result": "B_WIN",
+      "score_a": 0,
+      "score_b": 50,
+      "criterion_winners": ["TIE", "B", "B", "TIE"]
+    }
+  ],
+  "observations": {
+    "reason_validation": "Every live verdict reached consensus under a validator that independently re-scores the four criteria and rejects unsupported criterion reasons or summary.",
+    "clarity_independence": "Passed on the deliberately separated case: incorrect A won clarity while correct B won the match 90-10.",
+    "position_swap": "Passed for one clear pair: the same strong output won 100-0 in both A and B positions.",
+    "near_tie_winner_stability": "5/5 B_WIN (100%).",
+    "near_tie_exact_vector_stability": "4/5 used TIE/B/B/TIE (80%); one run used B/B/B/TIE because relevance changed from TIE to B.",
+    "near_tie_score_stability": "Four runs scored 0-50; one scored 0-90. Winner was stable but criterion-level scoring was not perfectly stable."
+  },
+  "limitations": [
+    "The sample is small and cannot establish general position neutrality or statistical reliability.",
+    "A semantic validator can still share the leader's interpretation error; consensus is not objective ground truth.",
+    "The first clarity contrast remained debatable, showing that criterion independence depends on the size of the stylistic difference.",
+    "The V2 validator adds an additional semantic audit call and therefore increases GenLayer execution cost and latency relative to V1.",
+    "The contract still judges operator-submitted bytes and does not authenticate provider or contestant AGENTS.md provenance."
+  ],
+  "sanitization": "Only allowlisted transaction status, canonical verdict, score, criterion vector, selected rationale, digest, and audit findings are retained. Raw receipts, traces, validator configuration, contestant output bodies, stdout, and stderr are not stored."
+}

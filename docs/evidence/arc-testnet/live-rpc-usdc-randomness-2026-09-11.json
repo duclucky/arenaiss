@@ -1,0 +1,86 @@
+{
+  "schema_version": "AsyncAgentArenaLiveArcObservationV1",
+  "observed_at": "2026-09-11T09:27:33Z",
+  "network": {
+    "name": "Arc Testnet",
+    "chain_id": 5042002,
+    "rpc": "https://rpc.testnet.arc.io",
+    "rpc_methods": [
+      "eth_chainId",
+      "eth_blockNumber",
+      "eth_getBlockByNumber",
+      "eth_getCode",
+      "eth_call"
+    ]
+  },
+  "randomness_observation": {
+    "seed_block": 61544328,
+    "seed_block_hash": "0x4de2a3c8fd65d31d027c3033491a7277a2cb6ed9db6b3aad33b2e26cd6d621e1",
+    "seed_block_timestamp": "2026-09-11T09:27:30Z",
+    "observed_block_number": 61544329,
+    "observed_block_hash": "0x953b586c0ffd34c216d7bda96d7a6720bcfc56b2cde1d3bcb9332c02a3417d20",
+    "observed_block_timestamp": "2026-09-11T09:27:31Z",
+    "seed_block_is_mined": true,
+    "seed_block_is_within_256_block_window": true,
+    "rpc_quorum": {
+      "required": 3,
+      "matching": 4,
+      "provider_independence_proven": false,
+      "responses": [
+        {
+          "endpoint": "https://rpc.testnet.arc.io",
+          "chain_id": 5042002,
+          "block_number": 61544328,
+          "block_hash": "0x4de2a3c8fd65d31d027c3033491a7277a2cb6ed9db6b3aad33b2e26cd6d621e1"
+        },
+        {
+          "endpoint": "https://rpc.blockdaemon.testnet.arc.io",
+          "chain_id": 5042002,
+          "block_number": 61544328,
+          "block_hash": "0x4de2a3c8fd65d31d027c3033491a7277a2cb6ed9db6b3aad33b2e26cd6d621e1"
+        },
+        {
+          "endpoint": "https://rpc.drpc.testnet.arc.io",
+          "chain_id": 5042002,
+          "block_number": 61544328,
+          "block_hash": "0x4de2a3c8fd65d31d027c3033491a7277a2cb6ed9db6b3aad33b2e26cd6d621e1"
+        },
+        {
+          "endpoint": "https://rpc.quicknode.testnet.arc.io",
+          "chain_id": 5042002,
+          "block_number": 61544328,
+          "block_hash": "0x4de2a3c8fd65d31d027c3033491a7277a2cb6ed9db6b3aad33b2e26cd6d621e1"
+        }
+      ]
+    },
+    "derived_seed": "0x94a2b9fe2fbc97fe999967e217acc77ab13eb200e8213e02a233906c8f2c9fd6",
+    "sample_bracket": {
+      "entrant_count": 8,
+      "topic_count": 17,
+      "preliminary_match_count": 0,
+      "main_match_count": 7,
+      "bye_count": 8,
+      "bracket_digest": "0xd9e5a3b65d2dad460db1c02d9f6e774fee366cf743b3805bd1a96e3b97a1cdaa"
+    },
+    "bindings_are_synthetic": true,
+    "scope": "Read-only Arc blockhash observation plus offline deterministic derivation and a 4-of-4 matching sample across the four no-key endpoints listed by current Arc documentation; provider organizational independence, a GenVM target-runtime probe, deployed Arena contract, and onchain seed consumption remain unproven."
+  },
+  "usdc_observation": {
+    "contract": "0x3600000000000000000000000000000000000000",
+    "code_nonempty": true,
+    "decimals": 6,
+    "symbol": "USDC",
+    "metadata_calls": [
+      "decimals()",
+      "symbol()"
+    ],
+    "transfer_or_balance_proof": false,
+    "scope": "The canonical Arc Testnet USDC contract was read successfully. No wallet, balance, escrow, transfer, credit, or withdrawal receipt was queried or created."
+  },
+  "redactions": {
+    "private_keys": true,
+    "wallet_addresses": true,
+    "transaction_receipts": true,
+    "raw_rpc_payloads": true
+  }
+}

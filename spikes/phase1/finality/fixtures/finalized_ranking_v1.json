@@ -1,0 +1,86 @@
+{
+  "profile": "FinalizedRankingV1",
+  "source": {
+    "kind": "synthetic-eip712-vector",
+    "warning": "This fixture proves signature/quorum behavior, not independent notary operation or GenLayer finality."
+  },
+  "domain": {
+    "name": "AsyncAgentArenaFinality",
+    "version": "1",
+    "chainId": 5042002,
+    "verifyingContract": "0x3434343434343434343434343434343434343434"
+  },
+  "primaryType": "FinalizedRanking",
+  "types": {
+    "FinalizedRanking": [
+      {"name": "schemaHash", "type": "bytes32"},
+      {"name": "sourceChainId", "type": "uint256"},
+      {"name": "sourceJudge", "type": "address"},
+      {"name": "sourceTxHash", "type": "bytes32"},
+      {"name": "sourceFinalityRef", "type": "bytes32"},
+      {"name": "consensusFinalized", "type": "bool"},
+      {"name": "executionSucceeded", "type": "bool"},
+      {"name": "destinationChainId", "type": "uint256"},
+      {"name": "destinationManager", "type": "address"},
+      {"name": "tournamentId", "type": "bytes32"},
+      {"name": "rosterCommitment", "type": "bytes32"},
+      {"name": "bracketCommitment", "type": "bytes32"},
+      {"name": "rankingDigest", "type": "bytes32"},
+      {"name": "settlementNonce", "type": "uint256"},
+      {"name": "notarySetEpoch", "type": "uint256"},
+      {"name": "issuedAt", "type": "uint256"},
+      {"name": "expiresAt", "type": "uint256"}
+    ]
+  },
+  "message": {
+    "schemaHash": "0xff55b715a5851a5855eeaf5a7ab1e658a93b6bad61a5c5c815a986f41e1ca5c6",
+    "sourceChainId": 61999,
+    "sourceJudge": "0x5656565656565656565656565656565656565656",
+    "sourceTxHash": "0x6666666666666666666666666666666666666666666666666666666666666666",
+    "sourceFinalityRef": "0x7777777777777777777777777777777777777777777777777777777777777777",
+    "consensusFinalized": true,
+    "executionSucceeded": true,
+    "destinationChainId": 5042002,
+    "destinationManager": "0x1212121212121212121212121212121212121212",
+    "tournamentId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "rosterCommitment": "0x8888888888888888888888888888888888888888888888888888888888888888",
+    "bracketCommitment": "0x9999999999999999999999999999999999999999999999999999999999999999",
+    "rankingDigest": "0xabababababababababababababababababababababababababababababababab",
+    "settlementNonce": 1,
+    "notarySetEpoch": 7,
+    "issuedAt": 1750000100,
+    "expiresAt": 1750000700
+  },
+  "policy": {
+    "now": 1750000200,
+    "max_future_skew_seconds": 30,
+    "threshold": 3,
+    "notary_set_epoch": 7,
+    "source_chain_id": 61999,
+    "source_judge": "0x5656565656565656565656565656565656565656",
+    "destination_chain_id": 5042002,
+    "destination_manager": "0x1212121212121212121212121212121212121212",
+    "verifier_address": "0x3434343434343434343434343434343434343434",
+    "schema_hash": "0xff55b715a5851a5855eeaf5a7ab1e658a93b6bad61a5c5c815a986f41e1ca5c6",
+    "tournament_id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "roster_commitment": "0x8888888888888888888888888888888888888888888888888888888888888888",
+    "bracket_commitment": "0x9999999999999999999999999999999999999999999999999999999999999999",
+    "ranking_digest": "0xabababababababababababababababababababababababababababababababab",
+    "settlement_nonce": 1,
+    "active_notaries": [
+      "0x39F0C498C0a274193E71c16D1867Dbb3aa51A551",
+      "0xc45D0034F0419aa17cDD6e2bdbe30218Adc32306",
+      "0xa4C2d8634BcC72DaeA54FF06F9DC2eF15C564D66",
+      "0x2c4221cA1F54d457A3FBFa8558f2d737656bd739",
+      "0x05a1a31e8ADF80f50f5fBA3904882d8aeDc042B5"
+    ]
+  },
+  "expected_digest": "0x3e2dc80386d8ed5c3e74d8d585b0875f54520f4d80a26e7b0721fb9bd95e36ee",
+  "notaries": [
+    {"address": "0x39F0C498C0a274193E71c16D1867Dbb3aa51A551", "signature": "0x170ebb5f1daf9a940230b2edbfa0eaf5ba4e948d07f8c8e4aa1da71da73ebc7660e51aef1de7d094b88ef1f12bd7d8d2872be5ef347d3d559c690387f3c7352b1b"},
+    {"address": "0xc45D0034F0419aa17cDD6e2bdbe30218Adc32306", "signature": "0x351e32698380d31e8c843f43a7dc4f57d1f8db300f52db6ae9aaf4bbbdc215df66f5e52c90ce3189651dd51a2942ded6127c5722d53df03fd48a66fdc98f23091b"},
+    {"address": "0xa4C2d8634BcC72DaeA54FF06F9DC2eF15C564D66", "signature": "0xf630e563f837ceedbffe519c550b38e4a9f803734e0711c6a60d84e67a5800b611eaaccc58dee7cce7f9b9580311647c863b8f998e80f48ff1273fb77336e18b1b"},
+    {"address": "0x2c4221cA1F54d457A3FBFa8558f2d737656bd739", "signature": "0xb8babc74748d3ce47954468d97216473582ad26262ae6d7833a42abd7970034452ae5e76db116309a7bed5e79d58986175e31856d235899a5dd64049c30bc2601c"},
+    {"address": "0x05a1a31e8ADF80f50f5fBA3904882d8aeDc042B5", "signature": "0xce2593257e6cd9a7d353a3879cd1a249bf6264412479f4ed700178f06be886e71c98343b01da866597a8ea8923b1f8b19590884710d649b24c6ad5ccd7ba372d1b"}
+  ]
+}

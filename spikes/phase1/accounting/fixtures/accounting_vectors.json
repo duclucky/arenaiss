@@ -1,0 +1,1125 @@
+{
+  "schema_version": "TopFiveAccountingV1",
+  "policy": {
+    "min_entrants": 8,
+    "max_entrants": 32,
+    "entry_stake_micro_usdc": 1000001,
+    "platform_fee_bps": 1000,
+    "payout_bps": [
+      4000,
+      2500,
+      1500,
+      1200,
+      800
+    ],
+    "rounding_remainder_destination": "rank_1",
+    "tie_policy": {
+      "first_tie": "rematch_with_new_committed_topic",
+      "max_rematches": 1,
+      "after_rematch_tie": "criterion_priority_then_seeded_tiebreak",
+      "retryable_or_expired": "cancel_match_and_refund"
+    }
+  },
+  "cases": [
+    {
+      "entrant_count": 8,
+      "expected": {
+        "gross_pool": 8000008,
+        "platform_fee": 800000,
+        "net_prize_pool": 7200008,
+        "winner_credits": [
+          2880005,
+          1800002,
+          1080001,
+          864000,
+          576000
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 8000008,
+        "bracket": {
+          "preliminary_matches": 0,
+          "bye_count": 8,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 11,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 8000008,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 8000008
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 9,
+      "expected": {
+        "gross_pool": 9000009,
+        "platform_fee": 900000,
+        "net_prize_pool": 8100009,
+        "winner_credits": [
+          3240005,
+          2025002,
+          1215001,
+          972001,
+          648000
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 9000009,
+        "bracket": {
+          "preliminary_matches": 1,
+          "bye_count": 7,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 12,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 9000009,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 9000009
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 10,
+      "expected": {
+        "gross_pool": 10000010,
+        "platform_fee": 1000001,
+        "net_prize_pool": 9000009,
+        "winner_credits": [
+          3600005,
+          2250002,
+          1350001,
+          1080001,
+          720000
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 10000010,
+        "bracket": {
+          "preliminary_matches": 2,
+          "bye_count": 6,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 13,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 10000010,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 10000010
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 11,
+      "expected": {
+        "gross_pool": 11000011,
+        "platform_fee": 1100001,
+        "net_prize_pool": 9900010,
+        "winner_credits": [
+          3960006,
+          2475002,
+          1485001,
+          1188001,
+          792000
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 11000011,
+        "bracket": {
+          "preliminary_matches": 3,
+          "bye_count": 5,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 14,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 11000011,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 11000011
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 12,
+      "expected": {
+        "gross_pool": 12000012,
+        "platform_fee": 1200001,
+        "net_prize_pool": 10800011,
+        "winner_credits": [
+          4320007,
+          2700002,
+          1620001,
+          1296001,
+          864000
+        ],
+        "rounding_remainder": 3,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 12000012,
+        "bracket": {
+          "preliminary_matches": 4,
+          "bye_count": 4,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 15,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 12000012,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 12000012
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 13,
+      "expected": {
+        "gross_pool": 13000013,
+        "platform_fee": 1300001,
+        "net_prize_pool": 11700012,
+        "winner_credits": [
+          4680007,
+          2925003,
+          1755001,
+          1404001,
+          936000
+        ],
+        "rounding_remainder": 3,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 13000013,
+        "bracket": {
+          "preliminary_matches": 5,
+          "bye_count": 3,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 16,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 13000013,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 13000013
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 14,
+      "expected": {
+        "gross_pool": 14000014,
+        "platform_fee": 1400001,
+        "net_prize_pool": 12600013,
+        "winner_credits": [
+          5040007,
+          3150003,
+          1890001,
+          1512001,
+          1008001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 14000014,
+        "bracket": {
+          "preliminary_matches": 6,
+          "bye_count": 2,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 17,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 14000014,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 14000014
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 15,
+      "expected": {
+        "gross_pool": 15000015,
+        "platform_fee": 1500001,
+        "net_prize_pool": 13500014,
+        "winner_credits": [
+          5400007,
+          3375003,
+          2025002,
+          1620001,
+          1080001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 15000015,
+        "bracket": {
+          "preliminary_matches": 7,
+          "bye_count": 1,
+          "main_matches": 7,
+          "placement_matches": 4,
+          "total_matches": 18,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 15000015,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 15000015
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 16,
+      "expected": {
+        "gross_pool": 16000016,
+        "platform_fee": 1600001,
+        "net_prize_pool": 14400015,
+        "winner_credits": [
+          5760008,
+          3600003,
+          2160002,
+          1728001,
+          1152001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 16000016,
+        "bracket": {
+          "preliminary_matches": 0,
+          "bye_count": 16,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 19,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 16000016,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 16000016
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 17,
+      "expected": {
+        "gross_pool": 17000017,
+        "platform_fee": 1700001,
+        "net_prize_pool": 15300016,
+        "winner_credits": [
+          6120008,
+          3825004,
+          2295002,
+          1836001,
+          1224001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 17000017,
+        "bracket": {
+          "preliminary_matches": 1,
+          "bye_count": 15,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 20,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 17000017,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 17000017
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 18,
+      "expected": {
+        "gross_pool": 18000018,
+        "platform_fee": 1800001,
+        "net_prize_pool": 16200017,
+        "winner_credits": [
+          6480008,
+          4050004,
+          2430002,
+          1944002,
+          1296001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 18000018,
+        "bracket": {
+          "preliminary_matches": 2,
+          "bye_count": 14,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 21,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 18000018,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 18000018
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 19,
+      "expected": {
+        "gross_pool": 19000019,
+        "platform_fee": 1900001,
+        "net_prize_pool": 17100018,
+        "winner_credits": [
+          6840009,
+          4275004,
+          2565002,
+          2052002,
+          1368001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 19000019,
+        "bracket": {
+          "preliminary_matches": 3,
+          "bye_count": 13,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 22,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 19000019,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 19000019
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 20,
+      "expected": {
+        "gross_pool": 20000020,
+        "platform_fee": 2000002,
+        "net_prize_pool": 18000018,
+        "winner_credits": [
+          7200009,
+          4500004,
+          2700002,
+          2160002,
+          1440001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 20000020,
+        "bracket": {
+          "preliminary_matches": 4,
+          "bye_count": 12,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 23,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 20000020,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 20000020
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 21,
+      "expected": {
+        "gross_pool": 21000021,
+        "platform_fee": 2100002,
+        "net_prize_pool": 18900019,
+        "winner_credits": [
+          7560010,
+          4725004,
+          2835002,
+          2268002,
+          1512001
+        ],
+        "rounding_remainder": 3,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 21000021,
+        "bracket": {
+          "preliminary_matches": 5,
+          "bye_count": 11,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 24,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 21000021,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 21000021
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 22,
+      "expected": {
+        "gross_pool": 22000022,
+        "platform_fee": 2200002,
+        "net_prize_pool": 19800020,
+        "winner_credits": [
+          7920009,
+          4950005,
+          2970003,
+          2376002,
+          1584001
+        ],
+        "rounding_remainder": 1,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 22000022,
+        "bracket": {
+          "preliminary_matches": 6,
+          "bye_count": 10,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 25,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 22000022,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 22000022
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 23,
+      "expected": {
+        "gross_pool": 23000023,
+        "platform_fee": 2300002,
+        "net_prize_pool": 20700021,
+        "winner_credits": [
+          8280010,
+          5175005,
+          3105003,
+          2484002,
+          1656001
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 23000023,
+        "bracket": {
+          "preliminary_matches": 7,
+          "bye_count": 9,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 26,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 23000023,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 23000023
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 24,
+      "expected": {
+        "gross_pool": 24000024,
+        "platform_fee": 2400002,
+        "net_prize_pool": 21600022,
+        "winner_credits": [
+          8640011,
+          5400005,
+          3240003,
+          2592002,
+          1728001
+        ],
+        "rounding_remainder": 3,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 24000024,
+        "bracket": {
+          "preliminary_matches": 8,
+          "bye_count": 8,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 27,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 24000024,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 24000024
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 25,
+      "expected": {
+        "gross_pool": 25000025,
+        "platform_fee": 2500002,
+        "net_prize_pool": 22500023,
+        "winner_credits": [
+          9000012,
+          5625005,
+          3375003,
+          2700002,
+          1800001
+        ],
+        "rounding_remainder": 3,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 25000025,
+        "bracket": {
+          "preliminary_matches": 9,
+          "bye_count": 7,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 28,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 25000025,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 25000025
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 26,
+      "expected": {
+        "gross_pool": 26000026,
+        "platform_fee": 2600002,
+        "net_prize_pool": 23400024,
+        "winner_credits": [
+          9360012,
+          5850006,
+          3510003,
+          2808002,
+          1872001
+        ],
+        "rounding_remainder": 3,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 26000026,
+        "bracket": {
+          "preliminary_matches": 10,
+          "bye_count": 6,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 29,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 26000026,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 26000026
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 27,
+      "expected": {
+        "gross_pool": 27000027,
+        "platform_fee": 2700002,
+        "net_prize_pool": 24300025,
+        "winner_credits": [
+          9720011,
+          6075006,
+          3645003,
+          2916003,
+          1944002
+        ],
+        "rounding_remainder": 1,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 27000027,
+        "bracket": {
+          "preliminary_matches": 11,
+          "bye_count": 5,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 30,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 27000027,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 27000027
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 28,
+      "expected": {
+        "gross_pool": 28000028,
+        "platform_fee": 2800002,
+        "net_prize_pool": 25200026,
+        "winner_credits": [
+          10080012,
+          6300006,
+          3780003,
+          3024003,
+          2016002
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 28000028,
+        "bracket": {
+          "preliminary_matches": 12,
+          "bye_count": 4,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 31,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 28000028,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 28000028
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 29,
+      "expected": {
+        "gross_pool": 29000029,
+        "platform_fee": 2900002,
+        "net_prize_pool": 26100027,
+        "winner_credits": [
+          10440012,
+          6525006,
+          3915004,
+          3132003,
+          2088002
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 29000029,
+        "bracket": {
+          "preliminary_matches": 13,
+          "bye_count": 3,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 32,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 29000029,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 29000029
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 30,
+      "expected": {
+        "gross_pool": 30000030,
+        "platform_fee": 3000003,
+        "net_prize_pool": 27000027,
+        "winner_credits": [
+          10800012,
+          6750006,
+          4050004,
+          3240003,
+          2160002
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 30000030,
+        "bracket": {
+          "preliminary_matches": 14,
+          "bye_count": 2,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 33,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 30000030,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 30000030
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 31,
+      "expected": {
+        "gross_pool": 31000031,
+        "platform_fee": 3100003,
+        "net_prize_pool": 27900028,
+        "winner_credits": [
+          11160012,
+          6975007,
+          4185004,
+          3348003,
+          2232002
+        ],
+        "rounding_remainder": 1,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 31000031,
+        "bracket": {
+          "preliminary_matches": 15,
+          "bye_count": 1,
+          "main_matches": 15,
+          "placement_matches": 4,
+          "total_matches": 34,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 31000031,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 31000031
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    },
+    {
+      "entrant_count": 32,
+      "expected": {
+        "gross_pool": 32000032,
+        "platform_fee": 3200003,
+        "net_prize_pool": 28800029,
+        "winner_credits": [
+          11520013,
+          7200007,
+          4320004,
+          3456003,
+          2304002
+        ],
+        "rounding_remainder": 2,
+        "rounding_remainder_destination": "rank_1",
+        "total_destination": 32000032,
+        "bracket": {
+          "preliminary_matches": 0,
+          "bye_count": 32,
+          "main_matches": 31,
+          "placement_matches": 4,
+          "total_matches": 35,
+          "paid_ranks": 5
+        },
+        "cancel": {
+          "refund_total": 32000032,
+          "platform_fee": 0,
+          "winner_credits": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_destination": 32000032
+        }
+      },
+      "duplicate_actions": {
+        "settle_first": "SUCCESS",
+        "settle_second": "REJECT_DUPLICATE",
+        "withdraw_first": "SUCCESS",
+        "withdraw_second": "REJECT_DUPLICATE"
+      }
+    }
+  ]
+}

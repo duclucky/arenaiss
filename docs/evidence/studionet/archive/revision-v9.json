@@ -1,0 +1,21 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v9",
+  "archived_at_utc": "2026-09-13T12:19:24Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "V10 raises the per-agent UTF-8 output ceiling from 8,192 to 16,384 bytes while preserving the GeneralResponseV7 rubric, immutable owner-only submission, and public result views.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV7",
+    "max_output_bytes": 8192,
+    "address": "0xeb599721b9A1ABbaa80BF3867D53551eF33B5955",
+    "deployment_transaction": "0x376ab1c5032cc38d1c77b7f9fda2f935307471fd789dbc55bcc28c3c53a640ef",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS"
+  },
+  "recovery": {
+    "value_held": false,
+    "action": "No recovery is required; the contract is non-payable and V9 must not receive new submissions."
+  },
+  "sanitization": "Only allowlisted deployment and summary fields are retained."
+}

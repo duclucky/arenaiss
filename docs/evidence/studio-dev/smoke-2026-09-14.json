@@ -1,0 +1,56 @@
+{
+  "schema": "arena-genlayer-studio-dev-smoke-v1",
+  "capturedAtUtc": "2026-09-14T08:48:43.3685403Z",
+  "network": {
+    "name": "GenLayer Studio Devnet",
+    "studioVersion": "v0.123.0-rc.6",
+    "genvmVersion": "v0.3.0-rc7",
+    "chainId": 61997,
+    "rpc": "https://studio-dev.genlayer.com/api"
+  },
+  "arenaMatchJudge": {
+    "address": "0xC78f358a51612d8E869111F95f75409b4d8Ab9bF",
+    "deterministicPath": {
+      "transaction": "0x408bde6b2f88ab2d65ea76bcf9320b286e70b3f41b6f92bda77b2381571abcb5",
+      "status": "FINALIZED",
+      "consensusResult": "MAJORITY_AGREE",
+      "executionResult": "FINISHED_WITH_RETURN",
+      "validatorVotes": ["AGREE", "AGREE", "AGREE", "IDLE", "IDLE"],
+      "feeDepositWei": "613869600010352",
+      "executionFeeConsumedWei": "78639500000000",
+      "storageFeeUsedWei": "11500000000",
+      "matchId": "studio_dev_smoke_match_20260914",
+      "attemptId": "studio_dev_smoke_attempt_identical_01",
+      "storedResult": {
+        "status": "FINAL",
+        "result": "TIE",
+        "scoreA": 0,
+        "scoreB": 0,
+        "safetyClass": "NEITHER_UNSAFE",
+        "criteriaCount": 5,
+        "allCriteriaTie": true,
+        "outputDigest": "sha256:cce7ff187f59bce3c6c03f3db6df543982f9343f6e0bd63e2794aa3d176e4af6",
+        "topicDigest": "sha256:13662e6fffd97145b77ddafb0fb38502ae4cf8388d91710b267488804dae51c5"
+      }
+    },
+    "semanticPath": {
+      "transactionSubmitted": false,
+      "feeCharged": false,
+      "simulationResult": "FAILED",
+      "errorClass": "AttributeError",
+      "error": "module 'genlayer.vm' has no attribute 'run_nondet_unsafe'",
+      "failingSourceLine": "contracts/ArenaMatchJudge.py:464"
+    }
+  },
+  "agentEvaluationJudge": {
+    "address": "0x07c48f7DdBA2dcFE116445EDC37bf53c4BF5d7F8",
+    "semanticPath": {
+      "transactionSubmitted": false,
+      "affectedBySameRuntimeApi": true,
+      "failingSourceLine": "contracts/AgentEvaluationJudge.py:409",
+      "verificationBasis": "Both deployed semantic entrypoints invoke the same unavailable gl.vm.run_nondet_unsafe API under the same pinned runner."
+    }
+  },
+  "conclusion": "Deployment and deterministic state writes work, but semantic evaluation is blocked by an API mismatch between the pinned Studio Dev runner and the deployed contract source.",
+  "sanitization": "Only allowlisted transaction status, fee summary, public stored result, and the minimal exception are retained. Raw receipts, traces, validator configuration, provider configuration, and credentials are excluded."
+}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Arena ISS verified SQLite backup
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ducky/projects/async-agent-arena
+Environment=DOCKER_HOST=unix://%t/docker.sock
+ExecStart=/home/ducky/projects/async-agent-arena/deploy/backup-now.sh
+

@@ -1,0 +1,92 @@
+{
+  "schema_version": "arena-genlayer-deployment-evidence-v1",
+  "captured_at_utc": "2026-09-13T16:32:17Z",
+  "network": {
+    "name": "Studionet",
+    "chain_id": 61999,
+    "rpc": "https://studio.genlayer.com/api",
+    "explorer": "https://explorer-studio.genlayer.com"
+  },
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "address": "0x09Ba3CE193E477a66Fdaf556bA63519A767eb130",
+    "deployment_transaction": "0x11efbf818306b62ea346767b698c2a6967f0680ce1dc689319ff7f77bb67fe6e",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS",
+    "runner": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
+    "raw_source_sha256": "accf2cc3811c6e445da2ac96e18b6761eb00d08b2ba05d96f4aecc562d031a6c",
+    "normalized_readback_source_sha256": "accf2cc3811c6e445da2ac96e18b6761eb00d08b2ba05d96f4aecc562d031a6c",
+    "supersedes": "archive/revision-v9.json"
+  },
+  "readback": {
+    "schema_contains": [
+      "submit_match",
+      "get_match_result",
+      "get_config",
+      "get_operator"
+    ],
+    "remote_code_matches_normalized_local_source": true,
+    "canonical_config": {
+      "rubric_version": "GeneralResponseV7",
+      "max_topic_bytes": 2048,
+      "max_output_bytes": 16384,
+      "tie_margin_points": 20,
+      "safety_weight": 100,
+      "safety_overrides_aggregate": true,
+      "safety_classes": [
+        "NEITHER_UNSAFE",
+        "A_SAFER",
+        "B_SAFER",
+        "BOTH_UNSAFE"
+      ],
+      "operator": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+      "public_result_read": {
+        "method": "get_match_result",
+        "unknown_case_status": "UNKNOWN"
+      }
+    }
+  },
+  "live_boundary_smokes": {
+    "deterministic": {
+      "transaction": "0x8bb27410c04a4f01df7d7431bfc8084de31c481638b4733a730bfe112c8e8c38",
+      "consensus_status": "FINALIZED",
+      "consensus_result": "MAJORITY_AGREE",
+      "leader_execution": "SUCCESS",
+      "output_bytes_per_side": 16384,
+      "canonical_status": "FINAL",
+      "canonical_result": "TIE"
+    },
+    "semantic": {
+      "transaction": "0x45ea1db0f538adf86eb38436ac72194e6790cc5b91af2a467a3f76aef7ac2725",
+      "consensus_status": "FINALIZED",
+      "consensus_result": "MAJORITY_AGREE",
+      "leader_execution": "SUCCESS",
+      "output_bytes_per_side": 16384,
+      "match_id": "sha256:1f925b67291442a7dd5ca358e8854c7ff53d25ab37bd89c9a67a64001082d7d9",
+      "attempt_id": "sha256:a6f60fd3ff88bb6ac604fa612490668b3c6248e3880e49f64ad57e2454690bcc",
+      "canonical_status": "FINAL",
+      "canonical_result": "A_WIN",
+      "score_a": 90,
+      "score_b": 0,
+      "safety_class": "NEITHER_UNSAFE",
+      "criterion_winners": [
+        "A",
+        "A",
+        "A",
+        "TIE",
+        "TIE"
+      ],
+      "canonical_view_re_read": true
+    }
+  },
+  "toolchain": {
+    "genlayer_cli": "0.39.2",
+    "genvm_linter": "0.11.0",
+    "genvm_validation_bundle": "v0.2.16",
+    "python": "3.12.13",
+    "genlayer_py": "v0.18",
+    "genlayer_test": "v0.29"
+  },
+  "sanitization": "Only allowlisted deployment, consensus, source, schema, config, and public-view fields are retained. Raw receipts, traces, validator configuration, stdout, and stderr are not stored."
+}

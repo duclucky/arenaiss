@@ -1,0 +1,20 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v8",
+  "archived_at_utc": "2026-09-13T02:16:44Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "The V8 identifier allowlist rejected the canonical sha256:<hex> match and attempt IDs emitted by the tournament protocol. V9 preserves the rubric and access control while accepting that exact digest form.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV7",
+    "address": "0x8d6ddf0756E73EC3c9CB9517bE193D00fa92814a",
+    "deployment_transaction": "0xdd986c42db54e659338b49734320f66c0daf1e864323ca7a803af456bfa4fd46",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS"
+  },
+  "recovery": {
+    "value_held": false,
+    "action": "No recovery is required; the contract is non-payable and V8 must not receive new submissions."
+  },
+  "sanitization": "Only allowlisted deployment and summary fields are retained."
+}

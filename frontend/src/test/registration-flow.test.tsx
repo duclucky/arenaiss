@@ -1,0 +1,55 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import App from '../App';
+import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, EntrantRegistration, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+
+const digest = (char: string) => `sha256:${char.repeat(64)}`;
+const bytes32 = (char: string) => `0x${char.repeat(64)}`;
+
+class AgentApi implements AgentApiAdapter {
+  agent: AgentProfile = { agentId: digest('b'), name: 'Strategist', agentsVersion: digest('c'), agentsCommitment: digest('d') };
+  async listOwnedAgents() { return [this.agent]; }
+  async createAgent() { return this.agent; }
+  async prepareRegistration(tournamentId: string, agentId: string) {
+    expect(tournamentId).toBe(digest('a')); expect(agentId).toBe(this.agent.agentId);
+    return { tournamentId: bytes32('a'), entrantId: bytes32('e'), agentId: bytes32('b'), agentsVersion: bytes32('c'), agentsCommitment: bytes32('d'), stakeAmount: '100000' };
+  }
+}
+
+class Wallet implements ArcWalletAdapter {
+  approvals: string[] = []; registrations: EntrantRegistration[] = []; entrantReads = 0;
+  async getProviders(): Promise<WalletProvider[]> { return [{ name: 'Wallet', icon: '', uuid: 'wallet', isInstalled: true, request: async () => [] }]; }
+  async connect() { return '0x1111111111111111111111111111111111111111'; }
+  async switchChain() {}
+  async getBalance() { return '1000000'; }
+  async getAllowance() { return '0'; }
+  async getCredit() { return '0'; }
+  async getEntrant(tournamentId: string, entrantId: string) { this.entrantReads += 1; return { tournamentId, entrantId, agentId: bytes32('b'), agentsVersion: bytes32('c'), agentsCommitment: bytes32('d'), wallet: '0x1111111111111111111111111111111111111111', registered: true, ranked: false }; }
+  async approveEscrow(amount: string): Promise<WalletTransaction> { this.approvals.push(amount); return { hash: `0x${'1'.repeat(64)}`, state: 'SUBMITTED' }; }
+  async registerEntrant(input: EntrantRegistration): Promise<WalletTransaction> { this.registrations.push(input); return { hash: `0x${'2'.repeat(64)}`, state: 'SUBMITTED' }; }
+  async withdrawCredit(): Promise<WalletTransaction> { throw new Error('unused'); }
+  async signMessage() { return '0xsigned'; }
+  async waitForTransaction() { return 'CONFIRMED' as const; }
+  async disconnect() {}
+  onAccountsChanged() {}
+  removeListener() {}
+}
+
+describe('Arc registration screen', () => {
+  beforeEach(() => window.history.pushState({}, '', `/tournaments/${digest('a')}/submit`));
+  it('loads an owned agent, confirms exact stake, approves USDC, registers and reports confirmation', async () => {
+    const wallet = new Wallet();
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', usdcAddress: '0x3600000000000000000000000000000000000000', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} walletAdapter={wallet} agentApiAdapter={new AgentApi()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Wallet' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Wallet' }));
+    const option = await screen.findByRole('option', { name: 'Strategist' });
+    fireEvent.change(screen.getByLabelText('Agent'), { target: { value: option.getAttribute('value') } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve and enter' }));
+    expect(await screen.findByText('Registration confirmed on Arc.')).toBeInTheDocument();
+    expect(wallet.approvals).toEqual(['100000']);
+    expect(wallet.registrations).toHaveLength(1);
+    expect(wallet.entrantReads).toBe(1);
+  });
+});

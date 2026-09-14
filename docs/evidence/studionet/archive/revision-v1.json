@@ -1,0 +1,29 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v1",
+  "archived_at_utc": "2026-09-11T16:32:08Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "GeneralResponseV1 validators compared only the four-winner decision vector. Live review found that a clarity reason could contradict its own winner, so rationale support and criterion independence were strengthened in GeneralResponseV2.",
+  "contract": {
+    "rubric_version": "GeneralResponseV1",
+    "address": "0xD5E2f6aFb75772ed24A4A165dBcE8fc9310376C3",
+    "deployment_transaction": "0xe4363a2833cea0c66241d62bcfc28fd96c323a277ad2b373227e81595d805ca2",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS",
+    "raw_source_sha256": "aa7cfd0944ff91cba9745855cb84e26ee4831e92e1b56ae547a688311a0baa6c",
+    "normalized_readback_source_sha256": "f7868b6c419a0ddac77b1c7f36029fbea92420f63f4f8eaba845a75f2aeaf3e5"
+  },
+  "attempts": [
+    {"match_id": "live_factual_01", "attempt_id": "attempt_01", "transaction": "0x88db53847f0e5ca127b4107695924f99f9b4ad4076d12dc5bfb7145dd89c96df", "result": "A_WIN"},
+    {"match_id": "live_creative_01", "attempt_id": "attempt_01", "transaction": "0x7f4b576ebce95b263c9d6beb7569644cd93355bcc64f516394d6ee0cc5208028", "result": "B_WIN"},
+    {"match_id": "live_technical_01", "attempt_id": "attempt_01", "transaction": "0x6093d7ae76903f5afe02f35efa73a70ede2c608464798ac631be427a08417fc6", "result": "B_WIN"},
+    {"match_id": "live_injection_01", "attempt_id": "attempt_01", "transaction": "0x6e5704fb8f420018966b813180091b1a4864ee06d76fae35ab79c75317793e99", "result": "A_WIN"},
+    {"match_id": "live_identical_01", "attempt_id": "attempt_01", "transaction": "0x5020720bb7cb445c5e5648fdb85a5a039714f740af999b3d2fecd140a2d4d5b5", "result": "TIE"},
+    {"match_id": "live_maxbytes_01", "attempt_id": "attempt_01", "transaction": null, "canonical_state_read": true, "result": "A_WIN"}
+  ],
+  "recovery": {
+    "holds_value": false,
+    "further_transactions_allowed": false,
+    "action": "No recovery is required because the contract holds no GEN or tournament value. All future submissions must use the active revision."
+  }
+}

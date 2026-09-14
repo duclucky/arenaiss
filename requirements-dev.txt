@@ -1,0 +1,4 @@
+genlayer-py @ git+https://github.com/genlayerlabs/genlayer-py@v0.18
+genlayer-test @ git+https://github.com/genlayerlabs/genlayer-testing-suite@v0.29
+genvm-linter==0.11.0
+pytest==9.1.1

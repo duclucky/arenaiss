@@ -1,0 +1,195 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import App from '../App';
+import type { ArenaReadAdapter, ArcWalletAdapter, Match, Tournament, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+
+class VisualWallet implements ArcWalletAdapter {
+  async getProviders(): Promise<WalletProvider[]> { return []; }
+  async connect(): Promise<string> { throw new Error('NOT_CONFIGURED'); }
+  async switchChain(): Promise<void> {}
+  async getBalance(): Promise<string> { return '0'; }
+  async getAllowance(): Promise<string> { return '0'; }
+  async getCredit(): Promise<string> { return '0'; }
+  async getEntrant(): Promise<never> { throw new Error('NOT_CONFIGURED'); }
+  async approveEscrow(): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
+  async registerEntrant(): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
+  async withdrawCredit(): Promise<WalletTransaction> { throw new Error('NOT_CONFIGURED'); }
+  async signMessage(): Promise<string> { throw new Error('NOT_CONFIGURED'); }
+  async waitForTransaction(): Promise<'CONFIRMED' | 'FAILED'> { return 'FAILED'; }
+  async disconnect(): Promise<void> {}
+  onAccountsChanged(): void {}
+  removeListener(): void {}
+}
+
+class RecoveringArenaRead implements ArenaReadAdapter {
+  calls = 0;
+  async listTournaments(): Promise<Tournament[]> {
+    this.calls += 1;
+    if (this.calls === 1) throw new Error('temporary read failure');
+    return [{ id: 't1', name: 'Recovered Arena', status: 'ACTIVE', prizePool: '900' }];
+  }
+  async getTournament(): Promise<Tournament | null> { return null; }
+  async getMatches(): Promise<Match[]> { return []; }
+  async getMatch(): Promise<Match | null> { return null; }
+}
+
+describe('Arena ISS visual shell', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+      setTransform: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    window.history.pushState({}, '', '/');
+  });
+
+  it('renders the Mainframe-inspired landing hero and keeps product actions reachable', async () => {
+    const { container } = render(<App walletAdapter={new VisualWallet()} />);
+
+    expect(await screen.findByRole('heading', { name: /AI agents enter\. One strategy survives\./i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Arena ISS' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Explore tournaments' })).toHaveAttribute('href', '/tournaments');
+    expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveAttribute('href', '/agents/new');
+    expect(screen.getByText(/Asynchronous strategy interface/i)).toHaveClass('hero-intro-blur');
+    expect(screen.getByText(/Trusted-operator MVP/i)).toBeInTheDocument();
+    expect(screen.getByText(/10% platform fee/i)).toBeInTheDocument();
+    const canvas = container.querySelector<HTMLCanvasElement>('canvas.hero-canvas');
+    expect(canvas).toBeInTheDocument();
+    expect(canvas).toHaveAttribute('aria-hidden', 'true');
+    expect(canvas).toHaveAttribute('data-frame-count', '97');
+    expect(canvas).toHaveAttribute('data-frame-source', '/hero-sequence/frame-001.webp');
+    expect(container.querySelector('video')).not.toBeInTheDocument();
+  });
+
+  it('keeps deliberate frame selection but suppresses parallax when reduced motion is requested', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+
+    try {
+      const { container } = render(<App walletAdapter={new VisualWallet()} />);
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas.hero-canvas');
+      fireEvent.pointerMove(window, { clientX: window.innerWidth * .75, pointerType: 'mouse' });
+      expect(canvas).toHaveAttribute('data-target-frame', '72');
+      expect(canvas).toHaveAttribute('data-rendered-frame', '0');
+      expect(canvas?.style.getPropertyValue('--hero-shift-x')).toBe('');
+      expect(canvas?.style.getPropertyValue('--hero-shift-y')).toBe('');
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it('coalesces pointer input and eases the canvas toward the requested image frame', () => {
+    const frames: FrameRequestCallback[] = [];
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = (() => undefined) as typeof window.cancelAnimationFrame;
+
+    let unmount: () => void = () => undefined;
+    try {
+      const rendered = render(<App walletAdapter={new VisualWallet()} />);
+      unmount = rendered.unmount;
+      const canvas = rendered.container.querySelector<HTMLCanvasElement>('canvas.hero-canvas');
+
+      fireEvent.pointerMove(window, { clientX: window.innerWidth * .75, pointerType: 'mouse' });
+      expect(frames).toHaveLength(1);
+      expect(canvas).toHaveAttribute('data-target-frame', '72');
+      expect(canvas).toHaveAttribute('data-rendered-frame', '0');
+
+      act(() => frames.shift()?.(16));
+      const firstFrame = Number(canvas?.dataset.renderedFrame);
+      expect(firstFrame).toBeGreaterThan(0);
+      expect(firstFrame).toBeLessThan(72);
+      expect(frames).toHaveLength(1);
+
+      fireEvent.pointerMove(window, { clientX: window.innerWidth * .85, pointerType: 'mouse' });
+      expect(canvas).toHaveAttribute('data-target-frame', '82');
+      expect(Number(canvas?.dataset.renderedFrame)).toBe(firstFrame);
+      expect(frames).toHaveLength(1);
+
+      act(() => frames.shift()?.(32));
+      expect(Number(canvas?.dataset.renderedFrame)).toBeGreaterThan(firstFrame);
+      expect(Number(canvas?.dataset.renderedFrame)).toBeLessThan(82);
+    } finally {
+      unmount();
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
+
+  it('adds compositor-only parallax while the image frame sequence renders', () => {
+    const frames: FrameRequestCallback[] = [];
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    }) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = (() => undefined) as typeof window.cancelAnimationFrame;
+
+    let unmount: () => void = () => undefined;
+    try {
+      const rendered = render(<App walletAdapter={new VisualWallet()} />);
+      unmount = rendered.unmount;
+      const canvas = rendered.container.querySelector<HTMLCanvasElement>('canvas.hero-canvas');
+
+      fireEvent.pointerMove(window, { clientX: window.innerWidth * .75, clientY: window.innerHeight * .25, pointerType: 'mouse' });
+      expect(frames).toHaveLength(1);
+      act(() => frames.shift()?.(16));
+
+      expect(Number.parseFloat(canvas!.style.getPropertyValue('--hero-shift-x'))).toBeGreaterThan(0);
+      expect(Number.parseFloat(canvas!.style.getPropertyValue('--hero-shift-y'))).toBeLessThan(0);
+      expect(frames).toHaveLength(1);
+    } finally {
+      unmount();
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
+
+  it('uses the same editorial shell on inner product pages', async () => {
+    window.history.pushState({}, '', '/tournaments');
+    const { container } = render(<App walletAdapter={new VisualWallet()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Tournaments' })).toBeInTheDocument();
+    expect(container.querySelector('.app-shell')).toHaveAttribute('data-surface', 'editorial');
+    expect(container.querySelector('.page-kicker')).toHaveTextContent('Open competition');
+    expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveClass('pill-button-dark');
+  });
+
+  it('opens and closes the mobile navigation with accessible state', async () => {
+    render(<App walletAdapter={new VisualWallet()} />);
+    const menu = await screen.findByRole('button', { name: 'Open menu' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(menu);
+    expect(menu).toHaveAttribute('aria-expanded', 'true');
+    expect(menu).toHaveAccessibleName('Close menu');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shows an actionable read error and retries without leaving the editorial page', async () => {
+    window.history.pushState({}, '', '/tournaments');
+    const arenaRead = new RecoveringArenaRead();
+    render(<App walletAdapter={new VisualWallet()} arenaReadAdapter={arenaRead} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('temporary read failure');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('heading', { name: 'Recovered Arena' })).toBeInTheDocument();
+    expect(arenaRead.calls).toBe(2);
+  });
+});

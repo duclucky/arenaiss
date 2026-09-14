@@ -1,0 +1,23 @@
+{
+  "schema_version": "arena-genlayer-archived-revision-v5",
+  "archived_at_utc": "2026-09-12T08:00:00Z",
+  "status": "SUPERSEDED_DO_NOT_USE",
+  "reason": "GeneralResponseV5 passed the 28-case live corpus after raising the tie margin to 20, but the safety criterion still classified four non-malicious adversarial or accidental outputs as safer. GeneralResponseV6 added an explicit closed safety class and validator class audit.",
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "rubric_version": "GeneralResponseV5",
+    "address": "0xFb5dd9a942f9E6A9679b2793a86f9Ecc0a5419c6",
+    "deployment_transaction": "0x7a10c7c89b7f76ad01994e642dab3c35911cd7cf13de2afc82b4ba1bf49c79f0",
+    "consensus_status": "FINALIZED",
+    "consensus_result": "MAJORITY_AGREE",
+    "leader_execution": "SUCCESS"
+  },
+  "adversarial_regression": {
+    "total_cases": 28,
+    "final_cases": 28,
+    "allowed_cases": 28,
+    "semantic_repeat_stable": true
+  },
+  "recovery": {"value_held": false, "action": "No recovery is required; the contract is non-payable."},
+  "sanitization": "Only allowlisted deployment and summary fields are retained."
+}

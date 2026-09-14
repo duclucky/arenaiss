@@ -1,0 +1,61 @@
+{
+  "schema": "arena-genlayer-studio-dev-deployments-v1",
+  "capturedAtUtc": "2026-09-14T08:34:08.2324522Z",
+  "network": {
+    "name": "GenLayer Studio Devnet",
+    "studioVersion": "v0.123.0-rc.6",
+    "genvmVersion": "v0.3.0-rc7",
+    "chainId": 61997,
+    "rpc": "https://studio-dev.genlayer.com/api",
+    "explorer": "https://explorer-studio-dev.genlayer.com",
+    "stability": "release-candidate; may reset"
+  },
+  "operator": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+  "contracts": [
+    {
+      "name": "ArenaMatchJudge",
+      "rubricVersion": "GeneralResponseV7",
+      "address": "0xC78f358a51612d8E869111F95f75409b4d8Ab9bF",
+      "deploymentTransaction": "0x5e2f898c6949244ee03ae5d591582a9df01299b35d389032ec07857489cbef55",
+      "status": "FINALIZED",
+      "consensusResult": "MAJORITY_AGREE",
+      "executionResult": "FINISHED_WITH_RETURN",
+      "sourceSha256": "c40b3e0e5e1fc6fc786f231666924fcce21203226c127c25d803dd6f0e242eff",
+      "deployedSourceMatchesLocal": true,
+      "feeDepositWei": "153646800002588",
+      "executionFeeConsumedWei": "78789000000000",
+      "schemaMethods": ["get_config", "get_match_result", "get_operator", "submit_match"]
+    },
+    {
+      "name": "AgentEvaluationJudge",
+      "rubricVersion": "AgentEvaluationV5",
+      "address": "0x07c48f7DdBA2dcFE116445EDC37bf53c4BF5d7F8",
+      "deploymentTransaction": "0x9b81b9524fd1f15924ea03c34ccc0477e7f91aac36e8fb68ac7710694c0688fe",
+      "status": "FINALIZED",
+      "consensusResult": "MAJORITY_AGREE",
+      "executionResult": "FINISHED_WITH_RETURN",
+      "sourceSha256": "c26f083c0ca726df4e86e41ceae3eb566a5ae7aa62ced16dcc2d46809d058fb3",
+      "deployedSourceMatchesLocal": true,
+      "feeDepositWei": "153673500002588",
+      "executionFeeConsumedWei": "78811250000000",
+      "schemaMethods": ["get_config", "get_evaluation", "get_operator", "submit_evaluation"],
+      "executesActions": false
+    }
+  ],
+  "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+  "toolchain": {
+    "genlayerCli": "0.40.0-rc.3",
+    "genlayerJs": "2.0.0-rc.1",
+    "genvmLinter": "0.11.0"
+  },
+  "verification": {
+    "localAstLintPassed": true,
+    "localSdkValidation": "UNAVAILABLE: genvm-linter 0.11.0 v0.3.0-rc7 bundle does not contain the Studio-hosted 5jyc runner",
+    "localDirectTests": "UNAVAILABLE: genlayer-test 0.29.2 direct bundle is pinned to GenVM v0.2.16 and does not contain the Studio-hosted 5jyc runner",
+    "studioUiSchemaPassed": true,
+    "studioUiReadbackPassed": true,
+    "cliSchemaPassed": true,
+    "sdkSourceReadbackPassed": true
+  },
+  "sanitization": "Only allowlisted network, deployment, fee summary, schema, source hash, and public view fields are retained. Raw receipts, traces, validator configuration, stdout, stderr, and credentials are excluded."
+}

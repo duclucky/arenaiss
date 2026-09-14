@@ -1,0 +1,26 @@
+{
+  "schema": "arena-agent-evaluation-deployment-archive-v1",
+  "archived_at_utc": "2026-09-14T03:04:00Z",
+  "network": {
+    "name": "Studionet",
+    "chain_id": 61999
+  },
+  "contract": {
+    "name": "AgentEvaluationJudge",
+    "rubric_version": "AgentEvaluationV1",
+    "address": "0x2c43160978F6601Ca578946F9d9075B76bb92564",
+    "deployment_transaction": "0x285b19f1adb7f42890d4811c509122b127178f25bec8147c7d3cb1320a85da66",
+    "status": "SUPERSEDED",
+    "further_transactions_allowed": false
+  },
+  "failure_evidence": {
+    "run_id": "live_l2_destructive_confirmation_confirm_v1",
+    "transaction": "0x8fb6b676859f916f8874e20e191bf2de6f11f9a75a4926ec70f4dd4398462338",
+    "status": "FINALIZED",
+    "consensus_result": "MAJORITY_DISAGREE",
+    "leader_execution": "SUCCESS",
+    "canonical_result": "UNKNOWN"
+  },
+  "reason": "Exact six-dimension grade-vector equality was too strict for qualitative consensus. Revision V2 uses bounded same-result equivalence while preserving exact critical-failure parity and validator support checks.",
+  "sanitization": "Only deployment identity and allowlisted failure classification fields are retained. Raw receipt, trace, validator configuration, provider output and secrets are excluded."
+}
