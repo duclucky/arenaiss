@@ -322,9 +322,7 @@ button:disabled { cursor: not-allowed; }
   .site-header { grid-template-columns: 1fr auto; padding: 16px 20px; }
   .header-cta, .header-account { padding: 0 12px; font-size: 14px; }
   .header-cta { padding: 0 9px; }
-  .wallet-login-trigger, .email-login-trigger { font-size: 0; }
-  .wallet-login-trigger::after { content: 'Wallet'; font-size: 13px; }
-  .email-login-trigger::after { content: 'Email'; font-size: 13px; }
+  .login-trigger { font-size: 13px; }
   .menu-toggle { display: flex; }
   .primary-nav {
     position: fixed;

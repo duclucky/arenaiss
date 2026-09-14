@@ -35,7 +35,14 @@ describe('managed email login', () => {
     });
 
     render(<App env={env} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with email' }));
+    const login = await screen.findByRole('button', { name: 'Login' });
+    expect(screen.getAllByRole('button', { name: 'Login' })).toHaveLength(1);
+    fireEvent.click(login);
+    expect(screen.getByRole('heading', { name: 'Sign in to Arena ISS' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with wallet' })).toBeInTheDocument();
+    const emailLogin = screen.getByRole('button', { name: 'Continue with email' });
+    await waitFor(() => expect(emailLogin).not.toBeDisabled());
+    fireEvent.click(emailLogin);
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'user@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }));
     expect(await screen.findByText('We sent a 6-digit code to your email.')).toBeInTheDocument();
@@ -45,5 +52,21 @@ describe('managed email login', () => {
     expect(await screen.findByRole('button', { name: /0x4444/i })).toBeInTheDocument();
     expect(requests.find((request) => request.path.endsWith('/api/auth/email/challenge'))?.init?.credentials).toBe('include');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('keeps both methods in one login dialog and explains unavailable email auth', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      wallet: true,
+      email: false,
+      managedWallet: false,
+    }), { status: 200 }));
+
+    render(<App env={env} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+    expect(screen.getAllByRole('button', { name: 'Login' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Continue with wallet' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Continue with email' })).toBeDisabled();
+    expect(screen.getByText('Not configured on this server yet')).toBeInTheDocument();
   });
 });

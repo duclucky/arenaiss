@@ -8,7 +8,7 @@ import { AppProvider, loadRuntimeConfig } from '../context';
 import { SubmitEntry } from '../views/SubmitEntry';
 import { TournamentDetail } from '../views/TournamentDetail';
 import { MatchDetail } from '../views/MatchDetail';
-import { WalletModal } from '../components/WalletModal';
+import { LoginModal } from '../components/LoginModal';
 import { NotFound } from '../views/NotFound';
 import { ArcWalletAdapter, WalletProvider, ArcNetworkConfig, EntrantRegistration, WalletTransaction } from '../adapters/interfaces';
 import { BrowserArcWalletAdapter } from '../adapters/wallet';
@@ -62,7 +62,8 @@ describe('App Tests', () => {
 
   it('2. wallet modal lists detected providers without auto-selecting', async () => {
     const testAdapter = new TestWalletAdapter();
-    render(<AppProvider walletAdapter={testAdapter}><WalletModal onClose={() => {}} /></AppProvider>);
+    render(<AppProvider walletAdapter={testAdapter}><LoginModal onClose={() => {}} /></AppProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
     const providerBtn = await screen.findByText('Test Provider');
     expect(providerBtn).toBeInTheDocument();
     expect(testAdapter.connectCalls).toHaveLength(0);
@@ -73,8 +74,8 @@ describe('App Tests', () => {
     const env = { VITE_ARC_CHAIN_ID: '5042002', VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.io', VITE_ARC_NETWORK_NAME: 'Arc Testnet', VITE_ARC_USDC_ADDRESS: '0x0000000000000000000000000000000000000001' };
     render(<App env={env} walletAdapter={testAdapter} />);
     
-    const connectBtns = screen.getAllByText('Connect Wallet');
-    fireEvent.click(connectBtns[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
 
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
     
@@ -89,8 +90,7 @@ describe('App Tests', () => {
     
     // Disconnect
     fireEvent.click(disconnectBtn);
-    const newConnectBtns = await screen.findAllByText('Connect Wallet');
-    expect(newConnectBtns[0]).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Login' })).toBeInTheDocument();
   });
 
   it('4. malformed config renders NOT_CONFIGURED and disables live writes', async () => {
@@ -236,13 +236,13 @@ describe('App Tests', () => {
     
     render(<App env={env} walletAdapter={testAdapter} />);
     
-    const connectBtns = screen.getAllByText('Connect Wallet');
-    const trigger = connectBtns[0];
+    const trigger = screen.getByRole('button', { name: 'Login' });
     trigger.focus();
     fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
 
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
-    const closeBtn = screen.getByLabelText('Close modal');
+    const closeBtn = screen.getByLabelText('Close login');
     
     await waitFor(() => expect(document.activeElement).toBe(closeBtn));
     
@@ -302,8 +302,8 @@ describe('App Tests', () => {
     const env = { VITE_ARC_CHAIN_ID: '5042002', VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.io', VITE_ARC_NETWORK_NAME: 'Arc Testnet' };
     
     render(<App env={env} walletAdapter={testAdapter} />);
-    const connectBtns = screen.getAllByText('Connect Wallet');
-    fireEvent.click(connectBtns[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
     
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
     fireEvent.click(providerBtn!);

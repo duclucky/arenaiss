@@ -43,7 +43,8 @@ describe('Arc registration screen', () => {
     const wallet = new Wallet();
     const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', usdcAddress: '0x3600000000000000000000000000000000000000', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
     render(<App config={config} walletAdapter={wallet} agentApiAdapter={new AgentApi()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Wallet' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Wallet' }));
     const option = await screen.findByRole('option', { name: 'Strategist' });
     fireEvent.change(screen.getByLabelText('Agent'), { target: { value: option.getAttribute('value') } });
