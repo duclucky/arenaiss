@@ -3,6 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { HttpAgentAdapter } from '../adapters/agent-api';
 
 describe('agent HTTP adapter', () => {
+  it('invokes the browser fetch function with its global receiver', async () => {
+    let calls = 0;
+    const fetcher = function (this: unknown) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      calls += 1;
+      if (calls === 1) return Promise.resolve(new Response(JSON.stringify({ message: 'Arena challenge' }), { status: 200 }));
+      if (calls === 2) return Promise.resolve(new Response(null, { status: 204 }));
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    };
+    const adapter = new HttpAgentAdapter('https://arena.example', () => '0x1111111111111111111111111111111111111111', async () => '0xsigned', fetcher as typeof fetch);
+    await expect(adapter.listOwnedAgents()).resolves.toEqual([]);
+  });
+
   it('authenticates by wallet challenge and sends no caller identity in agent body', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Arena challenge' }), { status: 200 }))

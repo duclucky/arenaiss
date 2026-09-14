@@ -19,7 +19,7 @@ export async function verifyStudioNextDeployments(
 ): Promise<StudioNextDeploymentStatus> {
   let requestId = 0;
   const rpc = async (method: string, params: unknown[]) => {
-    const response = await fetcher(config.rpcUrl, {
+    const response = await fetcher.call(globalThis, config.rpcUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++requestId, method, params }),

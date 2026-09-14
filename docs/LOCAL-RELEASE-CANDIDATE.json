@@ -2,8 +2,8 @@
   "schema": "arena-local-release-candidate-v1",
   "createdAt": "2026-09-14",
   "scope": "LOCAL_ONLY",
-  "fileCount": 227,
-  "sourceBundleSha256": "697fe1a081b803ffd80862f49e7c76d36646c5032462acfdca991700b9758115",
+  "fileCount": 228,
+  "sourceBundleSha256": "b915cd230e13b2fbc2ad1ca6a0fb6e57408a63a0441abe2aa4e850229058bd50",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -68,7 +68,7 @@
     "pythonDirectTests": 79,
     "typescriptTests": 161,
     "foundryTests": 14,
-    "frontendTests": 40
+    "frontendTests": 43
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

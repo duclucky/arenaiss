@@ -56,7 +56,7 @@ export class HttpAgentAdapter implements AgentApiAdapter {
   }
 
   private async request<T>(path: string, init: RequestInit, allowEmpty = false): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`, { ...init, credentials: 'include' });
+    const response = await this.fetcher.call(globalThis, `${this.baseUrl}${path}`, { ...init, credentials: 'include' });
     if (!response.ok) {
       const detail = await response.json().catch(() => ({ error: `HTTP_${response.status}` }));
       throw new Error(typeof detail.error === 'string' ? detail.error : `HTTP_${response.status}`);
