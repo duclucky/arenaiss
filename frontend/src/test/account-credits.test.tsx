@@ -57,7 +57,8 @@ describe('Account tournament credits', () => {
     const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
     render(<App config={config} walletAdapter={wallet} agentApiAdapter={new CreditsAgentApi()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connect Wallet' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Test Wallet' }));
 
     expect(await screen.findByText(tournamentA)).toBeInTheDocument();
