@@ -60,4 +60,12 @@ describe('arena live-read adapter', () => {
     const adapter = new HttpArenaReadAdapter('/', fetcher as typeof fetch);
     expect((await adapter.getMatches('t1'))[0].round).toBe(0);
   });
+
+  it('keeps verdict explorer links bound to the network that produced them', async () => {
+    const hash = `0x${'cd'.repeat(32)}`;
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ id: 'v1', matchId: 'm1', winner: 'A', reasons: ['reason'], summary: 'A wins', transactionHash: hash, chainId: 61999 }), { status: 200 }));
+    const adapter = new HttpArenaReadAdapter('/api', fetcher as typeof fetch, 'https://explorer-studio-dev.genlayer.com');
+
+    expect((await adapter.getMatchVerdict('m1'))?.explorerUrl).toBe(`https://explorer-studio.genlayer.com/transactions/${hash}`);
+  });
 });

@@ -13,7 +13,7 @@ The checkouts are references, not application dependencies. Released packages mu
 | `.tools/circle-skills` | [circlefin/skills](https://github.com/circlefin/skills) | `26dc09ea0746a038c969c6f197feee1267f834b5` | Apache-2.0 | Arc, USDC, wallet, and Circle CLI operating guidance |
 | `.tools/genlayer-skills` | [genlayerlabs/skills](https://github.com/genlayerlabs/skills) | `195deb417c2ac4a90dd23429a0c3940bde80389a` | MIT | Intelligent Contract authoring, lint, tests, and CLI guidance |
 | `.tools/genlayer-js` | [genlayerlabs/genlayer-js](https://github.com/genlayerlabs/genlayer-js) | `1b7f50a3a3f2963ea857941b0fb386081dd5c326` | MIT | SDK source/API and released-package version reference |
-| `.tools/genlayer-project-boilerplate` | [genlayerlabs/genlayer-project-boilerplate](https://github.com/genlayerlabs/genlayer-project-boilerplate) | `e685f1f12c4c357787d48390692a654baf576f03` | MIT | Selective project scaffold reference |
+| `.tools/genlayer-project-boilerplate` | [genlayerlabs/genlayer-project-boilerplate](https://github.com/genlayerlabs/genlayer-project-boilerplate) | `816f3b88175032f10242e278c0d13d75f185c882` (`v2-dev`) | MIT | Studio Next/Consensus v0.6 scaffold and client-version reference |
 | `.tools/genlayer-studio-bridge-boilerplate` | [genlayer-foundation/genlayer-studio-bridge-boilerplate](https://github.com/genlayer-foundation/genlayer-studio-bridge-boilerplate) | `85fe384c78957bb668271eb8d87f06ae153619bc` | MIT | Authenticated/idempotent transport design reference; not payout authority |
 | `.tools/private-ai-gateway` | [Dstack-TEE/private-ai-gateway](https://github.com/Dstack-TEE/private-ai-gateway) | `19daf2b7152eeaf1f8be3fd66d261b8c1ce8eac5` | Apache-2.0 | ACI `aci/1` specification, verifier behavior, and official byte-exact receipt vectors |
 
@@ -28,6 +28,9 @@ The workstation already provides these command-line tools, so no binary or packa
 | Circle CLI | `1.0.0` | Read the Circle CLI skill and scoped `--help`; writes require explicit authorization |
 | GenLayer CLI | stable `0.39.2`; Studio Dev `0.40.0-rc.3` via exact `npx` version | Read the GenLayer CLI skill; use the coherent network release family and never expose validator-private output |
 | GenLayer JS | project dependency `2.0.0-rc.1` | Exact v0.6-compatible RC providing the `studioDevnet` chain definition for Studio `v0.123.0-rc.6` |
+| GenLayer Python | `0.19.0rc2` at `4ea0055f...` | Exact `v2-dev` revision, installed only in the ignored project environment |
+| GenLayer test | `0.30.0rc2` at `d84591b...` | Studio Next `studio_devnet` config and Consensus v0.6 direct/integration boundary |
+| GenVM linter | `0.11.1rc2` at `28450e6...` | Contract AST and SDK validation against pinned GenVM `v0.6.0-rc5` bundle |
 | Node.js | `24.11.1` | Tooling runtime; application version must be locked when implementation begins |
 | npm | `11.18.0` | Dependency installation only after authorization and manifest review |
 | uv | `0.11.23` | Python environment management when GenLayer implementation begins |

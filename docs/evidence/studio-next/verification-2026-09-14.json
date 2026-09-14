@@ -1,0 +1,47 @@
+{
+  "schema": "arena-genlayer-studio-next-verification-v1",
+  "capturedAtUtc": "2026-09-14T11:34:34.8623078Z",
+  "network": {
+    "name": "GenLayer Studio Next",
+    "chainId": 61997,
+    "canonicalRpc": "https://studio-next.genlayer.com/api",
+    "deploymentRpcAlias": "https://studio-dev.genlayer.com/api",
+    "explorer": "https://explorer-studio-dev.genlayer.com/",
+    "rpcAliasesReturnedSameChain": true,
+    "deploymentReceiptsMatchedAcrossAliases": true
+  },
+  "contracts": [
+    {
+      "name": "ArenaMatchJudge",
+      "address": "0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679",
+      "deploymentTransaction": "0x647f2c2662f1123a541a3025189ab04ddf88a17ff96b4c13de758a2d678a1f81",
+      "sourceBytes": 20349,
+      "sourceSha256": "a90bcbfac8dc9925a1e0f93e7b69ab3661ae2119f8f08a371336b55834ad13c8",
+      "schemaSha256": "c4cce966340b006123d8939d35cf79dc975c8b15290b8269e22376cf758bf8cf",
+      "canonicalRpcSourceAndSchemaMatched": true
+    },
+    {
+      "name": "AgentEvaluationJudge",
+      "address": "0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d",
+      "deploymentTransaction": "0x67f1acfffab81e3db71cd892370db6cfa4846ffa5a1db858148ff65e7f55b2ed",
+      "sourceBytes": 23199,
+      "sourceSha256": "74682ca3f45cce2d344cc670260b3a99914fec4ee47e0fb93f6e256b40598454",
+      "schemaSha256": "0b3effb2a241a2b871503f408f84eeabf4b8e61a244b1f03bb28426931b847ab",
+      "canonicalRpcSourceAndSchemaMatched": true
+    }
+  ],
+  "frontendToolchain": {
+    "@genlayer/transaction-kit": "0.1.0-rc.2",
+    "@genlayer/transaction-kit-react": "0.1.0-rc.2",
+    "genlayer-js": "2.0.0-rc.1"
+  },
+  "browserCorsPreflight": {
+    "origin": "https://arenaiss.xyz",
+    "status": 200,
+    "allowOrigin": "*",
+    "allowMethodsIncludesPost": true,
+    "allowHeadersIncludesContentType": true
+  },
+  "newTransactionSubmitted": false,
+  "sanitization": "Public RPC identity, finalized deployment identifiers, source/schema digests, package versions and CORS result only. No credentials, raw receipts, validator configuration, prompts or provider output are retained."
+}

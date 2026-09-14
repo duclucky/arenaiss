@@ -21,6 +21,21 @@
 
 ## Studio Dev release-candidate deployment — 2026-09-14
 
+- The hackathon's canonical name and endpoint are now reflected in the app as
+  **Studio Next**, `https://studio-next.genlayer.com/api`, chain `61997`. Direct
+  readback proved that this endpoint and the earlier `studio-dev` deployment
+  endpoint expose the same chain, deployment receipts, contract source bytes
+  and schemas for both judge addresses. No redeployment was necessary.
+- The frontend now carries the required prerelease client stack:
+  `@genlayer/transaction-kit` and its React adapter at `0.1.0-rc.2`, plus
+  `genlayer-js` `2.0.0-rc.1`. A public Evaluations-page verifier reads chain,
+  source and schema directly from Studio Next and compares the exact reviewed
+  source digests for both deployed judges; it does not expose a public judge
+  write path because the trusted-operator backend owns that authority.
+- Sanitized canonical-endpoint verification is recorded at
+  `docs/evidence/studio-next/verification-2026-09-14.json`. Historical
+  Studionet verdicts remain labelled and linked to the chain that produced them.
+
 - Studio Dev `v0.123.0-rc.6` (chain `61997`) now has active finalized deployments of
   `ArenaMatchJudge` `GeneralResponseV7` at
   `0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679` and
@@ -34,14 +49,19 @@
   Runtime adapters now expose separate Studio Dev factories and submit the exact
   fee quote returned by `genlayer-js` `2.0.0-rc.1`; Studionet factories remain
   available for historical lifecycle verification.
+- The local toolchain has since been refreshed from official boilerplate
+  `v2-dev` revision `816f3b8`: `genlayer-py 0.19.0rc2`, `genlayer-test
+  0.30.0rc2`, and `genvm-linter 0.11.1rc2`, all dependency-pinned to exact
+  upstream commits. `gltest.config.yaml` now selects the preconfigured
+  `studio_devnet` chain type while overriding its RPC with the canonical Studio
+  Next endpoint. GenVM `v0.6.0-rc5` contains the deployed `5jyc...` runner;
+  contract SDK validation and all 79 direct tests pass with this stack.
 - Sanitized replacement deployment and semantic smoke evidence is recorded at
   `docs/evidence/studio-dev/redeployment-2026-09-14.json`. The superseded first
   deployment remains preserved in `deployment-2026-09-14.json` and
   `smoke-2026-09-14.json`. Studio Dev remains a
   resettable release-candidate environment, so this supplements rather than
-  rewrites the durable Studionet evidence below. Local AST lint passes; local
-  SDK validation/direct tests cannot load the Studio-hosted `5jyc` runner from
-  the published GenVM `v0.3.0-rc7` or legacy `v0.2.16` bundles.
+  rewrites the durable Studionet evidence below.
 - The original semantic smoke exposed that GenVM v0.3 renamed
   `gl.vm.run_nondet_unsafe` to `gl.vm.run_nondet`. A focused 2-case regression
   failed before and passed after the two-call-site migration. On the replacement

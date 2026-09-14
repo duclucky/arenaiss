@@ -158,6 +158,16 @@ export type ArcNetworkConfig = {
   escrowAddress?: string;
   apiUrl?: string;
   genLayerExplorerUrl?: string;
+  genLayer?: GenLayerNetworkConfig;
+};
+
+export type GenLayerNetworkConfig = {
+  chainId: 61997;
+  rpcUrl: string;
+  name: string;
+  explorerUrl: string;
+  matchJudgeAddress: `0x${string}`;
+  evaluationJudgeAddress: `0x${string}`;
 };
 
 export type EntrantRegistration = {

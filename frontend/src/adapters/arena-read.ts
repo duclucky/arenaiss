@@ -5,6 +5,10 @@ type Fetcher = typeof fetch;
 const TOURNAMENT_STATES = new Set(['UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED']);
 const MATCH_STATES = new Set<MatchState>(['SCHEDULED', 'WAITING_FOR_OUTPUTS', 'JUDGING', 'ACCEPTED', 'FAILED', 'RETRYABLE', 'FINALIZED', 'TIE', 'RETRY', 'WINNER_ADVANCED']);
 const DEMO_TOURNAMENT_IDS = new Set(['1', '2', '3']);
+const GENLAYER_EXPLORERS_BY_CHAIN: Readonly<Record<number, string>> = {
+  61997: 'https://explorer-studio-dev.genlayer.com',
+  61999: 'https://explorer-studio.genlayer.com',
+};
 
 export class HttpArenaReadAdapter implements ArenaReadAdapter, GenLayerReadAdapter {
   private baseUrl: string;
@@ -43,7 +47,8 @@ export class HttpArenaReadAdapter implements ArenaReadAdapter, GenLayerReadAdapt
     const body = await this.request<unknown>(`/api/matches/${encodeURIComponent(matchId)}/verdict`, true);
     if (body === null) return null;
     const verdict = normalizeVerdict(body);
-    if (verdict.transactionHash && this.explorerBaseUrl) verdict.explorerUrl = `${this.explorerBaseUrl}/transactions/${verdict.transactionHash}`;
+    const explorerBaseUrl = verdict.chainId === undefined ? this.explorerBaseUrl : GENLAYER_EXPLORERS_BY_CHAIN[verdict.chainId] ?? this.explorerBaseUrl;
+    if (verdict.transactionHash && explorerBaseUrl) verdict.explorerUrl = `${explorerBaseUrl}/transactions/${verdict.transactionHash}`;
     return verdict;
   }
 
