@@ -11,7 +11,7 @@ const OTP_MAX_ATTEMPTS = 5;
 export type LoginIdentityKind = 'WALLET' | 'EMAIL';
 export type ManagedWallet = {
   state: 'READY'; userId: string; walletId: string; address: string;
-  blockchain: 'ARC-TESTNET'; accountType: 'EOA';
+  blockchain: 'ARC-TESTNET'; accountType: 'SCA';
 };
 export type ManagedAccount = {
   userId: string;
@@ -34,7 +34,7 @@ export type EmailLoginSender = { sendLoginCode(email: string, code: string): Pro
 type IdentityRecord = { identityKey: string; kind: LoginIdentityKind; userId: string; principal: string; createdAt: number };
 type WalletOperation = {
   state: 'PENDING' | 'READY' | 'FAILED'; userId: string; idempotencyKey: string;
-  walletId?: string; address?: string; blockchain: 'ARC-TESTNET'; accountType: 'EOA'; updatedAt: number;
+  walletId?: string; address?: string; blockchain: 'ARC-TESTNET'; accountType: 'EOA' | 'SCA'; updatedAt: number;
 };
 type EmailChallenge = { digest: Buffer; expiresAt: number; attempts: number };
 
@@ -110,12 +110,11 @@ export class ManagedIdentityService {
     return this.login(identityKey, 'EMAIL', principal);
   }
 
-  getAccount(userId: string, kind: LoginIdentityKind): ManagedAccount {
+  async getAccount(userId: string, kind: LoginIdentityKind): Promise<ManagedAccount> {
     if (!USER_ID.test(userId)) throw new Error('unauthorized');
     const identity = this.runtime.list<IdentityRecord>('auth-identities').find((record) => record.userId === userId && record.kind === kind);
     if (!identity) throw new Error('unauthorized');
-    const wallet = this.readyWallet(userId);
-    if (!wallet) throw new Error('managed wallet unavailable');
+    const wallet = await this.ensureWallet(userId);
     return { userId, principal: identity.principal, identity: { kind }, managedWallet: wallet };
   }
 
@@ -181,8 +180,11 @@ export class ManagedIdentityService {
 
   private async provisionWallet(userId: string): Promise<ManagedWallet> {
     const existing = this.runtime.get<WalletOperation>('circle-wallets', userId);
-    const pending: WalletOperation = existing ?? {
-      state: 'PENDING', userId, idempotencyKey: randomUUID(), blockchain: 'ARC-TESTNET', accountType: 'EOA', updatedAt: this.now(),
+    if (existing?.accountType === 'EOA') {
+      this.runtime.putIfAbsent('circle-wallets-legacy', userId, existing);
+    }
+    const pending: WalletOperation = (existing?.accountType === 'SCA' ? existing : undefined) ?? {
+      state: 'PENDING', userId, idempotencyKey: randomUUID(), blockchain: 'ARC-TESTNET', accountType: 'SCA', updatedAt: this.now(),
     };
     pending.state = 'PENDING';
     pending.updatedAt = this.now();
@@ -202,7 +204,7 @@ export class ManagedIdentityService {
 
   private readyWallet(userId: string): ManagedWallet | undefined {
     const record = this.runtime.get<WalletOperation>('circle-wallets', userId);
-    if (!record || record.state !== 'READY' || !record.walletId || !record.address) return undefined;
+    if (!record || record.accountType !== 'SCA' || record.state !== 'READY' || !record.walletId || !record.address) return undefined;
     return record as ManagedWallet;
   }
 

@@ -40,7 +40,7 @@ export class ArenaHttpApi {
       if (request.method === 'GET' && request.path === '/api/account') {
         const session = this.requireSessionRecord(request.headers);
         if (!this.managedIdentity || !session.userId || !session.identityKind) throw new Error('managed wallet unavailable');
-        return this.json(200, this.managedIdentity.getAccount(session.userId, session.identityKind));
+        return this.json(200, await this.managedIdentity.getAccount(session.userId, session.identityKind));
       }
       if (request.method === 'GET' && request.path === '/api/account/usdc-balances') {
         const session = this.requireManagedSession(request.headers);

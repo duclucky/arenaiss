@@ -1,8 +1,7 @@
 # Circle-managed identity and wallet boundary
 
-Status: locally implemented, disabled until server-only Circle and SMTP
-configuration is supplied. No production Circle wallet has been created by this
-change.
+Status: locally implemented. The SCA migration below is not yet published or
+verified against Circle/Arc Testnet in this change.
 
 ## Decision
 
@@ -13,8 +12,14 @@ Arena ISS authenticates a person with either:
 
 The authentication credential is an identity proof only. It is not the wallet
 that Arena uses as the user's managed account. After successful authentication,
-the server creates or resumes exactly one Circle developer-controlled EOA on
+the server creates or resumes exactly one active Circle developer-controlled SCA on
 `ARC-TESTNET` and associates it with a pseudonymous Arena user ID.
+
+SCA is an ERC-4337 smart-contract account controlled by Arena's developer
+credentials. Circle Gas Station automatically sponsors its transaction gas on
+supported testnets when the account's default network policy is active and
+within its limits. This is not an MSCA/passkey wallet and it does not eliminate
+the requirement for source-chain USDC and the CCTP transfer/forwarding fee.
 
 This intentionally selects Circle developer-controlled wallets. Circle's
 user-controlled email/social authentication is not used because that product
@@ -26,8 +31,11 @@ model makes the server the wallet custodian.
 - Wallet login: normalized external address, Arena user ID and principal.
 - Email login: HMAC-SHA-256 identity key, Arena user ID and principal. The raw
   email address is not persisted.
-- Circle wallet: user ID, wallet ID, public address, `EOA`, `ARC-TESTNET`, state,
+- Active Circle wallet: user ID, wallet ID, public address, `SCA`, `ARC-TESTNET`, state,
   update time and the UUID v4 idempotency key.
+- Legacy EOA metadata, if present, is retained under a separate local record.
+  The new SCA receives a fresh creation idempotency key and address; no testnet
+  funds are moved and the legacy EOA is not used for new account actions.
 
 The OTP digest is held only in memory, expires after ten minutes, permits at
 most five attempts and is deleted after successful use. A restart invalidates
@@ -40,6 +48,10 @@ server process share a promise. A failed call or server restart retries with the
 same persisted idempotency key, so it does not intentionally create a second
 paid/custodial wallet operation. Circle response data is accepted only when it
 contains exactly one wallet with a wallet ID and valid EVM address.
+Existing authenticated sessions trigger SCA provisioning on `GET /api/account`;
+new logins do so during sign-in. Until the SCA is ready, legacy EOA writes fail
+closed. Legacy on-chain Agent ownership is still tied to the old EOA address;
+this migration does not transfer or deactivate those Agents.
 
 ## API
 

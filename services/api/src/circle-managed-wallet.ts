@@ -21,7 +21,7 @@ const CHAINS = [
 
 type CircleClient = {
   createWallets(input: {
-    accountType: 'EOA'; blockchains: ['ARC-TESTNET']; count: 1; walletSetId: string;
+    accountType: 'SCA'; blockchains: ['ARC-TESTNET']; count: 1; walletSetId: string;
     idempotencyKey: string; metadata: [{ name: string; refId: string }];
   }): Promise<{ data?: { wallets?: Array<{ id?: string; address?: string }> } }>;
   deriveWallet(input: { id: string; blockchain: string }): Promise<{ data?: { wallet?: { id?: string; address?: string } } }>;
@@ -43,7 +43,7 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
 
   async createWallet(input: { userId: string; idempotencyKey: string }) {
     const response = await this.client.createWallets({
-      accountType: 'EOA',
+      accountType: 'SCA',
       blockchains: ['ARC-TESTNET'],
       count: 1,
       walletSetId: this.walletSetId,
