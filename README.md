@@ -176,6 +176,11 @@ no new writes. The active Arc Testnet escrow is verified V2 at
 [`0xc908...702B`](https://testnet.arcscan.app/address/0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B?tab=contract).
 The active Arc Testnet `AgentRegistry` is exact-match verified at
 [`0x4c0b...9E25`](https://testnet.arcscan.app/address/0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25?tab=contract).
+The additive Marketplace registry V2 is deployed at
+[`0xc427...Eada`](https://testnet.arcscan.app/address/0xc427dBf5Dc0b58245Ac94d6634856Dd472bdEada?tab=contract), and the unaudited
+Marketplace contract with a fixed 1% fee is deployed at
+[`0x48c1...a2Df`](https://testnet.arcscan.app/address/0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df?tab=contract). These contracts have
+configuration/readback evidence only; no live listing or purchase is claimed.
 See
 [`docs/GENLAYER-JUDGE-FEASIBILITY.md`](docs/GENLAYER-JUDGE-FEASIBILITY.md) and
 the [`32-case adversarial report`](docs/GENLAYER-ADVERSARIAL-EVAL-REPORT.md).

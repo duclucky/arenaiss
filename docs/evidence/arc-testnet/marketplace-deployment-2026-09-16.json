@@ -1,0 +1,38 @@
+{
+  "schema": "arena-marketplace-deployment-v1",
+  "network": "arc-testnet",
+  "chain_id": 5042002,
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "owner": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+  "registry": {
+    "address": "0xc427dBf5Dc0b58245Ac94d6634856Dd472bdEada",
+    "deployment_transaction": "0x124b95a797d88f0146d25d3733421049804e84a8102f662b9d2797a60e9b3753",
+    "block_number": 62273685,
+    "gas_used": "345042",
+    "source_sha256": "56be72a3d60e356cbd242a0fd87c4ec80f1ad50af5036c2bd6a3ff5779ba0a9e",
+    "runtime_bytecode_sha256": "2e6e3dd9a212898377b0ec4ca9593de7e4b58b50b62adcdc7617fdfd8721c38f"
+  },
+  "marketplace": {
+    "address": "0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df",
+    "deployment_transaction": "0xd7e4755d21612807b9fb8b93de2230a945d1943ed2803f986e18c72dd227902b",
+    "configure_transaction": "0x560ac44bc232b0846dc72b0aca0c0ebfa1d05b2b59bdd8f55a5e5ba5c355eafc",
+    "block_number": 62273695,
+    "configure_block_number": 62273704,
+    "gas_used": "871834",
+    "configure_gas_used": "45102",
+    "platform_fee_bps": 100,
+    "source_sha256": "f9582937b55598e61684117a8b46d5339c09e55538389b69a85c9ff1b8f9b109",
+    "runtime_bytecode_sha256": "3aa826050eab5f1a9e254d70980e44268d48402d5a489562420db831c43a43c1"
+  },
+  "verification": {
+    "registry_administrator_matches_owner": true,
+    "registry_marketplace_binding_matches": true,
+    "marketplace_usdc_matches_arc_canonical": true,
+    "marketplace_registry_matches": true,
+    "operator_matches_owner": true,
+    "platform_recipient_matches_owner": true,
+    "platform_fee_bps": 100,
+    "runtime_code_present": true
+  },
+  "status": "DEPLOYED_UNAUDITED_TESTNET"
+}

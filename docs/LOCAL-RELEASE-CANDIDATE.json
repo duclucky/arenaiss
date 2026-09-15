@@ -2,8 +2,8 @@
   "schema": "arena-local-release-candidate-v1",
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
-  "fileCount": 260,
-  "sourceBundleSha256": "f3d1e9514b4698ff9cd222f61438284a20a55610584764164b29858ff676aae4",
+  "fileCount": 261,
+  "sourceBundleSha256": "a812174c26bd38dea3ee1387693614a29cc541e9755364b6e292d3e70869cb63",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -47,6 +47,7 @@
     "package-lock.json": "9cd79018494cbed4c11d7822193f7e19fc5fc63a47ae98faea55468c2728594c",
     "package.json": "b23c174fb806132683373d7ab2fca50a388df18319648c990b9f65903e74e84b",
     "scripts/check.ps1": "d39ce1b13063f9f4457722a55ac78c653f7026a95cea3749016be3aa2aa5f1d3",
+    "scripts/deploy-agent-marketplace.mjs": "e96a21c6ca14e04fc580ac75f9b7a64dfeedfa5237cde8c067fca370a5c14109",
     "packages/marketplace/src/eligibility.ts": "a1e5dc7f6b343cf401708f1c2b95eb5c5176a15621d88db6c2cf25a158be61c5",
     "packages/marketplace/test/eligibility.test.ts": "36bcac03f9709e4d70435e66dc1d3587929ca45c595daec6e7a83313cd2a051c",
     "scripts/deploy-agent-registry.mjs": "0b883360eaafe94257373f50d8838f6602e94224358d98be4259e453ee719f36",
