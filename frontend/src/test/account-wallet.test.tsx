@@ -40,7 +40,7 @@ describe('managed Arena ISS wallet account', () => {
     expect(await screen.findByRole('link', { name: 'Start with Agent' })).toHaveAttribute('href', '/agents');
     expect(screen.queryByRole('button', { name: /0xe6db/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Arena ISS technology ticker' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
   });
 
   it('uses the requested wallet copy, multichain balance and transfer controls', async () => {
