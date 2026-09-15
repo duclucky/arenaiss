@@ -57,8 +57,12 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.getByText(/Arena ISS is live on Arc Network/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Copy wallet address' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address));
-    expect(screen.getByLabelText('Recipient wallet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send USDC' })).toBeInTheDocument();
+    const bridgeAmount = screen.getByLabelText('Amount (USDC)', { selector: '#bridge-amount' });
+    fireEvent.change(bridgeAmount, { target: { value: '2.00' } });
+    expect(bridgeAmount).toBeValid();
+    expect(screen.getByRole('heading', { name: 'Withdraw' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Recipient wallet').closest('form')).toHaveClass('wallet-action-form');
+    expect(screen.getByRole('button', { name: 'Withdraw USDC' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Bridge to Arc' })).toBeInTheDocument();
   });
 

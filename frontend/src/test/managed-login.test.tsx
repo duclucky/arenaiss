@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
 
@@ -12,6 +12,7 @@ const env = {
 };
 
 describe('managed email login', () => {
+  beforeEach(() => window.history.pushState({}, '', '/'));
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('requests an OTP, verifies it, and displays the server-managed Circle address', async () => {
@@ -31,13 +32,12 @@ describe('managed email login', () => {
         identity: { kind: 'EMAIL' },
         managedWallet: { state: 'READY', userId: `usr_${'a'.repeat(64)}`, walletId: 'circle-wallet-id', address: managedAddress, blockchain: 'ARC-TESTNET', accountType: 'EOA' },
       }), { status: 200 });
+      if (path.endsWith('/api/agents')) return new Response(JSON.stringify([]), { status: 200 });
       throw new Error(`unexpected request: ${path}`);
     });
 
     render(<App env={env} />);
-    const login = await screen.findByRole('button', { name: 'Login' });
-    expect(screen.getAllByRole('button', { name: 'Login' })).toHaveLength(1);
-    fireEvent.click(login);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start with Agent' }));
     expect(screen.getByRole('heading', { name: 'Sign in to Arena ISS' })).toBeInTheDocument();
     const walletLogin = screen.getByRole('button', { name: 'Continue with wallet' });
     expect(walletLogin).toBeInTheDocument();
@@ -55,12 +55,10 @@ describe('managed email login', () => {
     fireEvent.change(screen.getByLabelText('6-digit code'), { target: { value: '654321' } });
     fireEvent.click(screen.getByRole('button', { name: 'Verify and sign in' }));
 
-    expect(await screen.findByRole('link', { name: 'Start with Agent' })).toHaveAttribute('href', '/agents');
-    expect(screen.queryByRole('button', { name: /0x4444/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'My Agents' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /0x4444/i })).toBeInTheDocument();
     expect(requests.find((request) => request.path.endsWith('/api/auth/email/challenge'))?.init?.credentials).toBe('include');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole('link', { name: 'Start with Agent' }));
-    expect(await screen.findByRole('button', { name: /0x4444/i })).toBeInTheDocument();
   });
 
   it('keeps both methods in one login dialog and explains unavailable email auth', async () => {
@@ -71,9 +69,7 @@ describe('managed email login', () => {
     }), { status: 200 }));
 
     render(<App env={env} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
-
-    expect(screen.getAllByRole('button', { name: 'Login' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Start with Agent' }));
     expect(screen.getByRole('button', { name: 'Continue with wallet' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Continue with email' })).toBeDisabled();
     expect(screen.getByText('Not configured on this server yet')).toBeInTheDocument();

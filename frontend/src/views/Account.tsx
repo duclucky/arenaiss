@@ -191,24 +191,24 @@ export function Account() {
             </div>}
 
             {managedAccount && <div className="grid gap-5 border-t border-border pt-6 lg:grid-cols-2">
-              <form className="space-y-3" onSubmit={submitBridge}>
-                <div><h2 className="text-xl font-bold">Bridge USDC to Arc</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source wallet also needs that network's testnet gas token.</p></div>
+              <form className="wallet-action-form" onSubmit={submitBridge}>
+                <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Bridge USDC to Arc</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source wallet also needs that network's testnet gas token.</p></div>
                 <label className="block text-sm font-bold" htmlFor="bridge-chain">Source network</label>
                 <select id="bridge-chain" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
                   {CCTP_CHAINS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
                 </select>
                 <label className="block text-sm font-bold" htmlFor="bridge-amount">Amount (USDC)</label>
-                <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
+                <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
                 <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Bridge to Arc</button>
               </form>
 
-              <form className="space-y-3" onSubmit={submitTransfer}>
-                <div><h2 className="text-xl font-bold">Send from Arc</h2><p className="mt-1 text-sm text-muted-foreground">Transfer testnet USDC to an EVM wallet on Arc.</p></div>
+              <form className="wallet-action-form" onSubmit={submitTransfer}>
+                <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Withdraw</h2><p className="mt-1 text-sm text-muted-foreground">Transfer testnet USDC to an EVM wallet on Arc.</p></div>
                 <label className="block text-sm font-bold" htmlFor="withdraw-address">Recipient wallet</label>
                 <input id="withdraw-address" className="retro-inset w-full p-3 font-mono text-sm" placeholder="0x…" required pattern="^0x[0-9a-fA-F]{40}$" value={destinationAddress} onChange={(event) => setDestinationAddress(event.target.value)} />
                 <label className="block text-sm font-bold" htmlFor="withdraw-amount">Amount (USDC)</label>
-                <input id="withdraw-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$" value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} />
-                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Send USDC</button>
+                <input id="withdraw-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} />
+                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Withdraw USDC</button>
               </form>
             </div>}
 

@@ -76,7 +76,7 @@ describe('App Tests', () => {
     const env = { VITE_ARC_CHAIN_ID: '5042002', VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.io', VITE_ARC_NETWORK_NAME: 'Arc Testnet', VITE_ARC_USDC_ADDRESS: '0x0000000000000000000000000000000000000001' };
     render(<App env={env} walletAdapter={testAdapter} />);
     
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start with Agent' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
 
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
@@ -86,7 +86,6 @@ describe('App Tests', () => {
     
     fireEvent.click(providerBtn!);
 
-    fireEvent.click(await screen.findByRole('link', { name: 'Start with Agent' }));
     fireEvent.click(await screen.findByRole('button', { name: /0xTest/i }));
     const disconnectBtn = await screen.findByText('Disconnect');
     expect(disconnectBtn).toBeInTheDocument();
@@ -239,7 +238,7 @@ describe('App Tests', () => {
     
     render(<App env={env} walletAdapter={testAdapter} />);
     
-    const trigger = screen.getByRole('button', { name: 'Login' });
+    const trigger = screen.getByRole('button', { name: 'Start with Agent' });
     trigger.focus();
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
@@ -305,14 +304,13 @@ describe('App Tests', () => {
     const env = { VITE_ARC_CHAIN_ID: '5042002', VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.io', VITE_ARC_NETWORK_NAME: 'Arc Testnet' };
     
     render(<App env={env} walletAdapter={testAdapter} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start with Agent' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
     
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
     fireEvent.click(providerBtn!);
 
     // Account is intentionally available only from the signed-in address menu.
-    fireEvent.click(await screen.findByRole('link', { name: 'Start with Agent' }));
     const accountMenu = await screen.findByRole('button', { name: /0xTest/i });
     fireEvent.click(accountMenu);
     fireEvent.click(screen.getByRole('menuitem', { name: 'View account' }));

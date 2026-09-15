@@ -64,6 +64,7 @@ configuration:
 CIRCLE_API_KEY
 CIRCLE_ENTITY_SECRET
 CIRCLE_WALLET_SET_ID
+ARC_AGENT_REGISTRY_ADDRESS
 ARENA_IDENTITY_PEPPER
 SMTP_HOST
 SMTP_PORT
@@ -80,11 +81,14 @@ are ignored by Git.
 ## Current limitation
 
 This slice provisions the managed wallet, makes it the account address, and
-provides wallet/email sign-in controls in the web UI. It does not yet authorize
-Circle contract execution, fund the wallet, or migrate the existing
-browser-signed Tournament registration/claim path. The UI blocks those actions
-for managed accounts and never falls back to the sign-in wallet. Those are
-separate value-bearing operations and require policy, explicit confirmation,
-transaction status reconciliation and action-time authorization before a live
-call. Until that migration is implemented, do not claim that managed users can
-enter or claim a Tournament.
+provides wallet/email sign-in controls in the web UI. Agent registration and
+deactivation are implemented as Circle contract-execution calls to the
+configured Arc `AgentRegistry`; both require an Arc transaction hash before the
+backend changes active Agent state. The registry address must identify a
+separately reviewed deployment. No deployment or live call is implied by local
+configuration support.
+
+Tournament registration/claim migration remains separate. The UI blocks those
+value-bearing actions for managed accounts and never falls back to the sign-in
+wallet. Do not claim that managed users can enter or claim a Tournament until
+that migration has live evidence.

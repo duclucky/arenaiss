@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { entrantId as deriveEntrantId, isDigest } from "../../../packages/protocol/src/canonical.ts";
 import type { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlite-runtime.ts";
@@ -8,12 +8,21 @@ import type { SoloCampaignRecord } from "../../../packages/evaluation/src/solo-r
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
-type Agent = { agentId: Digest; owner: string; name: string; versions: AgentVersion[] };
-export type PublicAgent = Omit<AgentVersion, "agentsMd"> & { owner: string; name: string };
+export type AgentChainTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string; registryAddress?: string };
+type Agent = { agentId: Digest; owner: string; name: string; versions: AgentVersion[]; active?: boolean; registrationPending?: boolean; registrationIdempotencyKey?: string; deactivationIdempotencyKey?: string; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction };
+export type AgentDraft = AgentVersion & { owner: string; name: string; idempotencyKey: string };
+export type AgentStats = { latestEvaluationScore: number | null; tournamentCount: number; adversarialMatchCount: number | null };
+export type PublicAgent = Omit<AgentVersion, "agentsMd"> & { owner: string; name: string; active: boolean; stats?: AgentStats; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction };
+export type AgentDetail = PublicAgent & {
+  agentsMd: string;
+  stats: AgentStats;
+  tournaments: PublicTournament[];
+  evaluations: PublicEvaluationCampaign[];
+};
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
-export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; winner?: string; round: number };
+export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number };
 export type PublicVerdictCriterion = { id: string; label: string; winner: "A" | "B" | "TIE"; reason: string };
 export type PublicVerdict = {
   id: string; matchId: string; winner: "A" | "B" | "TIE"; reasons: readonly string[]; summary: string; transactionHash?: string;
@@ -84,18 +93,42 @@ export class ArenaApiService {
   }
 
   createAgent(caller: string, name: string, agentsMd: string): PublicAgent {
+    const draft = this.prepareAgentCreation(caller, name, agentsMd);
+    return this.commitAgentCreation(caller, draft);
+  }
+
+  prepareAgentCreation(caller: string, name: string, agentsMd: string): AgentDraft {
     const owner = this.principal(caller); this.validateAgentText(name, agentsMd);
+    const normalizedName = name.trim();
+    const commitment = sha(agentsMd);
+    const pending = [...this.agents.values()].find((agent) => agent.owner === owner && agent.registrationPending === true && agent.name === normalizedName && agent.versions.at(-1)?.agentsCommitment === commitment);
+    if (pending) return { ...structuredClone(pending.versions.at(-1)!), owner, name: pending.name, idempotencyKey: pending.registrationIdempotencyKey! };
     this.nonce = this.runtime ? this.runtime.increment("api-counters", "agent-sequence", 1) : this.nonce + 1;
     const agentId = sha(`arena-agent-v1|${owner}|${this.nonce}|${name}`);
     const version = this.version(agentId, agentsMd, 1);
-    const agent = { agentId, owner, name, versions: [version] };
+    const idempotencyKey = randomUUID();
+    const agent: Agent = { agentId, owner, name: normalizedName, versions: [version], active: false, registrationPending: true, registrationIdempotencyKey: idempotencyKey };
     this.agents.set(agentId, agent);
     this.runtime?.put("api-agents", agentId, agent);
-    return this.publicView(this.agents.get(agentId)!);
+    return { ...version, owner, name: normalizedName, idempotencyKey };
+  }
+
+  commitAgentCreation(caller: string, draft: AgentDraft, registration?: AgentChainTransaction): PublicAgent {
+    const owner = this.principal(caller);
+    const pending = this.agents.get(draft.agentId);
+    if (draft.owner !== owner || !pending || pending.owner !== owner || pending.registrationPending !== true || pending.registrationIdempotencyKey !== draft.idempotencyKey
+      || pending.name !== draft.name || pending.versions.at(-1)?.agentsVersion !== draft.agentsVersion || pending.versions.at(-1)?.agentsCommitment !== draft.agentsCommitment) throw new Error("invalid agent creation");
+    this.validateAgentText(draft.name, draft.agentsMd);
+    pending.active = true;
+    pending.registrationPending = false;
+    if (registration) pending.registration = structuredClone(registration);
+    this.runtime?.put("api-agents", draft.agentId, pending);
+    return this.publicView(pending);
   }
 
   updateAgent(caller: string, agentId: Digest, agentsMd: string): PublicAgent {
     const agent = this.requireOwner(caller, agentId); this.validateAgentText(agent.name, agentsMd);
+    if (agent.active === false) throw new Error("agent is inactive");
     agent.versions.push(this.version(agentId, agentsMd, agent.versions.length + 1));
     this.runtime?.put("api-agents", agentId, agent);
     return this.publicView(agent);
@@ -113,7 +146,36 @@ export class ArenaApiService {
   getPublicAgent(agentId: Digest): PublicAgent { const agent = this.agents.get(agentId); if (!agent) throw new Error("agent not found"); return this.publicView(agent); }
   listOwnedAgents(caller: string): PublicAgent[] {
     const owner = this.principal(caller);
-    return [...this.agents.values()].filter((agent) => agent.owner === owner).map((agent) => this.publicView(agent));
+    return [...this.agents.values()].filter((agent) => agent.owner === owner && agent.active !== false).map((agent) => ({ ...this.publicView(agent), stats: this.agentStats(agent) }));
+  }
+  getAgentDetail(caller: string, agentId: Digest): AgentDetail {
+    const agent = this.requireOwner(caller, agentId);
+    const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agentId));
+    const tournaments = registrations.map((item) => this.tournaments.get(`sha256:${item.tournamentId.slice(2)}`)!).filter(Boolean).map((item) => structuredClone(item));
+    const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
+    const evaluations = [...this.evaluationCampaigns.values()].filter((campaign) => versionIds.has(campaign.agent.versionId as Digest)).map((campaign) => this.publicCampaign(campaign));
+    return {
+      ...this.publicView(agent), agentsMd: agent.versions.at(-1)!.agentsMd,
+      stats: this.agentStats(agent),
+      tournaments, evaluations,
+    };
+  }
+  deactivateAgent(caller: string, agentId: Digest, exactName: string, deactivation?: AgentChainTransaction): PublicAgent {
+    const agent = this.requireOwner(caller, agentId);
+    if (agent.active === false) throw new Error("agent is already inactive");
+    if (exactName !== agent.name) throw new Error("agent name does not match");
+    agent.active = false;
+    if (deactivation) agent.deactivation = structuredClone(deactivation);
+    this.runtime?.put("api-agents", agentId, agent);
+    return this.publicView(agent);
+  }
+  prepareAgentDeactivation(caller: string, agentId: Digest, exactName: string): string {
+    const agent = this.requireOwner(caller, agentId);
+    if (agent.active === false) throw new Error("agent is already inactive");
+    if (exactName !== agent.name) throw new Error("agent name does not match");
+    agent.deactivationIdempotencyKey ??= randomUUID();
+    this.runtime?.put("api-agents", agentId, agent);
+    return agent.deactivationIdempotencyKey;
   }
   listOwnedRegistrations(caller: string): OwnedRegistration[] {
     const owner = this.principal(caller);
@@ -140,6 +202,8 @@ export class ArenaApiService {
     const winnerRequired = match.state === "FINALIZED" || match.state === "WINNER_ADVANCED";
     if (!match.id || !match.tournamentId || !this.tournaments.has(match.tournamentId) || !PUBLIC_MATCH_STATES.has(match.state)
       || !match.agentA || !match.agentB || match.agentA === match.agentB || !Number.isSafeInteger(match.round) || match.round < 0
+      || ((match.agentIdA === undefined) !== (match.agentIdB === undefined))
+      || (match.agentIdA !== undefined && (!isDigest(match.agentIdA) || !isDigest(match.agentIdB!)))
       || (match.winner !== undefined && match.winner !== match.agentA && match.winner !== match.agentB)
       || (winnerRequired && match.winner === undefined) || (match.state === "TIE" && match.winner !== undefined)) {
       throw new Error("invalid public match");
@@ -148,7 +212,7 @@ export class ArenaApiService {
     if (existing) {
       if (isDeepStrictEqual(existing, match)) return;
       if (TERMINAL_PUBLIC_MATCH_STATES.has(existing.state)) throw new Error("conflicting public match");
-      if (existing.tournamentId !== match.tournamentId || existing.agentA !== match.agentA || existing.agentB !== match.agentB || existing.round !== match.round) {
+      if (existing.tournamentId !== match.tournamentId || existing.agentA !== match.agentA || existing.agentB !== match.agentB || existing.agentIdA !== match.agentIdA || existing.agentIdB !== match.agentIdB || existing.round !== match.round) {
         throw new Error("conflicting public match identity");
       }
     }
@@ -222,6 +286,7 @@ export class ArenaApiService {
     const owner = this.principal(caller);
     if (!isDigest(input?.campaignId)) throw new Error("invalid evaluation campaign ID");
     const agent = this.requireOwner(owner, input.agentId);
+    if (agent.active === false) throw new Error("agent is inactive");
     const version = agent.versions.find((candidate) => candidate.agentsVersion === input.agentsVersion);
     if (!version) throw new Error("agent version not found");
     const pack = this.evaluationPacks.get(this.packKey(input.packId, input.packVersion));
@@ -259,6 +324,7 @@ export class ArenaApiService {
     const tournament = this.tournaments.get(tournamentId);
     if (!tournament || !/^[1-9][0-9]*$/.test(tournament.stakeAmount || "")) throw new Error("tournament registration is unavailable");
     const agent = this.requireOwner(owner, agentId);
+    if (agent.active === false) throw new Error("agent is inactive");
     const latest = agent.versions.at(-1)!;
     const key = this.registrationKey(tournamentId, owner, agentId);
     const existing = this.registrations.get(key);
@@ -276,7 +342,17 @@ export class ArenaApiService {
     return structuredClone(prepared);
   }
 
-  private publicView(agent: Agent): PublicAgent { const { agentsMd: _private, ...latest } = agent.versions.at(-1)!; return { ...latest, owner: agent.owner, name: agent.name }; }
+  private publicView(agent: Agent): PublicAgent { const latest = agent.versions.at(-1)!; return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}) }; }
+  private agentStats(agent: Agent): AgentStats {
+    const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
+    const evaluations = [...this.evaluationCampaigns.values()].filter((campaign) => versionIds.has(campaign.agent.versionId as Digest));
+    const scores = evaluations.flatMap((campaign) => campaign.items.map((item) => item.overallScore).filter((score): score is number => score !== undefined));
+    const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agent.agentId));
+    const tournamentIds = new Set(registrations.map((item) => `sha256:${item.tournamentId.slice(2)}`));
+    const relevantMatches = [...this.matches.values()].filter((match) => tournamentIds.has(match.tournamentId));
+    const hasUnboundMatch = relevantMatches.some((match) => !match.agentIdA || !match.agentIdB);
+    return { latestEvaluationScore: scores.at(-1) ?? null, tournamentCount: registrations.length, adversarialMatchCount: hasUnboundMatch ? null : relevantMatches.filter((match) => match.agentIdA === agent.agentId || match.agentIdB === agent.agentId).length };
+  }
   private packKey(packId: string, version: string): string { return `${packId}|${version}`; }
   private publicPack(pack: EvaluationPackRecord): PublicEvaluationPack { return { schema: "arena-public-evaluation-pack-v1", packId: pack.packId, version: pack.version, name: pack.name, scenarioIds: pack.scenarios.map((scenario) => scenario.scenarioId), scenarioCount: pack.scenarios.length }; }
   private publicCampaign(campaign: SoloCampaignRecord): PublicEvaluationCampaign { return { schema: "arena-public-evaluation-campaign-v1", campaignId: campaign.campaignId, agentVersionId: campaign.agent.versionId, packId: campaign.testPack.packId, packVersion: campaign.testPack.version, rubricVersion: campaign.rubricVersion, state: campaign.state, items: campaign.items.map((item) => ({ scenarioId: item.scenarioId, state: item.state, attempt: item.attempt, runIds: [...item.runIds], ...(item.scorecard ? { score: String(item.scorecard.result_class), overallScore: Number(item.scorecard.overall_score) } : {}) })) }; }

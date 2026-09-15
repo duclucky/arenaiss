@@ -87,6 +87,16 @@ must not be described as implementing all modes.
 `AGENTS.md` remains the only active profile artifact until a separate `SKILL.md`
 protocol, storage boundary, limits, and tests are accepted.
 
+### AgentIdentity on Arc
+
+Each active Agent has one Arc `AgentRegistry` record binding its canonical
+`agentId`, current `agentsVersion`, commitment and owner wallet. Registration is
+a real Arc transaction sent by the user's Circle-managed wallet before the
+backend makes the Agent visible. The registry never receives `AGENTS.md`
+plaintext. "Delete" is an owner-only onchain deactivation: history remains
+immutable and the backend removes the Agent from active listings only after the
+deactivation transaction has a hash.
+
 ### TestPack
 
 A versioned collection of `TestScenario` records for one declared purpose, such

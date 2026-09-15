@@ -372,6 +372,15 @@ the Tournament browser lifecycle complete. Successful live tournament, match and
 verdict records are already projected into the API/UI; backend state must not be
 presented as Arc finality.
 
+On 2026-09-15 the owner approved an Arc-bound Agent lifecycle. A local
+`AgentRegistry` contract, Circle contract-execution adapter, authenticated API
+routes and Agent management UI now implement registration, private detail,
+copy, exact-name deactivation and evidence-derived activity metrics. This work
+has local test evidence only: `ARC_AGENT_REGISTRY_ADDRESS` is intentionally
+required, but this registry has not been deployed or called on Arc and no new
+transaction has been signed. Existing legacy match rows without canonical Agent
+IDs produce an unavailable match count instead of a fabricated value.
+
 The active Arc escrow V2 is locally covered by 14 Foundry tests and has
 constructor/readback plus exact-match explorer verification evidence. Its
 automatic payout worker has six focused tests, including isolated recipient

@@ -185,7 +185,7 @@ button:disabled { cursor: not-allowed; }
 .hero-line--promise { font-size: clamp(13px, 2.15vw, 31px); }
 .type-cursor { display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -.08em; background: #000; animation: blink 1s step-end infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: clamp(24px, 3vw, 36px); opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
 .hero-actions[data-visible='true'] { opacity: 1; transform: translateY(0); }
 .hero-pill {
   display: inline-flex;
@@ -228,20 +228,8 @@ button:disabled { cursor: not-allowed; }
   letter-spacing: .11em;
   text-transform: uppercase;
 }
+.ticker-brand-logo { width: 18px; height: 18px; margin-right: 8px; flex: none; }
 .header-ticker-item::after { content: '·'; margin: 0 34px; opacity: .55; }
-.header-ticker-toggle {
-  min-width: 72px;
-  border: 0;
-  border-left: 1px solid rgba(0,0,0,.28);
-  background: rgba(239,237,231,.82);
-  font-family: var(--retro-control-font);
-  font-size: 11px;
-  text-transform: uppercase;
-}
-.header-ticker-toggle:hover, .header-ticker-toggle:focus-visible { background: var(--retro-face-hover); }
-.header-ticker[data-paused='true'] .header-ticker-track,
-.header-ticker:hover .header-ticker-track,
-.header-ticker:focus-within .header-ticker-track { animation-play-state: paused; }
 @keyframes header-ticker-scroll { to { transform: translateX(-50%); } }
 .hero-footnote {
   position: absolute;
@@ -345,6 +333,11 @@ button:disabled { cursor: not-allowed; }
 }
 .retro-icon-button { width: 44px; padding: 0; }
 .login-method-button { justify-content: flex-start !important; text-align: left; }
+.wallet-action-form { display: flex; flex-direction: column; gap: 12px; }
+.wallet-action-form :is(input, select) { min-height: 52px; }
+@media (min-width: 1024px) {
+  .wallet-action-form__intro { min-height: 84px; }
+}
 .login-method-button > svg { flex: 0 0 24px; }
 .appear { animation: in-soft .7s cubic-bezier(.16,1,.3,1) both; animation-delay: var(--delay,0s); }
 @keyframes in-soft { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
@@ -386,7 +379,7 @@ button:disabled { cursor: not-allowed; }
   .header-ticker { height: 34px; }
   .header-ticker-item { font-size: 10px; }
   .header-ticker-item::after { margin: 0 18px; }
-  .header-ticker-toggle { min-width: 54px; font-size: 9px; }
+  .ticker-brand-logo { width: 15px; height: 15px; margin-right: 6px; }
   .hero-footnote { right: 20px; bottom: 18px; left: 20px; justify-content: space-between; gap: 8px; font-size: 10px; }
   .hero-footnote span:not(:last-child)::after { display: none; }
 }

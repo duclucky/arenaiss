@@ -66,9 +66,11 @@ describe('Arena ISS visual shell', () => {
     expect(screen.getByRole('link', { name: 'Arena ISS' })).toHaveAttribute('href', '/');
     const ticker = screen.getByRole('region', { name: 'Arena ISS technology ticker' });
     expect(ticker.closest('header')).toBeInTheDocument();
-    for (const label of ['Arc', 'USDC', 'CCTP', 'Escrow', 'GenLayer', 'GenVM']) expect(ticker).toHaveTextContent(label);
-    fireEvent.click(screen.getByRole('button', { name: 'Pause technology ticker' }));
-    expect(screen.getByRole('button', { name: 'Play technology ticker' })).toBeInTheDocument();
+    for (const label of ['Arc', 'USDC', 'CCTP', 'Escrow', 'GenLayer', 'GenVM', 'Judge', 'Marketplace']) expect(ticker).toHaveTextContent(label);
+    expect(ticker.querySelector('[data-brand-logo="arc"]')).toBeInTheDocument();
+    expect(ticker.querySelector('[data-brand-logo="genlayer"]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /technology ticker/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Login' })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Tournaments' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Agents' })).not.toBeInTheDocument();
@@ -198,7 +200,8 @@ describe('Arena ISS visual shell', () => {
 
   it('does not expose product navigation before login', async () => {
     render(<App walletAdapter={new VisualWallet()} />);
-    expect(await screen.findByRole('button', { name: 'Login' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Start with Agent' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Login' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
   });

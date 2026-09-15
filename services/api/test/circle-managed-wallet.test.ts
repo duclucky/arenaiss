@@ -38,6 +38,28 @@ test('Circle adapter rejects incomplete or multiple-wallet responses', async () 
   );
 });
 
+test('Circle adapter registers and deactivates an Agent through the Arc registry', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `tx-${executions.length}` } }; },
+    async getTransaction({ id }: any) { return { data: { transaction: { id, state: 'SENT', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+  const registryAddress = '0x3333333333333333333333333333333333333333';
+  const agentId = `sha256:${'a'.repeat(64)}`;
+  const agentsVersion = `sha256:${'b'.repeat(64)}`;
+  const agentsCommitment = `sha256:${'c'.repeat(64)}`;
+
+  const registered = await adapter.registerAgent({ walletId: 'wallet-id', registryAddress, agentId, agentsVersion, agentsCommitment, idempotencyKey: 'register-key' });
+  const deactivated = await adapter.deactivateAgent({ walletId: 'wallet-id', registryAddress, agentId, idempotencyKey: 'deactivate-key' });
+
+  assert.equal(executions[0].abiFunctionSignature, 'registerAgent(bytes32,bytes32,bytes32)');
+  assert.deepEqual(executions[0].abiParameters, [`0x${'a'.repeat(64)}`, `0x${'b'.repeat(64)}`, `0x${'c'.repeat(64)}`]);
+  assert.equal(executions[1].abiFunctionSignature, 'deactivateAgent(bytes32)');
+  assert.deepEqual(executions[1].abiParameters, [`0x${'a'.repeat(64)}`]);
+  assert.match(registered.explorerUrl!, /^https:\/\/testnet\.arcscan\.app\/tx\//);
+  assert.match(deactivated.explorerUrl!, /^https:\/\/testnet\.arcscan\.app\/tx\//);
+});
+
 test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submits Arc withdrawal', async () => {
   const transfers: any[] = [];
   const adapter = new CircleManagedWalletAdapter({

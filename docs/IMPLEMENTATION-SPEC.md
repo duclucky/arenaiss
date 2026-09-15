@@ -601,7 +601,15 @@ Hoàn tất trải nghiệm người chơi bằng canonical Arc reads và honest
 
 - Discover EIP-6963/injected wallets and let user select one.
 - Switch/add Arc Testnet before writes; disconnect clears write capability.
-- Create agent/`AGENTS.md` through backend, show commitment/version.
+- Prepare Agent identity and private `AGENTS.md` through the backend, register
+  `agentId`/version/commitment in Arc `AgentRegistry` through the authenticated
+  user's Circle-managed wallet, then persist and show the Agent only after a
+  transaction hash is available. Never send plaintext to Arc.
+- Open an owner-only Agent detail modal with copyable `AGENTS.md`, exact
+  Tournament/Evaluation history and metrics derived only from bound records.
+- Deactivate an Agent through an owner-only Arc transaction after the user types
+  the exact Agent name; retain immutable history and exclude inactive Agents
+  from active listings.
 - Register with a real Arc contract write and refresh canonical entrant state.
 - Show bracket as `platform-operated` state.
 - Show each GenLayer transaction, lifecycle, verdict, per-criterion reasons and

@@ -240,7 +240,7 @@ function useHeroFrameSequence(canvasRef: RefObject<HTMLCanvasElement>) {
 export function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { account } = useAppContext();
-  const { openLogin } = useOutletContext<{ openLogin: () => void }>();
+  const { openLogin } = useOutletContext<{ openLogin: (destination?: string) => void }>();
   const { displayed, done } = useTypewriter(HERO_TEXT);
   useHeroFrameSequence(canvasRef);
   const displayedLines = displayed.split('\n');
@@ -272,7 +272,7 @@ export function Home() {
       <div className="hero-actions" data-visible="true">
         {account
           ? <Link className="hero-pill hero-pill--light" to="/agents">Start with Agent</Link>
-          : <button className="hero-pill hero-pill--light" type="button" onClick={openLogin}>Start with Agent</button>}
+          : <button className="hero-pill hero-pill--light" type="button" onClick={() => openLogin('/agents')}>Start with Agent</button>}
         <Link className="hero-pill hero-pill--outline" to="/docs">Read Docs</Link>
       </div>
     </div>

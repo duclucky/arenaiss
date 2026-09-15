@@ -72,7 +72,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
 }
 
 export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
-  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'] as const;
+  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARC_AGENT_REGISTRY_ADDRESS', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'] as const;
   const values = Object.fromEntries(names.map((name) => [name, environment[name]?.trim() || ''])) as Record<typeof names[number], string>;
   if (names.every((name) => !values[name])) return undefined;
   const missing = names.filter((name) => !values[name]);
@@ -81,6 +81,7 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
   return {
     runtime,
     identityPepper: values.ARENA_IDENTITY_PEPPER,
+    agentRegistryAddress: values.ARC_AGENT_REGISTRY_ADDRESS,
     circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
     emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
   };

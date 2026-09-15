@@ -124,6 +124,17 @@ export type AgentProfile = {
   name: string;
   agentsVersion: string;
   agentsCommitment: string;
+  active?: boolean;
+  stats?: { latestEvaluationScore: number | null; tournamentCount: number; adversarialMatchCount: number | null };
+  registration?: ManagedWalletTransaction;
+  deactivation?: ManagedWalletTransaction;
+};
+
+export type AgentDetail = AgentProfile & {
+  agentsMd: string;
+  stats: NonNullable<AgentProfile['stats']>;
+  tournaments: Array<{ id: string; name: string; status: string; entrantIds: readonly string[]; prizePool: string }>;
+  evaluations: EvaluationCampaign[];
 };
 
 export type OwnedRegistration = Pick<EntrantRegistration, 'tournamentId' | 'entrantId'>;
@@ -158,6 +169,8 @@ export interface AgentApiAdapter {
   listOwnedRegistrations(): Promise<OwnedRegistration[]>;
   createAgent(name: string, agentsMd: string): Promise<AgentProfile>;
   prepareRegistration(tournamentId: string, agentId: string): Promise<EntrantRegistration & { stakeAmount: string }>;
+  getAgent?(agentId: string): Promise<AgentDetail>;
+  deactivateAgent?(agentId: string, exactName: string): Promise<AgentProfile>;
 }
 
 export type EvaluationScenario = {

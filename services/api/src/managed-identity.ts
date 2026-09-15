@@ -24,6 +24,8 @@ export type CircleWalletPort = {
   listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
   transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
 };
 export type UsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
 export type WalletTransactionResult = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
@@ -43,6 +45,7 @@ export type ManagedIdentityOptions = {
   emailSender: EmailLoginSender;
   generateEmailCode?: () => string;
   now?: () => number;
+  agentRegistryAddress?: string;
 };
 
 export class ManagedIdentityService {
@@ -52,6 +55,7 @@ export class ManagedIdentityService {
   private readonly emailSender: EmailLoginSender;
   private readonly generateEmailCode: () => string;
   private readonly now: () => number;
+  private readonly agentRegistryAddress?: string;
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
 
@@ -63,6 +67,7 @@ export class ManagedIdentityService {
     this.emailSender = options.emailSender;
     this.generateEmailCode = options.generateEmailCode ?? (() => String(randomInt(0, 1_000_000)).padStart(6, '0'));
     this.now = options.now ?? Date.now;
+    this.agentRegistryAddress = options.agentRegistryAddress ? requireAddress(options.agentRegistryAddress) : undefined;
   }
 
   async loginWallet(address: string): Promise<ManagedAccount> {
@@ -138,6 +143,18 @@ export class ManagedIdentityService {
       amount: requireUsdcAmount(amount),
       idempotencyKey: randomUUID(),
     });
+  }
+
+  async registerAgent(userId: string, input: { agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.agentRegistryAddress) throw new Error('agent registry unavailable');
+    return this.circleWallets.registerAgent({ walletId: wallet.walletId, registryAddress: this.agentRegistryAddress, ...input });
+  }
+
+  async deactivateAgent(userId: string, agentId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.agentRegistryAddress) throw new Error('agent registry unavailable');
+    return this.circleWallets.deactivateAgent({ walletId: wallet.walletId, registryAddress: this.agentRegistryAddress, agentId, idempotencyKey });
   }
 
   private async login(identityKey: string, kind: LoginIdentityKind, principal: string): Promise<ManagedAccount> {
