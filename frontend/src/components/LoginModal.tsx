@@ -6,7 +6,7 @@ import { useAppContext } from '../context';
 
 type LoginMethod = 'choice' | 'wallet' | 'email';
 
-export function LoginModal({ onClose }: { onClose: () => void }) {
+export function LoginModal({ onClose, onAuthenticated }: { onClose: () => void; onAuthenticated?: () => void }) {
   const { connectWallet, managedIdentityEnabled, requestEmailCode, signInWithEmail, wallet } = useAppContext();
   const [method, setMethod] = useState<LoginMethod>('choice');
   const [providers, setProviders] = useState<WalletProvider[]>([]);
@@ -82,6 +82,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     setError('');
     try {
       await connectWallet(providerUuid);
+      onAuthenticated?.();
       onClose();
     } catch (reason) {
       setWalletStatus('error');
@@ -122,6 +123,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     setError('');
     try {
       await signInWithEmail(email, code);
+      onAuthenticated?.();
       onClose();
     } catch (reason) {
       setError(message(reason, 'The code is invalid or expired. Request a new code and try again.'));

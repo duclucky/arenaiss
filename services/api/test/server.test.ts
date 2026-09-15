@@ -113,7 +113,7 @@ test('managed identity configuration is optional but rejects every partial secre
     assert.equal(managedIdentityFromEnvironment(database, {}), undefined);
     assert.throws(
       () => managedIdentityFromEnvironment(database, { CIRCLE_API_KEY: 'secret-value' }),
-      /configuration is incomplete: CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_SET_ID, ARENA_IDENTITY_PEPPER, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM/,
+      /configuration is incomplete: CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_SET_ID, ARC_AGENT_REGISTRY_ADDRESS, ARENA_IDENTITY_PEPPER, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM/,
     );
   } finally { database.close(); }
 });

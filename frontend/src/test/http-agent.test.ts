@@ -34,4 +34,16 @@ describe('agent HTTP adapter', () => {
     expect(createBody).toEqual({ name: 'A', agentsMd: 'Private strategy' });
     expect(fetcher.mock.calls.every((call) => call[1].credentials === 'include')).toBe(true);
   });
+
+  it('loads private detail and deactivates with only the exact Agent name', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ agentId: 'sha256:a', agentsMd: 'private', tournaments: [], evaluations: [], stats: {} }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ agentId: 'sha256:a', name: 'A', active: false }), { status: 202 }));
+    const adapter = new HttpAgentAdapter('https://arena.example', () => null, async () => 'unused', fetcher, true);
+    await adapter.getAgent('sha256:a');
+    await adapter.deactivateAgent('sha256:a', 'A');
+    expect(fetcher.mock.calls[0][0]).toBe('https://arena.example/api/agents/sha256%3Aa');
+    expect(fetcher.mock.calls[1][1].method).toBe('DELETE');
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ name: 'A' });
+  });
 });

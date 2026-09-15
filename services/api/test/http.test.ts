@@ -159,14 +159,20 @@ test('email OTP login is bounded, stores no plaintext email, and provisions the 
   try {
     const deliveries: Array<{ email: string; code: string }> = [];
     let provisions = 0;
+    const registryCalls: string[] = [];
     let now = 1_000_000;
     const managed = {
       runtime,
       identityPepper: 'test-only-pepper-with-at-least-32-bytes',
-      circleWallets: { createWallet: async () => {
-        provisions += 1;
-        return { walletId: '22222222-2222-4222-8222-222222222222', address: '0x4444444444444444444444444444444444444444' };
-      } },
+      agentRegistryAddress: '0x3333333333333333333333333333333333333333',
+      circleWallets: {
+        createWallet: async () => {
+          provisions += 1;
+          return { walletId: '22222222-2222-4222-8222-222222222222', address: '0x4444444444444444444444444444444444444444' };
+        },
+        registerAgent: async ({ agentId }: any) => { registryCalls.push(`register:${agentId}`); return { transactionId: 'register-tx', state: 'SENT', txHash: `0x${'a'.repeat(64)}`, explorerUrl: `https://testnet.arcscan.app/tx/0x${'a'.repeat(64)}` }; },
+        deactivateAgent: async ({ agentId }: any) => { registryCalls.push(`deactivate:${agentId}`); return { transactionId: 'deactivate-tx', state: 'SENT', txHash: `0x${'b'.repeat(64)}`, explorerUrl: `https://testnet.arcscan.app/tx/0x${'b'.repeat(64)}` }; },
+      },
       emailSender: { sendLoginCode: async (email: string, code: string) => { deliveries.push({ email, code }); } },
       generateEmailCode: () => '654321',
       now: () => now,
@@ -190,6 +196,13 @@ test('email OTP login is bounded, stores no plaintext email, and provisions the 
     const agent = await api.handle({ method: 'POST', path: '/api/agents', headers: { cookie }, body: { name: 'Email Agent', agentsMd: 'private' } });
     assert.equal(agent.status, 201);
     assert.match(agent.body.owner, /^usr_[0-9a-f]{64}$/);
+    assert.equal(agent.body.registration.transactionId, 'register-tx');
+    const detail = await api.handle({ method: 'GET', path: `/api/agents/${agent.body.agentId}`, headers: { cookie } });
+    assert.equal(detail.body.agentsMd, 'private');
+    assert.equal((await api.handle({ method: 'DELETE', path: `/api/agents/${agent.body.agentId}`, headers: { cookie }, body: { name: 'wrong' } })).status, 400);
+    const deleted = await api.handle({ method: 'DELETE', path: `/api/agents/${agent.body.agentId}`, headers: { cookie }, body: { name: 'Email Agent' } });
+    assert.equal(deleted.body.deactivation.transactionId, 'deactivate-tx');
+    assert.deepEqual(registryCalls, [`register:${agent.body.agentId}`, `deactivate:${agent.body.agentId}`]);
     assert.equal((await api.handle({ method: 'POST', path: '/api/auth/email/verify', body: { email: 'user@example.com', code: '654321' } })).status, 401);
 
     await api.handle({ method: 'POST', path: '/api/auth/email/challenge', body: { email: 'second@example.com' } });

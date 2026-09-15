@@ -17,10 +17,47 @@ test("agent owner stores AGENTS.md and public view exposes commitment only", () 
   assert.match(api.getPublicAgent(created.agentId).agentsCommitment, /^sha256:/);
 });
 
+test("an interrupted onchain creation retry reuses the persisted Agent identity and idempotency key", () => {
+  const api = new ArenaApiService(ALICE);
+  const first = api.prepareAgentCreation(ALICE, "Retry Agent", "same private body");
+  const retried = api.prepareAgentCreation(ALICE, "Retry Agent", "same private body");
+  assert.equal(retried.agentId, first.agentId);
+  assert.equal(retried.idempotencyKey, first.idempotencyKey);
+  assert.equal(api.listOwnedAgents(ALICE).length, 0);
+  api.commitAgentCreation(ALICE, retried, { transactionId: "circle-tx", state: "SENT", txHash: `0x${"1".repeat(64)}` });
+  assert.equal(api.listOwnedAgents(ALICE).length, 1);
+});
+
 test("another wallet cannot read or mutate AGENTS.md", () => {
   const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "secret prompt");
   assert.throws(() => api.getPrivateAgent(BOB, created.agentId), /unauthorized/i);
   assert.throws(() => api.updateAgent(BOB, created.agentId, "stolen"), /unauthorized/i);
+});
+
+test("agent detail keeps AGENTS.md private, reports exact activity, and deactivation requires the exact name", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"8".repeat(64)}` as const;
+  const matchId = `sha256:${"7".repeat(64)}` as const;
+  const agent = api.createAgent(ALICE, "Delete me", "private instructions");
+  api.publishTournament(ALICE, { id: tournamentId, name: "Bound arena", status: "ACTIVE", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
+  api.prepareRegistration(ALICE, tournamentId, agent.agentId);
+  api.publishMatch(ALICE, {
+    id: matchId, tournamentId, state: "FINALIZED", agentA: "Delete me", agentB: "Other", winner: "Delete me", round: 1,
+    agentIdA: agent.agentId,
+    agentIdB: `sha256:${"6".repeat(64)}`,
+  });
+
+  const detail = api.getAgentDetail(ALICE, agent.agentId);
+  assert.equal(detail.agentsMd, "private instructions");
+  assert.equal(detail.stats.tournamentCount, 1);
+  assert.equal(detail.stats.adversarialMatchCount, 1);
+  assert.equal(detail.stats.latestEvaluationScore, null);
+  assert.throws(() => api.getAgentDetail(BOB, agent.agentId), /unauthorized/i);
+  assert.throws(() => api.deactivateAgent(ALICE, agent.agentId, "wrong name"), /name does not match/i);
+
+  api.deactivateAgent(ALICE, agent.agentId, "Delete me");
+  assert.equal(api.listOwnedAgents(ALICE).length, 0);
+  assert.throws(() => api.updateAgent(ALICE, agent.agentId, "v2"), /inactive/i);
 });
 
 test("updating creates append-only version and old commitment remains addressable", () => {

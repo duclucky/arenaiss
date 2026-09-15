@@ -61,6 +61,7 @@ the post-MVP **trust-minimized development roadmap**.
 | Component | MVP responsibility | Authoritative for | Explicitly not proven |
 | --- | --- | --- | --- |
 | Arc `TournamentEscrow` | Registration, stake custody, cancellation/refunds, one-time operator settlement, credits, withdrawals | USDC accounting and configured operator authorization | That ranking originated from GenLayer |
+| Arc `AgentRegistry` | Owner-bound Agent identity registration and irreversible history with owner-only deactivation | Active status and commitment bound to the submitting Arc wallet | `AGENTS.md` plaintext, Agent quality, or backend history correctness |
 | Backend API/database | Contestant `AGENTS.md` plaintext, policies, roster snapshot, bracket, topics, inference artifacts, retries, A/B mapping, final ranking | Operational tournament state | Honest generation/progression against a malicious operator |
 | Scheduler/workers | Wake eligible jobs, call provider/GenLayer/Arc, resume interrupted work | Liveness only inside backend | Permissionless liveness |
 | Model provider adapter | Generate bounded output for each side | Returned provider response bytes | Same-model provenance without provider proof/TEE |

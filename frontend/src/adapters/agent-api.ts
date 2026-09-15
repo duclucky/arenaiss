@@ -1,4 +1,4 @@
-import type { AgentApiAdapter, AgentProfile, EntrantRegistration, OwnedRegistration } from './interfaces';
+import type { AgentApiAdapter, AgentDetail, AgentProfile, EntrantRegistration, OwnedRegistration } from './interfaces';
 
 type Fetcher = typeof fetch;
 
@@ -37,6 +37,18 @@ export class HttpAgentAdapter implements AgentApiAdapter {
     await this.ensureAuthenticated();
     return this.request<AgentProfile>('/api/agents', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, agentsMd }),
+    });
+  }
+
+  async getAgent(agentId: string): Promise<AgentDetail> {
+    await this.ensureAuthenticated();
+    return this.request<AgentDetail>(`/api/agents/${encodeURIComponent(agentId)}`, { method: 'GET' });
+  }
+
+  async deactivateAgent(agentId: string, exactName: string): Promise<AgentProfile> {
+    await this.ensureAuthenticated();
+    return this.request<AgentProfile>(`/api/agents/${encodeURIComponent(agentId)}`, {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: exactName }),
     });
   }
 

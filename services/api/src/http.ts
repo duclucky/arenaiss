@@ -121,14 +121,33 @@ export class ArenaHttpApi {
         const owner = this.requireSession(request.headers);
         return this.json(200, this.service.listOwnedAgents(owner));
       }
+      const agentMatch = request.path.match(/^\/api\/agents\/(sha256:[0-9a-fA-F]{64})$/);
+      if (request.method === 'GET' && agentMatch) {
+        const owner = this.requireSession(request.headers);
+        return this.json(200, this.service.getAgentDetail(owner, agentMatch[1] as `sha256:${string}`));
+      }
+      if (request.method === 'DELETE' && agentMatch) {
+        const session = this.requireSessionRecord(request.headers);
+        const agentId = agentMatch[1] as `sha256:${string}`;
+        const exactName = requireString(request.body?.name);
+        const idempotencyKey = this.service.prepareAgentDeactivation(session.principal, agentId, exactName);
+        const transaction = this.managedIdentity
+          ? await this.managedIdentity.deactivateAgent(this.requireManagedSession(request.headers).userId!, agentId, idempotencyKey)
+          : undefined;
+        return this.json(202, this.service.deactivateAgent(session.principal, agentId, exactName, transaction));
+      }
       if (request.method === 'GET' && request.path === '/api/registrations') {
         const owner = this.requireSession(request.headers);
         return this.json(200, this.service.listOwnedRegistrations(owner));
       }
       if (request.method === 'POST' && request.path === '/api/agents') {
-        const owner = this.requireSession(request.headers);
+        const session = this.requireSessionRecord(request.headers);
         const body = request.body || {};
-        const created = this.service.createAgent(owner, requireString(body.name), requireString(body.agentsMd));
+        const draft = this.service.prepareAgentCreation(session.principal, requireString(body.name), requireString(body.agentsMd));
+        const transaction = this.managedIdentity
+          ? await this.managedIdentity.registerAgent(this.requireManagedSession(request.headers).userId!, draft)
+          : undefined;
+        const created = this.service.commitAgentCreation(session.principal, draft, transaction);
         return this.json(201, created);
       }
       const registrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/registrations$/);

@@ -86,6 +86,14 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.transactionResult(submitted.data?.transaction, 'https://testnet.arcscan.app/tx/');
   }
 
+  async registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeRegistry(input.walletId, input.registryAddress, 'registerAgent(bytes32,bytes32,bytes32)', [digestBytes32(input.agentId), digestBytes32(input.agentsVersion), digestBytes32(input.agentsCommitment)], input.idempotencyKey, 'arena-iss-agent-register');
+  }
+
+  async deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeRegistry(input.walletId, input.registryAddress, 'deactivateAgent(bytes32)', [digestBytes32(input.agentId)], input.idempotencyKey, 'arena-iss-agent-deactivate');
+  }
+
   async bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
     const config = CHAINS.find((chain) => chain.chain === input.sourceChain && chain.fast);
     if (!config) throw new Error('unsupported CCTP source chain');
@@ -128,6 +136,17 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return wallet.id;
   }
 
+  private async executeRegistry(walletId: string, contractAddress: string, abiFunctionSignature: string, abiParameters: string[], idempotencyKey: string, refId: string): Promise<WalletTransactionResult> {
+    const response = await this.client.createContractExecutionTransaction({
+      walletId, contractAddress, abiFunctionSignature, abiParameters,
+      fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey, refId,
+    });
+    if (!response.data?.id) throw new Error('Circle returned an invalid transaction response');
+    const submitted = await this.client.getTransaction({ id: response.data.id, waitForTxHash: true, pollingInterval: 1000 });
+    if (!submitted.data?.transaction?.txHash) throw new Error('Circle did not return an Arc transaction hash');
+    return this.transactionResult(submitted.data?.transaction, 'https://testnet.arcscan.app/tx/');
+  }
+
   private transactionResult(data: { id?: string; state?: string; txHash?: string } | undefined, explorerBase: string): WalletTransactionResult {
     if (!data?.id) throw new Error('Circle returned an invalid transaction response');
     return { transactionId: data.id, state: data.state || 'INITIATED', txHash: data.txHash, explorerUrl: data.txHash ? `${explorerBase}${data.txHash}` : undefined };
@@ -141,6 +160,11 @@ function normalizeCircleAmount(value: string | undefined): string {
 function decimalToBaseUnits(value: string): string {
   const [whole, fraction = ''] = value.split('.');
   return (BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0')).toString();
+}
+
+function digestBytes32(value: string): string {
+  if (!/^sha256:[0-9a-fA-F]{64}$/.test(value)) throw new Error('invalid agent digest');
+  return `0x${value.slice(7).toLowerCase()}`;
 }
 
 function sourceExplorer(chain: string): string {

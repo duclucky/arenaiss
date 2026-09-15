@@ -44,5 +44,5 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\tests\system\release-candidate.test.ts"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-& forge test --root "$PSScriptRoot\.." --match-path contracts/arc/test/TournamentEscrow.t.sol
+& forge test --root "$PSScriptRoot\.."
 exit $LASTEXITCODE
