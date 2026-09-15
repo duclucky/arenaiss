@@ -3,7 +3,7 @@
   "createdAt": "2026-09-15",
   "scope": "LOCAL_ONLY",
   "fileCount": 243,
-  "sourceBundleSha256": "737482045f95ef8343212bd774325e91022a0278c1e55c95c880d840b06476e7",
+  "sourceBundleSha256": "92693296dde1f57139407e19206a375252bf605655b09c0a50832f435755f63d",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -45,7 +45,7 @@
     "package.json": "b23c174fb806132683373d7ab2fca50a388df18319648c990b9f65903e74e84b",
     "scripts/check.ps1": "2284914eae29b6e430903e9a431bff19680ca1b3c6806c194b3143e7f947e576",
     "scripts/deploy-agent-registry.mjs": "0b883360eaafe94257373f50d8838f6602e94224358d98be4259e453ee719f36",
-    "scripts/deploy-agent-registry-circle.mjs": "0c3f23d9ce377ebcfd00bae7095c3072cecb6365a1d54861bb7ae165dde226d9",
+    "scripts/deploy-agent-registry-circle.mjs": "253cf514c051f3b990f448c030bae0975fe486a8d7e4228f3a8cbadbc06a472a",
     "packages/evaluation/src/run-tracker.ts": "4df39ede74835dca3b84c8812e63ccacae20c42a24078986cd89677390aaf01a",
     "packages/evaluation/test/run-tracker.test.ts": "e36f73409a866592d6f0849455f430460411bfec17a7b817db32a5cd16684fb3",
     "packages/genlayer/src/sdk-port.ts": "5f92ca62939fbc57a14e950fab643545b37b9280c173751cfc50a9c2bf0a5433",

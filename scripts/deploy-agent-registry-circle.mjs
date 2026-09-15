@@ -28,16 +28,19 @@ function deploymentIdempotencyKey(sourceDigest) {
 
 async function fundedArcWallet(walletsClient, walletSetId) {
   if (process.env.CIRCLE_DEPLOYER_WALLET_ID) return process.env.CIRCLE_DEPLOYER_WALLET_ID;
-  const response = await walletsClient.getWalletsWithBalances({
+  const response = await walletsClient.listWallets({
     blockchain: "ARC-TESTNET",
     walletSetId,
-    amountGte: "0.01",
     pageSize: 50,
   });
-  const wallets = response.data?.wallets || response.data?.data?.wallets || [];
-  const wallet = wallets.find((candidate) => candidate.id && candidate.state === "LIVE");
-  if (!wallet?.id) throw new Error("no funded LIVE Arc Testnet wallet is available for deployment");
-  return wallet.id;
+  const wallets = response.data?.wallets || [];
+  for (const wallet of wallets) {
+    if (!wallet.id || wallet.state !== "LIVE") continue;
+    const balances = await walletsClient.getWalletTokenBalance({ id: wallet.id });
+    const funded = balances.data?.tokenBalances?.some((balance) => Number(balance.amount || "0") >= 0.01);
+    if (funded) return wallet.id;
+  }
+  throw new Error("no funded LIVE Arc Testnet wallet is available for deployment");
 }
 
 async function waitForContract(client, contractId) {
