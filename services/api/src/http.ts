@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import type { ArenaApiService } from './service.ts';
 import { ManagedIdentityService, type LoginIdentityKind, type ManagedIdentityOptions } from './managed-identity.ts';
+import type { MarketplaceChainPort } from './marketplace-arc.ts';
 
 type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
@@ -18,10 +19,12 @@ export class ArenaHttpApi {
   private challenges = new Map<string, { message: string; expiresAt: number }>();
   private sessions = new Map<string, { principal: string; userId?: string; identityKind?: LoginIdentityKind; expiresAt: number }>();
   private managedIdentity?: ManagedIdentityService;
+  private marketplaceChain?: MarketplaceChainPort;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort) {
     this.service = service;
     this.verifySignature = verifySignature;
+    this.marketplaceChain = marketplaceChain;
     this.managedIdentity = managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined;
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
   }
@@ -61,6 +64,28 @@ export class ArenaHttpApi {
         return this.json(200, this.managedIdentity!.getCctpTransfer(session.userId!, cctpTransferMatch[1]));
       }
       if (request.method === 'GET' && request.path === '/api/tournaments') return this.json(200, this.service.listTournaments());
+      if (request.method === 'GET' && request.path === '/api/marketplace/listings') return this.json(200, await this.reconcileMarketplaceListings());
+      if (request.method === 'GET' && request.path === '/api/marketplace/certificates') { const owner = this.requireSession(request.headers); return this.json(200, this.service.listOwnedMarketplaceCertificates(owner)); }
+      if (request.method === 'POST' && request.path === '/api/marketplace/eligibility') {
+        const owner = this.requireSession(request.headers); const body = request.body || {};
+        return this.json(201, this.service.createMarketplaceEligibility(owner, { agentId: requireDigest(body.agentId), agentsVersion: requireDigest(body.agentsVersion), campaignIds: requireStringArray(body.campaignIds) as `sha256:${string}`[], issuedAt: requireInteger(body.issuedAt), expiresAt: requireInteger(body.expiresAt), network: requireString(body.network), chainId: requireInteger(body.chainId), judgeAddress: requireAddress(body.judgeAddress) }));
+      }
+      const certificateMatch = request.path.match(/^\/api\/marketplace\/certificates\/(sha256:[0-9a-fA-F]{64})\/approve$/);
+      if (request.method === 'POST' && certificateMatch) { const operator = this.requireSession(request.headers); if (operator.toLowerCase() !== this.service.operatorAddress) throw new Error('unauthorized operator'); return this.json(200, this.service.approveMarketplaceEligibility(operator, certificateMatch[1] as `sha256:${string}`, requireTransaction(request.body?.transaction))); }
+      if (request.method === 'GET' && request.path === '/api/marketplace/my-listings') { const owner = this.requireSession(request.headers); return this.json(200, this.service.listMarketplaceListings().filter((row) => row.sellerAddress.toLowerCase() === owner.toLowerCase())); }
+      if (request.method === 'POST' && request.path === '/api/marketplace/listings') {
+        const session = this.requireManagedSession(request.headers); const body = request.body || {}; if (!this.managedIdentity) throw new Error('marketplace unavailable');
+        const transaction = await this.managedIdentity.marketplaceCreateListing(session.userId!, { agentId: requireDigest(body.agentId), version: requireDigest(body.agentsVersion), commitment: requireDigest(body.agentsCommitment), certificateDigest: requireDigest(body.certificateDigest), price: requireUint(body.price), expiresAt: requireInteger(body.expiresAt), idempotencyKey: requireString(body.idempotencyKey) });
+        const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!);
+        const requestedListingId = requireString(body.listingId);
+        const listingId = transaction.txHash && this.marketplaceChain?.resolveCreatedListingId ? await this.marketplaceChain.resolveCreatedListingId(transaction.txHash) : requestedListingId;
+        const listing = this.service.createMarketplaceListing(session.principal, { listingId, certificateDigest: requireDigest(body.certificateDigest), sellerAddress: account.managedWallet.address, price: requireUint(body.price), expiresAt: requireInteger(body.expiresAt), transaction });
+        return this.json(202, listing);
+      }
+      const listingBuy = request.path.match(/^\/api\/marketplace\/listings\/([1-9][0-9]*)\/buy$/);
+      if (request.method === 'POST' && listingBuy) { const session = this.requireManagedSession(request.headers); if (!this.managedIdentity) throw new Error('marketplace unavailable'); const listing = this.service.listMarketplaceListings().find((row) => row.listingId === listingBuy[1]); if (!listing) throw new Error('marketplace listing unavailable'); const transaction = await this.managedIdentity.marketplaceBuy(session.userId!, listingBuy[1], listing.price, requireString(request.body?.approvalIdempotencyKey), requireString(request.body?.buyIdempotencyKey)); const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!); const projected = this.service.submitMarketplacePurchase(session.principal, listingBuy[1], account.managedWallet.address, transaction); return this.json(202, projected); }
+      const listingDelivery = request.path.match(/^\/api\/marketplace\/listings\/([1-9][0-9]*)\/delivery$/);
+      if (request.method === 'GET' && listingDelivery) { const session = this.requireSessionRecord(request.headers); if (!this.marketplaceChain) throw new Error('marketplace unavailable'); const snapshot = await this.marketplaceChain.snapshot(listingDelivery[1]); this.service.publishMarketplaceListing(this.service.operatorAddress, snapshot); return this.json(200, this.service.getMarketplaceDelivery(session.principal, listingDelivery[1], snapshot)); }
       const tournamentMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})$/);
       if (request.method === 'GET' && tournamentMatch) {
         const tournament = this.service.getTournament(tournamentMatch[1]);
@@ -258,6 +283,16 @@ export class ArenaHttpApi {
   private json(status: number, body: any): ApiResponse {
     return { status, headers: { 'content-type': 'application/json; charset=utf-8' }, body };
   }
+
+  private async reconcileMarketplaceListings(): Promise<any[]> {
+    if (!this.marketplaceChain) return this.service.listMarketplaceListings();
+    for (const listing of this.service.listMarketplaceListings()) {
+      if (listing.state === 'SUBMITTED' || listing.state === 'BUY_SUBMITTED') {
+        try { this.service.publishMarketplaceListing(this.service.operatorAddress, await this.marketplaceChain.snapshot(listing.listingId)); } catch { /* pending Arc transaction remains projected */ }
+      }
+    }
+    return this.service.listMarketplaceListings();
+  }
 }
 
 function requireAddress(value: unknown): string {
@@ -269,6 +304,11 @@ function requireString(value: unknown): string {
   if (typeof value !== 'string') throw new Error('invalid request');
   return value;
 }
+
+function requireInteger(value: unknown): number { if (!Number.isSafeInteger(value)) throw new Error('invalid request'); return value as number; }
+function requireDigest(value: unknown): `sha256:${string}` { if (typeof value !== 'string' || !/^sha256:[0-9a-fA-F]{64}$/.test(value)) throw new Error('invalid digest'); return value.toLowerCase() as `sha256:${string}`; }
+function requireUint(value: unknown): string { if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value)) throw new Error('invalid amount'); return value; }
+function requireTransaction(value: unknown): { transactionId: string; state: string; txHash?: string; explorerUrl?: string } { if (!value || typeof value !== 'object' || typeof (value as any).transactionId !== 'string' || typeof (value as any).state !== 'string') throw new Error('invalid transaction'); const row = value as any; if (row.txHash !== undefined && !/^0x[0-9a-fA-F]{64}$/.test(row.txHash)) throw new Error('invalid transaction'); return { transactionId: row.transactionId, state: row.state, ...(row.txHash ? { txHash: row.txHash } : {}), ...(row.explorerUrl ? { explorerUrl: row.explorerUrl } : {}) }; }
 
 function requireStringArray(value: unknown): string[] {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) throw new Error('invalid request');

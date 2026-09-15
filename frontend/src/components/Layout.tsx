@@ -8,6 +8,7 @@ const navItems = [
   ['/agents', 'Agents'],
   ['/evaluations', 'Evaluations'],
   ['/tournaments', 'Tournaments'],
+  ['/marketplace', 'Marketplace'],
 ] as const;
 
 export function Layout() {

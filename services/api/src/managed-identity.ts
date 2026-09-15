@@ -38,6 +38,8 @@ export type CircleWalletPort = {
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult>;
 };
 export type UsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
 export type WalletTransactionResult = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
@@ -66,6 +68,7 @@ export type ManagedIdentityOptions = {
   generateEmailCode?: () => string;
   now?: () => number;
   agentRegistryAddress?: string;
+  marketplaceAddress?: string;
 };
 
 export class ManagedIdentityService {
@@ -76,6 +79,7 @@ export class ManagedIdentityService {
   private readonly generateEmailCode: () => string;
   private readonly now: () => number;
   private readonly agentRegistryAddress?: string;
+  private readonly marketplaceAddress?: string;
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
   private readonly cctpTransfers = new Map<string, Promise<void>>();
@@ -89,6 +93,7 @@ export class ManagedIdentityService {
     this.generateEmailCode = options.generateEmailCode ?? (() => String(randomInt(0, 1_000_000)).padStart(6, '0'));
     this.now = options.now ?? Date.now;
     this.agentRegistryAddress = options.agentRegistryAddress ? requireAddress(options.agentRegistryAddress) : undefined;
+    this.marketplaceAddress = options.marketplaceAddress ? requireAddress(options.marketplaceAddress) : undefined;
   }
 
   async loginWallet(address: string): Promise<ManagedAccount> {
@@ -198,6 +203,16 @@ export class ManagedIdentityService {
     const wallet = this.requireReadyWallet(userId);
     if (!this.agentRegistryAddress) throw new Error('agent registry unavailable');
     return this.circleWallets.deactivateAgent({ walletId: wallet.walletId, registryAddress: this.agentRegistryAddress, agentId, idempotencyKey });
+  }
+
+  async marketplaceCreateListing(userId: string, input: { agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
+    return this.circleWallets.marketplaceCreateListing({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, ...input });
+  }
+
+  async marketplaceBuy(userId: string, listingId: string, price: string, approvalIdempotencyKey: string, buyIdempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
+    return this.circleWallets.marketplaceBuy({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, listingId, price, approvalIdempotencyKey, buyIdempotencyKey });
   }
 
   private async login(identityKey: string, kind: LoginIdentityKind, principal: string): Promise<ManagedAccount> {

@@ -4,7 +4,7 @@ import { AppProvider } from './context';
 import { Layout } from './components/Layout';
 import { Home } from './views/Home';
 import { ArcNetworkConfig, ArcWalletAdapter } from './adapters/interfaces';
-import type { AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, EvaluationApiAdapter, ManagedIdentityAdapter } from './adapters/interfaces';
+import type { AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, EvaluationApiAdapter, ManagedIdentityAdapter, MarketplaceApiAdapter } from './adapters/interfaces';
 
 const Tournaments = lazy(() => import('./views/Tournaments').then((module) => ({ default: module.Tournaments })));
 const TournamentDetail = lazy(() => import('./views/TournamentDetail').then((module) => ({ default: module.TournamentDetail })));
@@ -17,6 +17,7 @@ const NotFound = lazy(() => import('./views/NotFound').then((module) => ({ defau
 const Evaluations = lazy(() => import('./views/Evaluations').then((module) => ({ default: module.Evaluations })));
 const EvaluationDetail = lazy(() => import('./views/EvaluationDetail').then((module) => ({ default: module.EvaluationDetail })));
 const EvaluationRunDetail = lazy(() => import('./views/EvaluationRunDetail').then((module) => ({ default: module.EvaluationRunDetail })));
+const Marketplace = lazy(() => import('./views/Marketplace').then((module) => ({ default: module.Marketplace })));
 
 function deferred(element: ReactNode) {
   return <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>{element}</Suspense>;
@@ -31,11 +32,12 @@ interface AppProps {
   arenaReadAdapter?: ArenaReadAdapter;
   genLayerReadAdapter?: GenLayerReadAdapter;
   identityAdapter?: ManagedIdentityAdapter;
+  marketplaceApiAdapter?: MarketplaceApiAdapter;
 }
 
-export default function App({ config, env, walletAdapter, agentApiAdapter, evaluationApiAdapter, arenaReadAdapter, genLayerReadAdapter, identityAdapter }: AppProps = {}) {
+export default function App({ config, env, walletAdapter, agentApiAdapter, evaluationApiAdapter, arenaReadAdapter, genLayerReadAdapter, identityAdapter, marketplaceApiAdapter }: AppProps = {}) {
   return (
-    <AppProvider config={config} env={env} walletAdapter={walletAdapter} agentApiAdapter={agentApiAdapter} evaluationApiAdapter={evaluationApiAdapter} arenaReadAdapter={arenaReadAdapter} genLayerReadAdapter={genLayerReadAdapter} identityAdapter={identityAdapter}>
+    <AppProvider config={config} env={env} walletAdapter={walletAdapter} agentApiAdapter={agentApiAdapter} evaluationApiAdapter={evaluationApiAdapter} arenaReadAdapter={arenaReadAdapter} genLayerReadAdapter={genLayerReadAdapter} identityAdapter={identityAdapter} marketplaceApiAdapter={marketplaceApiAdapter}>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
@@ -51,6 +53,7 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
             <Route path="evaluations" element={deferred(<Evaluations />)} />
             <Route path="evaluations/:id" element={deferred(<EvaluationDetail />)} />
             <Route path="evaluation-runs/:id" element={deferred(<EvaluationRunDetail />)} />
+            <Route path="marketplace" element={deferred(<Marketplace />)} />
             <Route path="docs" element={<section aria-label="Arena ISS documentation" />} />
             <Route path="*" element={deferred(<NotFound />)} />
           </Route>

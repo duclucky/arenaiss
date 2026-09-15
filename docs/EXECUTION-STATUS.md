@@ -427,8 +427,12 @@ allowing ownership transfer only through its one-time configured Marketplace.
 `AgentMarketplace` accepts only operator-authorized eligibility digests, escrows
 ERC-20 USDC, transfers ownership atomically and fixes the platform fee at 100
 basis points (1%) with seller/platform pull credits. Persistent API/delivery
-(`MKT-3`), browser/Circle flows (`MKT-4`) and
-an authorized purchase lifecycle (`MKT-5`) remain open. `AgentRegistryV2` is at
+(`MKT-3`) and browser/Circle flows (`MKT-4`) are implemented locally: public
+listings reconcile only from strict Arc readback, managed SCA listing performs
+the contract call, managed SCA buying performs approval plus purchase, and
+private AGENTS.md delivery requires the current canonical buyer owner. The
+authorized purchase lifecycle (`MKT-5`) remains open because no live listing,
+approval, purchase or transfer was made. `AgentRegistryV2` is at
 `0xc427dBf5Dc0b58245Ac94d6634856Dd472bdEada`; `AgentMarketplace` is at
 `0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df`. Canonical readback confirms the
 owner/operator/platform recipient, registry binding, Arc USDC address and fixed

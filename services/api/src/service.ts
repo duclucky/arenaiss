@@ -6,6 +6,7 @@ import type { EvaluationRunRecord } from "../../../packages/evaluation/src/run-t
 import { validateEvaluationScenario, type EvaluationScenario } from "../../../packages/evaluation/src/protocol.ts";
 import type { SoloCampaignRecord } from "../../../packages/evaluation/src/solo-runner.ts";
 import { VersionComparisonRegistry, type RegressionPolicy, type VersionComparisonRecord } from "../../../packages/evaluation/src/comparison.ts";
+import { evaluateMarketplaceEligibility } from "../../../packages/marketplace/src/eligibility.ts";
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
@@ -54,6 +55,11 @@ export type PrivateEvaluationRun = Omit<PublicEvaluationRun, "schema" | "scenari
 export type EvaluationPackRecord = { schema: "arena-evaluation-pack-v1"; packId: Digest; version: string; owner: string; name: string; scenarios: EvaluationScenario[] };
 export type PublicEvaluationPack = { schema: "arena-public-evaluation-pack-v1"; packId: string; version: string; name: string; scenarioIds: string[]; scenarioCount: number };
 export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number }> };
+export type MarketplaceTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
+export type MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1"; certificateDigest: Digest; evidenceDigest: string; owner: string; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; packId: Digest; packVersion: string; rubricVersion: string; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: "ELIGIBLE" | "APPROVED"; authorization?: MarketplaceTransaction };
+export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
+export type PublicMarketplaceListing = Omit<MarketplaceListing, "seller" | "buyer">;
+export type MarketplaceArcSnapshot = { listingId: string; agentId: Digest; version: Digest; commitment: Digest; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: "ACTIVE" | "SOLD" | "CANCELLED" | "EXPIRED"; registryOwner: string; registryActive: boolean };
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const USER_PRINCIPAL = /^usr_[0-9a-f]{64}$/;
@@ -72,6 +78,8 @@ export class ArenaApiService {
   private evaluationPacks = new Map<string, EvaluationPackRecord>();
   private evaluationCampaigns = new Map<string, SoloCampaignRecord>();
   private versionComparisons: VersionComparisonRegistry;
+  private marketplaceCertificates = new Map<Digest, MarketplaceCertificate>();
+  private marketplaceListings = new Map<string, MarketplaceListing>();
   private nonce = 0;
   private runtime?: SqliteRuntimeStore;
 
@@ -91,9 +99,12 @@ export class ArenaApiService {
       }
       for (const pack of runtime.list<EvaluationPackRecord>("evaluation-packs")) this.evaluationPacks.set(this.packKey(pack.packId, pack.version), pack);
       for (const campaign of runtime.list<SoloCampaignRecord>("evaluation-campaigns")) this.evaluationCampaigns.set(campaign.campaignId, campaign);
+      for (const certificate of runtime.list<MarketplaceCertificate>("marketplace-certificates")) this.marketplaceCertificates.set(certificate.certificateDigest, certificate);
+      for (const listing of runtime.list<MarketplaceListing>("marketplace-listings")) this.marketplaceListings.set(listing.listingId, listing);
       this.nonce = runtime.counter("api-counters", "agent-sequence");
     }
   }
+  get operatorAddress(): string { return this.operator; }
 
   createAgent(caller: string, name: string, agentsMd: string): PublicAgent {
     const draft = this.prepareAgentCreation(caller, name, agentsMd);
@@ -351,6 +362,51 @@ export class ArenaApiService {
     const ownedAgentIds = new Set([...this.agents.values()].filter((agent) => agent.owner === owner).map((agent) => agent.agentId));
     return this.versionComparisons.list().filter((record) => ownedAgentIds.has(record.agentId as Digest));
   }
+
+  createMarketplaceEligibility(caller: string, input: { agentId: Digest; agentsVersion: Digest; campaignIds: Digest[]; issuedAt: number; expiresAt: number; network: string; chainId: number; judgeAddress: string }): MarketplaceCertificate {
+    const owner = this.principal(caller); const agent = this.requireOwner(owner, input.agentId);
+    const version = agent.versions.find((row) => row.agentsVersion === input.agentsVersion); if (!version) throw new Error("agent version not found");
+    if (!Array.isArray(input.campaignIds) || input.campaignIds.length !== 2 || new Set(input.campaignIds).size !== 2) throw new Error("exactly two Evo campaigns are required");
+    const campaigns = input.campaignIds.map((id) => this.evaluationCampaigns.get(id) ?? this.runtime?.get<SoloCampaignRecord>("evaluation-campaigns", id));
+    if (campaigns.some((row) => !row || row.owner !== owner || row.state !== "FINALIZED" || row.agent.versionId !== version.agentsVersion || row.agent.commitment !== version.agentsCommitment)) throw new Error("Evo campaign is not finalized or bound to this version");
+    const first = campaigns[0]!;
+    if (campaigns.some((row) => row!.testPack.packId !== first.testPack.packId || row!.testPack.version !== first.testPack.version || row!.rubricVersion !== first.rubricVersion || JSON.stringify(row!.testPack.scenarios.map((s) => s.scenarioId)) !== JSON.stringify(first.testPack.scenarios.map((s) => s.scenarioId)))) throw new Error("Evo campaigns are not comparable");
+    const gradePoints: Record<string, number> = { EXCELLENT: 100, GOOD: 80, MIXED: 60, POOR: 30, FAIL: 0 };
+    const runs = campaigns.flatMap((campaign) => campaign!.items.map((item) => {
+      const runId = item.currentRunId ?? item.runIds.at(-1); const run = runId ? this.runtime?.get<EvaluationRunRecord>("evaluation-runs", runId) : undefined;
+      if (!run || run.judge.state !== "FINALIZED" || !run.scorecard || item.state !== "FINALIZED" || run.provider.state !== "SUCCESS" || run.input.mode !== "ACTION_DECISION"
+        || run.input.agent.version_id !== version.agentsVersion || run.input.agent.commitment !== version.agentsCommitment || run.input.scenario.scenario_id !== item.scenarioId
+        || run.rubricVersion !== first.rubricVersion || run.scorecard.agent_version_id !== version.agentsVersion || run.scorecard.agents_digest !== version.agentsCommitment
+        || run.scorecard.rubric_version !== first.rubricVersion || run.scorecard.run_id !== run.runId || run.scorecard.status !== "FINAL") throw new Error("Evo run is not finalized or canonically bound");
+      return { runId: run.runId, scenarioId: item.scenarioId, state: "FINALIZED", agentVersionId: run.input.agent.version_id, agentsCommitment: run.input.agent.commitment,
+        testPackId: first.testPack.packId, testPackVersion: first.testPack.version, rubricVersion: first.rubricVersion, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress,
+        overallScore: run.scorecard.overall_score, dimensions: Object.fromEntries((run.scorecard.dimensions ?? []).map((row: any) => [String(row.dimension_id), gradePoints[String(row.grade)]])), criticalFindingCount: Array.isArray(run.scorecard.policy_findings) ? run.scorecard.policy_findings.length : 1 };
+    }));
+    const result = evaluateMarketplaceEligibility({ agentId: agent.agentId, agentVersionId: version.agentsVersion, agentsCommitment: version.agentsCommitment, testPackId: first.testPack.packId, testPackVersion: first.testPack.version, rubricVersion: first.rubricVersion, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress, issuedAt: input.issuedAt, expiresAt: input.expiresAt, requiredScenarioIds: first.testPack.scenarios.map((s) => s.scenarioId), runs });
+    if (!result.eligible) throw new Error(`Agent version is not marketplace eligible: ${result.reasons.join(",")}`);
+    const certificateDigest = sha(JSON.stringify(result.certificate)); const existing = this.marketplaceCertificates.get(certificateDigest); if (existing) return structuredClone(existing);
+    const record: MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1", certificateDigest, evidenceDigest: result.certificate.evidenceDigest, owner, agentId: agent.agentId, agentVersionId: version.agentsVersion, agentsCommitment: version.agentsCommitment, packId: first.testPack.packId, packVersion: first.testPack.version, rubricVersion: first.rubricVersion, coverageBps: result.certificate.coverageBps, overallScore: result.certificate.overallScore, dimensionScores: result.certificate.dimensionScores, maxSpread: result.certificate.maxSpread, issuedAt: input.issuedAt, expiresAt: input.expiresAt, state: "ELIGIBLE" };
+    this.marketplaceCertificates.set(certificateDigest, record); this.runtime?.put("marketplace-certificates", certificateDigest, record); return structuredClone(record);
+  }
+  approveMarketplaceEligibility(caller: string, digest: Digest, transaction: MarketplaceTransaction): MarketplaceCertificate { this.requireOperator(caller); const record = this.marketplaceCertificates.get(digest); if (!record) throw new Error("marketplace certificate not found"); if (record.state === "APPROVED") return structuredClone(record); record.state = "APPROVED"; record.authorization = structuredClone(transaction); this.runtime?.put("marketplace-certificates", digest, record); return structuredClone(record); }
+  listOwnedMarketplaceCertificates(caller: string): MarketplaceCertificate[] { const owner = this.principal(caller); return [...this.marketplaceCertificates.values()].filter((row) => row.owner === owner).map((row) => structuredClone(row)); }
+  createMarketplaceListing(caller: string, input: { listingId: string; certificateDigest: Digest; sellerAddress: string; price: string; expiresAt: number; transaction: MarketplaceTransaction }): PublicMarketplaceListing {
+    const owner = this.principal(caller); const certificate = this.marketplaceCertificates.get(input.certificateDigest); if (!certificate || certificate.owner !== owner || certificate.state !== "APPROVED") throw new Error("approved marketplace certificate is required");
+    if (!/^[1-9][0-9]*$/.test(input.listingId) || !/^[1-9][0-9]*$/.test(input.price) || !Number.isSafeInteger(input.expiresAt) || input.expiresAt > certificate.expiresAt || !ADDRESS.test(input.sellerAddress)) throw new Error("invalid marketplace listing");
+    if ([...this.marketplaceListings.values()].some((row) => row.certificateDigest === input.certificateDigest && !["CANCELLED", "EXPIRED"].includes(row.state))) throw new Error("certificate already has a listing");
+    const agent = this.requireOwner(owner, certificate.agentId); const record: MarketplaceListing = { schema: "arena-marketplace-listing-v1", listingId: input.listingId, certificateDigest: input.certificateDigest, agentId: certificate.agentId, agentVersionId: certificate.agentVersionId, agentsCommitment: certificate.agentsCommitment, name: agent.name, seller: owner, sellerAddress: input.sellerAddress.toLowerCase(), price: input.price, expiresAt: input.expiresAt, state: "SUBMITTED", transaction: structuredClone(input.transaction) };
+    this.marketplaceListings.set(record.listingId, record); this.runtime?.put("marketplace-listings", record.listingId, record); return this.publicMarketplaceListing(record);
+  }
+  publishMarketplaceListing(caller: string, snapshot: MarketplaceArcSnapshot): PublicMarketplaceListing { this.requireOperator(caller); const row = this.marketplaceListings.get(snapshot.listingId); if (!row) throw new Error("marketplace listing not found");
+    if (snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment || snapshot.sellerAddress.toLowerCase() !== row.sellerAddress
+      || snapshot.price !== row.price || snapshot.expiresAt !== row.expiresAt || !snapshot.registryActive) throw new Error("Arc listing binding mismatch");
+    if (snapshot.state === "SOLD") { if (!row.buyer || !row.buyerAddress || row.buyerAddress !== snapshot.buyerAddress?.toLowerCase() || snapshot.registryOwner.toLowerCase() !== row.buyerAddress) throw new Error("canonical buyer mismatch"); }
+    else if (snapshot.state === "ACTIVE" && snapshot.registryOwner.toLowerCase() !== row.sellerAddress) throw new Error("canonical seller mismatch");
+    if (row.state === "SOLD" && snapshot.state !== "SOLD") throw new Error("marketplace state cannot regress");
+    row.state = snapshot.state; this.runtime?.put("marketplace-listings", row.listingId, row); return this.publicMarketplaceListing(row); }
+  submitMarketplacePurchase(caller: string, listingId: string, buyerAddress: string, transaction: MarketplaceTransaction): PublicMarketplaceListing { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "ACTIVE" || row.seller === buyer || !ADDRESS.test(buyerAddress)) throw new Error("marketplace listing is unavailable"); row.state = "BUY_SUBMITTED"; row.buyer = buyer; row.buyerAddress = buyerAddress.toLowerCase(); row.purchase = structuredClone(transaction); this.runtime?.put("marketplace-listings", row.listingId, row); return this.publicMarketplaceListing(row); }
+  listMarketplaceListings(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state !== "SUBMITTED").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
+  getMarketplaceDelivery(caller: string, listingId: string, snapshot: MarketplaceArcSnapshot): { agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; agentsMd: string } { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "SOLD" || row.buyer !== buyer || snapshot.state !== "SOLD" || snapshot.registryOwner.toLowerCase() !== row.buyerAddress || snapshot.buyerAddress?.toLowerCase() !== row.buyerAddress || snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment) throw new Error("marketplace delivery unavailable"); const agent = this.agents.get(row.agentId)!; const version = agent.versions.find((item) => item.agentsVersion === row.agentVersionId)!; return { agentId: row.agentId, agentVersionId: row.agentVersionId, agentsCommitment: row.agentsCommitment, agentsMd: version.agentsMd }; }
   prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest): PreparedRegistration {
     const owner = this.principal(caller);
     if (!isDigest(tournamentId) || !isDigest(agentId)) throw new Error("invalid registration identity");
@@ -448,6 +504,7 @@ export class ArenaApiService {
     });
     return { resultClass, overallScore, dimensions, actionsExecuted: false };
   }
+  private publicMarketplaceListing(row: MarketplaceListing): PublicMarketplaceListing { const { seller: _seller, buyer: _buyer, ...publicRow } = structuredClone(row); return publicRow; }
   private requireOperator(caller: string): void { if (this.address(caller) !== this.operator) throw new Error("unauthorized operator"); }
   private requireOwner(caller: string, agentId: Digest): Agent { const agent = this.agents.get(agentId); if (!agent || agent.owner !== this.principal(caller)) throw new Error("unauthorized agent access"); return agent; }
   private principal(value: string): string { if (ADDRESS.test(value)) return value.toLowerCase(); if (USER_PRINCIPAL.test(value)) return value; throw new Error("invalid principal"); }
