@@ -88,7 +88,7 @@ function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: M
   const feeUsdc = process.env.EVALUATION_FEE_USDC?.trim();
   const model = process.env.MODEL?.trim();
   if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].some(Boolean)) return undefined;
-  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].every(Boolean)) throw new Error('evaluation execution configuration is incomplete');
+  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc, model].every(Boolean)) return undefined;
   const provider = new OpenAICompatibleEvaluationProvider({ endpoint: providerEndpoint!, apiKey: providerKey! });
   const judge = createStudioNextAgentEvaluationPort(privateKey!);
   const runner = new SoloEvaluationRunner(provider, new EvaluationRunTracker(judge, new PersistentEvaluationRunStore(runtime), judgeAddress!), new PersistentSoloCampaignStore(runtime));
