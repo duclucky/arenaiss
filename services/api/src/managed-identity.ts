@@ -150,12 +150,17 @@ export class ManagedIdentityService {
   }
 
   async transferUsdc(userId: string, destinationAddress: string, amount: string): Promise<WalletTransactionResult> {
+    return this.transferUsdcWithIdempotency(userId, destinationAddress, amount, randomUUID());
+  }
+
+  async transferUsdcWithIdempotency(userId: string, destinationAddress: string, amount: string, idempotencyKey: string): Promise<WalletTransactionResult> {
     const wallet = this.requireReadyWallet(userId);
+    if (!idempotencyKey || idempotencyKey.length > 256) throw new TypeError('idempotency key is invalid');
     return this.circleWallets.transferUsdc({
       walletId: wallet.walletId,
       destinationAddress: requireAddress(destinationAddress),
       amount: requireUsdcAmount(amount),
-      idempotencyKey: randomUUID(),
+      idempotencyKey,
     });
   }
 

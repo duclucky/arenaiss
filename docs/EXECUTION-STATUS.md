@@ -396,11 +396,16 @@ Gas Station sponsorship and CCTP readback have not been verified by this edit.
 The bounded `EVAL-3`/`EVAL-4` runtime slice is now implemented locally:
 immutable EvaluationRun bindings, distinct provider states, SQLite persistence,
 V5 submission/finality, canonical scorecard readback, a multi-scenario `SOLO`
-runner, classified retry/resume, immutable Test Pack/campaign records and public/owner Run Detail projections. It has
-not sent a new paid request or network transaction. The next dependency-ordered
-action is campaign execution wiring from authenticated records plus the `SOLO`
-  creation and Run Detail frontend. Test Pack editing/version management remains
-  separate.
+runner, classified retry/resume, immutable Test Pack/campaign records and public/owner Run Detail projections.
+Authenticated Evo execution is now wired locally through a server-owned six-case
+`ACTION_DECISION` pack. The API persists an idempotent fee binding before charging
+the managed Arc wallet in configured USDC, and advances the campaign only after
+Circle returns an Arc transaction hash. GenLayer submission is signed separately
+by the configured Studio Next owner key, so GenLayer gas is never included in or
+deducted from the user-facing Evo fee. The UI exposes the configured fee and is
+disabled when the execution configuration is incomplete. No paid provider request,
+USDC charge, or new GenLayer transaction was sent by this local implementation.
+Test Pack editing/version management remains separate.
 The deterministic `EVAL-5` slice now compares isolated baseline/candidate Agent
 versions only across exact Test Pack, scenario, runtime/model, rubric and
 required-run bindings. Its versioned policy applies repeated-run coverage and

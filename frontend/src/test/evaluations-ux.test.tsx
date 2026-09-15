@@ -33,6 +33,8 @@ const run = {
 const evaluationApi: EvaluationApiAdapter = {
   async listCampaigns() { return [campaign]; }, async getCampaign(id) { return id === campaign.campaignId ? campaign : null; }, async listRuns() { return [run]; }, async getRun() { return run; },
   async createPack() { throw new Error('creation must not be exposed before execution is wired'); }, async createSoloCampaign() { throw new Error('creation must not be exposed before execution is wired'); },
+  async getExecutionConfig() { return { enabled: true, feeUsdc: '1', feeAsset: 'USDC', genLayerGasPayer: 'OWNER' }; },
+  async startEvo() { return campaign; }, async advanceCampaign() { return campaign; },
   async listComparisons() { return []; }, async getComparison() { throw new Error('not used'); }, async createVersionComparison() { throw new Error('not used'); },
 };
 const config = {
@@ -49,15 +51,15 @@ describe('evaluation product UX', () => {
     expect(screen.queryByLabelText('Scenario objective')).not.toBeInTheDocument();
   });
 
-  it('lets an authenticated user select only an Agent and keeps future billing honest', async () => {
+  it('lets an authenticated user select an Agent and states the USDC/owner-gas split', async () => {
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi}><Evaluations /></AppProvider></MemoryRouter>);
     const selector = await screen.findByLabelText('Agent to evaluate');
     await screen.findByRole('option', { name: 'Safety Scout · v7' });
     await waitFor(() => expect(selector).toHaveValue('agent_1'));
     expect(screen.queryByLabelText('Scenario objective')).not.toBeInTheDocument();
     expect(screen.getByText('1 USDC')).toBeInTheDocument();
-    expect(screen.getByText(/Arc escrow integration pending/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Start evaluation/i })).toBeDisabled();
+    expect(screen.getByText(/GenLayer transaction gas is paid by the Arena ISS owner wallet/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Start evaluation/i })).toBeEnabled();
   });
 
   it('renders campaign outcomes as a table with a run evidence link', async () => {

@@ -12,14 +12,34 @@ export function Evaluations() {
   const [campaigns, setCampaigns] = useState<EvaluationCampaign[]>([]);
   const [agentId, setAgentId] = useState('');
   const [error, setError] = useState('');
+  const [execution, setExecution] = useState<{ enabled: boolean; feeUsdc?: string }>({ enabled: false });
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     if (!account || !agentApi || !evaluationApi) return;
-    Promise.all([agentApi.listOwnedAgents(), evaluationApi.listCampaigns()]).then(([nextAgents, nextCampaigns]) => {
+    Promise.all([agentApi.listOwnedAgents(), evaluationApi.listCampaigns(), evaluationApi.getExecutionConfig?.() ?? Promise.resolve({ enabled: false })]).then(([nextAgents, nextCampaigns, nextExecution]) => {
       setAgents(nextAgents); setCampaigns(nextCampaigns);
+      setExecution(nextExecution);
       if (nextAgents[0]) setAgentId((current) => current || nextAgents[0].agentId);
     }).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not load evaluations.'));
   }, [account, agentApi, evaluationApi]);
+
+  const startEvaluation = async () => {
+    const agent = agents.find((candidate) => candidate.agentId === agentId);
+    if (!agent || !evaluationApi?.startEvo || !evaluationApi.advanceCampaign) return;
+    setRunning(true); setError('');
+    try {
+      let campaign = await evaluationApi.startEvo({ agentId: agent.agentId, agentsVersion: agent.agentsVersion });
+      setCampaigns((current) => [campaign, ...current.filter((row) => row.campaignId !== campaign.campaignId)]);
+      for (let step = 0; step < 90 && !['FINALIZED', 'FAILED'].includes(campaign.state); step += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        campaign = await evaluationApi.advanceCampaign(campaign.campaignId);
+        setCampaigns((current) => current.map((row) => row.campaignId === campaign.campaignId ? campaign : row));
+      }
+      if (!['FINALIZED', 'FAILED'].includes(campaign.state)) setError('Evaluation is still processing. You can reopen it from My evaluations.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not start evaluation.'); }
+    finally { setRunning(false); }
+  };
 
   return <section className="mx-auto max-w-5xl space-y-10">
     <header><p className="page-kicker">Arena ISS / SOLO</p><h1 className="page-title">Evaluations</h1><h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-tight sm:text-4xl">Hidden tests. Independent verdicts.</h2><p className="page-lede">Arena ISS designs, versions and randomizes every scenario. You choose the Agent; the test prompts stay hidden before and during execution.</p></header>
@@ -30,9 +50,9 @@ export function Evaluations() {
     </section>
     <section aria-labelledby="start-heading" className="grid gap-5 lg:grid-cols-[1fr_300px]">
       <div className="glass-panel p-6 md:p-8"><p className="page-kicker">New evaluation</p><h2 id="start-heading" className="text-2xl font-bold">Choose an Agent</h2>
-        {!account ? <div className="mt-5 retro-inset p-5"><p className="font-semibold">Log in to continue</p><p className="mt-2 text-sm text-neutral-600">Sign in from the header, then select one of your versioned Agents.</p></div> : <div className="mt-5"><label htmlFor="evaluation-agent" className="text-sm font-semibold">Agent to evaluate</label><select id="evaluation-agent" className="field-control mt-2" value={agentId} onChange={(event) => setAgentId(event.target.value)}>{agents.length === 0 && <option value="">No Agents available</option>}{agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.name} · {agent.agentsVersion}</option>)}</select>{error && <p role="alert" className="mt-4 text-sm text-red-900">{error}</p>}<button className="metal-button-solid mt-5 w-full sm:w-auto" disabled aria-describedby="execution-status">Start evaluation</button><p id="execution-status" className="mt-3 max-w-xl text-xs leading-relaxed text-neutral-600">Campaign execution and Arc escrow are not enabled in this UI phase. No campaign, charge, provider call or transaction will be created.</p></div>}
+        {!account ? <div className="mt-5 retro-inset p-5"><p className="font-semibold">Log in to continue</p><p className="mt-2 text-sm text-neutral-600">Sign in from the header, then select one of your versioned Agents.</p></div> : <div className="mt-5"><label htmlFor="evaluation-agent" className="text-sm font-semibold">Agent to evaluate</label><select id="evaluation-agent" className="field-control mt-2" value={agentId} onChange={(event) => setAgentId(event.target.value)}>{agents.length === 0 && <option value="">No Agents available</option>}{agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.name} · {agent.agentsVersion}</option>)}</select>{error && <p role="alert" className="mt-4 text-sm text-red-900">{error}</p>}<button className="metal-button-solid mt-5 w-full sm:w-auto" disabled={!execution.enabled || !agentId || running} aria-describedby="execution-status" onClick={startEvaluation}>{running ? 'Evaluation running…' : 'Start evaluation'}</button><p id="execution-status" className="mt-3 max-w-xl text-xs leading-relaxed text-neutral-600">{execution.enabled ? `The Evo fee is ${execution.feeUsdc} USDC. GenLayer gas is paid separately by the Arena ISS owner wallet.` : 'Evaluation execution is not configured on this server.'}</p></div>}
       </div>
-      <aside className="glass-panel p-6" aria-labelledby="fee-heading"><p className="page-kicker">Planned testnet fee</p><h2 id="fee-heading" className="font-mono text-4xl font-bold">1 USDC</h2><p className="mt-4 text-sm leading-relaxed">Held in Arc Testnet escrow. A platform or infrastructure failure will qualify for a full refund; a completed low score will not.</p><p className="mt-5 border-t border-black/20 pt-4 text-xs font-semibold uppercase tracking-wider">Arc escrow integration pending</p></aside>
+      <aside className="glass-panel p-6" aria-labelledby="fee-heading"><p className="page-kicker">Evo fee</p><h2 id="fee-heading" className="font-mono text-4xl font-bold">{execution.feeUsdc ?? '—'} USDC</h2><p className="mt-4 text-sm leading-relaxed">Charged from your managed Arc wallet once per Evo campaign. GenLayer transaction gas is paid by the Arena ISS owner wallet.</p><p className="mt-5 border-t border-black/20 pt-4 text-xs font-semibold uppercase tracking-wider">Arc Testnet · USDC (6 decimals)</p></aside>
     </section>
     {account && <CampaignList campaigns={campaigns} />}
   </section>;
