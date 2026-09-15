@@ -21,7 +21,12 @@ export type ManagedAccount = {
 };
 export type CircleWalletPort = {
   createWallet(input: { userId: string; idempotencyKey: string }): Promise<{ walletId: string; address: string }>;
+  listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
+  transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
 };
+export type UsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
+export type WalletTransactionResult = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
 export type EmailLoginSender = { sendLoginCode(email: string, code: string): Promise<void> };
 
 type IdentityRecord = { identityKey: string; kind: LoginIdentityKind; userId: string; principal: string; createdAt: number };
@@ -109,6 +114,32 @@ export class ManagedIdentityService {
     return { userId, principal: identity.principal, identity: { kind }, managedWallet: wallet };
   }
 
+  async listUsdcBalances(userId: string): Promise<UsdcBalance[]> {
+    const wallet = this.requireReadyWallet(userId);
+    return this.circleWallets.listUsdcBalances({ walletId: wallet.walletId, address: wallet.address });
+  }
+
+  async transferUsdc(userId: string, destinationAddress: string, amount: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    return this.circleWallets.transferUsdc({
+      walletId: wallet.walletId,
+      destinationAddress: requireAddress(destinationAddress),
+      amount: requireUsdcAmount(amount),
+      idempotencyKey: randomUUID(),
+    });
+  }
+
+  async bridgeUsdcToArc(userId: string, sourceChain: string, amount: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    return this.circleWallets.bridgeUsdcToArc({
+      walletId: wallet.walletId,
+      address: wallet.address,
+      sourceChain: requireIdentifier(sourceChain, 'source chain'),
+      amount: requireUsdcAmount(amount),
+      idempotencyKey: randomUUID(),
+    });
+  }
+
   private async login(identityKey: string, kind: LoginIdentityKind, principal: string): Promise<ManagedAccount> {
     let identity = this.runtime.get<IdentityRecord>('auth-identities', identityKey);
     if (!identity) {
@@ -158,6 +189,12 @@ export class ManagedIdentityService {
     return record as ManagedWallet;
   }
 
+  private requireReadyWallet(userId: string): ManagedWallet {
+    const wallet = this.readyWallet(userId);
+    if (!wallet) throw new Error('managed wallet unavailable');
+    return wallet;
+  }
+
   private emailIdentityKey(email: string): string {
     return `email:${createHmac('sha256', this.pepper).update(email).digest('hex')}`;
   }
@@ -165,6 +202,14 @@ export class ManagedIdentityService {
   private codeDigest(identityKey: string, code: string): Buffer {
     return createHmac('sha256', this.pepper).update(`${identityKey}|${code}`).digest();
   }
+}
+
+function requireUsdcAmount(value: string): string {
+  if (typeof value !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(value)) throw new Error('invalid USDC amount');
+  const [whole, fraction = ''] = value.split('.');
+  const baseUnits = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0');
+  if (baseUnits <= 0n || baseUnits > 1_000_000_000_000n) throw new Error('invalid USDC amount');
+  return `${whole}${fraction ? `.${fraction}` : ''}`;
 }
 
 function requireAddress(value: string): string {

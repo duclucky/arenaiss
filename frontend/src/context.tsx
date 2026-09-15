@@ -17,6 +17,7 @@ interface AppContextType {
   networkConfig: ArcNetworkConfig | null;
   account: string | null;
   managedAccount: ManagedAccount | null;
+  managedIdentity: ManagedIdentityAdapter | null;
   managedIdentityEnabled: boolean;
   connectWallet: (providerUuid: string) => Promise<void>;
   requestEmailCode: (email: string) => Promise<void>;
@@ -212,6 +213,7 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
         networkConfig,
         account,
         managedAccount,
+        managedIdentity: identity,
         managedIdentityEnabled,
         connectWallet,
         requestEmailCode,

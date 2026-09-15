@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import App from '../App';
@@ -50,6 +50,8 @@ class TestWalletAdapter implements ArcWalletAdapter {
 }
 
 describe('App Tests', () => {
+  beforeEach(() => window.history.pushState({}, '', '/'));
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -84,6 +86,7 @@ describe('App Tests', () => {
     
     fireEvent.click(providerBtn!);
 
+    fireEvent.click(await screen.findByRole('link', { name: 'Start with Agent' }));
     fireEvent.click(await screen.findByRole('button', { name: /0xTest/i }));
     const disconnectBtn = await screen.findByText('Disconnect');
     expect(disconnectBtn).toBeInTheDocument();
@@ -293,7 +296,7 @@ describe('App Tests', () => {
     const spyFetch = vi.spyOn(globalThis, 'fetch');
     const testAdapter = new TestWalletAdapter();
     render(<App walletAdapter={testAdapter} />);
-    await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards/i });
+    await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
     expect(spyFetch).not.toHaveBeenCalled();
   });
 
@@ -309,6 +312,7 @@ describe('App Tests', () => {
     fireEvent.click(providerBtn!);
 
     // Account is intentionally available only from the signed-in address menu.
+    fireEvent.click(await screen.findByRole('link', { name: 'Start with Agent' }));
     const accountMenu = await screen.findByRole('button', { name: /0xTest/i });
     fireEvent.click(accountMenu);
     fireEvent.click(screen.getByRole('menuitem', { name: 'View account' }));

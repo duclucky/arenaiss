@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
+import { useAppContext } from '../context';
 
 const HERO_FRAME_COUNT = 97;
 const HERO_FIRST_FRAME = '/hero-sequence/frame-001.webp';
-const HERO_LINE = 'Arena ISS — Intelligence, Safety & Standards. Test how agents think, act, and follow rules.';
+const HERO_LINES = [
+  { key: 'brand', text: 'Arena ISS' },
+  { key: 'standard', text: 'Arena Intelligence, Safety & Standards.' },
+  { key: 'promise', text: 'Test how agents think, act, and follow rules.' },
+] as const;
+const HERO_TEXT = HERO_LINES.map(({ text }) => text).join('\n');
+const HERO_LABEL = HERO_LINES.map(({ text }) => text).join(' ');
 const FRAME_RESPONSE = 14;
 const FRAME_EPSILON = 0.08;
 const PARALLAX_RESPONSE = 10;
@@ -231,8 +239,12 @@ function useHeroFrameSequence(canvasRef: RefObject<HTMLCanvasElement>) {
 
 export function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { displayed, done } = useTypewriter(HERO_LINE);
+  const { account } = useAppContext();
+  const { openLogin } = useOutletContext<{ openLogin: () => void }>();
+  const { displayed, done } = useTypewriter(HERO_TEXT);
   useHeroFrameSequence(canvasRef);
+  const displayedLines = displayed.split('\n');
+  const activeLine = Math.min(displayedLines.length - 1, HERO_LINES.length - 1);
 
   return <section className="hero-stage">
     <canvas
@@ -246,11 +258,23 @@ export function Home() {
     />
     <div className="hero-wash" aria-hidden="true" />
     <div className="hero-content">
-      <p className="hero-intro-blur">Arena ISS<br />Intelligence, Safety &amp; Standards</p>
-      <h1 aria-label={HERO_LINE} className="hero-typewriter">
-        <span aria-hidden="true">{displayed}</span>
-        {!done && <span className="type-cursor" aria-hidden="true" />}
+      <h1 aria-label={HERO_LABEL} className="hero-typewriter">
+        {HERO_LINES.map((line, index) => <span
+          key={line.key}
+          aria-hidden="true"
+          className={`hero-line hero-line--${line.key}`}
+          data-hero-line={line.key}
+        >
+          {displayedLines[index] ?? ''}
+          {!done && activeLine === index && <span className="type-cursor" aria-hidden="true" />}
+        </span>)}
       </h1>
+      <div className="hero-actions" data-visible="true">
+        {account
+          ? <Link className="hero-pill hero-pill--light" to="/agents">Start with Agent</Link>
+          : <button className="hero-pill hero-pill--light" type="button" onClick={openLogin}>Start with Agent</button>}
+        <Link className="hero-pill hero-pill--outline" to="/docs">Read Docs</Link>
+      </div>
     </div>
     <div className="hero-footnote" aria-label="Technology stack">
       <span>Arc-native USDC escrow</span><span>GenLayer semantic verdicts</span><span>Asynchronous by design</span>

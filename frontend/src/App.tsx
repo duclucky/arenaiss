@@ -51,6 +51,7 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
             <Route path="evaluations" element={deferred(<Evaluations />)} />
             <Route path="evaluations/:id" element={deferred(<EvaluationDetail />)} />
             <Route path="evaluation-runs/:id" element={deferred(<EvaluationRunDetail />)} />
+            <Route path="docs" element={<section aria-label="Arena ISS documentation" />} />
             <Route path="*" element={deferred(<NotFound />)} />
           </Route>
         </Routes>

@@ -55,9 +55,12 @@ describe('managed email login', () => {
     fireEvent.change(screen.getByLabelText('6-digit code'), { target: { value: '654321' } });
     fireEvent.click(screen.getByRole('button', { name: 'Verify and sign in' }));
 
-    expect(await screen.findByRole('button', { name: /0x4444/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Start with Agent' })).toHaveAttribute('href', '/agents');
+    expect(screen.queryByRole('button', { name: /0x4444/i })).not.toBeInTheDocument();
     expect(requests.find((request) => request.path.endsWith('/api/auth/email/challenge'))?.init?.credentials).toBe('include');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('link', { name: 'Start with Agent' }));
+    expect(await screen.findByRole('button', { name: /0x4444/i })).toBeInTheDocument();
   });
 
   it('keeps both methods in one login dialog and explains unavailable email auth', async () => {

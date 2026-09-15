@@ -125,6 +125,35 @@ test('wallet login provisions one persisted Circle wallet and exposes it through
   } finally { runtime.close(); }
 });
 
+test('managed wallet balance, Arc withdrawal and CCTP routes require the authenticated owner and validate inputs', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const calls: any[] = [];
+    const managed = {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      circleWallets: {
+        createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' }),
+        listUsdcBalances: async () => [{ chain: 'ARC-TESTNET', label: 'Arc Testnet', amount: '2', isArc: true, available: true }],
+        transferUsdc: async (input: any) => { calls.push(['transfer', input]); return { transactionId: 'tx-1', state: 'SENT' }; },
+        bridgeUsdcToArc: async (input: any) => { calls.push(['bridge', input]); return { transactionId: 'tx-2', state: 'SENT' }; },
+      },
+      emailSender: { sendLoginCode: async () => undefined },
+    };
+    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
+    assert.equal((await api.handle({ method: 'GET', path: '/api/account/usdc-balances' })).status, 401);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    assert.equal((await api.handle({ method: 'GET', path: '/api/account/usdc-balances', headers: { cookie } })).body[0].chain, 'ARC-TESTNET');
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: 'bad', amount: '1' } })).status, 400);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.0000001' } })).status, 400);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.25' } })).status, 202);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ETH-SEPOLIA', amount: '2' } })).status, 202);
+    assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'bridge']);
+  } finally { runtime.close(); }
+});
+
 test('email OTP login is bounded, stores no plaintext email, and provisions the same managed wallet once', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

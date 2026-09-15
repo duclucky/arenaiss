@@ -9,6 +9,7 @@ const navItems = [
   ['/agents', 'Agents'],
   ['/evaluations', 'Evaluations'],
 ] as const;
+const tickerItems = ['Arc', 'USDC', 'CCTP', 'Escrow', 'GenLayer', 'GenVM'] as const;
 
 export function Layout() {
   const { account, disconnectWallet } = useAppContext();
@@ -17,6 +18,7 @@ export function Layout() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [tickerPaused, setTickerPaused] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,6 +45,15 @@ export function Layout() {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!accountOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) setAccountOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [accountOpen]);
+
   async function disconnect() {
     await disconnectWallet();
     setAccountOpen(false);
@@ -55,12 +66,37 @@ export function Layout() {
         <span>Arena ISS</span><span className="brand-star" aria-hidden="true">✳︎</span>
       </Link>
 
-      <nav id="site-nav" aria-label="Primary" data-open={menuOpen} className="primary-nav">
+      {isHome ? <div
+        className="header-ticker"
+        role="region"
+        aria-label="Arena ISS technology ticker"
+        data-paused={tickerPaused}
+      >
+        <div className="header-ticker-viewport">
+          <div className="header-ticker-track">
+            {[0, 1].map((group) => <div
+              key={group}
+              className="header-ticker-group"
+              aria-hidden={group === 1 ? 'true' : undefined}
+            >
+              {tickerItems.map((item) => <span className="header-ticker-item" key={`${group}-${item}`}>{item}</span>)}
+            </div>)}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="header-ticker-toggle"
+          aria-label={`${tickerPaused ? 'Play' : 'Pause'} technology ticker`}
+          onClick={() => setTickerPaused((paused) => !paused)}
+        >
+          {tickerPaused ? 'Play' : 'Pause'}
+        </button>
+      </div> : account ? <nav id="site-nav" aria-label="Primary" data-open={menuOpen} className="primary-nav">
         {navItems.map(([to, label]) => <NavLink key={to} to={to} className={({ isActive }) => clsx('nav-link', isActive && 'is-active')}>{label}</NavLink>)}
-      </nav>
+      </nav> : <div />}
 
       <div className="header-actions" ref={accountRef}>
-        {account ? <>
+        {!isHome && account ? <>
           <button className="header-account" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen} aria-haspopup="menu">
             <span>{account.slice(0, 6)}…{account.slice(-4)}</span>
           </button>
@@ -68,8 +104,8 @@ export function Layout() {
             <Link role="menuitem" to="/account">View account</Link>
             <button role="menuitem" onClick={disconnect}>Disconnect</button>
           </div>}
-        </> : <button onClick={() => setLoginOpen(true)} className="header-cta login-trigger" aria-label="Login">Login</button>}
-        <button
+        </> : !account ? <button onClick={() => setLoginOpen(true)} className="header-cta login-trigger" aria-label="Login">Login</button> : null}
+        {!isHome && account && <button
           onClick={() => setMenuOpen((open) => !open)}
           className="menu-toggle"
           aria-controls="site-nav"
@@ -77,11 +113,11 @@ export function Layout() {
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         >
           <span /><span /><span />
-        </button>
+        </button>}
       </div>
     </header>
 
-    <main className={isHome ? 'home-main' : 'editorial-main'}><Outlet /></main>
+    <main className={isHome ? 'home-main' : 'editorial-main'}><Outlet context={{ openLogin: () => setLoginOpen(true) }} /></main>
     {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
   </div>;
 }

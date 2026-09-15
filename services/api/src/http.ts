@@ -42,6 +42,18 @@ export class ArenaHttpApi {
         if (!this.managedIdentity || !session.userId || !session.identityKind) throw new Error('managed wallet unavailable');
         return this.json(200, this.managedIdentity.getAccount(session.userId, session.identityKind));
       }
+      if (request.method === 'GET' && request.path === '/api/account/usdc-balances') {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(200, await this.managedIdentity!.listUsdcBalances(session.userId!));
+      }
+      if (request.method === 'POST' && request.path === '/api/account/usdc-transfers') {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(202, await this.managedIdentity!.transferUsdc(session.userId!, requireString(request.body?.destinationAddress), requireString(request.body?.amount)));
+      }
+      if (request.method === 'POST' && request.path === '/api/account/cctp-transfers') {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(202, await this.managedIdentity!.bridgeUsdcToArc(session.userId!, requireString(request.body?.sourceChain), requireString(request.body?.amount)));
+      }
       if (request.method === 'GET' && request.path === '/api/tournaments') return this.json(200, this.service.listTournaments());
       const tournamentMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})$/);
       if (request.method === 'GET' && tournamentMatch) {
@@ -182,6 +194,12 @@ export class ArenaHttpApi {
       this.sessions.delete(token);
       throw new Error('unauthorized');
     }
+    return session;
+  }
+
+  private requireManagedSession(headers: Headers | undefined) {
+    const session = this.requireSessionRecord(headers);
+    if (!this.managedIdentity || !session.userId || !session.identityKind) throw new Error('managed wallet unavailable');
     return session;
   }
 
