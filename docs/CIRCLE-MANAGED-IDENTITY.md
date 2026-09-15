@@ -1,7 +1,8 @@
 # Circle-managed identity and wallet boundary
 
-Status: locally implemented. The SCA migration below is not yet published or
-verified against Circle/Arc Testnet in this change.
+Status: the SCA account flow is published on the owner VPS. Restart-safe CCTP
+operation recovery is implemented and tested locally in the current change, but
+has not yet been published or exercised through a live Circle/Arc Testnet write.
 
 ## Decision
 
@@ -36,6 +37,9 @@ model makes the server the wallet custodian.
 - Legacy EOA metadata, if present, is retained under a separate local record.
   The new SCA receives a fresh creation idempotency key and address; no testnet
   funds are moved and the legacy EOA is not used for new account actions.
+- CCTP transfer operation: owner user ID, managed wallet/address, source chain,
+  six-decimal USDC amount, lifecycle state and separate UUID v4 keys for approval
+  and burn. Neither key is returned by the public API.
 
 The OTP digest is held only in memory, expires after ten minutes, permits at
 most five attempts and is deleted after successful use. A restart invalidates
@@ -53,6 +57,15 @@ new logins do so during sign-in. Until the SCA is ready, legacy EOA writes fail
 closed. Legacy on-chain Agent ownership is still tied to the old EOA address;
 this migration does not transfer or deactivate those Agents.
 
+## CCTP recovery guarantees
+
+The server persists separate approval and burn idempotency keys before either
+Circle mutation. On startup it resumes `PENDING`, `APPROVING` and `BURNING`
+operations with those same keys. Concurrent recovery within one server process
+shares one active call, and callback replay cannot move the stored lifecycle
+backward. A legacy `BURNING` record without a persisted burn key becomes
+`RECOVERY_REQUIRED`; the server never guesses a new key or risks a duplicate burn.
+
 ## API
 
 - `GET /api/auth/capabilities`: advertise whether email and managed-wallet
@@ -62,6 +75,11 @@ this migration does not transfer or deactivate those Agents.
 - `POST /api/auth/email/verify`: verify email code.
 - `POST /api/auth/logout`: invalidate the server session.
 - `GET /api/account`: return safe identity kind and managed wallet metadata.
+- `GET /api/account/usdc-balances`: return available Circle-issued USDC balances.
+- `POST /api/account/usdc-transfers`: submit an Arc Testnet USDC withdrawal.
+- `POST /api/account/cctp-transfers`: persist and start a CCTP transfer to Arc.
+- `GET /api/account/cctp-transfers/:operationId`: return the authenticated
+  owner's redacted CCTP lifecycle state.
 
 All sessions use an opaque `HttpOnly; Secure; SameSite=Strict` cookie. API
 responses never include the Circle API key, entity secret, operation key, SMTP

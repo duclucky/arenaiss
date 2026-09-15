@@ -153,6 +153,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     };
     const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
     assert.equal((await api.handle({ method: 'GET', path: '/api/account/usdc-balances' })).status, 401);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', body: { sourceChain: 'ARB-SEPOLIA', amount: '2' } })).status, 401);
     await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
     const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
     const cookie = auth.headers['set-cookie'].split(';')[0];
@@ -171,6 +172,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal(bridge.status, 202);
     assert.match(bridge.body.operationId, /^[0-9a-f-]{36}$/);
     assert.equal(bridge.body.state, 'PENDING');
+    assert.equal((await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}` })).status, 401);
     releaseBridge();
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const status = await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}`, headers: { cookie } });
@@ -182,8 +184,66 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
       await new Promise((resolve) => setTimeout(resolve, 5));
       if (attempt === 9) assert.fail('CCTP operation did not reach SUBMITTED');
     }
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: bob } });
+    const bobAuth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: bob, signature: 'ok' } });
+    const bobCookie = bobAuth.headers['set-cookie'].split(';')[0];
+    assert.equal((await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}`, headers: { cookie: bobCookie } })).status, 400);
     assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'bridge']);
   } finally { runtime.close(); }
+});
+
+test('CCTP operation resumes after API restart with the persisted approval and burn keys', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const bridgeCalls: any[] = [];
+    const managed = {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      circleWallets: {
+        createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' }),
+        bridgeUsdcToArc: async (input: any) => {
+          bridgeCalls.push(input);
+          return { transactionId: 'burn-id', state: 'SENT', txHash: `0x${'6'.repeat(64)}` };
+        },
+      },
+      emailSender: { sendLoginCode: async () => undefined },
+    };
+    const initial = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
+    await initial.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const login = await initial.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const initialCookie = login.headers['set-cookie'].split(';')[0];
+    const account = await initial.handle({ method: 'GET', path: '/api/account', headers: { cookie: initialCookie } });
+    const operationId = '33333333-3333-4333-8333-333333333333';
+    runtime.put('circle-cctp-transfers', operationId, {
+      operationId,
+      state: 'BURNING',
+      userId: account.body.userId,
+      walletId: account.body.managedWallet.walletId,
+      address: account.body.managedWallet.address,
+      sourceChain: 'BASE-SEPOLIA',
+      amount: '1',
+      approvalIdempotencyKey: '44444444-4444-4444-8444-444444444444',
+      burnIdempotencyKey: '55555555-5555-4555-8555-555555555555',
+      updatedAt: 1,
+    });
+
+    const restarted = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
+    await restarted.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const restartedLogin = await restarted.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const cookie = restartedLogin.headers['set-cookie'].split(';')[0];
+    let status = await restarted.handle({ method: 'GET', path: `/api/account/cctp-transfers/${operationId}`, headers: { cookie } });
+    for (let attempt = 0; attempt < 20 && status.body.state !== 'SUBMITTED'; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      status = await restarted.handle({ method: 'GET', path: `/api/account/cctp-transfers/${operationId}`, headers: { cookie } });
+    }
+
+    assert.equal(status.body.state, 'SUBMITTED');
+    assert.equal(bridgeCalls.length, 1);
+    assert.equal(bridgeCalls[0].approvalIdempotencyKey, '44444444-4444-4444-8444-444444444444');
+    assert.equal(bridgeCalls[0].burnIdempotencyKey, '55555555-5555-4555-8555-555555555555');
+  } finally {
+    runtime.close();
+  }
 });
 
 test('email OTP login is bounded, stores no plaintext email, and provisions the same managed wallet once', async () => {

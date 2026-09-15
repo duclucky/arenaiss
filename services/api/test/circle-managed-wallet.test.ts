@@ -81,3 +81,43 @@ test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submit
   assert.equal(transfers[0].tokenAddress, '0x3600000000000000000000000000000000000000');
   assert.deepEqual(transfers[0].amount, ['1.25']);
 });
+
+test('Circle adapter reuses separately persisted approval and burn idempotency keys', async () => {
+  const executions: any[] = [];
+  const progress: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([
+    { finalityThreshold: 1000, minimumFee: 0, forwardFee: { med: '1' } },
+  ]), { status: 200, headers: { 'content-type': 'application/json' } });
+  try {
+    const adapter = new CircleManagedWalletAdapter({
+      async deriveWallet({ blockchain }: any) {
+        return { data: { wallet: { id: blockchain, address: '0x1111111111111111111111111111111111111111' } } };
+      },
+      async createContractExecutionTransaction(input: any) {
+        executions.push(input);
+        return { data: { id: executions.length === 1 ? 'approval-id' : 'burn-id' } };
+      },
+      async getTransaction({ id }: any) {
+        return { data: { transaction: { id, state: id === 'approval-id' ? 'COMPLETE' : 'SENT', txHash: id === 'burn-id' ? `0x${'4'.repeat(64)}` : undefined } } };
+      },
+    } as any, 'wallet-set-id');
+
+    const result = await adapter.bridgeUsdcToArc({
+      walletId: 'wallet-id',
+      address: '0x1111111111111111111111111111111111111111',
+      sourceChain: 'BASE-SEPOLIA',
+      amount: '1',
+      approvalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+      burnIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+      onProgress: (state: string) => progress.push(state),
+    } as any);
+
+    assert.equal(executions[0].idempotencyKey, '11111111-1111-4111-8111-111111111111');
+    assert.equal(executions[1].idempotencyKey, '22222222-2222-4222-8222-222222222222');
+    assert.deepEqual(progress, ['APPROVING', 'BURNING']);
+    assert.equal(result.txHash, `0x${'4'.repeat(64)}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

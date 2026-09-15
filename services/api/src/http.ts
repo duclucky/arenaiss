@@ -23,6 +23,7 @@ export class ArenaHttpApi {
     this.service = service;
     this.verifySignature = verifySignature;
     this.managedIdentity = managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined;
+    void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
   }
 
   async handle(request: ApiRequest): Promise<ApiResponse> {
