@@ -3,7 +3,7 @@
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
   "fileCount": 270,
-  "sourceBundleSha256": "cd2adb14d27424fee6c1be6e96ba3e8051e092f0ad04e385de350ae5254956b4",
+  "sourceBundleSha256": "80590b6de3aa1647eca0474ec379db7e610fd1371b8cdcfee44372978bceecdd",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -94,7 +94,7 @@
     "requirements-dev.txt": "43641e48e6c1e7e5c1f2c3cbc42cc7574f7df7ce73f3ec518f1c30949285eaf1",
     "gltest.config.yaml": "de9ffbb6bd5722186b1148337ed5e54d1297923d9357373d294418859fe41cc8",
     "Dockerfile": "bc7f5727a00874408d73e31d3063f469a284a7e09338e6ac644fbdd651b8fd47",
-    "compose.yaml": "16b5418aec7ca7bd28de74c9d77fea67d802d394d9303578506c4c7f96cdd235",
+    "compose.yaml": "b3b3aeb6b459ce03e1d5eae4a4d9c35c606b840b1a3d438a55d641b62d9568df",
     "deploy/Caddyfile": "116948d5fb5cf144e5d7c698777967b8dee1a84be9a79fa6f15eccdfd0b70606",
     "deploy/arena-backup.service": "248f27166fc2b0f2b59ea716c27e5f04f7fb7e7f55ad7c651a1e3102c9399ce0",
     "deploy/cloudflared.yml": "f58af160c3cf33ea034512f80a41b840fcd5c1f003bc5e7283feedeeda9d6a9f",
