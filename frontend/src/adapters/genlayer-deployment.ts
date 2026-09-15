@@ -3,6 +3,7 @@ import type { GenLayerNetworkConfig } from './interfaces';
 export const STUDIO_NEXT_SOURCE_HASHES = {
   matchJudge: 'a90bcbfac8dc9925a1e0f93e7b69ab3661ae2119f8f08a371336b55834ad13c8',
   evaluationJudge: '74682ca3f45cce2d344cc670260b3a99914fec4ee47e0fb93f6e256b40598454',
+  comparisonJudge: 'a6b098f777af6d70dfc3debdbe29354a14b8a776b11c04f180d1a7645c2bcb9a',
 } as const;
 
 export type StudioNextDeploymentStatus = {
@@ -10,12 +11,13 @@ export type StudioNextDeploymentStatus = {
   chainId?: number;
   matchJudgeVerified: boolean;
   evaluationJudgeVerified: boolean;
+  comparisonJudgeVerified: boolean;
 };
 
 export async function verifyStudioNextDeployments(
   config: GenLayerNetworkConfig,
   fetcher: typeof fetch = fetch,
-  expectedHashes: { matchJudge: string; evaluationJudge: string } = STUDIO_NEXT_SOURCE_HASHES,
+  expectedHashes: { matchJudge: string; evaluationJudge: string; comparisonJudge: string } = STUDIO_NEXT_SOURCE_HASHES,
 ): Promise<StudioNextDeploymentStatus> {
   let requestId = 0;
   const rpc = async (method: string, params: unknown[]) => {
@@ -35,7 +37,7 @@ export async function verifyStudioNextDeployments(
     const rawChainId = await rpc('eth_chainId', []);
     if (typeof rawChainId !== 'string' || !/^0x[0-9a-f]+$/i.test(rawChainId)) throw new Error('STUDIO_NEXT_CHAIN_ID_INVALID');
     const chainId = Number.parseInt(rawChainId.slice(2), 16);
-    if (chainId !== config.chainId) return { state: 'WRONG_CHAIN', chainId, matchJudgeVerified: false, evaluationJudgeVerified: false };
+    if (chainId !== config.chainId) return { state: 'WRONG_CHAIN', chainId, matchJudgeVerified: false, evaluationJudgeVerified: false, comparisonJudgeVerified: false };
 
     const verifyContract = async (address: `0x${string}`, expectedHash: string) => {
       const [encodedCode, schema] = await Promise.all([
@@ -50,17 +52,19 @@ export async function verifyStudioNextDeployments(
       return hash === expectedHash;
     };
 
-    const [matchJudgeVerified, evaluationJudgeVerified] = await Promise.all([
+    const [matchJudgeVerified, evaluationJudgeVerified, comparisonJudgeVerified] = await Promise.all([
       verifyContract(config.matchJudgeAddress, expectedHashes.matchJudge),
       verifyContract(config.evaluationJudgeAddress, expectedHashes.evaluationJudge),
+      verifyContract(config.comparisonJudgeAddress, expectedHashes.comparisonJudge),
     ]);
     return {
-      state: matchJudgeVerified && evaluationJudgeVerified ? 'VERIFIED' : 'SOURCE_MISMATCH',
+      state: matchJudgeVerified && evaluationJudgeVerified && comparisonJudgeVerified ? 'VERIFIED' : 'SOURCE_MISMATCH',
       chainId,
       matchJudgeVerified,
       evaluationJudgeVerified,
+      comparisonJudgeVerified,
     };
   } catch {
-    return { state: 'UNAVAILABLE', matchJudgeVerified: false, evaluationJudgeVerified: false };
+    return { state: 'UNAVAILABLE', matchJudgeVerified: false, evaluationJudgeVerified: false, comparisonJudgeVerified: false };
   }
 }

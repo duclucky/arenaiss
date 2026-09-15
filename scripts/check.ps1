@@ -8,6 +8,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & "$PSScriptRoot\..\.venv\Scripts\genvm-lint.exe" check "$PSScriptRoot\..\contracts\AgentEvaluationJudge.py"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+& "$PSScriptRoot\..\.venv\Scripts\genvm-lint.exe" check "$PSScriptRoot\..\contracts\ArenaComparisonJudge.py"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 & "$PSScriptRoot\..\.venv\Scripts\python.exe" -m pytest "$PSScriptRoot\..\tests\direct" -v
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -25,9 +28,14 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\packages\evaluation\test\corpus.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\run-tracker.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\solo-runner.test.ts" `
+  "$PSScriptRoot\..\packages\evaluation\test\comparison.test.ts" `
+  "$PSScriptRoot\..\packages\evaluation\test\tournament-comparison.test.ts" `
+  "$PSScriptRoot\..\packages\evaluation\test\tournament-runner.test.ts" `
   "$PSScriptRoot\..\packages\genlayer\test\tracker.test.ts" `
   "$PSScriptRoot\..\packages\genlayer\test\sdk-port.test.ts" `
   "$PSScriptRoot\..\packages\genlayer\test\evaluation-sdk-port.test.ts" `
+  "$PSScriptRoot\..\packages\genlayer\test\comparison-tracker.test.ts" `
+  "$PSScriptRoot\..\packages\genlayer\test\studio-next-chain.test.ts" `
   "$PSScriptRoot\..\packages\orchestrator\test\orchestrator.test.ts" `
   "$PSScriptRoot\..\packages\settlement\test\worker.test.ts" `
   "$PSScriptRoot\..\packages\settlement\test\auto-payout.test.ts" `
@@ -41,6 +49,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\tests\ops\backup.test.ts" `
   "$PSScriptRoot\..\tests\ops\seed-live-demo.test.ts" `
   "$PSScriptRoot\..\tests\system\trusted-operator-lifecycle.test.ts" `
+  "$PSScriptRoot\..\tests\system\evaluation-tournament-convergence.test.ts" `
   "$PSScriptRoot\..\tests\system\release-candidate.test.ts"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

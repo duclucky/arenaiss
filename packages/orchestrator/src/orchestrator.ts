@@ -2,7 +2,7 @@ import { attemptId, type Digest } from "../../protocol/src/canonical.ts";
 import { buildBracket, type MatchBlueprint, type SlotRef } from "../../domain/src/bracket.ts";
 import { advanceBracket, type MatchResult } from "../../domain/src/progression.ts";
 
-type Entrant = {
+export type Entrant = {
   entrantId: Digest;
   agentId: Digest;
   agentsVersion: Digest;
@@ -10,7 +10,7 @@ type Entrant = {
   agentsCommitment: Digest;
 };
 
-type InferenceInput = {
+export type InferenceInput = {
   tournamentId: Digest;
   matchId: Digest;
   attemptId: Digest;
@@ -19,7 +19,7 @@ type InferenceInput = {
   agentB: Entrant;
 };
 
-type PairOutput = { state: "OUTPUTS_READY" | "PARTIAL_PAIR"; outputA?: string; outputB?: string; outputADigest?: Digest; outputBDigest?: Digest };
+export type PairOutput = { state: "OUTPUTS_READY" | "PARTIAL_PAIR"; outputA?: string; outputB?: string; outputADigest?: Digest; outputBDigest?: Digest };
 
 export interface OrchestratorInference { run(input: InferenceInput): Promise<PairOutput>; }
 export type OrchestratorJudgeOutcome =

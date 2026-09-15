@@ -131,6 +131,7 @@ describe('App Tests', () => {
       VITE_GENLAYER_EXPLORER_URL: 'https://explorer-studio-dev.genlayer.com',
       VITE_GENLAYER_MATCH_JUDGE_ADDRESS: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
       VITE_GENLAYER_EVALUATION_JUDGE_ADDRESS: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
+      VITE_GENLAYER_COMPARISON_JUDGE_ADDRESS: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB',
     })?.genLayer).toEqual({
       chainId: 61997,
       rpcUrl: 'https://studio-next.genlayer.com/api',
@@ -138,6 +139,7 @@ describe('App Tests', () => {
       explorerUrl: 'https://explorer-studio-dev.genlayer.com',
       matchJudgeAddress: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
       evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
+      comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB',
     });
   });
 

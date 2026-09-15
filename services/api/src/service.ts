@@ -5,6 +5,7 @@ import type { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlit
 import type { EvaluationRunRecord } from "../../../packages/evaluation/src/run-tracker.ts";
 import { validateEvaluationScenario, type EvaluationScenario } from "../../../packages/evaluation/src/protocol.ts";
 import type { SoloCampaignRecord } from "../../../packages/evaluation/src/solo-runner.ts";
+import { VersionComparisonRegistry, type RegressionPolicy, type VersionComparisonRecord } from "../../../packages/evaluation/src/comparison.ts";
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
@@ -70,12 +71,14 @@ export class ArenaApiService {
   private registrations = new Map<string, PreparedRegistration>();
   private evaluationPacks = new Map<string, EvaluationPackRecord>();
   private evaluationCampaigns = new Map<string, SoloCampaignRecord>();
+  private versionComparisons: VersionComparisonRegistry;
   private nonce = 0;
   private runtime?: SqliteRuntimeStore;
 
   constructor(operator: string, runtime?: SqliteRuntimeStore) {
     this.operator = this.address(operator);
     this.runtime = runtime;
+    this.versionComparisons = new VersionComparisonRegistry(runtime);
     if (runtime) {
       for (const agent of runtime.list<Agent>("api-agents")) this.agents.set(agent.agentId, agent);
       for (const tournament of runtime.list<PublicTournament>("api-tournaments")) this.tournaments.set(tournament.id, tournament);
@@ -317,6 +320,36 @@ export class ArenaApiService {
   listOwnedEvaluationCampaigns(caller: string): PublicEvaluationCampaign[] {
     const owner = this.principal(caller);
     return [...this.evaluationCampaigns.values()].filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
+  }
+  createVersionComparison(caller: string, input: { comparisonId: Digest; agentId: Digest; baselineVersionId: Digest; candidateVersionId: Digest; baselineCampaignIds: Digest[]; candidateCampaignIds: Digest[]; policy: RegressionPolicy }): VersionComparisonRecord {
+    const owner = this.principal(caller);
+    const agent = this.requireOwner(owner, input.agentId);
+    if (!agent.versions.some((version) => version.agentsVersion === input.baselineVersionId) || !agent.versions.some((version) => version.agentsVersion === input.candidateVersionId)) throw new Error("comparison Agent version not found");
+    const campaigns = (ids: Digest[], versionId: Digest): SoloCampaignRecord[] => ids.map((campaignId) => {
+      const campaign = this.evaluationCampaigns.get(campaignId) ?? this.runtime?.get<SoloCampaignRecord>("evaluation-campaigns", campaignId);
+      if (!campaign || campaign.owner !== owner || campaign.agent.versionId !== versionId) throw new Error("unauthorized or mismatched comparison campaign");
+      return campaign;
+    });
+    return this.versionComparisons.compare({
+      schema: "arena-version-comparison-input-v1",
+      comparisonId: input.comparisonId,
+      agentId: input.agentId,
+      baseline: { versionId: input.baselineVersionId, campaigns: campaigns(input.baselineCampaignIds, input.baselineVersionId) },
+      candidate: { versionId: input.candidateVersionId, campaigns: campaigns(input.candidateCampaignIds, input.candidateVersionId) },
+      policy: input.policy,
+    });
+  }
+  getOwnedVersionComparison(caller: string, comparisonId: Digest): VersionComparisonRecord {
+    const owner = this.principal(caller);
+    const record = this.versionComparisons.get(comparisonId);
+    if (!record) throw new Error("version comparison not found");
+    this.requireOwner(owner, record.agentId as Digest);
+    return record;
+  }
+  listOwnedVersionComparisons(caller: string): VersionComparisonRecord[] {
+    const owner = this.principal(caller);
+    const ownedAgentIds = new Set([...this.agents.values()].filter((agent) => agent.owner === owner).map((agent) => agent.agentId));
+    return this.versionComparisons.list().filter((record) => ownedAgentIds.has(record.agentId as Digest));
   }
   prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest): PreparedRegistration {
     const owner = this.principal(caller);

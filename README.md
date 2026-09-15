@@ -20,9 +20,14 @@ envelope makes one immutable `AGENTS.md` materially control Level 1 responses
 and Level 2 inert action proposals, deterministic code derives objective action
 policy findings, and `AgentEvaluationJudge` stores a six-dimension GenLayer
 scorecard with reasons. The first local multi-scenario `SOLO` runner and
-redacted/private Run Detail APIs are now implemented. `SOLO` creation UI,
-version comparison, regression testing, executable tool sandbox traces and
-full Test Pack management remain planned.
+redacted/private Run Detail APIs are now implemented. A local owner-only EVAL-5
+API compares repeated SOLO cohorts for two versions of the same Agent and
+applies locked deterministic regression thresholds. Tournament convergence is
+now implemented additively: new attempts use the Evaluation provider envelope
+and a specialized rich `ComparisonRun`, while historical Tournament records
+retain their original verdict and transaction semantics. `SOLO` creation UI,
+comparison UI, executable tool sandbox traces and full Test Pack management
+remain planned.
 The local `EvaluationRun` core now durably records exact Agent/scenario/provider
 bindings, separates provider failure classes, submits the V5 evaluation ABI,
 tracks GenLayer finality, and accepts a scorecard only after canonical readback
@@ -131,6 +136,8 @@ with USDC stake, bounty, fee, refund or reward accounting.
   implementation status and next action.
 - [`docs/EXECUTION-OWNERSHIP-PLAN.md`](docs/EXECUTION-OWNERSHIP-PLAN.md) — work
   split between the primary agent and the owner-operated Coding Agent.
+- [`docs/EVAL-6-BACKWARD-COMPATIBILITY-PLAN.md`](docs/EVAL-6-BACKWARD-COMPATIBILITY-PLAN.md)
+  — audited additive/no-rewrite migration constraints for Tournament convergence.
 - [`docs/GATE-REVIEW.md`](docs/GATE-REVIEW.md) — honest parent-policy and
   submission implications of the trusted MVP.
 - [`docs/ADR-001-TRUSTED-OPERATOR-MVP.md`](docs/ADR-001-TRUSTED-OPERATOR-MVP.md)
@@ -158,6 +165,13 @@ smoke transactions after migrating the custom validator call to GenVM v0.3's
 [`docs/evidence/studio-dev/redeployment-2026-09-14.json`](docs/evidence/studio-dev/redeployment-2026-09-14.json).
 Canonical Studio Next endpoint and source/schema alias verification is in
 [`docs/evidence/studio-next/verification-2026-09-14.json`](docs/evidence/studio-next/verification-2026-09-14.json).
+
+The EVAL-6 comparison judge `ArenaComparisonJudge` (`AgentComparisonV1`) is
+deployed on Studio Next at
+[`0xe521...74BcB`](https://explorer-studio-dev.genlayer.com/address/0xe5210eCCC4182090A1416f515Dc7001B27274BcB).
+Its deployment and final-address deterministic comparison smoke both finalized
+successfully with exact source and canonical readback evidence in
+[`docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json`](docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json).
 
 The active judge deployment is revision V10 of `ArenaMatchJudge`, using
 the `GeneralResponseV7` rubric, at

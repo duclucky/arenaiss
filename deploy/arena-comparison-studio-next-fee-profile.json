@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "network": "studio_devnet",
+  "measuredAt": "2026-09-15T17:09:37Z",
+  "chainId": 61997,
+  "deploy": {
+    "leaderTimeunitsAllocation": "300",
+    "validatorTimeunitsAllocation": "600",
+    "executionBudgetPerRound": "153453600000000",
+    "totalMessageFees": "0",
+    "rotationsPerRound": "1"
+  },
+  "methods": {
+    "submit_comparison": {
+      "leaderTimeunitsAllocation": "300",
+      "validatorTimeunitsAllocation": "600",
+      "executionBudgetPerRound": "153453600000000",
+      "totalMessageFees": "0",
+      "rotationsPerRound": "1"
+    }
+  }
+}

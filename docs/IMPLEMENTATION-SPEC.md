@@ -926,6 +926,14 @@ generic/global Agent score ngoài Test Pack/runtime/scoring version.
 
 ### EVAL-5 — Version comparison and regression
 
+**Status:** local implementation pass. The owner-only API compares two immutable
+versions of the same Agent from separate finalized SOLO campaign cohorts. A
+versioned deterministic policy locks exact pack/scenario/runtime/model/rubric/run
+comparability, repeated-run aggregation, coverage, variance, per-dimension
+minimum/drop boundaries, aggregate drop and critical-finding zero tolerance.
+Records are immutable, redacted and restart-readable. No provider call, GenLayer
+transaction or Arc action is performed by comparison.
+
 **Prerequisite:** `EVAL-4 PASS`.
 
 1. So sánh hai AgentVersion trên cùng exact pack/runtime policy.
@@ -939,7 +947,15 @@ infrastructure-error tests pass.
 
 ### EVAL-6 — Pairwise and Tournament migration
 
-**Prerequisite:** `EVAL-5 PASS` và backward-compatibility plan được audit.
+**Status:** implementation and exit regression pass. New Tournament attempts can
+use the shared Evaluation provider envelope and specialized rich
+`ComparisonRun`; legacy attempts remain immutable projections under their
+original judge/rubric. `ArenaComparisonJudge` is deployed and smoke-verified on
+Studio Next. Arc payout/refund inputs and arithmetic are unchanged.
+
+**Prerequisite:** `EVAL-5 PASS` và backward-compatibility plan được audit. Both
+entry artifacts are now locally satisfied; the approved plan is
+`docs/EVAL-6-BACKWARD-COMPATIBILITY-PLAN.md`.
 
 1. Map existing MatchAttempt thành specialized ComparisonRun.
 2. Preserve deployed transaction/evidence links và historical result semantics.

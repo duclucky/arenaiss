@@ -9,12 +9,13 @@ deployment does **not** run the bounded live-lifecycle script as a daemon and
 does not claim an unattended production scheduler until the durable worker
 input/job model is implemented.
 
-The public Evaluations page also verifies both reviewed judge deployments
+The public Evaluations page also verifies all three reviewed judge deployments
 directly against the canonical Studio Next RPC (`https://studio-next.genlayer.com/api`,
 chain `61997`). Its build-time public settings include both judge addresses and
 the Studio Next explorer. These values are public chain identifiers, not secrets.
-Historical Studionet verdicts retain Studionet explorer links based on their
-recorded chain ID.
+The build also binds `ArenaComparisonJudge` at
+`0xe5210eCCC4182090A1416f515Dc7001B27274BcB`. Historical Studionet verdicts
+retain Studionet explorer links based on their recorded chain ID.
 
 The stable LAN endpoint is `http://192.168.1.24:8080`. The named Cloudflare
 Tunnel exposes the stable HTTPS hostnames `arenaiss.xyz` and

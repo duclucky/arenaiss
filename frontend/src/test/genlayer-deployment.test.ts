@@ -10,6 +10,7 @@ const config: GenLayerNetworkConfig = {
   explorerUrl: 'https://explorer-studio-dev.genlayer.com',
   matchJudgeAddress: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
   evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
+  comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB',
 };
 
 const code = btoa('contract source');
@@ -25,7 +26,7 @@ describe('Studio Next deployment verification', () => {
       return Promise.resolve(new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result })));
     };
 
-    await expect(verifyStudioNextDeployments(config, fetcher as typeof fetch, { matchJudge: hash, evaluationJudge: hash })).resolves.toMatchObject({ state: 'VERIFIED' });
+    await expect(verifyStudioNextDeployments(config, fetcher as typeof fetch, { matchJudge: hash, evaluationJudge: hash, comparisonJudge: hash })).resolves.toMatchObject({ state: 'VERIFIED', comparisonJudgeVerified: true });
   });
 
   it('requires chain 61997, schemas and exact deployed source bytes', async () => {
@@ -41,20 +42,21 @@ describe('Studio Next deployment verification', () => {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('contract source'));
     const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
-    await expect(verifyStudioNextDeployments(config, fetcher as typeof fetch, { matchJudge: hash, evaluationJudge: hash })).resolves.toEqual({
+    await expect(verifyStudioNextDeployments(config, fetcher as typeof fetch, { matchJudge: hash, evaluationJudge: hash, comparisonJudge: hash })).resolves.toEqual({
       state: 'VERIFIED',
       chainId: 61997,
       matchJudgeVerified: true,
       evaluationJudgeVerified: true,
+      comparisonJudgeVerified: true,
     });
-    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(fetcher).toHaveBeenCalledTimes(7);
     expect(fetcher.mock.calls.every(([url]) => url === config.rpcUrl)).toBe(true);
   });
 
   it('stops before contract reads on another chain', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: '0xf22f' })));
     await expect(verifyStudioNextDeployments(config, fetcher as typeof fetch)).resolves.toEqual({
-      state: 'WRONG_CHAIN', chainId: 61999, matchJudgeVerified: false, evaluationJudgeVerified: false,
+      state: 'WRONG_CHAIN', chainId: 61999, matchJudgeVerified: false, evaluationJudgeVerified: false, comparisonJudgeVerified: false,
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
