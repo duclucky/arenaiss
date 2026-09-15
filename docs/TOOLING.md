@@ -44,6 +44,18 @@ The default system Python observed during discovery was `3.13.14`. GenLayer work
 - No contract, frontend, deployment, or network transaction was created as part of tooling discovery.
 - Boilerplate sample applications are not copied. Any later extraction must be minimal, attributed, version-reviewed, and stripped of unrelated sample behavior.
 
+## Adapted brand marks
+
+The homepage technology ticker uses only the compact mark geometry needed by
+the project-owned React component. It does not import or vendor an upstream
+application tree.
+
+| Mark | Exact source | Adaptation |
+| --- | --- | --- |
+| Arc | Official `logo-ondark.svg` served by [arc.io](https://arc.io/) on `2026-09-15` | Mark-only path, rendered with the ticker foreground color |
+| USDC | Official Circle Brand Kit `Token Logo/USDC Token.svg`, downloaded from the [Circle pressroom](https://www.circle.com/pressroom#brandkit) on `2026-09-15` | Unmodified token-logo paths and official `#0B53BF` fill |
+| GenLayer | `.tools/genlayer-project-boilerplate/frontend/components/Logo.tsx` at `816f3b88175032f10242e278c0d13d75f185c882` | Strong Mark path only, rendered with the ticker foreground color |
+
 ## Refresh procedure
 
 Before refreshing, confirm the checkout is clean and inspect upstream changes. Fetching a new revision must be intentional; never let an automated agent silently move the tool baseline.
