@@ -31,6 +31,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\packages\evaluation\test\comparison.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\tournament-comparison.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\tournament-runner.test.ts" `
+  "$PSScriptRoot\..\packages\marketplace\test\eligibility.test.ts" `
   "$PSScriptRoot\..\packages\genlayer\test\tracker.test.ts" `
   "$PSScriptRoot\..\packages\genlayer\test\sdk-port.test.ts" `
   "$PSScriptRoot\..\packages\genlayer\test\evaluation-sdk-port.test.ts" `

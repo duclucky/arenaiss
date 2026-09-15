@@ -417,6 +417,19 @@ refund and zero-liability rules remain unchanged.
 The executable tool sandbox remains an optional compute-dependent Level 3
 roadmap item, not the current critical path.
 
+Marketplace phases `MKT-0` through `MKT-2` are implemented locally. The locked
+eligibility policy requires six scenarios with two finalized runs each, exact
+Agent/version/Test Pack/rubric/network bindings, 100% coverage, bounded score
+spread, minimum overall/dimension scores and zero critical deterministic
+findings. `AgentRegistryV2` preserves the immutable version/commitment while
+allowing ownership transfer only through its one-time configured Marketplace.
+`AgentMarketplace` accepts only operator-authorized eligibility digests, escrows
+ERC-20 USDC, transfers ownership atomically and fixes the platform fee at 100
+basis points (1%) with seller/platform pull credits. No contract has been
+deployed, no eligibility has been authorized onchain and no USDC transaction
+was made. Persistent API/delivery (`MKT-3`), browser/Circle flows (`MKT-4`) and
+an authorized Arc lifecycle (`MKT-5`) remain open.
+
 The remaining real browser-wallet lane stays open for the existing Tournament
 mode: connect a detected EVM wallet, switch/add Arc Testnet, submit a real
 registration from the frontend, expose submitted/confirmed/canonical readback,

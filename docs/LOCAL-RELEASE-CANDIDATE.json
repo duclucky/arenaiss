@@ -1,9 +1,9 @@
 {
   "schema": "arena-local-release-candidate-v1",
-  "createdAt": "2026-09-15",
+  "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
-  "fileCount": 255,
-  "sourceBundleSha256": "f1b86488849558d317bf77034a79ba30b27a227b13b81212e70662da74f21c1d",
+  "fileCount": 260,
+  "sourceBundleSha256": "f3d1e9514b4698ff9cd222f61438284a20a55610584764164b29858ff676aae4",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -37,13 +37,18 @@
   "criticalFiles": {
     "contracts/arc/TournamentEscrow.sol": "a243077315941524bc48eb863668aab37a72749f46e238621fe937de96257803",
     "contracts/arc/AgentRegistry.sol": "bb44f1593d12756e4fc32771265136cfb79cad184959b06b3f2ed86c4de8c5ad",
+    "contracts/arc/AgentRegistryV2.sol": "56be72a3d60e356cbd242a0fd87c4ec80f1ad50af5036c2bd6a3ff5779ba0a9e",
+    "contracts/arc/AgentMarketplace.sol": "f9582937b55598e61684117a8b46d5339c09e55538389b69a85c9ff1b8f9b109",
+    "contracts/arc/test/AgentMarketplace.t.sol": "d71d657e5c67f3f4d7ae6d1325243d898e4f6a179fa2c854c90de38fa96ba79e",
     "contracts/arc/test/AgentRegistry.t.sol": "bf7e0124cc077c2b83f3f9bb3c72a3fa33bd1556dbf0fbe7b308545b07ee4de1",
     "contracts/archive/ArenaMatchJudge.py": "a90bcbfac8dc9925a1e0f93e7b69ab3661ae2119f8f08a371336b55834ad13c8",
     "contracts/AgentEvaluationJudge.py": "74682ca3f45cce2d344cc670260b3a99914fec4ee47e0fb93f6e256b40598454",
     "frontend/package-lock.json": "9d5d7296a67a1599380da2db3c812b030d69290dabc18a304dd176735a197815",
     "package-lock.json": "9cd79018494cbed4c11d7822193f7e19fc5fc63a47ae98faea55468c2728594c",
     "package.json": "b23c174fb806132683373d7ab2fca50a388df18319648c990b9f65903e74e84b",
-    "scripts/check.ps1": "a0e15865558f150481d01ebc7992cd5a206aaff7cf1029cb32492eb7b80107d7",
+    "scripts/check.ps1": "d39ce1b13063f9f4457722a55ac78c653f7026a95cea3749016be3aa2aa5f1d3",
+    "packages/marketplace/src/eligibility.ts": "a1e5dc7f6b343cf401708f1c2b95eb5c5176a15621d88db6c2cf25a158be61c5",
+    "packages/marketplace/test/eligibility.test.ts": "36bcac03f9709e4d70435e66dc1d3587929ca45c595daec6e7a83313cd2a051c",
     "scripts/deploy-agent-registry.mjs": "0b883360eaafe94257373f50d8838f6602e94224358d98be4259e453ee719f36",
     "scripts/deploy-agent-registry-circle.mjs": "d497a77ec6527298e706577db065c3f19686c07e93c746962078fc0e9c478a38",
     "packages/evaluation/src/run-tracker.ts": "4df39ede74835dca3b84c8812e63ccacae20c42a24078986cd89677390aaf01a",
@@ -104,8 +109,8 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 204,
-    "foundryTests": 17,
+    "typescriptTests": 207,
+    "foundryTests": 20,
     "frontendTests": 59
   },
   "claims": [
