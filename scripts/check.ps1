@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $env:PYTHONUTF8 = '1'
 $env:GENVM_VERSION = 'v0.6.0-rc5'
 
-& "$PSScriptRoot\..\.venv\Scripts\genvm-lint.exe" check "$PSScriptRoot\..\contracts\ArenaMatchJudge.py"
+& "$PSScriptRoot\..\.venv\Scripts\genvm-lint.exe" check "$PSScriptRoot\..\contracts\archive\ArenaMatchJudge.py"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & "$PSScriptRoot\..\.venv\Scripts\genvm-lint.exe" check "$PSScriptRoot\..\contracts\AgentEvaluationJudge.py"

@@ -2,7 +2,6 @@ import { createAccount, createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 
 import type { GenLayerPort, JudgePair } from './tracker.ts';
-import { studioNextChain } from './studio-next.ts';
 
 type SdkClient = {
   estimateTransactionFeesForWrite(input: WriteInput): Promise<FeeQuote>;
@@ -45,14 +44,4 @@ export function createStudionetGenLayerPort(privateKey: string): SdkGenLayerPort
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new Error('GenLayer operator private key is invalid');
   const account = createAccount(privateKey as `0x${string}`);
   return new SdkGenLayerPort(createClient({ chain: studionet, account }) as unknown as SdkClient);
-}
-
-export function createStudioDevGenLayerPort(privateKey: string): SdkGenLayerPort {
-  return createStudioNextGenLayerPort(privateKey);
-}
-
-export function createStudioNextGenLayerPort(privateKey: string): SdkGenLayerPort {
-  if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new Error('GenLayer operator private key is invalid');
-  const account = createAccount(privateKey as `0x${string}`);
-  return new SdkGenLayerPort(createClient({ chain: studioNextChain(), account }) as unknown as SdkClient);
 }

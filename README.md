@@ -154,29 +154,25 @@ target for continued compatibility work, but it may reset and is not durable
 deployment evidence. Every network write still requires explicit action-time
 authorization.
 
-The active Studio Next preview deployments are `ArenaMatchJudge`
-`GeneralResponseV7` at
-[`0xbd55...B679`](https://explorer-studio-dev.genlayer.com/address/0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679)
-and `AgentEvaluationJudge` `AgentEvaluationV5` at
-[`0x0aA2...934d`](https://explorer-studio-dev.genlayer.com/address/0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d).
-Both deployments finalized with exact source readback and successful semantic
-smoke transactions after migrating the custom validator call to GenVM v0.3's
-`gl.vm.run_nondet` API. Sanitized evidence is in
-[`docs/evidence/studio-dev/redeployment-2026-09-14.json`](docs/evidence/studio-dev/redeployment-2026-09-14.json).
-Canonical Studio Next endpoint and source/schema alias verification is in
-[`docs/evidence/studio-next/verification-2026-09-14.json`](docs/evidence/studio-next/verification-2026-09-14.json).
-
-The EVAL-6 comparison judge `ArenaComparisonJudge` (`AgentComparisonV1`) is
-deployed on Studio Next at
+The active Studio Next preview deployments are `AgentEvaluationJudge`
+`AgentEvaluationV5` at
+[`0x0aA2...934d`](https://explorer-studio-dev.genlayer.com/address/0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d)
+and the EVAL-6 comparison judge `ArenaComparisonJudge`
+(`AgentComparisonV1`) at
 [`0xe521...74BcB`](https://explorer-studio-dev.genlayer.com/address/0xe5210eCCC4182090A1416f515Dc7001B27274BcB).
-Its deployment and final-address deterministic comparison smoke both finalized
+Their deployment and semantic smoke evidence finalized successfully with exact
+source readback. The former Studio Next `ArenaMatchJudge` at `0xbd55...B679`
+is archived: it remains on-chain and in immutable historical evidence, but is
+no longer part of runtime configuration, deployment verification or new writes.
+The comparison deployment and final-address deterministic smoke both finalized
 successfully with exact source and canonical readback evidence in
 [`docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json`](docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json).
 
-The active judge deployment is revision V10 of `ArenaMatchJudge`, using
+The historical Studionet judge deployment is revision V10 of `ArenaMatchJudge`, using
 the `GeneralResponseV7` rubric, at
 [`0x09Ba...b130`](https://explorer-studio.genlayer.com/address/0x09Ba3CE193E477a66Fdaf556bA63519A767eb130)
-on Studionet (`61999`). The active Arc Testnet escrow is verified V2 at
+on Studionet (`61999`). It is retained for historical readback only and receives
+no new writes. The active Arc Testnet escrow is verified V2 at
 [`0xc908...702B`](https://testnet.arcscan.app/address/0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B?tab=contract).
 The active Arc Testnet `AgentRegistry` is exact-match verified at
 [`0x4c0b...9E25`](https://testnet.arcscan.app/address/0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25?tab=contract).

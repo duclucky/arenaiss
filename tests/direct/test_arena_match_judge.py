@@ -4,7 +4,7 @@ import json
 import pytest
 
 
-CONTRACT_PATH = "contracts/ArenaMatchJudge.py"
+CONTRACT_PATH = "contracts/archive/ArenaMatchJudge.py"
 RUBRIC = "GeneralResponseV7"
 CRITERIA = ("relevance", "task_completion", "reasoning_quality", "clarity", "safety")
 

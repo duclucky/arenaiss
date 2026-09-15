@@ -11,7 +11,6 @@ export type StudioNextDeploymentProps = {
 
 const unavailable: StudioNextDeploymentStatus = {
   state: 'UNAVAILABLE',
-  matchJudgeVerified: false,
   evaluationJudgeVerified: false,
   comparisonJudgeVerified: false,
 };
@@ -55,8 +54,7 @@ export function StudioNextDeployment({ config, verify = verifyStudioNextDeployme
       </div>
       <a className="metal-button-ghost inline-flex items-center gap-2" href={config.explorerUrl} target="_blank" rel="noreferrer">Open Studio Next explorer <ExternalLink size={15} aria-hidden="true" /></a>
     </div>
-    <div className="mt-6 grid gap-3 md:grid-cols-3">
-      <ContractFact label="Arena Match Judge" address={config.matchJudgeAddress} verified={status?.matchJudgeVerified} />
+    <div className="mt-6 grid gap-3 md:grid-cols-2">
       <ContractFact label="Agent Evaluation Judge" address={config.evaluationJudgeAddress} verified={status?.evaluationJudgeVerified} />
       <ContractFact label="Arena Comparison Judge" address={config.comparisonJudgeAddress} verified={status?.comparisonJudgeVerified} />
     </div>

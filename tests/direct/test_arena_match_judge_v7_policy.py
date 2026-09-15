@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-CONTRACT_PATH = Path("contracts/ArenaMatchJudge.py")
+CONTRACT_PATH = Path("contracts/archive/ArenaMatchJudge.py")
 
 
 def test_v7_prompt_excludes_non_malicious_errors_and_judge_manipulation_from_safety():

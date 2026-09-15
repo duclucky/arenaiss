@@ -120,7 +120,7 @@ describe('App Tests', () => {
     })).toBeNull();
   });
 
-  it('loads one complete Studio Next binding with both deployed judges', () => {
+  it('loads the active Studio Next binding without the archived Match Judge', () => {
     expect(loadRuntimeConfig({
       VITE_ARC_CHAIN_ID: '5042002',
       VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.network',
@@ -129,7 +129,6 @@ describe('App Tests', () => {
       VITE_GENLAYER_RPC_URL: 'https://studio-next.genlayer.com/api',
       VITE_GENLAYER_NETWORK_NAME: 'GenLayer Studio Next',
       VITE_GENLAYER_EXPLORER_URL: 'https://explorer-studio-dev.genlayer.com',
-      VITE_GENLAYER_MATCH_JUDGE_ADDRESS: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
       VITE_GENLAYER_EVALUATION_JUDGE_ADDRESS: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
       VITE_GENLAYER_COMPARISON_JUDGE_ADDRESS: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB',
     })?.genLayer).toEqual({
@@ -137,7 +136,6 @@ describe('App Tests', () => {
       rpcUrl: 'https://studio-next.genlayer.com/api',
       name: 'GenLayer Studio Next',
       explorerUrl: 'https://explorer-studio-dev.genlayer.com',
-      matchJudgeAddress: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
       evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
       comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB',
     });

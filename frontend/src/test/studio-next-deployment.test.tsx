@@ -9,17 +9,15 @@ const config: GenLayerNetworkConfig = {
   rpcUrl: 'https://studio-next.genlayer.com/api',
   name: 'GenLayer Studio Next',
   explorerUrl: 'https://explorer-studio-dev.genlayer.com',
-  matchJudgeAddress: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679',
   evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d',
   comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB',
 };
 
 describe('Studio Next deployment card', () => {
-  it('shows a publicly verifiable binding for both deployed judges', async () => {
+  it('shows only the two active Studio Next judges', async () => {
     const verify = vi.fn().mockResolvedValue({
       state: 'VERIFIED',
       chainId: 61997,
-      matchJudgeVerified: true,
       evaluationJudgeVerified: true,
       comparisonJudgeVerified: true,
     });
@@ -28,7 +26,7 @@ describe('Studio Next deployment card', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Verifying on Studio Next');
     expect(await screen.findByText('Verified on chain 61997')).toBeInTheDocument();
-    expect(screen.getByText(config.matchJudgeAddress)).toBeInTheDocument();
+    expect(screen.queryByText('Arena Match Judge')).not.toBeInTheDocument();
     expect(screen.getByText(config.evaluationJudgeAddress)).toBeInTheDocument();
     expect(screen.getByText(config.comparisonJudgeAddress)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Studio Next explorer' })).toHaveAttribute('href', config.explorerUrl);
