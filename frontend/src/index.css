@@ -333,10 +333,17 @@ button:disabled { cursor: not-allowed; }
 }
 .retro-icon-button { width: 44px; padding: 0; }
 .login-method-button { justify-content: flex-start !important; text-align: left; }
-.wallet-action-form { display: flex; flex-direction: column; gap: 12px; }
+.wallet-action-grid { align-items: stretch; }
+.wallet-action-form {
+  display: grid;
+  grid-template-rows: auto auto 52px minmax(18px, auto) auto 52px 44px;
+  align-content: start;
+  gap: 10px 0;
+}
 .wallet-action-form :is(input, select) { min-height: 52px; }
+.wallet-action-form__hint { min-height: 18px; }
 @media (min-width: 1024px) {
-  .wallet-action-form__intro { min-height: 84px; }
+  .wallet-action-form__intro { min-height: 112px; }
 }
 .login-method-button > svg { flex: 0 0 24px; }
 .appear { animation: in-soft .7s cubic-bezier(.16,1,.3,1) both; animation-delay: var(--delay,0s); }

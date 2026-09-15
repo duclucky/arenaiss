@@ -1,11 +1,14 @@
 import { useAppContext } from '../context';
 import { ChevronRight, Copy, ShieldAlert } from 'lucide-react';
-import type { ManagedUsdcBalance, ManagedWalletTransaction } from '../adapters/interfaces';
-import { useState, useEffect } from 'react';
+import type { ManagedCctpTransfer, ManagedUsdcBalance, ManagedWalletTransaction } from '../adapters/interfaces';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type CreditRow = { tournamentId: string; credit: string };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
+type WalletAction =
+  | { kind: 'transfer'; state: 'submitting' | 'done' | 'error'; result?: ManagedWalletTransaction; message?: string }
+  | { kind: 'bridge'; state: 'submitting' | 'done' | 'error'; operation?: ManagedCctpTransfer; message?: string };
 
 export function Account() {
   const { account, managedAccount, agentApi, networkConfig, disconnectWallet, wallet } = useAppContext();
@@ -26,7 +29,10 @@ export function Account() {
   const [transferAmount, setTransferAmount] = useState('');
   const [bridgeChain, setBridgeChain] = useState('ETH-SEPOLIA');
   const [bridgeAmount, setBridgeAmount] = useState('');
-  const [walletAction, setWalletAction] = useState<{ kind: 'transfer' | 'bridge'; state: 'submitting' | 'done' | 'error'; result?: ManagedWalletTransaction; message?: string } | null>(null);
+  const [walletAction, setWalletAction] = useState<WalletAction | null>(null);
+  const bridgeableBalances = useMemo(() => managedBalances.filter((row) => !row.isArc && row.available && baseUnits(row.amount) > 0n), [managedBalances]);
+  const selectedBridgeBalance = useMemo(() => managedBalances.find((row) => row.chain === bridgeChain), [bridgeChain, managedBalances]);
+  const selectedBridgeHasUsdc = Boolean(selectedBridgeBalance?.available && baseUnits(selectedBridgeBalance.amount) > 0n);
 
   useEffect(() => {
     if (managedAccount && managedIdentity?.listUsdcBalances) {
@@ -47,6 +53,36 @@ export function Account() {
       setBalanceState('unavailable');
     }
   }, [account, balanceReload, managedAccount, managedIdentity, networkConfig, wallet]);
+
+  useEffect(() => {
+    const firstAvailable = bridgeableBalances.find((row) => CCTP_CHAINS.some(([chain]) => chain === row.chain));
+    if (firstAvailable && !selectedBridgeHasUsdc) setBridgeChain(firstAvailable.chain);
+  }, [bridgeableBalances, selectedBridgeHasUsdc]);
+
+  useEffect(() => {
+    if (walletAction?.kind !== 'bridge' || walletAction.state !== 'submitting' || !walletAction.operation?.operationId || !managedIdentity?.getCctpTransfer) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const operation = await managedIdentity.getCctpTransfer!(walletAction.operation!.operationId);
+        if (cancelled) return;
+        if (operation.state === 'FAILED') {
+          setWalletAction({ kind: 'bridge', state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
+          return;
+        }
+        if (operation.state === 'SUBMITTED') {
+          setWalletAction({ kind: 'bridge', state: 'done', operation });
+          setBridgeAmount('');
+          setBalanceReload((value) => value + 1);
+          return;
+        }
+        setWalletAction({ kind: 'bridge', state: 'submitting', operation });
+      } catch (reason) {
+        if (!cancelled) setWalletAction({ kind: 'bridge', state: 'error', operation: walletAction.operation, message: reason instanceof Error ? reason.message : 'Could not refresh CCTP status.' });
+      }
+    }, 2500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [managedIdentity, walletAction]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +151,7 @@ export function Account() {
 
   async function submitTransfer(event: React.FormEvent) {
     event.preventDefault();
-    if (!managedIdentity?.transferUsdc || !window.confirm(`Transfer ${transferAmount} USDC on Arc to ${destinationAddress}?`)) return;
+    if (!managedIdentity?.transferUsdc) return;
     setWalletAction({ kind: 'transfer', state: 'submitting' });
     try {
       const result = await managedIdentity.transferUsdc(destinationAddress, transferAmount);
@@ -128,12 +164,26 @@ export function Account() {
 
   async function submitBridge(event: React.FormEvent) {
     event.preventDefault();
-    if (!managedIdentity?.bridgeUsdcToArc || !window.confirm(`Bridge ${bridgeAmount} USDC from ${bridgeChain} to Arc Testnet?`)) return;
+    if (!managedIdentity?.bridgeUsdcToArc) return;
+    if (!selectedBridgeHasUsdc) {
+      setWalletAction({ kind: 'bridge', state: 'error', message: 'Select a source network with available USDC.' });
+      return;
+    }
+    if (selectedBridgeBalance && baseUnits(selectedBridgeBalance.amount) < baseUnits(bridgeAmount)) {
+      setWalletAction({ kind: 'bridge', state: 'error', message: 'Source network USDC balance is insufficient.' });
+      return;
+    }
     setWalletAction({ kind: 'bridge', state: 'submitting' });
     try {
-      const result = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
-      setWalletAction({ kind: 'bridge', state: 'done', result });
-      setBridgeAmount(''); setBalanceReload((value) => value + 1);
+      const operation = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
+      if (operation.state === 'FAILED') {
+        setWalletAction({ kind: 'bridge', state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
+      } else if (operation.state === 'SUBMITTED') {
+        setWalletAction({ kind: 'bridge', state: 'done', operation });
+        setBridgeAmount(''); setBalanceReload((value) => value + 1);
+      } else {
+        setWalletAction({ kind: 'bridge', state: 'submitting', operation });
+      }
     } catch (reason) {
       setWalletAction({ kind: 'bridge', state: 'error', message: reason instanceof Error ? reason.message : 'Bridge failed.' });
     }
@@ -177,10 +227,13 @@ export function Account() {
 
             <div>
               <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-1">USDC Balance</label>
-              <div className="text-4xl font-medium tracking-[-.04em] tabular-nums">
-                {balanceState === 'loading' && <span role="status" className="text-muted-foreground animate-pulse">Loading...</span>}
-                {balanceState === 'unavailable' && <span role="alert" className="text-destructive text-base font-normal">Unavailable</span>}
-                {balanceState !== 'loading' && balanceState !== 'unavailable' && <span>{balanceState} USDC</span>}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <div className="text-4xl font-medium tracking-[-.04em] tabular-nums">
+                  {balanceState === 'loading' && <span role="status" className="text-muted-foreground animate-pulse">Loading...</span>}
+                  {balanceState === 'unavailable' && <span role="alert" className="text-destructive text-base font-normal">Unavailable</span>}
+                  {balanceState !== 'loading' && balanceState !== 'unavailable' && <span>{balanceState} USDC</span>}
+                </div>
+                <a className="metal-button-ghost" href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Faucet USDC on Arc</a>
               </div>
             </div>
 
@@ -200,22 +253,28 @@ export function Account() {
               </ul>}
             </div>}
 
-            {managedAccount && <div className="grid gap-5 border-t border-border pt-6 lg:grid-cols-2">
+            {managedAccount && <div className="wallet-action-grid grid gap-5 border-t border-border pt-6 lg:grid-cols-2">
               <form className="wallet-action-form" onSubmit={submitBridge}>
                 <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Bridge USDC to Arc Testnet</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source SCA needs USDC for the transfer and CCTP fee; Gas Station sponsors source-network gas when its policy applies.</p></div>
                 <label className="block text-sm font-bold" htmlFor="bridge-chain">Source network</label>
                 <select id="bridge-chain" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
-                  {CCTP_CHAINS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                  {CCTP_CHAINS.map(([value, label]) => {
+                    const balance = managedBalances.find((row) => row.chain === value);
+                    const hasUsdc = Boolean(balance?.available && baseUnits(balance.amount) > 0n);
+                    return <option value={value} key={value} disabled={!hasUsdc}>{label}{hasUsdc ? ` · ${formatDisplayAmount(balance!.amount)} USDC` : ' · no USDC'}</option>;
+                  })}
                 </select>
+                <p className="wallet-action-form__hint text-xs font-semibold text-amber-900">{!selectedBridgeHasUsdc ? 'Choose a source network with available testnet USDC before bridging.' : ''}</p>
                 <label className="block text-sm font-bold" htmlFor="bridge-amount">Amount (USDC)</label>
                 <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
-                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Bridge to Arc Testnet</button>
+                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting' || !selectedBridgeHasUsdc}>Bridge to Arc Testnet</button>
               </form>
 
               <form className="wallet-action-form" onSubmit={submitTransfer}>
                 <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Withdraw</h2><p className="mt-1 text-sm text-muted-foreground">Transfer testnet USDC to an EVM wallet on Arc.</p></div>
                 <label className="block text-sm font-bold" htmlFor="withdraw-address">Recipient wallet</label>
                 <input id="withdraw-address" className="retro-inset w-full p-3 font-mono text-sm" placeholder="0x…" required pattern="^0x[0-9a-fA-F]{40}$" value={destinationAddress} onChange={(event) => setDestinationAddress(event.target.value)} />
+                <p className="wallet-action-form__hint text-xs font-semibold text-amber-900" aria-hidden="true"></p>
                 <label className="block text-sm font-bold" htmlFor="withdraw-amount">Amount (USDC)</label>
                 <input id="withdraw-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} />
                 <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Withdraw USDC</button>
@@ -223,11 +282,14 @@ export function Account() {
             </div>}
 
             {walletAction && <div role={walletAction.state === 'error' ? 'alert' : 'status'} className={walletAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
-              {walletAction.state === 'submitting' && 'Submitting securely through Circle…'}
+              {walletAction.state === 'submitting' && (walletAction.kind === 'bridge' && walletAction.operation ? cctpStatusText(walletAction.operation) : 'Submitting securely through Circle…')}
               {walletAction.state === 'error' && walletAction.message}
-              {walletAction.state === 'done' && <>Transaction submitted · {walletAction.result?.explorerUrl
+              {walletAction.state === 'done' && walletAction.kind === 'transfer' && <>Transaction submitted · {walletAction.result?.explorerUrl
                 ? <a className="underline" href={walletAction.result.explorerUrl} target="_blank" rel="noreferrer">View transaction</a>
                 : walletAction.result?.transactionId}</>}
+              {walletAction.state === 'done' && walletAction.kind === 'bridge' && <>CCTP source burn submitted · {walletAction.operation?.explorerUrl
+                ? <a className="underline" href={walletAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
+                : walletAction.operation?.transactionId}</>}
             </div>}
 
             <div className="pt-4 border-t border-border flex justify-end">
@@ -298,6 +360,19 @@ function formatDisplayAmount(value: string): string {
   const [whole, fraction = ''] = value.split('.');
   const trimmed = fraction.replace(/0+$/, '');
   return trimmed ? `${whole}.${trimmed}` : `${whole}.00`;
+}
+
+function baseUnits(value: string): bigint {
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(value)) return 0n;
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0');
+}
+
+function cctpStatusText(operation: ManagedCctpTransfer): string {
+  if (operation.state === 'PENDING') return 'CCTP transfer queued. Preparing Circle operation...';
+  if (operation.state === 'APPROVING') return 'Approving USDC spend on the source network...';
+  if (operation.state === 'BURNING') return 'Burning source USDC and forwarding to Arc Testnet...';
+  return 'Refreshing CCTP transfer status...';
 }
 
 const CCTP_CHAINS = [

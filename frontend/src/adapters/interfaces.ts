@@ -151,6 +151,17 @@ export type ManagedAccount = {
 
 export type ManagedUsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
 export type ManagedWalletTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
+export type ManagedCctpTransfer = {
+  operationId: string;
+  state: 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED';
+  sourceChain: string;
+  amount: string;
+  transactionId?: string;
+  txHash?: string;
+  explorerUrl?: string;
+  message?: string;
+  updatedAt: number;
+};
 
 export interface ManagedIdentityAdapter {
   capabilities(): Promise<{ wallet: true; email: boolean; managedWallet: boolean }>;
@@ -160,7 +171,8 @@ export interface ManagedIdentityAdapter {
   verifyEmail(email: string, code: string): Promise<ManagedAccount>;
   listUsdcBalances?(): Promise<ManagedUsdcBalance[]>;
   transferUsdc?(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction>;
-  bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedWalletTransaction>;
+  bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedCctpTransfer>;
+  getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
   logout(): Promise<void>;
 }
 

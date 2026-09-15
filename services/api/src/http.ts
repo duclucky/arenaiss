@@ -52,7 +52,12 @@ export class ArenaHttpApi {
       }
       if (request.method === 'POST' && request.path === '/api/account/cctp-transfers') {
         const session = this.requireManagedSession(request.headers);
-        return this.json(202, await this.managedIdentity!.bridgeUsdcToArc(session.userId!, requireString(request.body?.sourceChain), requireString(request.body?.amount)));
+        return this.json(202, await this.managedIdentity!.startBridgeUsdcToArc(session.userId!, requireString(request.body?.sourceChain), requireString(request.body?.amount)));
+      }
+      const cctpTransferMatch = request.path.match(/^\/api\/account\/cctp-transfers\/([0-9a-fA-F-]{36})$/);
+      if (request.method === 'GET' && cctpTransferMatch) {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(200, this.managedIdentity!.getCctpTransfer(session.userId!, cctpTransferMatch[1]));
       }
       if (request.method === 'GET' && request.path === '/api/tournaments') return this.json(200, this.service.listTournaments());
       const tournamentMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})$/);
