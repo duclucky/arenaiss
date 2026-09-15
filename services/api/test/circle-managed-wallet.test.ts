@@ -87,6 +87,28 @@ test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submit
   assert.deepEqual(transfers[0].amount, ['1.25']);
 });
 
+test('Circle adapter holds an Evo fee through completed Arc approval and escrow deposit', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `fee-${executions.length}` } }; },
+    async getTransaction({ id, waitForState }: any) { return { data: { transaction: { id, state: waitForState, txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+
+  const result = await adapter.holdEvaluationFee({
+    walletId: 'wallet-id', escrowAddress: '0x4444444444444444444444444444444444444444',
+    campaignId: `sha256:${'a'.repeat(64)}`, amountUsdc: '1.25',
+    approvalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+    depositIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+  });
+
+  assert.deepEqual(executions.map((row) => ({ contractAddress: row.contractAddress, signature: row.abiFunctionSignature, parameters: row.abiParameters, key: row.idempotencyKey })), [
+    { contractAddress: '0x3600000000000000000000000000000000000000', signature: 'approve(address,uint256)', parameters: ['0x4444444444444444444444444444444444444444', '1250000'], key: '11111111-1111-4111-8111-111111111111' },
+    { contractAddress: '0x4444444444444444444444444444444444444444', signature: 'deposit(bytes32)', parameters: [`0x${'a'.repeat(64)}`], key: '22222222-2222-4222-8222-222222222222' },
+  ]);
+  assert.equal(result.approval.state, 'COMPLETE');
+  assert.equal(result.deposit.state, 'COMPLETE');
+});
+
 test('Circle adapter reuses separately persisted approval and burn idempotency keys', async () => {
   const executions: any[] = [];
   const progress: string[] = [];

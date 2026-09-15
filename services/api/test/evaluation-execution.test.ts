@@ -7,55 +7,122 @@ import { EvaluationExecutionService } from '../src/evaluation-execution.ts';
 const campaignId = `sha256:${'a'.repeat(64)}`;
 const owner = `0x${'1'.repeat(40)}`;
 const operator = `0x${'2'.repeat(40)}`;
+const escrow = `0x${'3'.repeat(40)}`;
+const tx = (digit: string) => ({ transactionId: `circle-${digit}`, state: 'COMPLETE', txHash: `0x${digit.repeat(64)}` });
 
-test('Evo charges the configured USDC fee once and keeps GenLayer gas outside the fee boundary', async () => {
+test('Evo holds one fixed USDC fee then releases it only after all tests finalize', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
-    const transfers: any[] = []; let advances = 0;
-    const campaign = { campaignId, owner, state: 'PENDING' } as any;
+    const holds: any[] = []; const releases: string[] = []; let advances = 0;
+    const campaign: any = { campaignId, owner, state: 'PENDING' };
     const service = new EvaluationExecutionService({
-      runtime, operatorAddress: operator, feeUsdc: '1.25',
-      fees: { async transferUsdcWithIdempotency(userId, destinationAddress, amount, idempotencyKey) { transfers.push({ userId, destinationAddress, amount, idempotencyKey }); return { transactionId: 'circle_1', state: 'SUBMITTED' }; } },
-      model: 'cheap-5.6-sol', runner: { get: () => campaign, async advance() { advances += 1; return campaign; } } as any,
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
+      fees: { async holdEvaluationFee(input: any) { holds.push(input); return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release(id: string) { releases.push(id); return tx('3'); }, async refund() { throw new Error('unexpected refund'); } },
+      runner: { get: () => campaign, async advance() { advances += 1; campaign.state = advances === 2 ? 'FINALIZED' : 'RUNNING'; return structuredClone(campaign); }, failInfrastructure() { throw new Error('unexpected failure'); } } as any,
     });
 
     await service.start('usr_owner', owner, campaignId);
-    await service.start('usr_owner', owner, campaignId);
-
-    assert.equal(transfers.length, 1);
-    assert.deepEqual({ ...transfers[0], idempotencyKey: '<uuid>' }, { userId: 'usr_owner', destinationAddress: operator, amount: '1.25', idempotencyKey: '<uuid>' });
-    assert.match(transfers[0].idempotencyKey, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
-    assert.equal(advances, 2);
-    assert.equal(service.getFee(campaignId)?.state, 'SUBMITTED');
-    assert.equal(JSON.stringify(service.getFee(campaignId)).includes('gas'), false);
     await service.advance(owner, campaignId);
-    await assert.rejects(service.advance(`0x${'3'.repeat(40)}`, campaignId), /not found/);
+
+    assert.equal(holds.length, 1);
+    assert.equal(holds[0].escrowAddress, escrow);
+    assert.equal(holds[0].amountUsdc, '1');
+    assert.match(holds[0].approvalIdempotencyKey, /^[0-9a-f-]{36}$/i);
+    assert.match(holds[0].depositIdempotencyKey, /^[0-9a-f-]{36}$/i);
+    assert.deepEqual(releases, [campaignId]);
+    assert.equal(service.getFee(campaignId)?.state, 'RELEASED');
   } finally { runtime.close(); }
 });
 
-test('Evo retries a rejected fee with the same persisted UUID and advances only after submission', async () => {
+test('Evo refunds held USDC when the runner returns an infrastructure failure', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
-    let advances = 0;
-    const keys: string[] = []; let calls = 0;
+    const refunds: string[] = [];
+    const failed: any = { campaignId, owner, state: 'FAILED', items: [{ state: 'FAILED', failure: 'INFRASTRUCTURE_ERROR' }] };
     const service = new EvaluationExecutionService({
-      runtime, operatorAddress: operator, feeUsdc: '1',
-      fees: { async transferUsdcWithIdempotency(_userId, _destination, _amount, key) { keys.push(key); calls += 1; if (calls === 1) throw new Error('API parameter invalid'); return { transactionId: 'circle_2', state: 'SUBMITTED', txHash: `0x${'a'.repeat(64)}` }; } },
-      model: 'cheap-5.6-sol', runner: { get: () => ({ campaignId, owner }), async advance() { advances += 1; return {} as any; } } as any,
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { throw new Error('unexpected release'); }, async refund(id: string) { refunds.push(id); return tx('4'); } },
+      runner: { get: () => failed, async advance() { return failed; }, failInfrastructure() { return failed; } } as any,
     });
-    await assert.rejects(service.start('usr_owner', owner, campaignId), /API parameter invalid/);
-    assert.equal(advances, 0);
-    assert.equal(service.getFee(campaignId)?.state, 'FAILED');
-    await service.start('usr_owner', owner, campaignId);
-    assert.equal(advances, 1);
-    assert.equal(keys[0], keys[1]);
-    assert.match(keys[0], /^[0-9a-f-]{36}$/i);
+
+    const result = await service.start('usr_owner', owner, campaignId);
+    assert.equal(result.state, 'FAILED');
+    assert.deepEqual(refunds, [campaignId]);
+    assert.equal(service.getFee(campaignId)?.state, 'REFUNDED');
+    await service.advance(owner, campaignId);
+    assert.deepEqual(refunds, [campaignId]);
   } finally { runtime.close(); }
 });
 
-test('Evo requires the shared Tournament model instead of inventing a default', () => {
+test('unexpected runner errors become terminal infrastructure failures and refund', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
-    assert.throws(() => new EvaluationExecutionService({ runtime, operatorAddress: operator, feeUsdc: '1', fees: {} as any, runner: {} as any }), /model/i);
+    const failed: any = { campaignId, owner, state: 'FAILED', items: [{ state: 'FAILED', failure: 'INFRASTRUCTURE_ERROR' }] };
+    let marked = 0; let refunded = 0;
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { throw new Error('unexpected release'); }, async refund() { refunded += 1; return tx('4'); } },
+      runner: { get: () => ({ campaignId, owner, state: 'RUNNING' }), async advance() { throw new Error('canonical readback failed'); }, failInfrastructure() { marked += 1; return failed; } } as any,
+    });
+
+    const result = await service.start('usr_owner', owner, campaignId);
+    assert.equal(result.state, 'FAILED');
+    assert.equal(marked, 1);
+    assert.equal(refunded, 1);
+    assert.equal(service.getFee(campaignId)?.state, 'REFUNDED');
+  } finally { runtime.close(); }
+});
+
+test('concurrent terminal advances share one Arc settlement operation', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const finalized: any = { campaignId, owner, state: 'FINALIZED', items: [{ state: 'FINALIZED' }] };
+    let releases = 0;
+    let unblock!: () => void;
+    const blocked = new Promise<void>((resolve) => { unblock = resolve; });
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { releases += 1; await blocked; return tx('3'); }, async refund() { throw new Error('unexpected refund'); } },
+      runner: { get: () => finalized, async advance() { return finalized; }, failInfrastructure() { return finalized; } } as any,
+    });
+
+    const first = service.start('usr_owner', owner, campaignId);
+    await new Promise((resolve) => setImmediate(resolve));
+    const second = service.advance(owner, campaignId);
+    unblock();
+    await Promise.all([first, second]);
+
+    assert.equal(releases, 1);
+    assert.equal(service.getFee(campaignId)?.state, 'RELEASED');
+  } finally { runtime.close(); }
+});
+
+test('a refunded fee can never be released by a conflicting campaign projection', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const campaign: any = { campaignId, owner, state: 'FAILED', items: [{ state: 'FAILED', failure: 'INFRASTRUCTURE_ERROR' }] };
+    let releases = 0;
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { releases += 1; return tx('3'); }, async refund() { return tx('4'); } },
+      runner: { get: () => campaign, async advance() { return campaign; }, failInfrastructure() { return campaign; } } as any,
+    });
+
+    await service.start('usr_owner', owner, campaignId);
+    campaign.state = 'FINALIZED';
+    await assert.rejects(() => service.advance(owner, campaignId), /already refunded/i);
+    assert.equal(releases, 0);
+  } finally { runtime.close(); }
+});
+
+test('Evo requires the shared model and escrow configuration', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    assert.throws(() => new EvaluationExecutionService({ runtime, operatorAddress: operator, feeUsdc: '1', fees: {} as any, settlement: {} as any, runner: {} as any }), /escrow|model/i);
   } finally { runtime.close(); }
 });

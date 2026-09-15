@@ -146,6 +146,18 @@ test("transient provider failure gets a new bound attempt while second empty out
   assert.equal(judge.submissions.size, 0);
 });
 
+test("an unexpected infrastructure exception can terminally fail the active scenario without inventing a score", () => {
+  const runner = new SoloEvaluationRunner(new FixtureProvider(), new EvaluationRunTracker(new FixtureJudge(), new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
+  runner.start(campaign());
+  const failed = runner.failInfrastructure(digest("a"));
+  assert.equal(failed.state, "FAILED");
+  assert.equal(failed.items[0].state, "FAILED");
+  assert.equal(failed.items[0].failure, "INFRASTRUCTURE_ERROR");
+  assert.equal(failed.items[0].scorecard, undefined);
+  assert.equal(failed.items[1].state, "PENDING");
+  assert.deepEqual(runner.failInfrastructure(digest("a")), failed);
+});
+
 test("concurrent SOLO advance shares one paid operation", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });

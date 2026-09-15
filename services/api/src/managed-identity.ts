@@ -35,6 +35,7 @@ export type CircleWalletPort = {
   createWallet(input: { userId: string; idempotencyKey: string }): Promise<{ walletId: string; address: string }>;
   listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
   transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  holdEvaluationFee(input: { walletId: string; escrowAddress: string; campaignId: string; amountUsdc: string; approvalIdempotencyKey: string; depositIdempotencyKey: string }): Promise<{ approval: WalletTransactionResult; deposit: WalletTransactionResult }>;
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -69,6 +70,7 @@ export type ManagedIdentityOptions = {
   now?: () => number;
   agentRegistryAddress?: string;
   marketplaceAddress?: string;
+  evaluationEscrowAddress?: string;
 };
 
 export class ManagedIdentityService {
@@ -80,6 +82,7 @@ export class ManagedIdentityService {
   private readonly now: () => number;
   private readonly agentRegistryAddress?: string;
   private readonly marketplaceAddress?: string;
+  private readonly evaluationEscrowAddress?: string;
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
   private readonly cctpTransfers = new Map<string, Promise<void>>();
@@ -94,6 +97,7 @@ export class ManagedIdentityService {
     this.now = options.now ?? Date.now;
     this.agentRegistryAddress = options.agentRegistryAddress ? requireAddress(options.agentRegistryAddress) : undefined;
     this.marketplaceAddress = options.marketplaceAddress ? requireAddress(options.marketplaceAddress) : undefined;
+    this.evaluationEscrowAddress = options.evaluationEscrowAddress ? requireAddress(options.evaluationEscrowAddress) : undefined;
   }
 
   async loginWallet(address: string): Promise<ManagedAccount> {
@@ -162,6 +166,13 @@ export class ManagedIdentityService {
       amount: requireUsdcAmount(amount),
       idempotencyKey,
     });
+  }
+
+  async holdEvaluationFee(input: { userId: string; campaignId: string; amountUsdc: string; approvalIdempotencyKey: string; depositIdempotencyKey: string }): Promise<{ approval: WalletTransactionResult; deposit: WalletTransactionResult }> {
+    const wallet = this.requireReadyWallet(input.userId);
+    if (!this.evaluationEscrowAddress) throw new Error('evaluation fee escrow unavailable');
+    const { userId: _userId, ...fee } = input;
+    return this.circleWallets.holdEvaluationFee({ walletId: wallet.walletId, escrowAddress: this.evaluationEscrowAddress, ...fee });
   }
 
   async startBridgeUsdcToArc(userId: string, sourceChain: string, amount: string): Promise<CctpTransferOperation> {

@@ -214,7 +214,7 @@ export interface EvaluationApiAdapter {
   getRun(runId: string, privateView?: boolean): Promise<EvaluationRun & { scenario: Record<string, unknown>; provider: Record<string, unknown>; scorecard?: Record<string, unknown> }>;
   createPack(input: { packId: string; version: string; name: string; scenarios: EvaluationScenario[] }): Promise<EvaluationPack>;
   createSoloCampaign(input: { campaignId: string; agentId: string; agentsVersion: string; packId: string; packVersion: string; runtimePolicy: { model: string; maxOutputTokens: number; temperature: number; maxProviderAttempts: number } }): Promise<EvaluationCampaign>;
-  getExecutionConfig?(): Promise<{ enabled: boolean; feeUsdc?: string; feeAsset: 'USDC'; genLayerGasPayer: 'OWNER' }>;
+  getExecutionConfig?(): Promise<{ enabled: boolean; feeUsdc?: string; feeAsset: 'USDC'; feeCustody?: 'ESCROW'; escrowAddress?: string; genLayerGasPayer: 'OWNER' }>;
   startEvo?(input: { agentId: string; agentsVersion: string }): Promise<EvaluationCampaign>;
   advanceCampaign?(campaignId: string): Promise<EvaluationCampaign>;
   listComparisons(): Promise<VersionComparison[]>;

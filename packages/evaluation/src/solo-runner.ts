@@ -146,6 +146,15 @@ export class SoloEvaluationRunner {
     return this.store.get(campaignId);
   }
 
+  failInfrastructure(campaignId: string): SoloCampaignRecord {
+    const campaign = this.requireCampaign(campaignId);
+    if (campaign.state === "FINALIZED" || campaign.state === "FAILED") return campaign;
+    const itemIndex = campaign.items.findIndex((item) => item.state !== "FINALIZED");
+    if (itemIndex < 0) return this.persist({ ...campaign, state: "FAILED" });
+    const failed: SoloCampaignItem = { ...campaign.items[itemIndex], state: "FAILED", failure: "INFRASTRUCTURE_ERROR" };
+    return this.persist(this.updateItem(campaign, itemIndex, failed, "FAILED"));
+  }
+
   private async advanceClaimed(campaignId: string): Promise<SoloCampaignRecord> {
     let campaign = this.requireCampaign(campaignId);
     if (campaign.state === "FINALIZED" || campaign.state === "FAILED") return campaign;

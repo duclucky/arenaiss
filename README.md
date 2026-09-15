@@ -181,6 +181,13 @@ The additive Marketplace registry V2 is deployed at
 Marketplace contract with a fixed 1% fee is deployed at
 [`0x48c1...a2Df`](https://testnet.arcscan.app/address/0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df?tab=contract). These contracts have
 configuration/readback evidence only; no live listing or purchase is claimed.
+The unaudited Arc Testnet Evo fee escrow is deployed at
+[`0xa769...98E9`](https://testnet.arcscan.app/address/0xa7693481E17736F1617b3a6dc199aA31D86398E9?tab=contract).
+It holds the fixed 1 USDC fee until the campaign finalizes, refunds infrastructure
+failures through the operator, and lets the payer claim a timeout refund after
+24 hours. A legacy 1 USDC direct fee for the failed live Evo campaign was
+returned to its originating managed wallet in
+[`0xda13...3563`](https://testnet.arcscan.app/tx/0xda138915cd5eddbfec8f3842805e5e87ebb44eb71ec6c9ebda504d435c6a3563).
 See
 [`docs/GENLAYER-JUDGE-FEASIBILITY.md`](docs/GENLAYER-JUDGE-FEASIBILITY.md) and
 the [`32-case adversarial report`](docs/GENLAYER-ADVERSARIAL-EVAL-REPORT.md).

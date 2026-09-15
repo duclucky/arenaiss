@@ -1,0 +1,14 @@
+{
+  "schema": "arena-evo-fee-refund-v1",
+  "network": "arc-testnet",
+  "chain_id": 5042002,
+  "campaign_id": "sha256:805919daf6eef4152f8cdde993d114baf32ac4d3f3b171d9dc778a25a58d6e3e",
+  "failure_class": "INFRASTRUCTURE_ERROR",
+  "original_fee_transaction": "0xc104273d773d51c0959fdd3560ed64216c364e664275d888df6608532452e748",
+  "refund_transaction": "0xda138915cd5eddbfec8f3842805e5e87ebb44eb71ec6c9ebda504d435c6a3563",
+  "refund_block_number": 62289856,
+  "amount_usdc": "1",
+  "recipient": "0xF7c1378e6Cb297B570D570A35eAc4aD1e2FD0d61",
+  "recipient_balance_usdc_after": "25",
+  "status": "REFUNDED"
+}

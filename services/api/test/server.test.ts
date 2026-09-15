@@ -120,7 +120,7 @@ test('managed identity configuration is optional but rejects every partial secre
 
 test('partial Evo configuration disables execution without crashing the API', () => {
   const database = new SqliteRuntimeStore(':memory:');
-  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARC_AGENT_REGISTRY_ADDRESS', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'EVALUATION_FEE_USDC', 'GENLAYER_EVALUATION_JUDGE_ADDRESS', 'API_KEY', 'END_POINT', 'MODEL', 'STUDIONET_PRIVATE_KEY'] as const;
+  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARC_AGENT_REGISTRY_ADDRESS', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'EVALUATION_FEE_USDC', 'ARC_EVO_FEE_ESCROW_ADDRESS', 'GENLAYER_EVALUATION_JUDGE_ADDRESS', 'API_KEY', 'END_POINT', 'MODEL', 'STUDIONET_PRIVATE_KEY'] as const;
   const before = Object.fromEntries(names.map((name) => [name, process.env[name]]));
   Object.assign(process.env, { CIRCLE_API_KEY: 'x', CIRCLE_ENTITY_SECRET: 'x', CIRCLE_WALLET_SET_ID: 'x', ARC_AGENT_REGISTRY_ADDRESS: `0x${'1'.repeat(40)}`, ARENA_IDENTITY_PEPPER: 'x'.repeat(32), SMTP_HOST: 'localhost', SMTP_PORT: '25', SMTP_USER: 'x', SMTP_PASS: 'x', SMTP_FROM: 'x@example.com', EVALUATION_FEE_USDC: '1', GENLAYER_EVALUATION_JUDGE_ADDRESS: `0x${'2'.repeat(40)}` });
   try {

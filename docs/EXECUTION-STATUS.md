@@ -23,6 +23,29 @@
   the specialized ComparisonRun model; comparison UI and benchmark claims remain
   open.
 
+## Evo fee escrow and infrastructure refund — 2026-09-16
+
+- Evo no longer transfers its fixed 1 USDC fee directly to the owner. The
+  user's Circle-managed Arc wallet approves and deposits the exact amount into
+  `EvoFeeEscrow` at `0xa7693481E17736F1617b3a6dc199aA31D86398E9`.
+- The configured operator releases the fee only after the full campaign reaches
+  `FINALIZED`, and refunds it when the campaign reaches an infrastructure
+  failure. Concurrent settlement shares one operation and terminal release and
+  refund states cannot cross. The payer can recover a still-held fee directly
+  after a 24-hour timeout.
+- Arc Testnet deployment transaction
+  `0x87e73cb0ef9fe82a389668027a56a53103df400b63d92956ee8e4a60f253c13a`
+  succeeded at block `62289514`; exact immutable readback and runtime bytecode
+  evidence is recorded in
+  `docs/evidence/arc-testnet/evo-fee-escrow-deployment-2026-09-16.json`.
+- The earlier failed live Evo campaign's legacy direct fee was returned in Arc
+  transaction
+  `0xda138915cd5eddbfec8f3842805e5e87ebb44eb71ec6c9ebda504d435c6a3563`.
+  Sanitized evidence is recorded in
+  `docs/evidence/live/evo-fee-refund-2026-09-16.json`.
+- This is an unaudited testnet contract and remains within the disclosed
+  trusted-operator architecture; Arc does not verify the GenLayer verdict.
+
 ## EVAL-6 Studio Next deployment — 2026-09-16
 
 - `ArenaComparisonJudge` (`AgentComparisonV1`) is deployed at
