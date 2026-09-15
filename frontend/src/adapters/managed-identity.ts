@@ -1,4 +1,4 @@
-import type { ManagedAccount, ManagedIdentityAdapter, ManagedUsdcBalance, ManagedWalletTransaction } from './interfaces';
+import type { ManagedAccount, ManagedCctpTransfer, ManagedIdentityAdapter, ManagedUsdcBalance, ManagedWalletTransaction } from './interfaces';
 
 type Fetcher = typeof fetch;
 
@@ -45,8 +45,12 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
     return this.request('/api/account/usdc-transfers', { method: 'POST', body: JSON.stringify({ destinationAddress, amount }) });
   }
 
-  bridgeUsdcToArc(sourceChain: string, amount: string): Promise<ManagedWalletTransaction> {
+  bridgeUsdcToArc(sourceChain: string, amount: string): Promise<ManagedCctpTransfer> {
     return this.request('/api/account/cctp-transfers', { method: 'POST', body: JSON.stringify({ sourceChain, amount }) });
+  }
+
+  getCctpTransfer(operationId: string): Promise<ManagedCctpTransfer> {
+    return this.request(`/api/account/cctp-transfers/${operationId}`, { method: 'GET' });
   }
 
   async logout(): Promise<void> {
@@ -61,7 +65,7 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
     const headers = init.body ? { 'content-type': 'application/json' } : undefined;
     const response = await this.fetcher.call(globalThis, `${this.baseUrl}${path}`, { ...init, headers, credentials: 'include' });
     if (!response.ok) return this.read<T>(response);
-    if (allowEmpty || response.status === 204 || response.status === 202) return undefined as T;
+    if (allowEmpty || response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
 

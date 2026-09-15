@@ -94,7 +94,7 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeRegistry(input.walletId, input.registryAddress, 'deactivateAgent(bytes32)', [digestBytes32(input.agentId)], input.idempotencyKey, 'arena-iss-agent-deactivate');
   }
 
-  async bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+  async bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string; onProgress?: (state: 'APPROVING' | 'BURNING') => void }): Promise<WalletTransactionResult> {
     const config = CHAINS.find((chain) => chain.chain === input.sourceChain && chain.fast);
     if (!config) throw new Error('unsupported CCTP source chain');
     const sourceWalletId = await this.derivedWalletId(input.walletId, input.address, config.chain);
@@ -115,7 +115,9 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     });
     const approvalId = approval.data?.id;
     if (!approvalId) throw new Error('Circle did not create CCTP approval');
+    input.onProgress?.('APPROVING');
     await this.client.getTransaction({ id: approvalId, waitForState: 'COMPLETE', pollingInterval: 1500 });
+    input.onProgress?.('BURNING');
     const recipient = `0x${'0'.repeat(24)}${input.address.slice(2).toLowerCase()}`;
     const burn = await this.client.createContractExecutionTransaction({
       walletId: sourceWalletId, contractAddress: TOKEN_MESSENGER_V2,

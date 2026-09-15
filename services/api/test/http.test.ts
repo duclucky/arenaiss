@@ -129,14 +129,25 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const calls: any[] = [];
+    let releaseBridge!: () => void;
+    const bridgeGate = new Promise<void>((resolve) => { releaseBridge = resolve; });
     const managed = {
       runtime,
       identityPepper: 'test-only-pepper-with-at-least-32-bytes',
       circleWallets: {
         createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' }),
-        listUsdcBalances: async () => [{ chain: 'ARC-TESTNET', label: 'Arc Testnet', amount: '2', isArc: true, available: true }],
+        listUsdcBalances: async () => [
+          { chain: 'ARC-TESTNET', label: 'Arc Testnet', amount: '2', isArc: true, available: true },
+          { chain: 'ARB-SEPOLIA', label: 'Arbitrum Sepolia', amount: '3', isArc: false, available: true },
+        ],
         transferUsdc: async (input: any) => { calls.push(['transfer', input]); return { transactionId: 'tx-1', state: 'SENT' }; },
-        bridgeUsdcToArc: async (input: any) => { calls.push(['bridge', input]); return { transactionId: 'tx-2', state: 'SENT' }; },
+        bridgeUsdcToArc: async (input: any) => {
+          calls.push(['bridge', input]);
+          input.onProgress?.('APPROVING');
+          await bridgeGate;
+          input.onProgress?.('BURNING');
+          return { transactionId: 'tx-2', state: 'SENT', txHash: `0x${'2'.repeat(64)}`, explorerUrl: `https://sepolia.arbiscan.io/tx/0x${'2'.repeat(64)}` };
+        },
       },
       emailSender: { sendLoginCode: async () => undefined },
     };
@@ -149,7 +160,28 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: 'bad', amount: '1' } })).status, 400);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.0000001' } })).status, 400);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.25' } })).status, 202);
-    assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ETH-SEPOLIA', amount: '2' } })).status, 202);
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ETH-SEPOLIA', amount: '2' } })).status, 400);
+    const bridgePromise = api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ARB-SEPOLIA', amount: '2' } });
+    const bridge = await Promise.race([
+      bridgePromise,
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 20)),
+    ]);
+    assert.notEqual(bridge, 'timeout');
+    assert.equal(typeof bridge, 'object');
+    assert.equal(bridge.status, 202);
+    assert.match(bridge.body.operationId, /^[0-9a-f-]{36}$/);
+    assert.equal(bridge.body.state, 'PENDING');
+    releaseBridge();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const status = await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}`, headers: { cookie } });
+      if (status.body.state === 'SUBMITTED') {
+        assert.equal(status.body.transactionId, 'tx-2');
+        assert.match(status.body.explorerUrl, /^https:\/\/sepolia\.arbiscan\.io\/tx\//);
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (attempt === 9) assert.fail('CCTP operation did not reach SUBMITTED');
+    }
     assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'bridge']);
   } finally { runtime.close(); }
 });

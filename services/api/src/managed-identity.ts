@@ -19,11 +19,23 @@ export type ManagedAccount = {
   identity: { kind: LoginIdentityKind };
   managedWallet: ManagedWallet;
 };
+export type CctpTransferState = 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED';
+export type CctpTransferOperation = {
+  operationId: string;
+  state: CctpTransferState;
+  sourceChain: string;
+  amount: string;
+  transactionId?: string;
+  txHash?: string;
+  explorerUrl?: string;
+  message?: string;
+  updatedAt: number;
+};
 export type CircleWalletPort = {
   createWallet(input: { userId: string; idempotencyKey: string }): Promise<{ walletId: string; address: string }>;
   listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
   transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
-  bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
 };
@@ -35,6 +47,12 @@ type IdentityRecord = { identityKey: string; kind: LoginIdentityKind; userId: st
 type WalletOperation = {
   state: 'PENDING' | 'READY' | 'FAILED'; userId: string; idempotencyKey: string;
   walletId?: string; address?: string; blockchain: 'ARC-TESTNET'; accountType: 'EOA' | 'SCA'; updatedAt: number;
+};
+type CctpTransferRecord = CctpTransferOperation & {
+  userId: string;
+  walletId: string;
+  address: string;
+  idempotencyKey: string;
 };
 type EmailChallenge = { digest: Buffer; expiresAt: number; attempts: number };
 
@@ -133,15 +151,31 @@ export class ManagedIdentityService {
     });
   }
 
-  async bridgeUsdcToArc(userId: string, sourceChain: string, amount: string): Promise<WalletTransactionResult> {
+  async startBridgeUsdcToArc(userId: string, sourceChain: string, amount: string): Promise<CctpTransferOperation> {
     const wallet = this.requireReadyWallet(userId);
-    return this.circleWallets.bridgeUsdcToArc({
+    const normalizedSource = requireIdentifier(sourceChain, 'source chain');
+    const normalizedAmount = requireUsdcAmount(amount);
+    await this.requireSourceBalance(wallet, normalizedSource, normalizedAmount);
+    const operation: CctpTransferRecord = {
+      operationId: randomUUID(),
+      state: 'PENDING',
+      userId,
       walletId: wallet.walletId,
       address: wallet.address,
-      sourceChain: requireIdentifier(sourceChain, 'source chain'),
-      amount: requireUsdcAmount(amount),
+      sourceChain: normalizedSource,
+      amount: normalizedAmount,
       idempotencyKey: randomUUID(),
-    });
+      updatedAt: this.now(),
+    };
+    this.runtime.put('circle-cctp-transfers', operation.operationId, operation);
+    void this.runCctpTransfer(operation.operationId).catch(() => undefined);
+    return this.publicCctpOperation(operation);
+  }
+
+  getCctpTransfer(userId: string, operationId: string): CctpTransferOperation {
+    const operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', requireIdentifier(operationId, 'operation ID'));
+    if (!operation || operation.userId !== userId) throw new Error('CCTP transfer not found');
+    return this.publicCctpOperation(operation);
   }
 
   async registerAgent(userId: string, input: { agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
@@ -214,6 +248,45 @@ export class ManagedIdentityService {
     return wallet;
   }
 
+  private async requireSourceBalance(wallet: ManagedWallet, sourceChain: string, amount: string): Promise<void> {
+    const balances = await this.circleWallets.listUsdcBalances({ walletId: wallet.walletId, address: wallet.address });
+    const source = balances.find((row) => row.chain === sourceChain);
+    if (!source?.available) throw new Error('source chain has no available USDC');
+    if (BigInt(decimalToBaseUnits(source.amount)) < BigInt(decimalToBaseUnits(amount))) throw new Error('source chain USDC balance is insufficient');
+  }
+
+  private updateCctpTransfer(operationId: string, patch: Partial<CctpTransferRecord>): CctpTransferRecord | undefined {
+    const current = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
+    if (!current || current.state === 'SUBMITTED' || current.state === 'FAILED') return current;
+    const next = { ...current, ...patch, updatedAt: this.now() };
+    this.runtime.put('circle-cctp-transfers', operationId, next);
+    return next;
+  }
+
+  private async runCctpTransfer(operationId: string): Promise<void> {
+    const operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
+    if (!operation || operation.state !== 'PENDING') return;
+    try {
+      const result = await this.circleWallets.bridgeUsdcToArc({
+        walletId: operation.walletId,
+        address: operation.address,
+        sourceChain: operation.sourceChain,
+        amount: operation.amount,
+        idempotencyKey: operation.idempotencyKey,
+        onProgress: (state) => this.updateCctpTransfer(operationId, { state }),
+      });
+      this.updateCctpTransfer(operationId, { ...result, state: 'SUBMITTED' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'CCTP transfer failed';
+      this.updateCctpTransfer(operationId, { state: 'FAILED', message });
+    }
+  }
+
+  private publicCctpOperation(operation: CctpTransferRecord): CctpTransferOperation {
+    const { operationId, state, sourceChain, amount, transactionId, txHash, explorerUrl, message, updatedAt } = operation;
+    return { operationId, state, sourceChain, amount, transactionId, txHash, explorerUrl, message, updatedAt };
+  }
+
   private emailIdentityKey(email: string): string {
     return `email:${createHmac('sha256', this.pepper).update(email).digest('hex')}`;
   }
@@ -229,6 +302,11 @@ function requireUsdcAmount(value: string): string {
   const baseUnits = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0');
   if (baseUnits <= 0n || baseUnits > 1_000_000_000_000n) throw new Error('invalid USDC amount');
   return `${whole}${fraction ? `.${fraction}` : ''}`;
+}
+
+function decimalToBaseUnits(value: string): string {
+  const [whole, fraction = ''] = value.split('.');
+  return (BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0')).toString();
 }
 
 function requireAddress(value: string): string {

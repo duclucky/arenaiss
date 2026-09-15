@@ -11,7 +11,7 @@ import type { ManagedAccount, ManagedIdentityAdapter } from '../adapters/interfa
 const address = '0xe6dbe479ecbb295bdd955d672fd5076dc34e2513';
 const account: ManagedAccount = {
   userId: `usr_${'a'.repeat(64)}`, principal: `usr_${'b'.repeat(64)}`, identity: { kind: 'EMAIL' },
-  managedWallet: { state: 'READY', userId: `usr_${'a'.repeat(64)}`, walletId: 'wallet-id', address, blockchain: 'ARC-TESTNET', accountType: 'EOA' },
+  managedWallet: { state: 'READY', userId: `usr_${'a'.repeat(64)}`, walletId: 'wallet-id', address, blockchain: 'ARC-TESTNET', accountType: 'SCA' },
 };
 
 function identity(): ManagedIdentityAdapter {
@@ -23,7 +23,8 @@ function identity(): ManagedIdentityAdapter {
       { chain: 'BASE-SEPOLIA', label: 'Base Sepolia', amount: '1', isArc: false, available: true },
     ],
     transferUsdc: async () => ({ transactionId: 'transfer-1', state: 'INITIATED' }),
-    bridgeUsdcToArc: async () => ({ transactionId: 'bridge-1', state: 'INITIATED' }),
+    bridgeUsdcToArc: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'PENDING', sourceChain: 'BASE-SEPOLIA', amount: '1', updatedAt: 1 }),
+    getCctpTransfer: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED', sourceChain: 'BASE-SEPOLIA', amount: '1', transactionId: 'bridge-1', txHash: `0x${'1'.repeat(64)}`, explorerUrl: `https://sepolia.basescan.org/tx/0x${'1'.repeat(64)}`, updatedAt: 2 }),
   };
 }
 
@@ -57,6 +58,7 @@ describe('managed Arena ISS wallet account', () => {
     expect(balancesToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('list', { name: 'USDC balances by network' })).not.toBeInTheDocument();
     expect(screen.getByText(/Arena ISS is live on Arc Testnet/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Faucet USDC on Arc' })).toHaveAttribute('href', 'https://faucet.circle.com/');
     expect(screen.getByRole('heading', { name: 'Bridge USDC to Arc Testnet' })).toBeInTheDocument();
     fireEvent.click(balancesToggle);
     expect(balancesToggle).toHaveAttribute('aria-expanded', 'true');
@@ -65,6 +67,8 @@ describe('managed Arena ISS wallet account', () => {
     expect(within(balancesList).getByText('Base Sepolia')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Copy wallet address' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address));
+    expect(screen.getByLabelText('Source network')).toHaveValue('BASE-SEPOLIA');
+    expect(screen.getByRole('option', { name: 'Ethereum Sepolia · no USDC' })).toBeDisabled();
     const bridgeAmount = screen.getByLabelText('Amount (USDC)', { selector: '#bridge-amount' });
     fireEvent.change(bridgeAmount, { target: { value: '2.00' } });
     expect(bridgeAmount).toBeValid();
