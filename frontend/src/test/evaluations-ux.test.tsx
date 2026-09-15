@@ -33,7 +33,7 @@ const run = {
 const evaluationApi: EvaluationApiAdapter = {
   async listCampaigns() { return [campaign]; }, async getCampaign(id) { return id === campaign.campaignId ? campaign : null; }, async listRuns() { return [run]; }, async getRun() { return run; },
   async createPack() { throw new Error('creation must not be exposed before execution is wired'); }, async createSoloCampaign() { throw new Error('creation must not be exposed before execution is wired'); },
-  async getExecutionConfig() { return { enabled: true, feeUsdc: '1', feeAsset: 'USDC', genLayerGasPayer: 'OWNER' }; },
+  async getExecutionConfig() { return { enabled: true, feeUsdc: '1', feeAsset: 'USDC', feeCustody: 'ESCROW', escrowAddress: '0x3333333333333333333333333333333333333333', genLayerGasPayer: 'OWNER' }; },
   async startEvo() { return campaign; }, async advanceCampaign() { return campaign; },
   async listComparisons() { return []; }, async getComparison() { throw new Error('not used'); }, async createVersionComparison() { throw new Error('not used'); },
 };
@@ -58,6 +58,7 @@ describe('evaluation product UX', () => {
     await waitFor(() => expect(selector).toHaveValue('agent_1'));
     expect(screen.queryByLabelText('Scenario objective')).not.toBeInTheDocument();
     expect(screen.getByText('1 USDC')).toBeInTheDocument();
+    expect(screen.getByText(/held in Arc escrow and refunded if the evaluation fails because of infrastructure/i)).toBeInTheDocument();
     expect(screen.getByText(/GenLayer transaction gas is paid by the Arena ISS owner wallet/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Start evaluation/i })).toBeEnabled();
   });

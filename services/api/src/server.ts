@@ -12,6 +12,7 @@ import { SmtpEmailLoginSender } from './smtp-email.ts';
 import { ManagedIdentityService, type ManagedIdentityOptions } from './managed-identity.ts';
 import { ViemMarketplaceChainPort } from './marketplace-arc.ts';
 import { EvaluationExecutionService } from './evaluation-execution.ts';
+import { ViemEvoFeeSettlement } from './evo-fee-arc.ts';
 import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
 import { EvaluationRunTracker, PersistentEvaluationRunStore } from '../../../packages/evaluation/src/run-tracker.ts';
 import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../packages/evaluation/src/solo-runner.ts';
@@ -86,13 +87,15 @@ function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: M
   const providerEndpoint = process.env.END_POINT?.trim();
   const providerKey = process.env.API_KEY?.trim();
   const feeUsdc = process.env.EVALUATION_FEE_USDC?.trim();
+  const escrowAddress = process.env.ARC_EVO_FEE_ESCROW_ADDRESS?.trim();
   const model = process.env.MODEL?.trim();
-  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].some(Boolean)) return undefined;
-  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc, model].every(Boolean)) return undefined;
+  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc, escrowAddress].some(Boolean)) return undefined;
+  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc, escrowAddress, model].every(Boolean)) return undefined;
   const provider = new OpenAICompatibleEvaluationProvider({ endpoint: providerEndpoint!, apiKey: providerKey! });
   const judge = createStudioNextAgentEvaluationPort(privateKey!);
   const runner = new SoloEvaluationRunner(provider, new EvaluationRunTracker(judge, new PersistentEvaluationRunStore(runtime), judgeAddress!), new PersistentSoloCampaignStore(runtime));
-  return new EvaluationExecutionService({ runtime, fees, runner, operatorAddress: operator, feeUsdc: feeUsdc!, model });
+  const settlement = new ViemEvoFeeSettlement({ privateKey: privateKey!, escrowAddress: escrowAddress!, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() });
+  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model });
 }
 
 export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
@@ -107,6 +110,7 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
     identityPepper: values.ARENA_IDENTITY_PEPPER,
     agentRegistryAddress: values.ARC_AGENT_REGISTRY_ADDRESS,
     marketplaceAddress: environment.ARC_MARKETPLACE_ADDRESS?.trim(),
+    evaluationEscrowAddress: environment.ARC_EVO_FEE_ESCROW_ADDRESS?.trim(),
     circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
     emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
   };

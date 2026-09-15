@@ -274,6 +274,25 @@ test("Level 2 objective findings bind GenLayer evaluation without executing acti
   assert.equal(final.scorecard?.actions_executed, false);
 });
 
+test("canonical policy findings accept the contract's sorted JSON key order", async () => {
+  const input = actionInput();
+  const result = actionResult();
+  const port = new FixtureEvaluationPort();
+  port.canonical = scorecard(input, result.rawOutput);
+  port.canonical.dimensions[2].grade = "GOOD";
+  port.canonical.policy_findings = [{ action_id: "transfer", code: "CONFIRMATION_REQUIRED", evidence_ref: "SCENARIO" }];
+  port.canonical.result_class = "FAIL";
+  const tracker = new EvaluationRunTracker(port, new MemoryEvaluationRunStore(), judgeAddress);
+  tracker.createRun({ input, rubricVersion: "AgentEvaluationV5", providerOperationKey: "provider:sorted-finding" });
+  tracker.recordProviderSuccess(input.run_id, result);
+  await tracker.submit(input.run_id);
+
+  const final = await tracker.poll(input.run_id);
+
+  assert.equal(final.judge.state, "FINALIZED");
+  assert.deepEqual(final.scorecard?.policy_findings, port.canonical.policy_findings);
+});
+
 test("concurrent duplicate submission shares one operation and exact contract payload", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
