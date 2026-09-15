@@ -22,7 +22,9 @@ test('Evo charges the configured USDC fee once and keeps GenLayer gas outside th
     await service.start('usr_owner', owner, campaignId);
     await service.start('usr_owner', owner, campaignId);
 
-    assert.deepEqual(transfers, [{ userId: 'usr_owner', destinationAddress: operator, amount: '1.25', idempotencyKey: `evo-fee:${campaignId}` }]);
+    assert.equal(transfers.length, 1);
+    assert.deepEqual({ ...transfers[0], idempotencyKey: '<uuid>' }, { userId: 'usr_owner', destinationAddress: operator, amount: '1.25', idempotencyKey: '<uuid>' });
+    assert.match(transfers[0].idempotencyKey, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     assert.equal(advances, 2);
     assert.equal(service.getFee(campaignId)?.state, 'SUBMITTED');
     assert.equal(JSON.stringify(service.getFee(campaignId)).includes('gas'), false);
@@ -31,18 +33,23 @@ test('Evo charges the configured USDC fee once and keeps GenLayer gas outside th
   } finally { runtime.close(); }
 });
 
-test('Evo fails closed before execution when its USDC fee transfer fails', async () => {
+test('Evo retries a rejected fee with the same persisted UUID and advances only after submission', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     let advances = 0;
+    const keys: string[] = []; let calls = 0;
     const service = new EvaluationExecutionService({
       runtime, operatorAddress: operator, feeUsdc: '1',
-      fees: { async transferUsdcWithIdempotency() { throw new Error('insufficient USDC'); } },
+      fees: { async transferUsdcWithIdempotency(_userId, _destination, _amount, key) { keys.push(key); calls += 1; if (calls === 1) throw new Error('API parameter invalid'); return { transactionId: 'circle_2', state: 'SUBMITTED', txHash: `0x${'a'.repeat(64)}` }; } },
       model: 'cheap-5.6-sol', runner: { get: () => ({ campaignId, owner }), async advance() { advances += 1; return {} as any; } } as any,
     });
-    await assert.rejects(service.start('usr_owner', owner, campaignId), /insufficient USDC/);
+    await assert.rejects(service.start('usr_owner', owner, campaignId), /API parameter invalid/);
     assert.equal(advances, 0);
     assert.equal(service.getFee(campaignId)?.state, 'FAILED');
+    await service.start('usr_owner', owner, campaignId);
+    assert.equal(advances, 1);
+    assert.equal(keys[0], keys[1]);
+    assert.match(keys[0], /^[0-9a-f-]{36}$/i);
   } finally { runtime.close(); }
 });
 

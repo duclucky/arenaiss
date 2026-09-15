@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import { SoloEvaluationRunner, type SoloCampaignRecord } from '../../../packages/evaluation/src/solo-runner.ts';
 import type { WalletTransactionResult } from './managed-identity.ts';
@@ -38,11 +39,15 @@ export class EvaluationExecutionService {
     let fee = this.runtime.get<EvaluationFeeRecord>('evaluation-fees', campaignId);
     if (fee && (fee.owner !== owner || fee.amountUsdc !== this.feeUsdc || fee.destination !== this.operatorAddress)) throw new Error('evaluation fee binding conflict');
     if (!fee) {
-      fee = { schema: 'arena-evaluation-fee-v1', campaignId, owner, amountUsdc: this.feeUsdc, destination: this.operatorAddress, idempotencyKey: `evo-fee:${campaignId}`, state: 'PENDING' };
+      fee = { schema: 'arena-evaluation-fee-v1', campaignId, owner, amountUsdc: this.feeUsdc, destination: this.operatorAddress, idempotencyKey: randomUUID(), state: 'PENDING' };
       this.runtime.putIfAbsent('evaluation-fees', campaignId, fee);
       fee = this.runtime.get<EvaluationFeeRecord>('evaluation-fees', campaignId)!;
     }
-    if (fee.state === 'FAILED') throw new Error(fee.error || 'evaluation fee failed');
+    if (fee.state === 'FAILED') {
+      const legacyRejectedKey = fee.error === 'API parameter invalid' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fee.idempotencyKey);
+      fee = { ...fee, idempotencyKey: legacyRejectedKey ? randomUUID() : fee.idempotencyKey, state: 'PENDING', error: undefined };
+      this.runtime.put('evaluation-fees', campaignId, fee);
+    }
     if (fee.state === 'PENDING') {
       try {
         const transaction = await this.fees.transferUsdcWithIdempotency(userId, fee.destination, fee.amountUsdc, fee.idempotencyKey);
