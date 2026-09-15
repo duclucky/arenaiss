@@ -3,7 +3,7 @@
   "createdAt": "2026-09-15",
   "scope": "LOCAL_ONLY",
   "fileCount": 243,
-  "sourceBundleSha256": "867f89cfdedf4edefcaf3defc6ecb5f47083a07d642f3400fb51ab4a59a62c61",
+  "sourceBundleSha256": "f91a09499e23eeb9216652e2bd6107c87fe6a9c6f22e42bbcb7ef25b8e99b013",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -66,7 +66,7 @@
     "services/api/test/managed-identity.test.ts": "871d7e54c72d56d7259252d88156fea8837215dcfb747ccf5d8842e64fef494e",
     "services/api/test/circle-managed-wallet.test.ts": "e420f21d2a6fd7c83390de9ffe1bc38cb70c99748cf88c2f55f3ebcfa2cdef04",
     "frontend/src/context.tsx": "ce08f8878d33949f1951b41cc8508a9b02a707d562e5f9e52ca2d00bc3d9c4e5",
-    "frontend/src/components/Layout.tsx": "1bb8745ccf728d63e2a19e913fd808972dd1ffeca5af21532a8ff14dbad4bb38",
+    "frontend/src/components/Layout.tsx": "1206ea8ab515a9870c56495f2ff5aa450f23e06dbc6c256b97ca9a35d60b54cc",
     "frontend/src/components/LoginModal.tsx": "eb191c133d037979cc35f3aa5aeedc2afd1f23044c64a5190a9b9daa2fc09f1d",
     "frontend/src/adapters/managed-identity.ts": "b628cdb57b880c2a88af9a7e079d53faed954565a74a0f9e5671db826fa96143",
     "frontend/src/views/Account.tsx": "68ddd9cecc7a2ebe789f2da8aa892652d402218af1ab0b4044bd2e35c9987e62",

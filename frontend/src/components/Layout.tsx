@@ -5,9 +5,9 @@ import { useAppContext } from '../context';
 import { LoginModal } from './LoginModal';
 
 const navItems = [
-  ['/tournaments', 'Tournaments'],
   ['/agents', 'Agents'],
   ['/evaluations', 'Evaluations'],
+  ['/tournaments', 'Tournaments'],
 ] as const;
 const tickerItems = ['Arc', 'USDC', 'CCTP', 'Escrow', 'GenLayer', 'GenVM', 'Judge', 'Marketplace'] as const;
 

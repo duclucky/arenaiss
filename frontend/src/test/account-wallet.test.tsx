@@ -47,7 +47,13 @@ describe('managed Arena ISS wallet account', () => {
     render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={identity()} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
 
     expect(await screen.findByText('Arena ISS wallet', { selector: 'label' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
+    const primaryNavigation = screen.getByRole('navigation', { name: 'Primary' });
+    expect(primaryNavigation).toBeInTheDocument();
+    expect(within(primaryNavigation).getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Agents',
+      'Evaluations',
+      'Tournaments',
+    ]);
     expect(screen.getByRole('link', { name: 'Tournaments' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Agents' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Evaluations' })).toBeInTheDocument();
