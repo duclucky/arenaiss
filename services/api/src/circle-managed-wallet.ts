@@ -23,7 +23,7 @@ type CircleClient = {
     idempotencyKey: string; metadata: [{ name: string; refId: string }];
   }): Promise<{ data?: { wallets?: Array<{ id?: string; address?: string }> } }>;
   deriveWallet(input: { id: string; blockchain: string }): Promise<{ data?: { wallet?: { id?: string; address?: string } } }>;
-  getWalletTokenBalance(input: { id: string }): Promise<{ data?: { tokenBalances?: Array<{ amount?: string; token?: { symbol?: string; tokenAddress?: string; isNative?: boolean } }> } }>;
+  getWalletTokenBalance(input: { id: string }): Promise<{ data?: { tokenBalances?: Array<{ amount?: string; token?: { id?: string; blockchain?: string; symbol?: string; tokenAddress?: string; isNative?: boolean } }> } }>;
   createTransaction(input: Record<string, unknown>): Promise<{ data?: { id?: string; state?: string } }>;
   createContractExecutionTransaction(input: Record<string, unknown>): Promise<{ data?: { id?: string; state?: string } }>;
   getTransaction(input: { id: string; waitForState?: string; waitForTxHash?: boolean; pollingInterval?: number }): Promise<{ data?: { transaction?: { id?: string; state?: string; txHash?: string } } }>;
@@ -69,9 +69,14 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
   }
 
   async transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    const balances = await this.client.getWalletTokenBalance({ id: input.walletId });
+    const usdc = balances.data?.tokenBalances?.find((balance) => !balance.token?.isNative
+      && balance.token?.blockchain === 'ARC-TESTNET'
+      && balance.token?.tokenAddress?.toLowerCase() === ARC_USDC.toLowerCase());
+    if (!usdc?.token?.id) throw new Error('Circle did not return Arc USDC token metadata');
     const response = await this.client.createTransaction({
       walletId: input.walletId,
-      tokenAddress: ARC_USDC,
+      tokenId: usdc.token.id,
       destinationAddress: input.destinationAddress,
       amount: [input.amount],
       fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },

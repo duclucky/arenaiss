@@ -66,7 +66,11 @@ test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submit
     async deriveWallet({ blockchain }: any) { return { data: { wallet: { id: blockchain, address: '0x1111111111111111111111111111111111111111' } } }; },
     async getWalletTokenBalance({ id }: any) {
       const amount = id === 'wallet-id' ? '2.5' : id === 'BASE-SEPOLIA' ? '1' : '0';
-      return { data: { tokenBalances: [{ amount, token: { symbol: 'USDC', isNative: false } }] } };
+      const blockchain = id === 'wallet-id' ? 'ARC-TESTNET' : id;
+      return { data: { tokenBalances: [{ amount, token: {
+        id: `${blockchain}-usdc-token-id`, blockchain, symbol: 'USDC', isNative: false,
+        tokenAddress: blockchain === 'ARC-TESTNET' ? '0x3600000000000000000000000000000000000000' : undefined,
+      } }] } };
     },
     async createTransaction(input: any) { transfers.push(input); return { data: { id: 'transaction-id', state: 'INITIATED' } }; },
     async getTransaction() { return { data: { transaction: { id: 'transaction-id', state: 'SENT', txHash: `0x${'3'.repeat(64)}` } } }; },
@@ -78,7 +82,8 @@ test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submit
   ]);
   const result = await adapter.transferUsdc({ walletId: 'wallet-id', destinationAddress: '0x2222222222222222222222222222222222222222', amount: '1.25', idempotencyKey: '11111111-1111-4111-8111-111111111111' });
   assert.equal(result.transactionId, 'transaction-id');
-  assert.equal(transfers[0].tokenAddress, '0x3600000000000000000000000000000000000000');
+  assert.equal(transfers[0].tokenId, 'ARC-TESTNET-usdc-token-id');
+  assert.equal('tokenAddress' in transfers[0], false);
   assert.deepEqual(transfers[0].amount, ['1.25']);
 });
 
