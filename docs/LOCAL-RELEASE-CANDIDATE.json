@@ -3,7 +3,7 @@
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
   "fileCount": 274,
-  "sourceBundleSha256": "73fa41b5f69c89e90c6680e137e36a323d161327f27a673fbb26bf565b9f2b95",
+  "sourceBundleSha256": "44ffe7587e9fb80b002c9be2c7d8c0db97dc8b92ea96039bd0d3db24799ca4d5",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -100,7 +100,7 @@
     "requirements-dev.txt": "43641e48e6c1e7e5c1f2c3cbc42cc7574f7df7ce73f3ec518f1c30949285eaf1",
     "gltest.config.yaml": "de9ffbb6bd5722186b1148337ed5e54d1297923d9357373d294418859fe41cc8",
     "Dockerfile": "bc7f5727a00874408d73e31d3063f469a284a7e09338e6ac644fbdd651b8fd47",
-    "compose.yaml": "a378ce9555f05ead243adda5a1b9b53fe674f948df5f0056abb9739abda7f1d8",
+    "compose.yaml": "74d8424ea6028dfbda622d5c75c6fa0b72d1a1fac78a422117dd97594abbecdb",
     "scripts/deploy-evo-fee-escrow.mjs": "98e0a4367d71df2f2f127213cc381ef310622a92865098c52b08da9d02b21481",
     "deploy/Caddyfile": "116948d5fb5cf144e5d7c698777967b8dee1a84be9a79fa6f15eccdfd0b70606",
     "deploy/arena-backup.service": "248f27166fc2b0f2b59ea716c27e5f04f7fb7e7f55ad7c651a1e3102c9399ce0",
