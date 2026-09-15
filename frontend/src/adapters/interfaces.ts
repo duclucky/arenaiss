@@ -224,7 +224,6 @@ export type GenLayerNetworkConfig = {
   rpcUrl: string;
   name: string;
   explorerUrl: string;
-  matchJudgeAddress: `0x${string}`;
   evaluationJudgeAddress: `0x${string}`;
   comparisonJudgeAddress: `0x${string}`;
 };

@@ -37,7 +37,7 @@ const evaluationApi: EvaluationApiAdapter = {
 };
 const config = {
   chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet',
-  genLayer: { chainId: 61997 as const, rpcUrl: 'https://studio-next.genlayer.com/api', name: 'Studio Next', explorerUrl: 'https://explorer-studio-dev.genlayer.com', matchJudgeAddress: '0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679' as const, evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d' as const, comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB' as const },
+  genLayer: { chainId: 61997 as const, rpcUrl: 'https://studio-next.genlayer.com/api', name: 'Studio Next', explorerUrl: 'https://explorer-studio-dev.genlayer.com', evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d' as const, comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB' as const },
 };
 
 describe('evaluation product UX', () => {

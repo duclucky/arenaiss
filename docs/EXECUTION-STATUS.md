@@ -42,9 +42,12 @@
   `docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json`.
 - All active GenLayer SDK factories, frontend build defaults, Compose and
   integration configuration now resolve through the canonical Studio Next RPC.
-  The public verifier binds all three deployed judges. Historical Studionet
-  scripts and evidence remain deliberately chain-specific and were not rewritten.
-  Fresh three-contract source/schema/CORS evidence is in
+  The public verifier binds only `AgentEvaluationJudge` and
+  `ArenaComparisonJudge`. `ArenaMatchJudge` is archived from active runtime,
+  image configuration and new writes; its source, compatibility reader and
+  immutable evidence remain available for historical Tournament readback.
+  Historical Studionet scripts and evidence remain deliberately chain-specific
+  and were not rewritten. The pre-archive three-contract source/schema/CORS evidence is in
   `docs/evidence/studio-next/rpc-synchronization-2026-09-16.json`.
 
 ## Studio Dev release-candidate deployment — 2026-09-14
@@ -64,8 +67,8 @@
   `docs/evidence/studio-next/verification-2026-09-14.json`. Historical
   Studionet verdicts remain labelled and linked to the chain that produced them.
 
-- Studio Dev `v0.123.0-rc.6` (chain `61997`) now has active finalized deployments of
-  `ArenaMatchJudge` `GeneralResponseV7` at
+- Studio Dev `v0.123.0-rc.6` (chain `61997`) has finalized deployments of
+  the now-archived `ArenaMatchJudge` `GeneralResponseV7` at
   `0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679` and
   `AgentEvaluationJudge` `AgentEvaluationV5` at
   `0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d`.

@@ -1,0 +1,33 @@
+{
+  "schema": "arena-genlayer-contract-archive-v1",
+  "recordedAt": "2026-09-16",
+  "network": {
+    "name": "GenLayer Studio Next",
+    "chainId": 61997,
+    "rpcUrl": "https://studio-next.genlayer.com/api"
+  },
+  "contract": {
+    "name": "ArenaMatchJudge",
+    "address": "0xbd5592dc0A45B78614cd5d1c2f29F6F35dabB679",
+    "sourceSha256": "a90bcbfac8dc9925a1e0f93e7b69ab3661ae2119f8f08a371336b55834ad13c8"
+  },
+  "status": "ARCHIVED_NO_NEW_WRITES",
+  "activeReplacement": {
+    "name": "ArenaComparisonJudge",
+    "address": "0xe5210eCCC4182090A1416f515Dc7001B27274BcB"
+  },
+  "scope": [
+    "Removed from active frontend runtime configuration",
+    "Removed from public deployment verification",
+    "Removed from Docker and Compose build inputs",
+    "Studio Next write factory removed"
+  ],
+  "retained": [
+    "On-chain deployment",
+    "Historical evidence and explorer identity",
+    "Exact source for reproducible historical verification",
+    "Legacy Tournament read compatibility"
+  ],
+  "networkTransaction": null,
+  "sanitization": "Public deployment identity and archive status only. No credentials, receipts, validator configuration or provider output are retained."
+}

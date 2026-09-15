@@ -5,7 +5,7 @@ import pytest
 
 
 CONTRACTS = (
-    Path("contracts/ArenaMatchJudge.py"),
+    Path("contracts/archive/ArenaMatchJudge.py"),
     Path("contracts/AgentEvaluationJudge.py"),
     Path("contracts/ArenaComparisonJudge.py"),
 )

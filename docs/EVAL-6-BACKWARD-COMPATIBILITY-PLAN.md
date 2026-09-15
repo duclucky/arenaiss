@@ -56,6 +56,10 @@ Bracket progression may consume exactly one of:
    versions, exact scenario, response digests, rubric and GenLayer transaction
    readback all match its immutable binding.
 
+After the EVAL-6 cutover, option 1 is historical-read compatibility only.
+`ArenaMatchJudge` is not configured for new submissions; every new Tournament
+attempt uses option 2 through `ArenaComparisonJudge`.
+
 `INCOMPLETE`, `INCOMPARABLE`, `INFRASTRUCTURE_ERROR`, `UNSTABLE`, pending,
 failed or conflicting records are never eligible. A scorecard cannot directly
 advance a bracket or alter an Arc ranking.
