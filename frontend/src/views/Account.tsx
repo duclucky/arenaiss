@@ -66,7 +66,7 @@ export function Account() {
       try {
         const operation = await managedIdentity.getCctpTransfer!(walletAction.operation!.operationId);
         if (cancelled) return;
-        if (operation.state === 'FAILED') {
+        if (operation.state === 'FAILED' || operation.state === 'RECOVERY_REQUIRED') {
           setWalletAction({ kind: 'bridge', state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
           return;
         }
@@ -176,7 +176,7 @@ export function Account() {
     setWalletAction({ kind: 'bridge', state: 'submitting' });
     try {
       const operation = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
-      if (operation.state === 'FAILED') {
+      if (operation.state === 'FAILED' || operation.state === 'RECOVERY_REQUIRED') {
         setWalletAction({ kind: 'bridge', state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
       } else if (operation.state === 'SUBMITTED') {
         setWalletAction({ kind: 'bridge', state: 'done', operation });

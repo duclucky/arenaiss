@@ -153,7 +153,7 @@ export type ManagedUsdcBalance = { chain: string; label: string; amount: string;
 export type ManagedWalletTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
 export type ManagedCctpTransfer = {
   operationId: string;
-  state: 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED';
+  state: 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED' | 'RECOVERY_REQUIRED';
   sourceChain: string;
   amount: string;
   transactionId?: string;

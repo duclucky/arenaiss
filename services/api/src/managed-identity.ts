@@ -19,7 +19,7 @@ export type ManagedAccount = {
   identity: { kind: LoginIdentityKind };
   managedWallet: ManagedWallet;
 };
-export type CctpTransferState = 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED';
+export type CctpTransferState = 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED' | 'RECOVERY_REQUIRED';
 export type CctpTransferOperation = {
   operationId: string;
   state: CctpTransferState;
@@ -35,7 +35,7 @@ export type CircleWalletPort = {
   createWallet(input: { userId: string; idempotencyKey: string }): Promise<{ walletId: string; address: string }>;
   listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
   transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
-  bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; idempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
+  bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
 };
@@ -52,7 +52,9 @@ type CctpTransferRecord = CctpTransferOperation & {
   userId: string;
   walletId: string;
   address: string;
-  idempotencyKey: string;
+  approvalIdempotencyKey?: string;
+  burnIdempotencyKey?: string;
+  idempotencyKey?: string;
 };
 type EmailChallenge = { digest: Buffer; expiresAt: number; attempts: number };
 
@@ -76,6 +78,7 @@ export class ManagedIdentityService {
   private readonly agentRegistryAddress?: string;
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
+  private readonly cctpTransfers = new Map<string, Promise<void>>();
 
   constructor(options: ManagedIdentityOptions) {
     if (Buffer.byteLength(options.identityPepper || '', 'utf8') < 32) throw new Error('ARENA_IDENTITY_PEPPER is invalid');
@@ -164,7 +167,8 @@ export class ManagedIdentityService {
       address: wallet.address,
       sourceChain: normalizedSource,
       amount: normalizedAmount,
-      idempotencyKey: randomUUID(),
+      approvalIdempotencyKey: randomUUID(),
+      burnIdempotencyKey: randomUUID(),
       updatedAt: this.now(),
     };
     this.runtime.put('circle-cctp-transfers', operation.operationId, operation);
@@ -176,6 +180,12 @@ export class ManagedIdentityService {
     const operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', requireIdentifier(operationId, 'operation ID'));
     if (!operation || operation.userId !== userId) throw new Error('CCTP transfer not found');
     return this.publicCctpOperation(operation);
+  }
+
+  async resumeCctpTransfers(): Promise<void> {
+    const resumable = this.runtime.list<CctpTransferRecord>('circle-cctp-transfers')
+      .filter((operation) => ['PENDING', 'APPROVING', 'BURNING'].includes(operation.state));
+    await Promise.all(resumable.map((operation) => this.runCctpTransfer(operation.operationId)));
   }
 
   async registerAgent(userId: string, input: { agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
@@ -257,22 +267,45 @@ export class ManagedIdentityService {
 
   private updateCctpTransfer(operationId: string, patch: Partial<CctpTransferRecord>): CctpTransferRecord | undefined {
     const current = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
-    if (!current || current.state === 'SUBMITTED' || current.state === 'FAILED') return current;
-    const next = { ...current, ...patch, updatedAt: this.now() };
+    if (!current || ['SUBMITTED', 'FAILED', 'RECOVERY_REQUIRED'].includes(current.state)) return current;
+    const state = patch.state && cctpStateRank(patch.state) < cctpStateRank(current.state) ? current.state : patch.state;
+    const next = { ...current, ...patch, ...(state ? { state } : {}), updatedAt: this.now() };
     this.runtime.put('circle-cctp-transfers', operationId, next);
     return next;
   }
 
-  private async runCctpTransfer(operationId: string): Promise<void> {
-    const operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
-    if (!operation || operation.state !== 'PENDING') return;
+  private runCctpTransfer(operationId: string): Promise<void> {
+    const active = this.cctpTransfers.get(operationId);
+    if (active) return active;
+    const run = this.performCctpTransfer(operationId).finally(() => {
+      if (this.cctpTransfers.get(operationId) === run) this.cctpTransfers.delete(operationId);
+    });
+    this.cctpTransfers.set(operationId, run);
+    return run;
+  }
+
+  private async performCctpTransfer(operationId: string): Promise<void> {
+    let operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
+    if (!operation || !['PENDING', 'APPROVING', 'BURNING'].includes(operation.state)) return;
+    const approvalIdempotencyKey = operation.approvalIdempotencyKey ?? operation.idempotencyKey;
+    if (!approvalIdempotencyKey) {
+      this.updateCctpTransfer(operationId, { state: 'RECOVERY_REQUIRED', message: 'CCTP approval identity is unavailable.' });
+      return;
+    }
+    if (!operation.burnIdempotencyKey && operation.state === 'BURNING') {
+      this.updateCctpTransfer(operationId, { state: 'RECOVERY_REQUIRED', message: 'Legacy CCTP burn requires manual reconciliation.' });
+      return;
+    }
+    const burnIdempotencyKey = operation.burnIdempotencyKey ?? randomUUID();
+    operation = this.updateCctpTransfer(operationId, { approvalIdempotencyKey, burnIdempotencyKey }) ?? operation;
     try {
       const result = await this.circleWallets.bridgeUsdcToArc({
         walletId: operation.walletId,
         address: operation.address,
         sourceChain: operation.sourceChain,
         amount: operation.amount,
-        idempotencyKey: operation.idempotencyKey,
+        approvalIdempotencyKey,
+        burnIdempotencyKey,
         onProgress: (state) => this.updateCctpTransfer(operationId, { state }),
       });
       this.updateCctpTransfer(operationId, { ...result, state: 'SUBMITTED' });
@@ -294,6 +327,10 @@ export class ManagedIdentityService {
   private codeDigest(identityKey: string, code: string): Buffer {
     return createHmac('sha256', this.pepper).update(`${identityKey}|${code}`).digest();
   }
+}
+
+function cctpStateRank(state: CctpTransferState): number {
+  return ({ PENDING: 0, APPROVING: 1, BURNING: 2, SUBMITTED: 3, FAILED: 3, RECOVERY_REQUIRED: 3 })[state];
 }
 
 function requireUsdcAmount(value: string): string {

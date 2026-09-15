@@ -105,3 +105,65 @@ test('failed EOA replacement retries the new SCA idempotency key after restart',
     assert.notEqual(keys[0], 'old-key');
   } finally { runtime.close(); }
 });
+
+test('concurrent CCTP recovery shares one call and reuses both persisted operation keys', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const operationId = '11111111-1111-4111-8111-111111111111';
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    runtime.put('circle-cctp-transfers', operationId, {
+      operationId, state: 'APPROVING', userId: `usr_${'c'.repeat(64)}`, walletId: 'wallet-id', address,
+      sourceChain: 'BASE-SEPOLIA', amount: '1',
+      approvalIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+      burnIdempotencyKey: '33333333-3333-4333-8333-333333333333', updatedAt: 1,
+    });
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address }),
+        bridgeUsdcToArc: async (input: any) => {
+          calls += 1;
+          assert.equal(input.approvalIdempotencyKey, '22222222-2222-4222-8222-222222222222');
+          assert.equal(input.burnIdempotencyKey, '33333333-3333-4333-8333-333333333333');
+          await gate;
+          return { transactionId: 'burn-id', state: 'SENT', txHash: `0x${'4'.repeat(64)}` };
+        },
+      },
+    } as any);
+
+    const first = service.resumeCctpTransfers();
+    const second = service.resumeCctpTransfers();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(calls, 1);
+    release();
+    await Promise.all([first, second]);
+    assert.equal((runtime.get<any>('circle-cctp-transfers', operationId)).state, 'SUBMITTED');
+  } finally { runtime.close(); }
+});
+
+test('legacy CCTP burn without a persisted burn key requires reconciliation and is never replayed', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const operationId = '44444444-4444-4444-8444-444444444444';
+    let calls = 0;
+    runtime.put('circle-cctp-transfers', operationId, {
+      operationId, state: 'BURNING', userId: `usr_${'d'.repeat(64)}`, walletId: 'wallet-id', address,
+      sourceChain: 'BASE-SEPOLIA', amount: '1', idempotencyKey: 'legacy-approval-key', updatedAt: 1,
+    });
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address }),
+        bridgeUsdcToArc: async () => { calls += 1; throw new Error('must not execute'); },
+      },
+    } as any);
+
+    await service.resumeCctpTransfers();
+    const operation = runtime.get<any>('circle-cctp-transfers', operationId);
+    assert.equal(operation.state, 'RECOVERY_REQUIRED');
+    assert.match(operation.message, /manual reconciliation/);
+    assert.equal(calls, 0);
+  } finally { runtime.close(); }
+});
