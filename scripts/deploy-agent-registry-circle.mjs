@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
 import { initiateSmartContractPlatformClient } from "@circle-fin/smart-contract-platform";
-import { createPublicClient, getAddress, http, zeroHash } from "viem";
+import { createPublicClient, getAddress, http, serializeTransaction, zeroHash } from "viem";
 import { arcTestnet } from "viem/chains";
 
 const ARC_CHAIN_ID = 5_042_002;
@@ -57,6 +57,43 @@ async function waitForContract(client, contractId) {
   throw new Error("Circle deployment did not complete before timeout");
 }
 
+async function deployWithRawCircleSignature(walletsClient, walletId, bytecode, publicClient) {
+  const walletResponse = await walletsClient.getWallet({ id: walletId });
+  const wallet = walletResponse.data?.wallet;
+  if (!wallet?.address || wallet.blockchain !== "ARC-TESTNET") {
+    throw new Error("Circle deployer wallet is not an Arc Testnet wallet");
+  }
+  const deployer = getAddress(wallet.address);
+  const request = await publicClient.prepareTransactionRequest({ account: deployer, data: bytecode });
+  if (request.type !== "eip1559" || request.gas === undefined || request.maxFeePerGas === undefined
+    || request.maxPriorityFeePerGas === undefined || request.nonce === undefined) {
+    throw new Error("Arc RPC returned an unsupported deployment transaction request");
+  }
+  const unsignedTransaction = serializeTransaction({
+    chainId: ARC_CHAIN_ID,
+    data: bytecode,
+    gas: request.gas,
+    maxFeePerGas: request.maxFeePerGas,
+    maxPriorityFeePerGas: request.maxPriorityFeePerGas,
+    nonce: request.nonce,
+    type: "eip1559",
+    value: 0n,
+  });
+  const signed = await walletsClient.signTransaction({
+    walletId,
+    rawTransaction: unsignedTransaction,
+    memo: "Deploy the Arena ISS AgentRegistry contract on Arc Testnet",
+  });
+  const serializedTransaction = signed.data?.signedTransaction;
+  if (!/^0x[0-9a-fA-F]+$/.test(serializedTransaction || "")) {
+    throw new Error("Circle returned no signed Arc transaction");
+  }
+  const txHash = await publicClient.sendRawTransaction({ serializedTransaction });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1, timeout: 120_000 });
+  if (receipt.status !== "success" || !receipt.contractAddress) throw new Error("raw AgentRegistry deployment failed");
+  return { address: getAddress(receipt.contractAddress), txHash, deployer, receipt, circleContractId: null };
+}
+
 async function main() {
   const apiKey = required("CIRCLE_API_KEY");
   const entitySecret = required("CIRCLE_ENTITY_SECRET");
@@ -74,31 +111,38 @@ async function main() {
   const walletsClient = initiateDeveloperControlledWalletsClient({ apiKey, entitySecret });
   const contractsClient = initiateSmartContractPlatformClient({ apiKey, entitySecret });
   const walletId = await fundedArcWallet(walletsClient, walletSetId);
-  const deployed = await contractsClient.deployContract({
-    name: "ArenaISSAgentRegistry",
-    description: "Unaudited Arc Testnet registry for Arena ISS agent commitments",
-    blockchain: "ARC-TESTNET",
-    walletId,
-    abiJson: JSON.stringify(artifact.abi),
-    bytecode,
-    constructorParameters: [],
-    fee: { type: "level", config: { feeLevel: "MEDIUM" } },
-    idempotencyKey: deploymentIdempotencyKey(sourceDigest),
-    refId: `arena-iss-agent-registry-${sourceDigest.slice(0, 12)}`,
-  });
-  const contractId = deployed.data?.contractId;
-  if (!contractId) throw new Error("Circle returned no contract deployment id");
-  const contract = await waitForContract(contractsClient, contractId);
-  const address = getAddress(contract.contractAddress || contract.address);
-  const txHash = contract.txHash;
-  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash || "")) throw new Error("Circle returned no deployment transaction hash");
-
   const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
   if ((await publicClient.getChainId()) !== ARC_CHAIN_ID) throw new Error("wrong Arc chain");
-  const [record, code, receipt] = await Promise.all([
+  let deployment;
+  try {
+    const deployed = await contractsClient.deployContract({
+      name: "ArenaISSAgentRegistry",
+      description: "Unaudited Arc Testnet registry for Arena ISS agent commitments",
+      blockchain: "ARC-TESTNET",
+      walletId,
+      abiJson: JSON.stringify(artifact.abi),
+      bytecode,
+      constructorParameters: [],
+      fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+      idempotencyKey: deploymentIdempotencyKey(sourceDigest),
+      refId: `arena-iss-agent-registry-${sourceDigest.slice(0, 12)}`,
+    });
+    const contractId = deployed.data?.contractId;
+    if (!contractId) throw new Error("Circle returned no contract deployment id");
+    const contract = await waitForContract(contractsClient, contractId);
+    const address = getAddress(contract.contractAddress || contract.address);
+    const txHash = contract.txHash;
+    if (!/^0x[0-9a-fA-F]{64}$/.test(txHash || "")) throw new Error("Circle returned no deployment transaction hash");
+    const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+    deployment = { address, txHash, deployer: contract.deployerAddress, receipt, circleContractId: contractId };
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== "Forbidden") throw error;
+    deployment = await deployWithRawCircleSignature(walletsClient, walletId, bytecode, publicClient);
+  }
+  const { address, txHash, deployer, receipt, circleContractId } = deployment;
+  const [record, code] = await Promise.all([
     publicClient.readContract({ address, abi: artifact.abi, functionName: "agents", args: [zeroHash] }),
     publicClient.getCode({ address }),
-    publicClient.getTransactionReceipt({ hash: txHash }),
   ]);
   if (!Array.isArray(record) || record.length !== 4 || record[0] !== ZERO_ADDRESS || record[3] !== false) {
     throw new Error("AgentRegistry state readback mismatch");
@@ -109,11 +153,11 @@ async function main() {
     network: "arc-testnet",
     chain_id: ARC_CHAIN_ID,
     contract: "AgentRegistry",
-    circle_contract_id: contractId,
+    circle_contract_id: circleContractId,
     address,
     deployment_transaction: txHash,
     block_number: Number(receipt.blockNumber),
-    deployer: contract.deployerAddress,
+    deployer,
     gas_used: receipt.gasUsed.toString(),
     effective_gas_price_wei: receipt.effectiveGasPrice.toString(),
     source_sha256: sourceDigest,
