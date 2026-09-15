@@ -7,6 +7,7 @@ import { validateEvaluationScenario, type EvaluationScenario } from "../../../pa
 import type { SoloCampaignRecord } from "../../../packages/evaluation/src/solo-runner.ts";
 import { VersionComparisonRegistry, type RegressionPolicy, type VersionComparisonRecord } from "../../../packages/evaluation/src/comparison.ts";
 import { evaluateMarketplaceEligibility } from "../../../packages/marketplace/src/eligibility.ts";
+import { EVO_CORE_PACK_ID, EVO_CORE_SCENARIOS, EVO_CORE_VERSION } from "../../../packages/evaluation/src/evo-core.ts";
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
@@ -322,6 +323,15 @@ export class ArenaApiService {
     this.evaluationCampaigns.set(campaignId, campaign);
     this.runtime?.put("evaluation-campaigns", campaignId, campaign);
     return this.publicCampaign(campaign);
+  }
+  createEvoCampaign(caller: string, input: { agentId: Digest; agentsVersion: Digest; model: string }): PublicEvaluationCampaign {
+    const owner = this.principal(caller);
+    this.createEvaluationPack(owner, { packId: EVO_CORE_PACK_ID, version: EVO_CORE_VERSION, name: 'Arena ISS Evo Core', scenarios: EVO_CORE_SCENARIOS });
+    return this.createSoloCampaign(owner, {
+      campaignId: sha(`arena-evo-campaign-v1|${owner}|${input.agentId}|${input.agentsVersion}|${randomUUID()}`),
+      agentId: input.agentId, agentsVersion: input.agentsVersion, packId: EVO_CORE_PACK_ID, packVersion: EVO_CORE_VERSION,
+      runtimePolicy: { model: input.model, maxOutputTokens: 1200, temperature: 0, maxProviderAttempts: 2 },
+    });
   }
   getPublicEvaluationCampaign(campaignId: Digest): PublicEvaluationCampaign | null {
     if (!isDigest(campaignId)) throw new Error("invalid evaluation campaign ID");

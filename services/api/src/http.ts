@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { ArenaApiService } from './service.ts';
 import { ManagedIdentityService, type LoginIdentityKind, type ManagedIdentityOptions } from './managed-identity.ts';
 import type { MarketplaceChainPort } from './marketplace-arc.ts';
+import type { EvaluationExecutionService } from './evaluation-execution.ts';
 
 type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
@@ -21,11 +22,14 @@ export class ArenaHttpApi {
   private managedIdentity?: ManagedIdentityService;
   private marketplaceChain?: MarketplaceChainPort;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort) {
+  private evaluationExecution?: EvaluationExecutionService;
+
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService) {
     this.service = service;
     this.verifySignature = verifySignature;
     this.marketplaceChain = marketplaceChain;
-    this.managedIdentity = managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined;
+    this.evaluationExecution = evaluationExecution;
+    this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
   }
 
@@ -107,6 +111,17 @@ export class ArenaHttpApi {
         const owner = this.requireSession(request.headers);
         return this.json(200, this.service.listOwnedEvaluationRuns(owner));
       }
+      if (request.method === 'GET' && request.path === '/api/evaluation-config') {
+        return this.json(200, this.evaluationExecution?.config() ?? { enabled: false, feeAsset: 'USDC', genLayerGasPayer: 'OWNER' });
+      }
+      if (request.method === 'POST' && request.path === '/api/evaluation-campaigns/evo') {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
+        const body = request.body || {};
+        const created = this.service.createEvoCampaign(session.principal, { agentId: requireDigest(body.agentId), agentsVersion: requireDigest(body.agentsVersion), model: this.evaluationExecution.model });
+        const campaign = await this.evaluationExecution.start(session.userId!, session.principal, created.campaignId);
+        return this.json(202, campaign);
+      }
       if (request.method === 'POST' && request.path === '/api/evaluation-packs') {
         const owner = this.requireSession(request.headers);
         const body = request.body || {};
@@ -128,6 +143,19 @@ export class ArenaHttpApi {
           packVersion: requireString(body.packVersion),
           runtimePolicy: body.runtimePolicy as any,
         }));
+      }
+      const evaluationStart = request.path.match(/^\/api\/evaluation-campaigns\/(sha256:[0-9a-fA-F]{64})\/start$/);
+      if (request.method === 'POST' && evaluationStart) {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
+        const campaign = await this.evaluationExecution.start(session.userId!, session.principal, evaluationStart[1]);
+        return this.json(202, campaign);
+      }
+      const evaluationAdvance = request.path.match(/^\/api\/evaluation-campaigns\/(sha256:[0-9a-fA-F]{64})\/advance$/);
+      if (request.method === 'POST' && evaluationAdvance) {
+        const session = this.requireSessionRecord(request.headers);
+        if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
+        return this.json(202, await this.evaluationExecution.advance(session.principal, evaluationAdvance[1]));
       }
       if (request.method === 'GET' && request.path === '/api/evaluation-campaigns') {
         const owner = this.requireSession(request.headers);

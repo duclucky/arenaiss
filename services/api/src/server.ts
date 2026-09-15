@@ -9,8 +9,13 @@ import { viemSignatureVerifier } from './viem-verifier.ts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import { circleManagedWalletFromSecrets } from './circle-managed-wallet.ts';
 import { SmtpEmailLoginSender } from './smtp-email.ts';
-import type { ManagedIdentityOptions } from './managed-identity.ts';
+import { ManagedIdentityService, type ManagedIdentityOptions } from './managed-identity.ts';
 import { ViemMarketplaceChainPort } from './marketplace-arc.ts';
+import { EvaluationExecutionService } from './evaluation-execution.ts';
+import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
+import { EvaluationRunTracker, PersistentEvaluationRunStore } from '../../../packages/evaluation/src/run-tracker.ts';
+import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../packages/evaluation/src/solo-runner.ts';
+import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/src/evaluation-sdk-port.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -23,8 +28,10 @@ type ServerOptions = {
 
 export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore, options: ServerOptions = {}) {
   const managedIdentity = runtime ? managedIdentityFromEnvironment(runtime) : undefined;
+  const managedIdentityService = runtime && managedIdentity ? new ManagedIdentityService(managedIdentity) : undefined;
+  const evaluationExecution = runtime && managedIdentityService ? evaluationExecutionFromEnvironment(runtime, managedIdentityService, operator) : undefined;
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
-  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier, managedIdentity, marketplaceChain);
+  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
@@ -71,6 +78,21 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
+}
+
+function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: ManagedIdentityService, operator: string): EvaluationExecutionService | undefined {
+  const privateKey = process.env.GENLAYER_OWNER_PRIVATE_KEY?.trim();
+  const judgeAddress = process.env.GENLAYER_EVALUATION_JUDGE_ADDRESS?.trim();
+  const providerEndpoint = process.env.EVALUATION_PROVIDER_ENDPOINT?.trim();
+  const providerKey = process.env.EVALUATION_PROVIDER_API_KEY?.trim();
+  const feeUsdc = process.env.EVALUATION_FEE_USDC?.trim();
+  const model = process.env.EVALUATION_PROVIDER_MODEL?.trim() || 'gpt-4o-mini';
+  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].some(Boolean)) return undefined;
+  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].every(Boolean)) throw new Error('evaluation execution configuration is incomplete');
+  const provider = new OpenAICompatibleEvaluationProvider({ endpoint: providerEndpoint!, apiKey: providerKey! });
+  const judge = createStudioNextAgentEvaluationPort(privateKey!);
+  const runner = new SoloEvaluationRunner(provider, new EvaluationRunTracker(judge, new PersistentEvaluationRunStore(runtime), judgeAddress!), new PersistentSoloCampaignStore(runtime));
+  return new EvaluationExecutionService({ runtime, fees, runner, operatorAddress: operator, feeUsdc: feeUsdc!, model });
 }
 
 export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
