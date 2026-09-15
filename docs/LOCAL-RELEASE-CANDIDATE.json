@@ -2,8 +2,8 @@
   "schema": "arena-local-release-candidate-v1",
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
-  "fileCount": 274,
-  "sourceBundleSha256": "44ffe7587e9fb80b002c9be2c7d8c0db97dc8b92ea96039bd0d3db24799ca4d5",
+  "fileCount": 276,
+  "sourceBundleSha256": "63fedcdc638c3bf5e2198124a8b76a47f64d3942fb6e55217aa09eb7ab227884",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -76,6 +76,13 @@
     "services/api/test/managed-identity.test.ts": "871d7e54c72d56d7259252d88156fea8837215dcfb747ccf5d8842e64fef494e",
     "services/api/test/circle-managed-wallet.test.ts": "41ff5ffcc2a3a8690c915b2b3a7c766f44fe368b8b54db54275f136aa2e8907b",
     "services/api/test/evaluation-execution.test.ts": "40a40d48064751ac822f404159402f3510cdd74d189c792200baa068586cc189",
+    "frontend/src/App.tsx": "ee5887eafc9338b95ec7f7c39056316ca91ebcfcd173006b33a842299264426b",
+    "frontend/src/index.css": "7f8fba65713fa9c76c7f7b485ae23931d40d553048fe9f8f9c3529b7b6e1b44f",
+    "frontend/src/views/Home.tsx": "9576b3c8bc64e31a0d929758810a508048a16921b07698e98410b1d257d74e3e",
+    "frontend/src/views/Docs.tsx": "6e4a5c39819545f4e9b7f730490fc4ef99e4c70b5a8a40de6ad3942766f726c3",
+    "frontend/src/test/visual-shell.test.tsx": "08e72fc5bde1d67bc0698462fa7146f36fb5f3641706920561da440d77ebc6f8",
+    "frontend/src/test/docs.test.tsx": "a0cbf38c43687a40e8c6e6c64ae2da3a776543744467c04a052c64fefb09b509",
+    "frontend/src/test/App.test.tsx": "f4459a6a342209120e012fdc4b08d779b8ffd7956590a7512f58a031c48407de",
     "frontend/src/context.tsx": "7d0fb8cdb7bbf69b7e2717c44caaaf6534968411a583ed9e570e0544ebe5c479",
     "frontend/src/components/Layout.tsx": "b03ceec33f8a9681c4c8c0cdf2b3ac1f911b4831d12579a7a643cc06e434a70e",
     "frontend/src/components/LoginModal.tsx": "eb191c133d037979cc35f3aa5aeedc2afd1f23044c64a5190a9b9daa2fc09f1d",
@@ -119,7 +126,7 @@
     "pythonDirectTests": 84,
     "typescriptTests": 214,
     "foundryTests": 24,
-    "frontendTests": 59
+    "frontendTests": 61
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

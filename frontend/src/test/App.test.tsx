@@ -86,6 +86,7 @@ describe('App Tests', () => {
     
     fireEvent.click(providerBtn!);
 
+    await screen.findByRole('heading', { name: 'My Agents' });
     fireEvent.click(await screen.findByRole('button', { name: /0xTest/i }));
     const disconnectBtn = await screen.findByText('Disconnect');
     expect(disconnectBtn).toBeInTheDocument();

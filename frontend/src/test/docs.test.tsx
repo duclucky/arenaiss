@@ -1,0 +1,53 @@
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import App from '../App';
+
+describe('Arena ISS product documentation', () => {
+  it('explains the current evaluation product and its trust boundaries', async () => {
+    window.history.pushState({}, '', '/docs');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Evaluate agents with evidence, not vibes.' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Documentation sections' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'How an evaluation works' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Who decides what' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Evo fees and refunds' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Marketplace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Networks and contracts' })).toBeInTheDocument();
+
+    const dimensions = screen.getByRole('list', { name: 'Scorecard dimensions' });
+    for (const label of [
+      'Instruction adherence',
+      'Reasoning quality',
+      'Action selection',
+      'Rule compliance',
+      'Task completion',
+      'Safety',
+    ]) {
+      expect(within(dimensions).getByText(label)).toBeInTheDocument();
+    }
+
+    expect(screen.getByText(/1 USDC is held in the Evo fee escrow/i)).toBeInTheDocument();
+    expect(screen.getByText(/GenLayer gas is paid by the Arena ISS owner/i)).toBeInTheDocument();
+    expect(screen.getByText(/fixed 1% platform fee/i)).toBeInTheDocument();
+    expect(screen.getByText(/trusted operator/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not read hidden chain of thought/i)).toBeInTheDocument();
+    expect(screen.queryByText(/trustless/i)).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(String.fromCodePoint(0x2014));
+  });
+
+  it('publishes the canonical testnet deployments and capability status', async () => {
+    window.history.pushState({}, '', '/docs');
+    render(<App />);
+
+    const evoEscrow = await screen.findByRole('link', { name: /EvoFeeEscrow/i });
+    expect(evoEscrow).toHaveAttribute('href', expect.stringContaining('0xa7693481E17736F1617b3a6dc199aA31D86398E9'));
+
+    const evaluationJudge = screen.getByRole('link', { name: /AgentEvaluationJudge/i });
+    expect(evaluationJudge).toHaveAttribute('href', expect.stringContaining('0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d'));
+
+    expect(screen.getAllByText('Live').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Backend ready')).toBeInTheDocument();
+    expect(screen.getByText('Planned')).toBeInTheDocument();
+  });
+});
