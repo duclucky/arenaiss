@@ -1,7 +1,8 @@
 import { createAccount, createClient } from "genlayer-js";
-import { studioDevnet, studionet } from "genlayer-js/chains";
+import { studionet } from "genlayer-js/chains";
 
 import type { EvaluationJudgePort, EvaluationJudgeSubmission } from "../../evaluation/src/run-tracker.ts";
+import { studioNextChain } from "./studio-next.ts";
 
 type EvaluationSdkClient = {
   estimateTransactionFeesForWrite(input: EvaluationWriteInput): Promise<FeeQuote>;
@@ -57,8 +58,12 @@ export function createStudionetAgentEvaluationPort(privateKey: string): SdkAgent
 }
 
 export function createStudioDevAgentEvaluationPort(privateKey: string): SdkAgentEvaluationPort {
+  return createStudioNextAgentEvaluationPort(privateKey);
+}
+
+export function createStudioNextAgentEvaluationPort(privateKey: string): SdkAgentEvaluationPort {
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new TypeError("GenLayer private key is invalid");
   const account = createAccount(privateKey as `0x${string}`);
-  const client = createClient({ chain: studioDevnet, account });
+  const client = createClient({ chain: studioNextChain(), account });
   return new SdkAgentEvaluationPort(client as unknown as EvaluationSdkClient);
 }

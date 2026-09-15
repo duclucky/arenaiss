@@ -947,6 +947,13 @@ Agent plaintext never appear publicly.
 
 ### Wave E5 — Comparison and regression (`EVAL-5`)
 
+**Current evidence:** the local deterministic comparison module and owner-only
+API cover exact cohort binding, baseline/candidate/campaign/run isolation,
+immutable restart readback, redaction, repeated-run aggregation, symmetric
+coverage, infrastructure/partial states, critical findings, variance and exact
+threshold-minus/at/plus boundaries. No external call or transaction is part of
+this suite.
+
 #### CMP-1 exact comparability
 
 Reject comparison when TestPack, Scenario set, RuntimePolicy, model policy,
@@ -961,6 +968,15 @@ variance policy, exact threshold-minus/at/plus boundaries and incomplete runs.
 **Exit:** candidate/baseline isolation and regression decisions are reproducible.
 
 ### Wave E6 — Pairwise/Tournament convergence (`EVAL-6`)
+
+**Current evidence:** direct contract tests cover six-dimension comparison,
+exact bindings, replay, deterministic ties and operator authorization. TypeScript
+tests cover legacy projection, immutable SQLite restart, terminal eligibility,
+rich provider/tracker bindings and fee estimation. An eight-Agent/11-match
+full-system fixture converges through rich ComparisonRuns with 22 isolated
+provider calls and preserves the locked Arc credit calculation. Studio Next
+integration deploy/write/readback and the final deployed-address smoke both
+finalized successfully.
 
 Existing `GLJ`, `COR`, `SET`, Arc and full-system suites remain mandatory.
 Additional tests prove:

@@ -7,6 +7,7 @@ import pytest
 CONTRACTS = (
     Path("contracts/ArenaMatchJudge.py"),
     Path("contracts/AgentEvaluationJudge.py"),
+    Path("contracts/ArenaComparisonJudge.py"),
 )
 STUDIO_DEV_RUNNER = "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng"
 

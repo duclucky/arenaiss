@@ -402,3 +402,29 @@ test('authenticated API creates immutable Test Pack and SOLO campaign, public st
     runtime.close();
   }
 });
+
+test('version comparison routes require the owner session and preserve cohort arrays and regression policy', async () => {
+  const service = new ArenaApiService(operator);
+  let captured: any;
+  const record = { schema: 'arena-version-comparison-v1', comparisonId: `sha256:${'9'.repeat(64)}`, inputDigest: `sha256:${'8'.repeat(64)}`, status: 'PASS', agentId: `sha256:${'7'.repeat(64)}`, baselineVersionId: `sha256:${'6'.repeat(64)}`, candidateVersionId: `sha256:${'5'.repeat(64)}`, coverageBps: 10_000, findings: [], sourceCampaignIds: { baseline: [], candidate: [] }, sourceRunIds: { baseline: [], candidate: [] } };
+  (service as any).createVersionComparison = (owner: string, input: any) => { captured = { owner, input }; return record; };
+  (service as any).listOwnedVersionComparisons = () => [record];
+  (service as any).getOwnedVersionComparison = () => record;
+  const api = new ArenaHttpApi(service, async ({ address, signature }) => signature === `signed:${address}`);
+  const body = {
+    comparisonId: record.comparisonId, agentId: record.agentId, baselineVersionId: record.baselineVersionId, candidateVersionId: record.candidateVersionId,
+    baselineCampaignIds: [`sha256:${'1'.repeat(64)}`], candidateCampaignIds: [`sha256:${'2'.repeat(64)}`],
+    policy: { schema: 'arena-regression-policy-v1', requiredRunsPerScenario: 1, minimumScenarioCoverageBps: 10_000, maximumOverallDrop: 5, maximumDimensionDrop: 10, maximumOverallSpread: 10, maximumDimensionSpread: 10, minimumDimensionScores: {}, criticalFindingCodes: [] },
+  };
+  assert.equal((await api.handle({ method: 'POST', path: '/api/evaluation-comparisons', body })).status, 401);
+  await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+  const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: `signed:${alice}` } });
+  const headers = { cookie: auth.headers['set-cookie'].split(';')[0] };
+  const created = await api.handle({ method: 'POST', path: '/api/evaluation-comparisons', headers, body });
+  assert.equal(created.status, 201);
+  assert.equal(captured.owner, alice);
+  assert.deepEqual(captured.input.baselineCampaignIds, body.baselineCampaignIds);
+  assert.deepEqual(captured.input.policy, body.policy);
+  assert.equal((await api.handle({ method: 'GET', path: '/api/evaluation-comparisons', headers })).body.length, 1);
+  assert.equal((await api.handle({ method: 'GET', path: `/api/evaluation-comparisons/${record.comparisonId}`, headers })).body.status, 'PASS');
+});

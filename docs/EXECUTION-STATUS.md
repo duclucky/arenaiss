@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Date: `2026-09-14`
+- Date: `2026-09-16`
 - Product direction updated: `2026-09-14`
 - Product: `Arena ISS — Intelligence, Safety & Standards`, an Agent Evaluation
   Platform; see `docs/ADR-002-AGENT-EVALUATION-PLATFORM.md`
@@ -16,8 +16,36 @@
   bounded Level 1/2 provider protocol, inert action-policy slice, independent
   GenLayer scorecard feasibility gate, EvaluationRun persistence, first local
   multi-scenario `SOLO` runner and Run Detail read APIs are implemented. Full
-  Test Pack editing/version browser, `SOLO` creation UI, optional Level 3 executable sandbox,
-  comparison/regression and benchmark claims remain open.
+  Test Pack editing/version browser, `SOLO` creation UI and optional Level 3
+  executable sandbox remain open. Deterministic `EVAL-5` version comparison and
+  regression is implemented locally with immutable owner-only records. The
+  `EVAL-6` Tournament convergence is implemented and locally verified through
+  the specialized ComparisonRun model; comparison UI and benchmark claims remain
+  open.
+
+## EVAL-6 Studio Next deployment — 2026-09-16
+
+- `ArenaComparisonJudge` (`AgentComparisonV1`) is deployed at
+  `0xe5210eCCC4182090A1416f515Dc7001B27274BcB` on Studio Next, chain `61997`.
+- Deployment transaction
+  `0xebff1bca9a8b97eacf38bb79bbce4a04d37efadceda01ab89d09ae82780aee38`
+  finalized `MAJORITY_AGREE` with `FINISHED_WITH_RETURN`. Exact normalized
+  deployed source SHA-256 is
+  `a6b098f777af6d70dfc3debdbe29354a14b8a776b11c04f180d1a7645c2bcb9a`.
+- Final-address deterministic smoke transaction
+  `0x4b651de4fed5a3cc8b9233ab6ba34ded8b07b42ed18e4beb7a8f306f3f9b0b3d`
+  finalized with a canonical six-dimension `TIE` and exact evidence bindings.
+- The fee profile records the Studio Next v0.6 envelope needed by both deploy
+  and `submit_comparison`. Failed fee/payload calibration attempts did not write
+  contract state and are not represented as successful evidence.
+- Sanitized evidence is recorded at
+  `docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json`.
+- All active GenLayer SDK factories, frontend build defaults, Compose and
+  integration configuration now resolve through the canonical Studio Next RPC.
+  The public verifier binds all three deployed judges. Historical Studionet
+  scripts and evidence remain deliberately chain-specific and were not rewritten.
+  Fresh three-contract source/schema/CORS evidence is in
+  `docs/evidence/studio-next/rpc-synchronization-2026-09-16.json`.
 
 ## Studio Dev release-candidate deployment — 2026-09-14
 
@@ -188,8 +216,8 @@ The repository still contains bounded offline spikes for provenance, finality,
 randomness, Arc-source normalization, semantic verdicts and accounting. A fresh
 run after R2 REWORK-1 collected `84` tests and passed. `compileall` also passed.
 
-The current full local regression is `77` Python direct tests, `160` TypeScript
-domain/service/system tests, `14` Foundry tests and `32` frontend tests. GenVM
+The current full local regression is `84` Python direct tests, `204` TypeScript
+domain/service/system tests, `17` Foundry tests and `59` frontend tests. GenVM
 lint/validation, frontend typecheck and the production frontend build pass. The
 former 525 kB bundle warning is resolved; the latest build split the largest
 wallet chunk to about 294 kB and the main chunk to about 221 kB.
@@ -368,8 +396,21 @@ V5 submission/finality, canonical scorecard readback, a multi-scenario `SOLO`
 runner, classified retry/resume, immutable Test Pack/campaign records and public/owner Run Detail projections. It has
 not sent a new paid request or network transaction. The next dependency-ordered
 action is campaign execution wiring from authenticated records plus the `SOLO`
-creation and Run Detail frontend. Test Pack editing/version management remains
-separate.
+  creation and Run Detail frontend. Test Pack editing/version management remains
+  separate.
+The deterministic `EVAL-5` slice now compares isolated baseline/candidate Agent
+versions only across exact Test Pack, scenario, runtime/model, rubric and
+required-run bindings. Its versioned policy applies repeated-run coverage and
+variance, per-dimension minimum/drop thresholds, overall drop and critical-rule
+zero tolerance; incomplete, incomparable, infrastructure and unstable outcomes
+remain distinct. Comparison records contain digests/IDs and aggregate results,
+not `AGENTS.md` or raw provider output, and survive SQLite restart. The audited
+additive/no-rewrite plan for EVAL-6 is in
+`docs/EVAL-6-BACKWARD-COMPATIBILITY-PLAN.md`. EVAL-6 is now implemented: legacy
+Tournament evidence projects without rewrite, new attempts use the Evaluation
+provider envelope and rich GenLayer ComparisonRun, and only finalized eligible
+A/B results advance. Tie/retry/failure remains fail-closed. Arc settlement math,
+refund and zero-liability rules remain unchanged.
 The executable tool sandbox remains an optional compute-dependent Level 3
 roadmap item, not the current critical path.
 

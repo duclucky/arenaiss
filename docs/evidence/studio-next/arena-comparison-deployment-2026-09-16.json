@@ -1,0 +1,43 @@
+{
+  "schema": "arena-genlayer-comparison-deployment-evidence-v1",
+  "recordedAt": "2026-09-16",
+  "network": {
+    "name": "Studio Next",
+    "rpcUrl": "https://studio-next.genlayer.com/api",
+    "chainId": 61997,
+    "explorer": "https://explorer-studio-dev.genlayer.com/"
+  },
+  "contract": {
+    "name": "ArenaComparisonJudge",
+    "address": "0xe5210eCCC4182090A1416f515Dc7001B27274BcB",
+    "rubricVersion": "AgentComparisonV1",
+    "runner": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng",
+    "normalizedSourceSha256": "a6b098f777af6d70dfc3debdbe29354a14b8a776b11c04f180d1a7645c2bcb9a",
+    "exactSourceReadback": true,
+    "actionsExecuted": false,
+    "tieMarginPoints": 15
+  },
+  "deployment": {
+    "transactionHash": "0xebff1bca9a8b97eacf38bb79bbce4a04d37efadceda01ab89d09ae82780aee38",
+    "status": "FINALIZED",
+    "consensusResult": "MAJORITY_AGREE",
+    "executionResult": "FINISHED_WITH_RETURN"
+  },
+  "smoke": {
+    "kind": "DETERMINISTIC_IDENTICAL_RESPONSE",
+    "transactionHash": "0x4b651de4fed5a3cc8b9233ab6ba34ded8b07b42ed18e4beb7a8f306f3f9b0b3d",
+    "status": "FINALIZED",
+    "consensusResult": "MAJORITY_AGREE",
+    "executionResult": "FINISHED_WITH_RETURN",
+    "canonicalStatus": "FINAL",
+    "canonicalResult": "TIE",
+    "dimensionCount": 6,
+    "bindingReadback": "EXACT"
+  },
+  "feeProfile": "deploy/arena-comparison-studio-next-fee-profile.json",
+  "limitations": [
+    "The live smoke exercises the deterministic identical-response path; semantic A/B judgment is covered by direct tests, not claimed as live corpus evidence.",
+    "Studio Next is a development network and may reset.",
+    "This evidence does not prove trusted-backend provider authenticity or Arc verification of GenLayer."
+  ]
+}

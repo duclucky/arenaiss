@@ -194,6 +194,8 @@ export type EvaluationScenario = {
 export type EvaluationPack = { schema: string; packId: string; version: string; name: string; scenarioIds: string[]; scenarioCount: number };
 export type EvaluationCampaign = { schema: string; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number }> };
 export type EvaluationRun = { schema: string; runId: string; agentVersionId: string; mode: string; rubricVersion: string; scenario: { scenarioId: string; version: string; mode: string; digest: string }; provider: { state: string }; judge: { state: string; transactionHash?: string }; scorecard?: { resultClass: string; overallScore: number; dimensions: Array<{ dimensionId: string; grade: string }>; actionsExecuted: false } };
+export type RegressionPolicy = { schema: 'arena-regression-policy-v1'; requiredRunsPerScenario: number; minimumScenarioCoverageBps: number; maximumOverallDrop: number; maximumDimensionDrop: number; maximumOverallSpread: number; maximumDimensionSpread: number; minimumDimensionScores: Partial<Record<'instruction_adherence' | 'reasoning_quality' | 'action_selection' | 'rule_compliance' | 'task_completion' | 'safety', number>>; criticalFindingCodes: string[] };
+export type VersionComparison = { schema: 'arena-version-comparison-v1'; comparisonId: string; inputDigest: string; status: 'PASS' | 'REGRESSION' | 'INCOMPARABLE' | 'INCOMPLETE' | 'INFRASTRUCTURE_ERROR' | 'UNSTABLE'; agentId: string; baselineVersionId: string; candidateVersionId: string; coverageBps: number; findings: Array<{ code: string; dimension?: string; observed?: number; threshold?: number }>; baseline?: { overallScore: number }; candidate?: { overallScore: number } };
 export interface EvaluationApiAdapter {
   listCampaigns(): Promise<EvaluationCampaign[]>;
   getCampaign(campaignId: string): Promise<EvaluationCampaign | null>;
@@ -201,6 +203,9 @@ export interface EvaluationApiAdapter {
   getRun(runId: string, privateView?: boolean): Promise<EvaluationRun & { scenario: Record<string, unknown>; provider: Record<string, unknown>; scorecard?: Record<string, unknown> }>;
   createPack(input: { packId: string; version: string; name: string; scenarios: EvaluationScenario[] }): Promise<EvaluationPack>;
   createSoloCampaign(input: { campaignId: string; agentId: string; agentsVersion: string; packId: string; packVersion: string; runtimePolicy: { model: string; maxOutputTokens: number; temperature: number; maxProviderAttempts: number } }): Promise<EvaluationCampaign>;
+  listComparisons(): Promise<VersionComparison[]>;
+  getComparison(comparisonId: string): Promise<VersionComparison>;
+  createVersionComparison(input: { comparisonId: string; agentId: string; baselineVersionId: string; candidateVersionId: string; baselineCampaignIds: string[]; candidateCampaignIds: string[]; policy: RegressionPolicy }): Promise<VersionComparison>;
 }
 
 export type ArcNetworkConfig = {
@@ -221,6 +226,7 @@ export type GenLayerNetworkConfig = {
   explorerUrl: string;
   matchJudgeAddress: `0x${string}`;
   evaluationJudgeAddress: `0x${string}`;
+  comparisonJudgeAddress: `0x${string}`;
 };
 
 export type EntrantRegistration = {

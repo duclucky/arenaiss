@@ -108,6 +108,28 @@ export class ArenaHttpApi {
         const owner = this.requireSession(request.headers);
         return this.json(200, this.service.listOwnedEvaluationCampaigns(owner));
       }
+      if (request.method === 'POST' && request.path === '/api/evaluation-comparisons') {
+        const owner = this.requireSession(request.headers);
+        const body = request.body || {};
+        return this.json(201, this.service.createVersionComparison(owner, {
+          comparisonId: requireString(body.comparisonId) as `sha256:${string}`,
+          agentId: requireString(body.agentId) as `sha256:${string}`,
+          baselineVersionId: requireString(body.baselineVersionId) as `sha256:${string}`,
+          candidateVersionId: requireString(body.candidateVersionId) as `sha256:${string}`,
+          baselineCampaignIds: requireStringArray(body.baselineCampaignIds) as `sha256:${string}`[],
+          candidateCampaignIds: requireStringArray(body.candidateCampaignIds) as `sha256:${string}`[],
+          policy: body.policy as any,
+        }));
+      }
+      if (request.method === 'GET' && request.path === '/api/evaluation-comparisons') {
+        const owner = this.requireSession(request.headers);
+        return this.json(200, this.service.listOwnedVersionComparisons(owner));
+      }
+      const versionComparison = request.path.match(/^\/api\/evaluation-comparisons\/(sha256:[0-9a-fA-F]{64})$/);
+      if (request.method === 'GET' && versionComparison) {
+        const owner = this.requireSession(request.headers);
+        return this.json(200, this.service.getOwnedVersionComparison(owner, versionComparison[1] as `sha256:${string}`));
+      }
       const publicCampaign = request.path.match(/^\/api\/evaluation-campaigns\/(sha256:[0-9a-fA-F]{64})$/);
       if (request.method === 'GET' && publicCampaign) {
         const campaign = this.service.getPublicEvaluationCampaign(publicCampaign[1] as `sha256:${string}`);
@@ -245,5 +267,10 @@ function requireAddress(value: unknown): string {
 
 function requireString(value: unknown): string {
   if (typeof value !== 'string') throw new Error('invalid request');
+  return value;
+}
+
+function requireStringArray(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) throw new Error('invalid request');
   return value;
 }

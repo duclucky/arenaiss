@@ -305,3 +305,47 @@ test("same Agent version and Test Pack can create multiple idempotent SOLO campa
     runtime.close();
   }
 });
+
+test("EVAL-5 API compares only two versions of the same owned Agent and persists the redacted result", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const setup = new ArenaApiService(ALICE, runtime);
+    const baseline = setup.createAgent(ALICE, "Comparison Agent", "Baseline strategy.");
+    const candidate = setup.updateAgent(ALICE, baseline.agentId, "Candidate strategy.");
+    const scenario = { schema: "arena-test-scenario-v1" as const, scenarioId: "cmp_01", version: "1.0.0", level: "RESPONSE" as const, objective: "Answer consistently.", context: "", constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 };
+    const packId = sha256Text("comparison-pack");
+    setup.createEvaluationPack(ALICE, { packId, version: "1.0.0", name: "Comparison Pack", scenarios: [scenario] });
+    const runtimePolicy = { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 };
+    const baselineCampaignId = sha256Text("comparison-baseline-campaign");
+    const candidateCampaignId = sha256Text("comparison-candidate-campaign");
+    setup.createSoloCampaign(ALICE, { campaignId: baselineCampaignId, agentId: baseline.agentId, agentsVersion: baseline.agentsVersion, packId, packVersion: "1.0.0", runtimePolicy });
+    setup.createSoloCampaign(ALICE, { campaignId: candidateCampaignId, agentId: baseline.agentId, agentsVersion: candidate.agentsVersion, packId, packVersion: "1.0.0", runtimePolicy });
+
+    for (const [campaignId, versionId, score] of [[baselineCampaignId, baseline.agentsVersion, 80], [candidateCampaignId, candidate.agentsVersion, 82]] as const) {
+      const campaign = runtime.get<any>("evaluation-campaigns", campaignId)!;
+      const runId = sha256Text(`${campaignId}-run`);
+      campaign.state = "FINALIZED";
+      campaign.items[0] = {
+        scenarioId: "cmp_01", state: "FINALIZED", attempt: 1, runIds: [runId], currentRunId: runId,
+        scorecard: {
+          status: "FINAL", agent_version_id: versionId, rubric_version: "AgentEvaluationV5", scenario_digest: sha256Text("same-scenario"), overall_score: score,
+          result_class: "PASS", actions_executed: false, policy_findings: [], summary: "fixture",
+          dimensions: ["instruction_adherence", "reasoning_quality", "action_selection", "rule_compliance", "task_completion", "safety"].map((dimension) => ({ dimension_id: dimension, grade: dimension === "action_selection" ? "NOT_APPLICABLE" : "GOOD", reason: "fixture", evidence_refs: ["RESPONSE"] })),
+        },
+      };
+      runtime.put("evaluation-campaigns", campaignId, campaign);
+    }
+
+    const service = new ArenaApiService(ALICE, runtime);
+    const comparisonId = sha256Text("comparison-record");
+    const policy = { schema: "arena-regression-policy-v1" as const, requiredRunsPerScenario: 1, minimumScenarioCoverageBps: 10_000, maximumOverallDrop: 5, maximumDimensionDrop: 10, maximumOverallSpread: 10, maximumDimensionSpread: 10, minimumDimensionScores: { safety: 70 }, criticalFindingCodes: ["FORBIDDEN_ACTION"] };
+    const result = service.createVersionComparison(ALICE, { comparisonId, agentId: baseline.agentId, baselineVersionId: baseline.agentsVersion, candidateVersionId: candidate.agentsVersion, baselineCampaignIds: [baselineCampaignId], candidateCampaignIds: [candidateCampaignId], policy });
+    assert.equal(result.status, "PASS");
+    assert.equal(JSON.stringify(result).includes("strategy"), false);
+    assert.deepEqual(new ArenaApiService(ALICE, runtime).getOwnedVersionComparison(ALICE, comparisonId), result);
+    assert.equal(service.listOwnedVersionComparisons(ALICE).length, 1);
+    assert.throws(() => service.getOwnedVersionComparison(BOB, comparisonId), /unauthorized/i);
+  } finally {
+    runtime.close();
+  }
+});
