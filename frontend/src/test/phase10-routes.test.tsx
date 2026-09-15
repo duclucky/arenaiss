@@ -25,19 +25,23 @@ class RouteWallet implements ArcWalletAdapter {
 describe('phase 10 product routes', () => {
   beforeEach(() => window.history.pushState({}, '', '/'));
 
-  it('keeps Account out of primary navigation until the user signs in', async () => {
+  it('keeps all product navigation out of the public landing header', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
-    await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards/i });
-    expect(screen.getByRole('link', { name: 'Tournaments' })).toHaveAttribute('href', '/tournaments');
-    expect(screen.getByRole('link', { name: 'Agents' })).toHaveAttribute('href', '/agents');
+    await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
+    expect(screen.queryByRole('link', { name: 'Tournaments' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Agents' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Evaluations' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Credits' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
   });
 
   it('renders agent creation and redirects the legacy credits route to Account credits', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
-    await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards/i });
-    fireEvent.click(screen.getByRole('link', { name: 'Agents' }));
+    await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
+    act(() => {
+      window.history.pushState({}, '', '/agents');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
     expect(await screen.findByRole('heading', { name: 'My Agents' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Create Agent' }));
     expect(await screen.findByLabelText('Agent name')).toBeInTheDocument();

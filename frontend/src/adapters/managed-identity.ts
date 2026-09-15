@@ -1,4 +1,4 @@
-import type { ManagedAccount, ManagedIdentityAdapter } from './interfaces';
+import type { ManagedAccount, ManagedIdentityAdapter, ManagedUsdcBalance, ManagedWalletTransaction } from './interfaces';
 
 type Fetcher = typeof fetch;
 
@@ -35,6 +35,18 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
   async verifyEmail(email: string, code: string): Promise<ManagedAccount> {
     await this.request<void>('/api/auth/email/verify', { method: 'POST', body: JSON.stringify({ email, code }) }, true);
     return this.account();
+  }
+
+  listUsdcBalances(): Promise<ManagedUsdcBalance[]> {
+    return this.request('/api/account/usdc-balances', { method: 'GET' });
+  }
+
+  transferUsdc(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction> {
+    return this.request('/api/account/usdc-transfers', { method: 'POST', body: JSON.stringify({ destinationAddress, amount }) });
+  }
+
+  bridgeUsdcToArc(sourceChain: string, amount: string): Promise<ManagedWalletTransaction> {
+    return this.request('/api/account/cctp-transfers', { method: 'POST', body: JSON.stringify({ sourceChain, amount }) });
   }
 
   async logout(): Promise<void> {

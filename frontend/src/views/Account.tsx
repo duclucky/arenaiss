@@ -1,5 +1,6 @@
 import { useAppContext } from '../context';
-import { ShieldAlert } from 'lucide-react';
+import { Copy, ShieldAlert } from 'lucide-react';
+import type { ManagedUsdcBalance, ManagedWalletTransaction } from '../adapters/interfaces';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -8,6 +9,7 @@ type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
 
 export function Account() {
   const { account, managedAccount, agentApi, networkConfig, disconnectWallet, wallet } = useAppContext();
+  const { managedIdentity } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'credits' ? 'credits' : 'overview';
   const [balanceState, setBalanceState] = useState<'loading' | 'unavailable' | string>('loading');
@@ -17,9 +19,23 @@ export function Account() {
   const [creditsError, setCreditsError] = useState('');
   const [claimState, setClaimState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
   const [reload, setReload] = useState(0);
+  const [managedBalances, setManagedBalances] = useState<ManagedUsdcBalance[]>([]);
+  const [copied, setCopied] = useState(false);
+  const [destinationAddress, setDestinationAddress] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [bridgeChain, setBridgeChain] = useState('ETH-SEPOLIA');
+  const [bridgeAmount, setBridgeAmount] = useState('');
+  const [walletAction, setWalletAction] = useState<{ kind: 'transfer' | 'bridge'; state: 'submitting' | 'done' | 'error'; result?: ManagedWalletTransaction; message?: string } | null>(null);
 
   useEffect(() => {
-    if (account && networkConfig) {
+    if (managedAccount && managedIdentity?.listUsdcBalances) {
+      setBalanceState('loading');
+      managedIdentity.listUsdcBalances().then((rows) => {
+        setManagedBalances(rows);
+        const arc = rows.find((row) => row.isArc);
+        setBalanceState(arc?.available ? formatDisplayAmount(arc.amount) : 'unavailable');
+      }).catch(() => setBalanceState('unavailable'));
+    } else if (account && networkConfig) {
       setBalanceState('loading');
       wallet.getBalance(account, networkConfig)
         .then(val => {
@@ -29,7 +45,7 @@ export function Account() {
     } else {
       setBalanceState('unavailable');
     }
-  }, [account, balanceReload, networkConfig, wallet]);
+  }, [account, balanceReload, managedAccount, managedIdentity, networkConfig, wallet]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,9 +105,42 @@ export function Account() {
     }
   }
 
+  async function copyAddress() {
+    if (!account) return;
+    await navigator.clipboard.writeText(account);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function submitTransfer(event: React.FormEvent) {
+    event.preventDefault();
+    if (!managedIdentity?.transferUsdc || !window.confirm(`Transfer ${transferAmount} USDC on Arc to ${destinationAddress}?`)) return;
+    setWalletAction({ kind: 'transfer', state: 'submitting' });
+    try {
+      const result = await managedIdentity.transferUsdc(destinationAddress, transferAmount);
+      setWalletAction({ kind: 'transfer', state: 'done', result });
+      setTransferAmount(''); setDestinationAddress(''); setBalanceReload((value) => value + 1);
+    } catch (reason) {
+      setWalletAction({ kind: 'transfer', state: 'error', message: reason instanceof Error ? reason.message : 'Transfer failed.' });
+    }
+  }
+
+  async function submitBridge(event: React.FormEvent) {
+    event.preventDefault();
+    if (!managedIdentity?.bridgeUsdcToArc || !window.confirm(`Bridge ${bridgeAmount} USDC from ${bridgeChain} to Arc?`)) return;
+    setWalletAction({ kind: 'bridge', state: 'submitting' });
+    try {
+      const result = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
+      setWalletAction({ kind: 'bridge', state: 'done', result });
+      setBridgeAmount(''); setBalanceReload((value) => value + 1);
+    } catch (reason) {
+      setWalletAction({ kind: 'bridge', state: 'error', message: reason instanceof Error ? reason.message : 'Bridge failed.' });
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-7">
-      <div><p className="page-kicker">Wallet</p><h1 className="page-title">Account</h1></div>
+      <div><p className="page-kicker">Wallet</p><h1 className="sr-only">Arena ISS wallet</h1></div>
 
       {!networkConfig && (
         <div className="glass-panel flex items-start gap-3 rounded-lg border-red-400/40 p-4">
@@ -114,11 +163,15 @@ export function Account() {
         {account ? (
           <div className="space-y-6">
             <div>
-              <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-1">{managedAccount ? 'Circle-managed account address' : 'Connected address'}</label>
-              <div className="retro-inset mt-2 break-all p-4 font-mono text-sm">
-                {account}
+              <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-1">{managedAccount ? 'Arena ISS wallet' : 'Connected address'}</label>
+              <div className="retro-inset mt-2 flex items-center gap-3 p-3 pl-4">
+                <span className="min-w-0 flex-1 break-all font-mono text-sm">{account}</span>
+                <button type="button" className="metal-button-ghost shrink-0" onClick={copyAddress} aria-label="Copy wallet address"><Copy size={16} /> {copied ? 'Copied' : 'Copy'}</button>
               </div>
-              {managedAccount && <p className="mt-3 text-sm text-neutral-700">Signed in with {managedAccount.identity.kind === 'EMAIL' ? 'email' : 'an external wallet'}. The sign-in credential is not used to custody account funds.</p>}
+            </div>
+
+            <div role="note" className="border-l-4 border-amber-600 bg-amber-50/70 p-4 text-sm leading-relaxed text-amber-950">
+              <strong>Arena ISS is live on Arc Network.</strong> Direct deposits and withdrawals use Arc. CCTP deposits burn USDC on the selected source chain and mint it to this wallet on Arc.
             </div>
 
             <div>
@@ -129,6 +182,43 @@ export function Account() {
                 {balanceState !== 'loading' && balanceState !== 'unavailable' && <span>{balanceState} USDC</span>}
               </div>
             </div>
+
+            {managedAccount && managedBalances.length > 0 && <div>
+              <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-3">USDC by network</label>
+              <ul className="grid gap-2 sm:grid-cols-2" aria-label="USDC balances by network">
+                {managedBalances.map((row) => <li key={row.chain} className="retro-inset flex items-center justify-between gap-3 p-3"><span>{row.label}</span><strong>{row.available ? `${formatDisplayAmount(row.amount)} USDC` : 'Unavailable'}</strong></li>)}
+              </ul>
+            </div>}
+
+            {managedAccount && <div className="grid gap-5 border-t border-border pt-6 lg:grid-cols-2">
+              <form className="space-y-3" onSubmit={submitBridge}>
+                <div><h2 className="text-xl font-bold">Bridge USDC to Arc</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source wallet also needs that network's testnet gas token.</p></div>
+                <label className="block text-sm font-bold" htmlFor="bridge-chain">Source network</label>
+                <select id="bridge-chain" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
+                  {CCTP_CHAINS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                </select>
+                <label className="block text-sm font-bold" htmlFor="bridge-amount">Amount (USDC)</label>
+                <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
+                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Bridge to Arc</button>
+              </form>
+
+              <form className="space-y-3" onSubmit={submitTransfer}>
+                <div><h2 className="text-xl font-bold">Send from Arc</h2><p className="mt-1 text-sm text-muted-foreground">Transfer testnet USDC to an EVM wallet on Arc.</p></div>
+                <label className="block text-sm font-bold" htmlFor="withdraw-address">Recipient wallet</label>
+                <input id="withdraw-address" className="retro-inset w-full p-3 font-mono text-sm" placeholder="0x…" required pattern="^0x[0-9a-fA-F]{40}$" value={destinationAddress} onChange={(event) => setDestinationAddress(event.target.value)} />
+                <label className="block text-sm font-bold" htmlFor="withdraw-amount">Amount (USDC)</label>
+                <input id="withdraw-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$" value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} />
+                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Send USDC</button>
+              </form>
+            </div>}
+
+            {walletAction && <div role={walletAction.state === 'error' ? 'alert' : 'status'} className={walletAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
+              {walletAction.state === 'submitting' && 'Submitting securely through Circle…'}
+              {walletAction.state === 'error' && walletAction.message}
+              {walletAction.state === 'done' && <>Transaction submitted · {walletAction.result?.explorerUrl
+                ? <a className="underline" href={walletAction.result.explorerUrl} target="_blank" rel="noreferrer">View transaction</a>
+                : walletAction.result?.transactionId}</>}
+            </div>}
 
             <div className="pt-4 border-t border-border flex justify-end">
               <button
@@ -192,3 +282,15 @@ function formatUsdc(baseUnits: string): string {
   const fraction = (value % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
   return fraction ? `${whole}.${fraction}` : `${whole}.00`;
 }
+
+function formatDisplayAmount(value: string): string {
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(value)) return '0.00';
+  const [whole, fraction = ''] = value.split('.');
+  const trimmed = fraction.replace(/0+$/, '');
+  return trimmed ? `${whole}.${trimmed}` : `${whole}.00`;
+}
+
+const CCTP_CHAINS = [
+  ['ETH-SEPOLIA', 'Ethereum Sepolia'], ['BASE-SEPOLIA', 'Base Sepolia'], ['ARB-SEPOLIA', 'Arbitrum Sepolia'],
+  ['OP-SEPOLIA', 'OP Sepolia'],
+] as const;

@@ -46,11 +46,37 @@ describe('Arena ISS visual shell', () => {
   });
 
   it('renders the Arena ISS platform message without duplicate page actions', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    }));
     const { container } = render(<App walletAdapter={new VisualWallet()} />);
 
-    expect(await screen.findByRole('heading', { name: /Arena ISS — Intelligence, Safety & Standards\. Test how agents think, act, and follow rules\./i })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards\. Test how agents think, act, and follow rules\./i });
+    expect(heading.querySelectorAll('[data-hero-line]')).toHaveLength(3);
+    expect(heading.querySelector('[data-hero-line="brand"]')).toHaveTextContent('Arena ISS');
+    expect(heading.querySelector('[data-hero-line="standard"]')).toHaveTextContent('Arena Intelligence, Safety & Standards.');
+    expect(heading.querySelector('[data-hero-line="promise"]')).toHaveTextContent('Test how agents think, act, and follow rules.');
     expect(screen.getByRole('link', { name: 'Arena ISS' })).toHaveAttribute('href', '/');
-    expect(screen.getByText(/Intelligence, Safety & Standards/i)).toHaveClass('hero-intro-blur');
+    const ticker = screen.getByRole('region', { name: 'Arena ISS technology ticker' });
+    expect(ticker.closest('header')).toBeInTheDocument();
+    for (const label of ['Arc', 'USDC', 'CCTP', 'Escrow', 'GenLayer', 'GenVM']) expect(ticker).toHaveTextContent(label);
+    fireEvent.click(screen.getByRole('button', { name: 'Pause technology ticker' }));
+    expect(screen.getByRole('button', { name: 'Play technology ticker' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tournaments' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Agents' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Evaluations' })).not.toBeInTheDocument();
+    const start = screen.getByRole('button', { name: 'Start with Agent' });
+    expect(screen.getByRole('link', { name: 'Read Docs' })).toHaveAttribute('href', '/docs');
+    fireEvent.click(start);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Explore tournaments' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Build an agent' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Trusted-operator MVP/i)).not.toBeInTheDocument();
@@ -170,15 +196,11 @@ describe('Arena ISS visual shell', () => {
     expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveClass('pill-button-dark');
   });
 
-  it('opens and closes the mobile navigation with accessible state', async () => {
+  it('does not expose product navigation before login', async () => {
     render(<App walletAdapter={new VisualWallet()} />);
-    const menu = await screen.findByRole('button', { name: 'Open menu' });
-    expect(menu).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(menu);
-    expect(menu).toHaveAttribute('aria-expanded', 'true');
-    expect(menu).toHaveAccessibleName('Close menu');
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(await screen.findByRole('button', { name: 'Login' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
   });
 
   it('shows an actionable read error and retries without leaving the editorial page', async () => {

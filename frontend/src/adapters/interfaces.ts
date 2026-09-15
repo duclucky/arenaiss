@@ -138,12 +138,18 @@ export type ManagedAccount = {
   };
 };
 
+export type ManagedUsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
+export type ManagedWalletTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
+
 export interface ManagedIdentityAdapter {
   capabilities(): Promise<{ wallet: true; email: boolean; managedWallet: boolean }>;
   restore(): Promise<ManagedAccount | null>;
   signInWithWallet(address: string, signMessage: (message: string) => Promise<string>): Promise<ManagedAccount>;
   requestEmailCode(email: string): Promise<void>;
   verifyEmail(email: string, code: string): Promise<ManagedAccount>;
+  listUsdcBalances?(): Promise<ManagedUsdcBalance[]>;
+  transferUsdc?(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction>;
+  bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedWalletTransaction>;
   logout(): Promise<void>;
 }
 
