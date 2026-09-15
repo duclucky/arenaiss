@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,8 +53,16 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Account' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Signed in with email/)).not.toBeInTheDocument();
-    expect(await screen.findByText('Base Sepolia')).toBeInTheDocument();
-    expect(screen.getByText(/Arena ISS is live on Arc Network/)).toBeInTheDocument();
+    const balancesToggle = await screen.findByRole('button', { name: 'USDC by network' });
+    expect(balancesToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('list', { name: 'USDC balances by network' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Arena ISS is live on Arc Testnet/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bridge USDC to Arc Testnet' })).toBeInTheDocument();
+    fireEvent.click(balancesToggle);
+    expect(balancesToggle).toHaveAttribute('aria-expanded', 'true');
+    const balancesList = screen.getByRole('list', { name: 'USDC balances by network' });
+    expect(balancesList).toBeInTheDocument();
+    expect(within(balancesList).getByText('Base Sepolia')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Copy wallet address' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address));
     const bridgeAmount = screen.getByLabelText('Amount (USDC)', { selector: '#bridge-amount' });
@@ -63,7 +71,7 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.getByRole('heading', { name: 'Withdraw' })).toBeInTheDocument();
     expect(screen.getByLabelText('Recipient wallet').closest('form')).toHaveClass('wallet-action-form');
     expect(screen.getByRole('button', { name: 'Withdraw USDC' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Bridge to Arc' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bridge to Arc Testnet' })).toBeInTheDocument();
   });
 
   it('closes the account menu when clicking elsewhere', async () => {

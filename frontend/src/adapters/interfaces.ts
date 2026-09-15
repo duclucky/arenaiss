@@ -145,7 +145,7 @@ export type ManagedAccount = {
   identity: { kind: 'WALLET' | 'EMAIL' };
   managedWallet: {
     state: 'READY'; userId: string; walletId: string; address: string;
-    blockchain: 'ARC-TESTNET'; accountType: 'EOA';
+    blockchain: 'ARC-TESTNET'; accountType: 'EOA' | 'SCA';
   };
 };
 

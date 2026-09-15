@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { CircleManagedWalletAdapter } from '../src/circle-managed-wallet.ts';
 
-test('Circle adapter creates exactly one Arc Testnet EOA and forwards the persisted idempotency key', async () => {
+test('Circle adapter creates exactly one Arc Testnet SCA for automatic Gas Station sponsorship', async () => {
   const calls: any[] = [];
   const adapter = new CircleManagedWalletAdapter({
     async createWallets(input: any) {
@@ -18,7 +18,7 @@ test('Circle adapter creates exactly one Arc Testnet EOA and forwards the persis
   });
 
   assert.deepEqual(calls, [{
-    accountType: 'EOA',
+    accountType: 'SCA',
     blockchains: ['ARC-TESTNET'],
     count: 1,
     walletSetId: 'wallet-set-id',

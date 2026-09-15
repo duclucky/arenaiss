@@ -1,5 +1,5 @@
 import { useAppContext } from '../context';
-import { Copy, ShieldAlert } from 'lucide-react';
+import { ChevronRight, Copy, ShieldAlert } from 'lucide-react';
 import type { ManagedUsdcBalance, ManagedWalletTransaction } from '../adapters/interfaces';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -20,6 +20,7 @@ export function Account() {
   const [claimState, setClaimState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
   const [reload, setReload] = useState(0);
   const [managedBalances, setManagedBalances] = useState<ManagedUsdcBalance[]>([]);
+  const [balancesExpanded, setBalancesExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [destinationAddress, setDestinationAddress] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
@@ -127,7 +128,7 @@ export function Account() {
 
   async function submitBridge(event: React.FormEvent) {
     event.preventDefault();
-    if (!managedIdentity?.bridgeUsdcToArc || !window.confirm(`Bridge ${bridgeAmount} USDC from ${bridgeChain} to Arc?`)) return;
+    if (!managedIdentity?.bridgeUsdcToArc || !window.confirm(`Bridge ${bridgeAmount} USDC from ${bridgeChain} to Arc Testnet?`)) return;
     setWalletAction({ kind: 'bridge', state: 'submitting' });
     try {
       const result = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
@@ -171,7 +172,7 @@ export function Account() {
             </div>
 
             <div role="note" className="border-l-4 border-amber-600 bg-amber-50/70 p-4 text-sm leading-relaxed text-amber-950">
-              <strong>Arena ISS is live on Arc Network.</strong> Direct deposits and withdrawals use Arc. CCTP deposits burn USDC on the selected source chain and mint it to this wallet on Arc.
+              <strong>Arena ISS is live on Arc Testnet.</strong> Direct deposits and withdrawals use Arc Testnet. CCTP deposits burn USDC on the selected source chain and mint it to this wallet on Arc Testnet.
             </div>
 
             <div>
@@ -184,22 +185,31 @@ export function Account() {
             </div>
 
             {managedAccount && managedBalances.length > 0 && <div>
-              <label className="text-sm text-muted-foreground uppercase tracking-wider font-bold block mb-3">USDC by network</label>
-              <ul className="grid gap-2 sm:grid-cols-2" aria-label="USDC balances by network">
+              <button
+                type="button"
+                className="mb-3 flex min-h-11 w-full items-center gap-2 text-left text-sm font-bold uppercase tracking-wider text-muted-foreground focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+                aria-expanded={balancesExpanded}
+                aria-controls="usdc-balances-by-network"
+                onClick={() => setBalancesExpanded((expanded) => !expanded)}
+              >
+                <ChevronRight aria-hidden="true" size={18} className={`shrink-0 transition-transform ${balancesExpanded ? 'rotate-90' : ''}`} />
+                <span>USDC by network</span>
+              </button>
+              {balancesExpanded && <ul id="usdc-balances-by-network" className="grid gap-2 sm:grid-cols-2" aria-label="USDC balances by network">
                 {managedBalances.map((row) => <li key={row.chain} className="retro-inset flex items-center justify-between gap-3 p-3"><span>{row.label}</span><strong>{row.available ? `${formatDisplayAmount(row.amount)} USDC` : 'Unavailable'}</strong></li>)}
-              </ul>
+              </ul>}
             </div>}
 
             {managedAccount && <div className="grid gap-5 border-t border-border pt-6 lg:grid-cols-2">
               <form className="wallet-action-form" onSubmit={submitBridge}>
-                <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Bridge USDC to Arc</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source wallet also needs that network's testnet gas token.</p></div>
+                <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Bridge USDC to Arc Testnet</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source SCA needs USDC for the transfer and CCTP fee; Gas Station sponsors source-network gas when its policy applies.</p></div>
                 <label className="block text-sm font-bold" htmlFor="bridge-chain">Source network</label>
                 <select id="bridge-chain" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
                   {CCTP_CHAINS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
                 </select>
                 <label className="block text-sm font-bold" htmlFor="bridge-amount">Amount (USDC)</label>
                 <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
-                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Bridge to Arc</button>
+                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Bridge to Arc Testnet</button>
               </form>
 
               <form className="wallet-action-form" onSubmit={submitTransfer}>

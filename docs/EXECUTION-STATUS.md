@@ -347,7 +347,7 @@ Wallet-signature and email-OTP authentication plus resumable Circle
 developer-controlled wallet provisioning are implemented locally behind a
 complete server-only configuration gate. The code pins
 `@circle-fin/developer-controlled-wallets` `10.8.0`, creates one
-`ARC-TESTNET` EOA per Arena identity, persists the UUID v4 idempotency key before
+`ARC-TESTNET` SCA per Arena identity, persists the UUID v4 idempotency key before
 the Circle call, does not persist raw email, and exposes only safe account
 metadata. The frontend now restores the managed session, offers wallet or email
 login, displays the managed address, and blocks Tournament writes instead of
@@ -355,6 +355,12 @@ falling back to the sign-in wallet. No Circle API mutation, SMTP delivery,
 funding or Arc transaction was performed. Migration of Tournament registration
 and claim to Circle contract execution remains open and must not be represented
 as complete.
+
+The 2026-09-15 SCA/Gas Station change is local only: existing EOA metadata is
+archived, the new active SCA uses a fresh idempotency key, and no testnet asset
+or legacy Agent ownership is moved. Gas sponsorship depends on Circle's active
+default policy and limits on each source/Arc network. Live SCA creation,
+Gas Station sponsorship and CCTP readback have not been verified by this edit.
 
 The bounded `EVAL-3`/`EVAL-4` runtime slice is now implemented locally:
 immutable EvaluationRun bindings, distinct provider states, SQLite persistence,

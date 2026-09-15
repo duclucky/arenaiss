@@ -57,3 +57,51 @@ test('restart retries a failed provisioning operation with the same persisted id
     assert.match(keys[0], /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   } finally { runtime.close(); }
 });
+
+test('existing EOA is archived and replaced by a new SCA without reusing its creation key', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const identityKey = `wallet:${address}`;
+    const userId = `usr_${'a'.repeat(64)}`;
+    runtime.put('auth-identities', identityKey, { identityKey, kind: 'WALLET', userId, principal: address, createdAt: 1 });
+    const legacy = { state: 'READY', userId, walletId: 'old-eoa', address,
+      blockchain: 'ARC-TESTNET', accountType: 'EOA', idempotencyKey: 'old-key', updatedAt: 1 };
+    runtime.put('circle-wallets', userId, legacy);
+    const keys: string[] = [];
+    const service = new ManagedIdentityService(options(runtime, async ({ idempotencyKey }) => {
+      keys.push(idempotencyKey);
+      return { walletId: 'new-sca', address: '0x2222222222222222222222222222222222222222' };
+    }));
+    const account = await service.getAccount(userId, 'WALLET');
+    assert.equal(account.managedWallet.accountType, 'SCA');
+    assert.equal(account.managedWallet.walletId, 'new-sca');
+    assert.notEqual(keys[0], 'old-key');
+    assert.deepEqual(runtime.get('circle-wallets-legacy', userId), legacy);
+    assert.equal((await service.loginWallet(address)).managedWallet.walletId, 'new-sca');
+    assert.equal(keys.length, 1);
+  } finally { runtime.close(); }
+});
+
+test('failed EOA replacement retries the new SCA idempotency key after restart', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const userId = `usr_${'b'.repeat(64)}`;
+    const identityKey = `wallet:${address}`;
+    runtime.put('auth-identities', identityKey, { identityKey, kind: 'WALLET', userId, principal: address, createdAt: 1 });
+    runtime.put('circle-wallets', userId, { state: 'READY', userId, walletId: 'old-eoa', address,
+      blockchain: 'ARC-TESTNET', accountType: 'EOA', idempotencyKey: 'old-key', updatedAt: 1 });
+    const keys: string[] = [];
+    const failing = new ManagedIdentityService(options(runtime, async ({ idempotencyKey }) => {
+      keys.push(idempotencyKey);
+      throw new Error('Circle unavailable');
+    }));
+    await assert.rejects(failing.getAccount(userId, 'WALLET'), /provisioning failed/);
+    const restarted = new ManagedIdentityService(options(runtime, async ({ idempotencyKey }) => {
+      keys.push(idempotencyKey);
+      return { walletId: 'new-sca', address: '0x2222222222222222222222222222222222222222' };
+    }));
+    assert.equal((await restarted.getAccount(userId, 'WALLET')).managedWallet.walletId, 'new-sca');
+    assert.equal(keys[0], keys[1]);
+    assert.notEqual(keys[0], 'old-key');
+  } finally { runtime.close(); }
+});
