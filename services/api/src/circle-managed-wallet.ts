@@ -97,6 +97,20 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeRegistry(input.walletId, input.registryAddress, 'deactivateAgent(bytes32)', [digestBytes32(input.agentId)], input.idempotencyKey, 'arena-iss-agent-deactivate');
   }
 
+  async marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeRegistry(input.walletId, input.marketplaceAddress, 'createListing(bytes32,bytes32,bytes32,bytes32,uint128,uint64)', [digestBytes32(input.agentId), digestBytes32(input.version), digestBytes32(input.commitment), digestBytes32(input.certificateDigest), input.price, String(input.expiresAt)], input.idempotencyKey, 'arena-iss-marketplace-listing');
+  }
+
+  async marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult> {
+    const balances = await this.client.getWalletTokenBalance({ id: input.walletId });
+    const token = balances.data?.tokenBalances?.find((balance) => !balance.token?.isNative && balance.token?.blockchain === 'ARC-TESTNET' && balance.token?.tokenAddress?.toLowerCase() === ARC_USDC.toLowerCase());
+    if (!token?.token?.id) throw new Error('Circle did not return Arc USDC token metadata');
+    const approval = await this.client.createContractExecutionTransaction({ walletId: input.walletId, contractAddress: ARC_USDC, abiFunctionSignature: 'approve(address,uint256)', abiParameters: [input.marketplaceAddress, input.price], fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey: input.approvalIdempotencyKey, refId: 'arena-iss-marketplace-approve' });
+    if (!approval.data?.id) throw new Error('Circle returned an invalid marketplace approval response');
+    await this.client.getTransaction({ id: approval.data.id, waitForState: 'COMPLETE', pollingInterval: 1000 });
+    return this.executeRegistry(input.walletId, input.marketplaceAddress, 'buy(uint256)', [input.listingId], input.buyIdempotencyKey, 'arena-iss-marketplace-buy');
+  }
+
   async bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: 'APPROVING' | 'BURNING') => void }): Promise<WalletTransactionResult> {
     const config = CHAINS.find((chain) => chain.chain === input.sourceChain && chain.fast);
     if (!config) throw new Error('unsupported CCTP source chain');

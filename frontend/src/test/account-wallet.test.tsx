@@ -53,6 +53,7 @@ describe('managed Arena ISS wallet account', () => {
       'Agents',
       'Evaluations',
       'Tournaments',
+      'Marketplace',
     ]);
     expect(screen.getByRole('link', { name: 'Tournaments' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Agents' })).toBeInTheDocument();

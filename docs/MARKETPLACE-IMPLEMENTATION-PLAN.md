@@ -26,8 +26,8 @@ A version is eligible only when all conditions hold:
 - `MKT-0` (this change): freeze policy, authority, state machine and 1% accounting.
 - `MKT-1` (this change): deterministic eligibility aggregation and boundary tests.
 - `MKT-2` (this change): Arc AgentRegistryV2 and Marketplace contracts with unit tests.
-- `MKT-3`: persistent API projection, operator authorization worker and idempotent delivery.
-- `MKT-4`: Marketplace browser experience and Circle SCA buy/list flows.
+- `MKT-3` (this change): persistent API projection, strict Arc reconciliation, operator authorization and buyer-isolated delivery.
+- `MKT-4` (this change): Marketplace browser experience and Circle SCA buy/list flows.
 - `MKT-5`: authorized Studio Next/Arc Testnet deployment and bounded lifecycle evidence.
 
 `MKT-3` cannot treat a backend row as an onchain listing. `MKT-4` cannot release private content before the Arc owner changes. `MKT-5` requires fresh action-time authorization for signing and deployment.

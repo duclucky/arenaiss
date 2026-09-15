@@ -10,6 +10,7 @@ import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-run
 import { circleManagedWalletFromSecrets } from './circle-managed-wallet.ts';
 import { SmtpEmailLoginSender } from './smtp-email.ts';
 import type { ManagedIdentityOptions } from './managed-identity.ts';
+import { ViemMarketplaceChainPort } from './marketplace-arc.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -22,7 +23,8 @@ type ServerOptions = {
 
 export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore, options: ServerOptions = {}) {
   const managedIdentity = runtime ? managedIdentityFromEnvironment(runtime) : undefined;
-  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier, managedIdentity);
+  const marketplaceChain = marketplaceChainFromEnvironment(process.env);
+  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier, managedIdentity, marketplaceChain);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
@@ -82,9 +84,19 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
     runtime,
     identityPepper: values.ARENA_IDENTITY_PEPPER,
     agentRegistryAddress: values.ARC_AGENT_REGISTRY_ADDRESS,
+    marketplaceAddress: environment.ARC_MARKETPLACE_ADDRESS?.trim(),
     circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
     emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
   };
+}
+
+function marketplaceChainFromEnvironment(environment: NodeJS.ProcessEnv): ViemMarketplaceChainPort | undefined {
+  const rpcUrl = environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network';
+  const registry = environment.ARC_AGENT_REGISTRY_V2_ADDRESS?.trim();
+  const marketplace = environment.ARC_MARKETPLACE_ADDRESS?.trim();
+  if (!registry && !marketplace) return undefined;
+  if (!registry || !marketplace) throw new Error('marketplace configuration is incomplete');
+  return new ViemMarketplaceChainPort({ rpcUrl, registryAddress: registry, marketplaceAddress: marketplace });
 }
 
 class FixedWindowRateLimiter {

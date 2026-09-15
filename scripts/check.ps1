@@ -43,6 +43,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\packages\persistence\test\store.test.ts" `
   "$PSScriptRoot\..\packages\persistence\test\sqlite-runtime.test.ts" `
   "$PSScriptRoot\..\services\api\test\service.test.ts" `
+  "$PSScriptRoot\..\services\api\test\marketplace-arc.test.ts" `
+  "$PSScriptRoot\..\services\api\test\marketplace-service.test.ts" `
+  "$PSScriptRoot\..\services\api\test\marketplace-http.test.ts" `
   "$PSScriptRoot\..\services\api\test\http.test.ts" `
   "$PSScriptRoot\..\services\api\test\managed-identity.test.ts" `
   "$PSScriptRoot\..\services\api\test\circle-managed-wallet.test.ts" `
