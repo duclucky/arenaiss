@@ -128,6 +128,19 @@ EVAL-5 comparison + regression
 EVAL-6 tournament migration to shared model
    |
 EVAL-7 benchmarks + optional Arc bounty
+
+Marketplace expansion (after EVAL-6):
+MKT-0 policy/authority freeze
+   |
+MKT-1 Evo eligibility aggregation
+   |
+MKT-2 Arc registry V2 + marketplace accounting
+   |
+MKT-3 persistence/operator authorization/delivery
+   |
+MKT-4 frontend + Circle SCA flows
+   |
+MKT-5 authorized network lifecycle
 ```
 
 Phases 4 và 5 có thể triển khai độc lập sau Phase 3, nhưng mỗi batch vẫn được
