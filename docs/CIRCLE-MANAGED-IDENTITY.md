@@ -84,9 +84,11 @@ This slice provisions the managed wallet, makes it the account address, and
 provides wallet/email sign-in controls in the web UI. Agent registration and
 deactivation are implemented as Circle contract-execution calls to the
 configured Arc `AgentRegistry`; both require an Arc transaction hash before the
-backend changes active Agent state. The registry address must identify a
-separately reviewed deployment. No deployment or live call is implied by local
-configuration support.
+backend changes active Agent state. Production testnet configuration uses the
+exact-match verified Arc registry at
+`0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25`; deployment and zero-state
+readback evidence is recorded under `docs/evidence/arc-testnet/`. No user Agent
+registration or deactivation transaction is implied by deployment evidence.
 
 Tournament registration/claim migration remains separate. The UI blocks those
 value-bearing actions for managed accounts and never falls back to the sign-in

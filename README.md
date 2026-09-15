@@ -164,6 +164,8 @@ the `GeneralResponseV7` rubric, at
 [`0x09Ba...b130`](https://explorer-studio.genlayer.com/address/0x09Ba3CE193E477a66Fdaf556bA63519A767eb130)
 on Studionet (`61999`). The active Arc Testnet escrow is verified V2 at
 [`0xc908...702B`](https://testnet.arcscan.app/address/0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B?tab=contract).
+The active Arc Testnet `AgentRegistry` is exact-match verified at
+[`0x4c0b...9E25`](https://testnet.arcscan.app/address/0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25?tab=contract).
 See
 [`docs/GENLAYER-JUDGE-FEASIBILITY.md`](docs/GENLAYER-JUDGE-FEASIBILITY.md) and
 the [`32-case adversarial report`](docs/GENLAYER-ADVERSARIAL-EVAL-REPORT.md).

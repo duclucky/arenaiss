@@ -119,6 +119,10 @@
   `0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B`, with owner
   `0xC495ef51618D03267A1f227aFe5b27B38c748272` and canonical Arc USDC bound;
   deployment/readback evidence is under `docs/evidence/arc-testnet/`.
+  The Arc Testnet `AgentRegistry` is deployed and exact-match verified at
+  `0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25`; deployment, zero-state
+  readback and compiler evidence is recorded in
+  `docs/evidence/arc-testnet/agent-registry-deployment-2026-09-15.json`.
   V2 adds permissionless `withdrawCreditFor` and `withdrawPlatformFeeFor`
   entrypoints whose destinations remain fixed by the credit ledger and immutable
   owner policy. Its source is verified, but its automatic payout lifecycle is not

@@ -1,0 +1,43 @@
+{
+  "schema_version": "ArenaISSAgentRegistryDeploymentV1",
+  "network": {
+    "name": "Arc Testnet",
+    "chain_id": 5042002,
+    "rpc_url": "https://rpc.testnet.arc.network",
+    "explorer_base_url": "https://testnet.arcscan.app"
+  },
+  "contract": {
+    "name": "AgentRegistry",
+    "address": "0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25",
+    "deployment_transaction": "0x26ee659ef40c9255a2cb9479df5fdf19537bc817fde179e67c6aa4b0124bd610",
+    "block_number": 62174435,
+    "deployer": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+    "source_sha256": "bb44f1593d12756e4fc32771265136cfb79cad184959b06b3f2ed86c4de8c5ad",
+    "creation_bytecode_sha256": "2f8c75fd1cc2b98452755c9a9478c475b031babecc290b10c0c3b7d198f54eb3",
+    "runtime_bytecode_sha256": "5357d7e0b0daef37c2a58d90db3f23ef9da3cd324c416e942606f4aa8d07cb26",
+    "runtime_bytecode_bytes": 684,
+    "status": "DEPLOYED_UNAUDITED_REGISTRY"
+  },
+  "deployment_fee": {
+    "gas_used": 201212,
+    "effective_gas_price_wei": "20477218923",
+    "native_usdc_gas_paid": "0.004120262173934676"
+  },
+  "verification": {
+    "status": "VERIFIED_EXACT_MATCH",
+    "compiler": "v0.8.19+commit.7dd6d404",
+    "optimizer_enabled": true,
+    "optimizer_runs": 200,
+    "evm_version": "paris",
+    "via_ir": true,
+    "verified_at_utc": "2026-09-15T04:10:54.271579Z",
+    "url": "https://testnet.arcscan.app/address/0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25?tab=contract"
+  },
+  "readback": {
+    "zero_agent_owner": "0x0000000000000000000000000000000000000000",
+    "zero_agent_version": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "zero_agent_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "zero_agent_active": false
+  },
+  "scope": "Agent registration and owner-only permanent deactivation registry. Plaintext AGENTS.md is not stored onchain. No agent registration transaction was performed during deployment verification."
+}
