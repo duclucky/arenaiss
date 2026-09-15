@@ -30,8 +30,13 @@ describe('Agent management', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Safety Scout' }));
     const confirm = screen.getByRole('button', { name: 'Confirm deactivation' });
+    const confirmationInput = screen.getByLabelText('Type Safety Scout to confirm');
     expect(confirm).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Type Safety Scout to confirm'), { target: { value: 'Safety Scout' } });
+    confirmationInput.focus();
+    fireEvent.change(confirmationInput, { target: { value: 'S' } });
+    expect(confirmationInput).toHaveFocus();
+    fireEvent.change(confirmationInput, { target: { value: 'Safety Scout' } });
+    expect(confirmationInput).toHaveFocus();
     fireEvent.click(confirm);
     await waitFor(() => expect(deactivateAgent).toHaveBeenCalledWith(agent.agentId, 'Safety Scout'));
     expect(await screen.findByRole('link', { name: 'View Arc transaction' })).toHaveAttribute('href', 'https://testnet.arcscan.app/tx/0x2');

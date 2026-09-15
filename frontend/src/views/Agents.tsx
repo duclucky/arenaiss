@@ -80,11 +80,13 @@ function Stat({ label, value }: { label: string; value: number | null | undefine
 function History({ title, rows }: { title: string; rows: string[] }) { return <section><h3 className="font-bold">{title}</h3>{rows.length ? <ul className="mt-2 space-y-2">{rows.map((row) => <li key={row} className="retro-inset p-3 text-sm">{row}</li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">No activity yet.</p>}</section>; }
 function Modal({ title, closeLabel, onClose, children }: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
     dialog.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseRef.current(); };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  }, []);
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="agent-modal-title" className="glass-panel relative max-h-[85vh] w-full max-w-2xl overflow-auto bg-[#f8f5ee] p-6 outline-none"><button type="button" aria-label={closeLabel} className="absolute right-4 top-4 p-2" onClick={onClose}><X/></button><h2 id="agent-modal-title" className="pr-12 text-2xl font-bold">{title}</h2><div className="mt-5">{children}</div></div></div>;
 }
