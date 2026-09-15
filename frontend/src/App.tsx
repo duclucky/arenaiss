@@ -18,6 +18,7 @@ const Evaluations = lazy(() => import('./views/Evaluations').then((module) => ({
 const EvaluationDetail = lazy(() => import('./views/EvaluationDetail').then((module) => ({ default: module.EvaluationDetail })));
 const EvaluationRunDetail = lazy(() => import('./views/EvaluationRunDetail').then((module) => ({ default: module.EvaluationRunDetail })));
 const Marketplace = lazy(() => import('./views/Marketplace').then((module) => ({ default: module.Marketplace })));
+const Docs = lazy(() => import('./views/Docs').then((module) => ({ default: module.Docs })));
 
 function deferred(element: ReactNode) {
   return <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>{element}</Suspense>;
@@ -54,7 +55,7 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
             <Route path="evaluations/:id" element={deferred(<EvaluationDetail />)} />
             <Route path="evaluation-runs/:id" element={deferred(<EvaluationRunDetail />)} />
             <Route path="marketplace" element={deferred(<Marketplace />)} />
-            <Route path="docs" element={<section aria-label="Arena ISS documentation" />} />
+            <Route path="docs" element={deferred(<Docs />)} />
             <Route path="*" element={deferred(<NotFound />)} />
           </Route>
         </Routes>
