@@ -16,7 +16,7 @@ test('Evo charges the configured USDC fee once and keeps GenLayer gas outside th
     const service = new EvaluationExecutionService({
       runtime, operatorAddress: operator, feeUsdc: '1.25',
       fees: { async transferUsdcWithIdempotency(userId, destinationAddress, amount, idempotencyKey) { transfers.push({ userId, destinationAddress, amount, idempotencyKey }); return { transactionId: 'circle_1', state: 'SUBMITTED' }; } },
-      runner: { get: () => campaign, async advance() { advances += 1; return campaign; } } as any,
+      model: 'cheap-5.6-sol', runner: { get: () => campaign, async advance() { advances += 1; return campaign; } } as any,
     });
 
     await service.start('usr_owner', owner, campaignId);
@@ -38,10 +38,17 @@ test('Evo fails closed before execution when its USDC fee transfer fails', async
     const service = new EvaluationExecutionService({
       runtime, operatorAddress: operator, feeUsdc: '1',
       fees: { async transferUsdcWithIdempotency() { throw new Error('insufficient USDC'); } },
-      runner: { get: () => ({ campaignId, owner }), async advance() { advances += 1; return {} as any; } } as any,
+      model: 'cheap-5.6-sol', runner: { get: () => ({ campaignId, owner }), async advance() { advances += 1; return {} as any; } } as any,
     });
     await assert.rejects(service.start('usr_owner', owner, campaignId), /insufficient USDC/);
     assert.equal(advances, 0);
     assert.equal(service.getFee(campaignId)?.state, 'FAILED');
+  } finally { runtime.close(); }
+});
+
+test('Evo requires the shared Tournament model instead of inventing a default', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    assert.throws(() => new EvaluationExecutionService({ runtime, operatorAddress: operator, feeUsdc: '1', fees: {} as any, runner: {} as any }), /model/i);
   } finally { runtime.close(); }
 });
