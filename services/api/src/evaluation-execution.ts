@@ -26,9 +26,10 @@ export class EvaluationExecutionService {
   constructor(options: { runtime: SqliteRuntimeStore; fees: EvaluationFeePort; runner: SoloEvaluationRunner; operatorAddress: string; feeUsdc: string; model?: string }) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(options.operatorAddress)) throw new TypeError('evaluation operator address is invalid');
     if (!/^\d+(?:\.\d{1,6})?$/.test(options.feeUsdc) || Number(options.feeUsdc) <= 0) throw new TypeError('evaluation fee is invalid');
+    if (!options.model?.trim()) throw new TypeError('evaluation model is required');
     this.runtime = options.runtime; this.fees = options.fees; this.runner = options.runner;
     this.operatorAddress = options.operatorAddress.toLowerCase(); this.feeUsdc = options.feeUsdc;
-    this.model = options.model || 'gpt-4o-mini';
+    this.model = options.model.trim();
   }
 
   async start(userId: string, owner: string, campaignId: string): Promise<SoloCampaignRecord> {

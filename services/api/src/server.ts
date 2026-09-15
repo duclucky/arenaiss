@@ -81,12 +81,12 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
 }
 
 function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: ManagedIdentityService, operator: string): EvaluationExecutionService | undefined {
-  const privateKey = process.env.GENLAYER_OWNER_PRIVATE_KEY?.trim();
+  const privateKey = process.env.GENLAYER_OWNER_PRIVATE_KEY?.trim() || process.env.STUDIONET_PRIVATE_KEY?.trim();
   const judgeAddress = process.env.GENLAYER_EVALUATION_JUDGE_ADDRESS?.trim();
-  const providerEndpoint = process.env.EVALUATION_PROVIDER_ENDPOINT?.trim();
-  const providerKey = process.env.EVALUATION_PROVIDER_API_KEY?.trim();
+  const providerEndpoint = process.env.END_POINT?.trim();
+  const providerKey = process.env.API_KEY?.trim();
   const feeUsdc = process.env.EVALUATION_FEE_USDC?.trim();
-  const model = process.env.EVALUATION_PROVIDER_MODEL?.trim() || 'gpt-4o-mini';
+  const model = process.env.MODEL?.trim();
   if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].some(Boolean)) return undefined;
   if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc].every(Boolean)) throw new Error('evaluation execution configuration is incomplete');
   const provider = new OpenAICompatibleEvaluationProvider({ endpoint: providerEndpoint!, apiKey: providerKey! });
