@@ -77,6 +77,9 @@ describe('Arena ISS visual shell', () => {
     expect(screen.getByText('USDC settlement on Arc Testnet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'GenLayer' })).toHaveAttribute('src', '/brand/genlayer-logo-black.svg');
     expect(screen.getByText('AI verdicts in GenVM')).toBeInTheDocument();
+    const platformStrip = screen.getByRole('group', { name: 'Settlement and evaluation networks' });
+    expect(platformStrip).toHaveClass('hero-platforms');
+    expect(platformStrip.querySelectorAll('.hero-platform-card')).toHaveLength(2);
     fireEvent.click(start);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Explore tournaments' })).not.toBeInTheDocument();

@@ -204,8 +204,9 @@ button:disabled { cursor: not-allowed; }
 .hero-pill--light, .hero-pill--outline { background: var(--retro-face); color: #000; }
 .hero-pill--light:hover { background: var(--retro-face-hover); color: #000; }
 .hero-pill--light:active { box-shadow: var(--retro-pressed); }
-.hero-platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 460px); gap: 10px; margin-top: 22px; }
-.hero-platform-card { min-width: 0; padding: 14px 15px 15px; border: 1px solid rgba(5,5,5,.5); background: rgba(242,239,232,.58); box-shadow: inset 1px 1px 0 rgba(255,255,255,.78), 2px 2px 0 rgba(5,5,5,.2); backdrop-filter: blur(8px); }
+.hero-platforms { position: absolute; top: clamp(20px, 3vw, 34px); left: 50%; z-index: 3; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(calc(100% - 80px), 620px); gap: 0; margin: 0; transform: translateX(-50%); border: 1px solid rgba(5,5,5,.5); box-shadow: 2px 2px 0 rgba(5,5,5,.2); backdrop-filter: blur(8px); }
+.hero-platform-card { min-width: 0; padding: 11px 16px 12px; border: 0; border-right: 1px solid rgba(5,5,5,.35); background: rgba(242,239,232,.58); box-shadow: inset 1px 1px 0 rgba(255,255,255,.78); }
+.hero-platform-card:last-child { border-right: 0; }
 .hero-platform-card__head { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 12px; }
 .hero-platform-card__head > span { flex: none; font-family: var(--font-mono); font-size: 9px; letter-spacing: .11em; color: rgba(5,5,5,.68); }
 .hero-platform-card__logo { display: block; width: auto; max-width: 92px; object-fit: contain; object-position: left center; }
@@ -485,7 +486,7 @@ button:disabled { cursor: not-allowed; }
   .hero-line--brand { margin-bottom: 6px; font-size: clamp(30px, 9vw, 40px); }
   .hero-line--standard, .hero-line--promise { font-size: clamp(11px, 3.15vw, 15px); }
   .hero-pill { min-height: 44px; }
-  .hero-platforms { gap: 8px; margin-top: 16px; }
+  .hero-platforms { top: 16px; width: calc(100% - 32px); }
   .hero-platform-card { padding: 11px 12px 12px; }
   .hero-platform-card__head { min-height: 24px; gap: 6px; }
   .hero-platform-card__head > span { font-size: 7px; }
