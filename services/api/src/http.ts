@@ -345,7 +345,8 @@ export class ArenaHttpApi {
         const session = this.requireManagedSession(request.headers);
         if (!this.managedIdentity) throw new Error('managed Tournament registration unavailable');
         const agentId = requireString(request.body?.agentId);
-        const prepared = this.service.prepareRegistration(session.principal, managedRegistrationMatch[1] as `sha256:${string}`, agentId as `sha256:${string}`);
+        const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!);
+        const prepared = this.service.prepareRegistration(session.principal, managedRegistrationMatch[1] as `sha256:${string}`, agentId as `sha256:${string}`, account.managedWallet.address);
         const transaction = await this.managedIdentity.registerTournamentEntrant(session.userId!, {
           ...prepared,
         });

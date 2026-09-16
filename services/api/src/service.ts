@@ -536,8 +536,9 @@ export class ArenaApiService {
   listOwnedMarketplaceListings(caller: string): PublicMarketplaceListing[] { const owner = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.seller === owner).map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   listOwnedMarketplacePurchases(caller: string): PublicMarketplaceListing[] { const buyer = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.buyer === buyer && row.state === "SOLD").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   getMarketplaceDelivery(caller: string, listingId: string, snapshot: MarketplaceArcSnapshot): { agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; agentsMd: string } { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "SOLD" || row.buyer !== buyer || snapshot.state !== "SOLD" || snapshot.registryOwner.toLowerCase() !== row.buyerAddress || snapshot.buyerAddress?.toLowerCase() !== row.buyerAddress || snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment) throw new Error("marketplace delivery unavailable"); const agent = this.agents.get(row.agentId)!; const version = agent.versions.find((item) => item.agentsVersion === row.agentVersionId)!; return { agentId: row.agentId, agentVersionId: row.agentVersionId, agentsCommitment: row.agentsCommitment, agentsMd: version.agentsMd }; }
-  prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest): PreparedRegistration {
+  prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest, entrantWalletAddress?: string): PreparedRegistration {
     const owner = this.principal(caller);
+    const entrantWallet = this.address(entrantWalletAddress ?? owner);
     if (!isDigest(tournamentId) || !isDigest(agentId)) throw new Error("invalid registration identity");
     const tournament = this.tournaments.get(tournamentId);
     if (!tournament || !/^[1-9][0-9]*$/.test(tournament.stakeAmount || "")) throw new Error("tournament registration is unavailable");
@@ -547,10 +548,14 @@ export class ArenaApiService {
     const latest = agent.versions.at(-1)!;
     const key = this.registrationKey(tournamentId, owner, agentId);
     const existing = this.registrations.get(key);
-    if (existing) return structuredClone(existing);
+    const entrantId = digestBytes32(deriveEntrantId(tournamentId, entrantWallet, agentId, 1));
+    if (existing) {
+      if (existing.entrantId !== entrantId) throw new Error("registration entrant does not match the managed wallet; reconciliation required");
+      return structuredClone(existing);
+    }
     const prepared: PreparedRegistration = {
       tournamentId: digestBytes32(tournamentId),
-      entrantId: digestBytes32(deriveEntrantId(tournamentId, owner, agentId, 1)),
+      entrantId,
       agentId: digestBytes32(agentId),
       agentsVersion: digestBytes32(latest.agentsVersion),
       agentsCommitment: digestBytes32(latest.agentsCommitment),
