@@ -3,6 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { HttpEvaluationAdapter } from '../adapters/evaluation-api';
 
 describe('evaluation HTTP adapter', () => {
+  it('loads owner-only run evidence through the authenticated private route', async () => {
+    const calls: Array<{ url: string; credentials?: RequestCredentials }> = [];
+    let authenticated = 0;
+    const adapter = new HttpEvaluationAdapter('https://arena.example', async () => { authenticated += 1; }, async (url, init) => {
+      calls.push({ url: String(url), credentials: init?.credentials });
+      return new Response(JSON.stringify({ schema: 'arena-private-evaluation-run-v1', provider: { state: 'SUCCESS', output: { answer: 'Evidence' } } }), { status: 200 });
+    });
+    const result = await adapter.getRun('sha256:run', true);
+    expect(authenticated).toBe(1);
+    expect(calls).toEqual([{ url: 'https://arena.example/api/evaluation-runs/sha256%3Arun/private', credentials: 'include' }]);
+    expect(result.schema).toBe('arena-private-evaluation-run-v1');
+  });
   it('returns null only for an owned legacy campaign without a fee record', async () => {
     const adapter = new HttpEvaluationAdapter('https://arena.example', async () => undefined, async () => new Response(null, { status: 204 }));
     await expect(adapter.getFee('sha256:legacy')).resolves.toBeNull();

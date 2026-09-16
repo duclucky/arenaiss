@@ -57,7 +57,7 @@ export type PrivateEvaluationRun = Omit<PublicEvaluationRun, "schema" | "scenari
 };
 export type EvaluationPackRecord = { schema: "arena-evaluation-pack-v1"; packId: Digest; version: string; owner: string; name: string; scenarios: EvaluationScenario[] };
 export type PublicEvaluationPack = { schema: "arena-public-evaluation-pack-v1"; packId: string; version: string; name: string; scenarioIds: string[]; scenarioCount: number };
-export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; failureStage?: string; failureCode?: string }> };
+export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; createdAt?: number; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; failureStage?: string; failureCode?: string }> };
 export type MarketplaceTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
 export type MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1"; certificateDigest: Digest; evidenceDigest: string; owner: string; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; packId: Digest; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: "ELIGIBLE" | "APPROVED"; authorization?: MarketplaceTransaction };
 export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "CANCEL_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; purchaseApprovalIdempotencyKey?: string; purchaseIdempotencyKey?: string; cancellationIdempotencyKey?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
@@ -340,7 +340,7 @@ export class ArenaApiService {
       schema: "arena-solo-campaign-v1", campaignId, owner,
       agent: { versionId: version.agentsVersion as `sha256:${string}`, commitment: version.agentsCommitment as `sha256:${string}`, agentsMd: version.agentsMd },
       testPack: { packId: pack.packId, version: pack.version, scenarios: structuredClone(pack.scenarios) },
-      runtimePolicy: structuredClone(input.runtimePolicy), rubricVersion: "AgentEvaluationV5", state: "PENDING",
+      runtimePolicy: structuredClone(input.runtimePolicy), rubricVersion: "AgentEvaluationV5", state: "PENDING", createdAt: this.nowSeconds() * 1_000,
       items: pack.scenarios.map((scenario) => ({ scenarioId: scenario.scenarioId, state: "PENDING", attempt: 0, runIds: [] })),
     };
     this.evaluationCampaigns.set(campaignId, campaign);
@@ -383,7 +383,8 @@ export class ArenaApiService {
   }
   listOwnedEvaluationCampaigns(caller: string): PublicEvaluationCampaign[] {
     const owner = this.principal(caller);
-    return this.allEvaluationCampaigns().filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
+    const newest = this.runtime ? this.runtime.listNewest<SoloCampaignRecord>("evaluation-campaigns") : [...this.evaluationCampaigns.values()].reverse();
+    return newest.filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
   }
   createVersionComparison(caller: string, input: { comparisonId: Digest; agentId: Digest; baselineVersionId: Digest; candidateVersionId: Digest; baselineCampaignIds: Digest[]; candidateCampaignIds: Digest[]; policy: RegressionPolicy }): VersionComparisonRecord {
     const owner = this.principal(caller);
@@ -596,7 +597,7 @@ export class ArenaApiService {
     return this.runtime ? this.runtime.list<SoloCampaignRecord>("evaluation-campaigns") : [...this.evaluationCampaigns.values()].map((campaign) => structuredClone(campaign));
   }
   private publicPack(pack: EvaluationPackRecord): PublicEvaluationPack { return { schema: "arena-public-evaluation-pack-v1", packId: pack.packId, version: pack.version, name: pack.name, scenarioIds: pack.scenarios.map((scenario) => scenario.scenarioId), scenarioCount: pack.scenarios.length }; }
-  private publicCampaign(campaign: SoloCampaignRecord): PublicEvaluationCampaign { return { schema: "arena-public-evaluation-campaign-v1", campaignId: campaign.campaignId, agentVersionId: campaign.agent.versionId, packId: campaign.testPack.packId, packVersion: campaign.testPack.version, rubricVersion: campaign.rubricVersion, state: campaign.state, items: campaign.items.map((item) => ({ scenarioId: item.scenarioId, state: item.state, attempt: item.attempt, runIds: [...item.runIds], ...(item.scorecard ? { score: String(item.scorecard.result_class), overallScore: effectiveEvaluationScore(item.scorecard) } : {}), ...(item.failureStage && /^(PROVIDER|PERSISTENCE|GENLAYER_SUBMIT|GENLAYER_FINALITY|EXECUTION)$/.test(item.failureStage) ? { failureStage: item.failureStage } : {}), ...(item.failureCode && /^[A-Z_]{1,64}$/.test(item.failureCode) ? { failureCode: item.failureCode } : {}) })) }; }
+  private publicCampaign(campaign: SoloCampaignRecord): PublicEvaluationCampaign { return { schema: "arena-public-evaluation-campaign-v1", campaignId: campaign.campaignId, agentVersionId: campaign.agent.versionId, packId: campaign.testPack.packId, packVersion: campaign.testPack.version, rubricVersion: campaign.rubricVersion, state: campaign.state, ...(campaign.createdAt !== undefined ? { createdAt: campaign.createdAt } : {}), items: campaign.items.map((item) => ({ scenarioId: item.scenarioId, state: item.state, attempt: item.attempt, runIds: [...item.runIds], ...(item.scorecard ? { score: String(item.scorecard.result_class), overallScore: effectiveEvaluationScore(item.scorecard) } : {}), ...(item.failureStage && /^(PROVIDER|PERSISTENCE|GENLAYER_SUBMIT|GENLAYER_FINALITY|EXECUTION)$/.test(item.failureStage) ? { failureStage: item.failureStage } : {}), ...(item.failureCode && /^[A-Z_]{1,64}$/.test(item.failureCode) ? { failureCode: item.failureCode } : {}) })) }; }
   private requireSameSoloCampaign(existing: SoloCampaignRecord, owner: string, version: AgentVersion, pack: EvaluationPackRecord, runtimePolicy: SoloCampaignRecord["runtimePolicy"]): void {
     if (existing.owner !== owner
       || existing.agent.versionId !== version.agentsVersion

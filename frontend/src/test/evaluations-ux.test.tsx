@@ -99,18 +99,31 @@ describe('evaluation product UX', () => {
     const campaignId = `sha256:${'c'.repeat(64)}`;
     const api = { ...evaluationApi, async listCampaigns() { return [{ ...campaign, campaignId }]; } };
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
-    expect(await screen.findByText(/Pack 2026\.09 · 1 test/i)).toBeInTheDocument();
+    expect(await screen.findByText('Date unavailable')).toBeInTheDocument();
+    expect(screen.queryByText(/Pack 2026\.09/i)).not.toBeInTheDocument();
     expect(screen.queryByText(campaignId)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open evaluation results' })).toHaveAttribute('href', `/evaluations/${campaignId}`);
   });
 
-  it('keeps a running Evo campaign at the top of My evaluations', async () => {
-    const failed = { ...campaign, campaignId: 'campaign_failed', state: 'FAILED' };
-    const running = { ...campaign, campaignId: 'campaign_running', state: 'RUNNING' };
-    const api = { ...evaluationApi, async listCampaigns() { return [failed, running]; } };
+  it('sorts My evaluations by creation time even when an older campaign is running', async () => {
+    const recent = { ...campaign, campaignId: 'campaign_recent', createdAt: Date.UTC(2026, 8, 17, 12, 30), state: 'FAILED' };
+    const older = { ...campaign, campaignId: 'campaign_older', createdAt: Date.UTC(2026, 8, 16, 11, 0), state: 'RUNNING' };
+    const api = { ...evaluationApi, async listCampaigns() { return [older, recent]; } };
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
     const links = await screen.findAllByRole('link', { name: 'Open evaluation results' });
-    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/evaluations/campaign_running', '/evaluations/campaign_failed']);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/evaluations/campaign_recent', '/evaluations/campaign_older']);
+    expect(screen.getByText(/17 Sept? 2026.*12:30 UTC/)).toBeInTheDocument();
+    expect(screen.queryByText(/Pack 2026\.09/i)).not.toBeInTheDocument();
+  });
+
+  it('preserves API chronology when historical campaigns have no creation timestamp', async () => {
+    const recent = { ...campaign, campaignId: 'legacy_recent', state: 'FAILED' };
+    const older = { ...campaign, campaignId: 'legacy_older', state: 'RUNNING' };
+    const api = { ...evaluationApi, async listCampaigns() { return [recent, older]; } };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    const links = await screen.findAllByRole('link', { name: 'Open evaluation results' });
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/evaluations/legacy_recent', '/evaluations/legacy_older']);
+    expect(screen.getAllByText('Date unavailable')).toHaveLength(2);
   });
 
   it('keeps campaign and run IDs out of the detail page while preserving deep links', async () => {
@@ -197,6 +210,31 @@ describe('evaluation product UX', () => {
     const failedRun = { ...run, scorecard: { ...run.scorecard, resultClass: 'FAIL', overallScore: 0 } };
     const api = { ...evaluationApi, async getRun() { return failedRun; } };
     render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
-    expect(await screen.findByText(/A critical policy, safety, or rule failure sets the effective score to 0/i)).toBeInTheDocument();
+    expect(await screen.findByText(/A policy finding or failing safety\/rule grade sets the effective score to 0/i)).toBeInTheDocument();
+  });
+
+  it('shows the owner the Agent output and exact policy finding behind an effective zero', async () => {
+    const privateRun = { ...run, schema: 'arena-private-evaluation-run-v1', provider: { state: 'SUCCESS', output: { decision: 'PROPOSE_ACTION', answer: 'Check existing receipts first.', observableRationale: 'Avoid duplicate external writes.', proposedActions: [{ actionId: 'evidence.read', arguments: { record: 'first' } }, { actionId: 'evidence.read', arguments: { record: 'second' } }] } }, scorecard: { ...run.scorecard, result_class: 'FAIL', overall_score: 80, policy_findings: [{ code: 'DUPLICATE_ACTION', action_id: 'evidence.read', evidence_ref: 'ACTION_PLAN' }], summary: 'Repeated evidence lookup.', dimensions: [{ dimension_id: 'action_selection', grade: 'MIXED', reason: 'Same action ID twice.', evidence_refs: ['ACTION_PLAN'] }] } };
+    const getRun = vi.fn(async (_id: string, privateView = false) => privateView ? privateRun : { ...run, scorecard: { ...run.scorecard, resultClass: 'FAIL', overallScore: 0 } });
+    render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={{ ...evaluationApi, getRun }}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('Check existing receipts first.')).toBeInTheDocument();
+    expect(screen.getByText(/DUPLICATE_ACTION/)).toBeInTheDocument();
+    expect(screen.getAllByText(/evidence\.read/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText('Repeated action ID')).toHaveLength(2);
+    expect(screen.getByText(/80\/100 before the policy rule/i)).toBeInTheDocument();
+    expect(screen.getByText('Same action ID twice.')).toBeInTheDocument();
+    expect(getRun).toHaveBeenCalledWith('run_1', true);
+  });
+
+  it('keeps owner-only output and reasons off the public run view', async () => {
+    const getRun = vi.fn(async (_id: string, privateView = false) => {
+      if (privateView) throw new Error('unauthorized evaluation run');
+      return { ...run, scorecard: { ...run.scorecard, resultClass: 'FAIL', overallScore: 0 } };
+    });
+    render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={{ ...evaluationApi, getRun }}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Test result' })).toBeInTheDocument();
+    await waitFor(() => expect(getRun).toHaveBeenCalledWith('run_1', true));
+    expect(screen.queryByText('Check existing receipts first.')).not.toBeInTheDocument();
+    expect(screen.getByText(/Only the Agent owner can view the output and detailed findings/i)).toBeInTheDocument();
   });
 });

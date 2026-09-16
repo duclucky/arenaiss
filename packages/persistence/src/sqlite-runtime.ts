@@ -70,6 +70,15 @@ export class SqliteRuntimeStore {
     return rows.map((row) => JSON.parse(row.payload) as T);
   }
 
+  listNewest<T = unknown>(namespace: string): T[] {
+    this.requireOpen();
+    requireIdentifier(namespace, "namespace");
+    const rows = this.database.prepare(
+      "SELECT payload FROM runtime_records WHERE namespace = ? ORDER BY rowid DESC",
+    ).all(namespace) as Array<{ payload: string }>;
+    return rows.map((row) => JSON.parse(row.payload) as T);
+  }
+
   put(namespace: string, key: string, value: unknown): void {
     this.requireOpen();
     requireIdentifier(namespace, "namespace");
