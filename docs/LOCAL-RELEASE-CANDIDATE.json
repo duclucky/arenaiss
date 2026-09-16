@@ -3,7 +3,7 @@
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
   "fileCount": 290,
-  "sourceBundleSha256": "272f65b84eb35df3a5283d890364e2fcfa864e14e2d4eb55733c9626787f541e",
+  "sourceBundleSha256": "033ff2258a1dd1a40f31889995856583aea96744b29661db23ead068dba1427c",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -65,7 +65,7 @@
     "packages/evaluation/test/solo-runner.test.ts": "90ac7b2ae137384e3cbac5565ba55c87d7201c3a00d0210068701878b48d819b",
     "services/api/src/http.ts": "2555afd31d29529d2d4dbc6352a756b69f0c78886054900638c0233ced8d3ce2",
     "services/api/src/service.ts": "6f77701e014648537fea53cb3af5cc3aaceab9f1eb73eb17ef955d7d5fe02a6e",
-    "services/api/src/server.ts": "516769e54c7e74d8b59b5d7985a644d3df9c31c9d3d7d63a17af4d7ca5cf6898",
+    "services/api/src/server.ts": "3345950af3316b8e348200f4c0151e85d7ec11e6efc72dbbda24183b6d00b755",
     "services/api/src/managed-identity.ts": "8056f19fa530ab52638e22941d8febc8a18d04d86649b7933eb8cb29ab19fae5",
     "services/api/src/circle-managed-wallet.ts": "284d01e4f7a46dd33c7bf590f1520f30f2f736f0ea7bff7903e1a23b5a25cd55",
     "services/api/src/agent-registry-arc.ts": "5c0618ee55255ea3b8b27d087044c63e83c849631c07d05e4bba22106bfaec98",
@@ -134,7 +134,7 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 241,
+    "typescriptTests": 243,
     "foundryTests": 24,
     "frontendTests": 81
   },
