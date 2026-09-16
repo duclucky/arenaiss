@@ -3,7 +3,7 @@
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
   "fileCount": 287,
-  "sourceBundleSha256": "e2c65776077e4963708750994042410cec8a67f919a553a498ea28401088fe23",
+  "sourceBundleSha256": "3f8575c8b55a91e1404dec572af4283a5b21cd009146a81b62320330960d75d2",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -79,7 +79,7 @@
     "services/api/test/evaluation-execution.test.ts": "c211eefe7207b737058cb082b9cb74362533443f526727d1954b622e829d4e16",
     "frontend/src/App.tsx": "ed253b2044ac7d8bf2c03c3d6ec40c70821eba2f520f32fe8210ed80cfcf9a8a",
     "frontend/index.html": "c9885c3e9c49a62972afe4359fcf95eb61f69a778302fe9277dff0e6d8a0a6b5",
-    "frontend/src/index.css": "68183a0ede92e718f0e782ced4f44051ce0b060c4a6817d691b62e7290de4408",
+    "frontend/src/index.css": "afbb587cc550cd0e7c5092dc07acb947c6435607afb7b269ca5d8ca76fbd4dbf",
     "frontend/src/views/Home.tsx": "b9a8b442f76bf3e484823eae43668d2119e01b379b2296e96036b23d08ca6ff5",
     "frontend/src/views/Docs.tsx": "83b2edad199fa8ea552118f5154e7d71f217b04bb20566185ec49389f0e9aae3",
     "frontend/src/views/NewAgent.tsx": "b5709f21b5d110cb3d3f5163ee8265993b86c855f1a6618a1fe46d93be9e7c46",
