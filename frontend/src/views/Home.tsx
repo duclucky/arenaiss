@@ -292,8 +292,5 @@ export function Home() {
         <Link className="hero-pill hero-pill--outline" to="/docs">Read Docs</Link>
       </div>
     </div>
-    <div className="hero-footnote" aria-label="Technology stack">
-      <span>Arc-native USDC escrow</span><span>GenLayer semantic verdicts</span><span>Asynchronous by design</span>
-    </div>
   </section>;
 }
