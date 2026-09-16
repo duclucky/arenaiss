@@ -65,6 +65,10 @@ operations with those same keys. Concurrent recovery within one server process
 shares one active call, and callback replay cannot move the stored lifecycle
 backward. A legacy `BURNING` record without a persisted burn key becomes
 `RECOVERY_REQUIRED`; the server never guesses a new key or risks a duplicate burn.
+An uncertain upstream failure also becomes `RECOVERY_REQUIRED` with a safe
+public message. It does not invite another transfer until the source transaction
+has been reconciled. `SUBMITTED` means the source burn has a transaction hash;
+it does not prove that the destination mint on Arc has completed.
 
 ## API
 
@@ -78,6 +82,8 @@ backward. A legacy `BURNING` record without a persisted burn key becomes
 - `GET /api/account/usdc-balances`: return available Circle-issued USDC balances.
 - `POST /api/account/usdc-transfers`: submit an Arc Testnet USDC withdrawal.
 - `POST /api/account/cctp-transfers`: persist and start a CCTP transfer to Arc.
+- `GET /api/account/cctp-transfers`: return up to 20 recent operations belonging
+  to the authenticated owner, newest first, without replay keys.
 - `GET /api/account/cctp-transfers/:operationId`: return the authenticated
   owner's redacted CCTP lifecycle state.
 

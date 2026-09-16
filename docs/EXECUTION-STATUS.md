@@ -341,6 +341,33 @@ SHA-256 bundle over the recorded contract, runtime, frontend-source, script and 
 files, so source drift fails `npm run check` until the manifest is deliberately
 reviewed and refreshed.
 
+## Evaluation and wallet recovery hardening, 2026-09-16
+
+Evaluation campaign reads now use the durable SQLite runner record, so API
+campaign lists, detail, Agent statistics, comparison checks and Marketplace
+qualification observe worker transitions without a process restart. Legacy
+owned campaigns with no Evo fee record return an explicit empty fee response
+while retaining their campaign and run history. Evo failures expose bounded
+stage and code metadata. An uncertain GenLayer submission enters
+`RECOVERY_REQUIRED` and retains the held fee instead of being replayed or
+automatically refunded; a transient receipt read retries the same transaction.
+
+Managed CCTP operations can be listed by their authenticated owner and restored
+in the Account UI after reload. Replay keys are not returned. Uncertain Circle
+errors expose only a safe reconciliation message. A source burn marked
+`SUBMITTED` still does not prove the destination mint on Arc. Destination
+finality verification, live payment receipts, Marketplace `MKT-5` and live
+Tournament lifecycle evidence remain open. No new network transaction or
+deployment was performed in this local hardening batch.
+
+The owner reprioritized the live acceptance work on 2026-09-16: Tournament,
+Evo and Marketplace take precedence over CCTP. The local Account UI no longer
+offers new CCTP initiation, but still reads and refreshes earlier operations.
+CCTP status is separate from Arc withdrawal state, so an old pending operation
+cannot disable or erase a new direct Arc transfer status.
+CCTP destination-mint verification is deferred, not passed. Direct Arc USDC
+deposit and withdrawal remain in the core acceptance plan.
+
 The executable API now requires an explicit local database path. Agent
 `AGENTS.md` version history, published tournament metadata and immutable
 prepared-registration payloads survive service restart; authentication

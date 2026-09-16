@@ -106,6 +106,10 @@ export class ArenaHttpApi {
         const session = this.requireManagedSession(request.headers);
         return this.json(202, await this.managedIdentity!.startBridgeUsdcToArc(session.userId!, requireString(request.body?.sourceChain), requireString(request.body?.amount)));
       }
+      if (request.method === 'GET' && request.path === '/api/account/cctp-transfers') {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(200, this.managedIdentity!.listCctpTransfers(session.userId!));
+      }
       const cctpTransferMatch = request.path.match(/^\/api\/account\/cctp-transfers\/([0-9a-fA-F-]{36})$/);
       if (request.method === 'GET' && cctpTransferMatch) {
         const session = this.requireManagedSession(request.headers);
@@ -222,9 +226,11 @@ export class ArenaHttpApi {
       if (request.method === 'GET' && evaluationFee) {
         const session = this.requireSession(request.headers);
         if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
-        const campaign = this.service.getPublicEvaluationCampaign(evaluationFee[1] as `sha256:${string}`);
+        const owned = this.service.listOwnedEvaluationCampaigns(session).some((campaign) => campaign.campaignId === evaluationFee[1]);
+        if (!owned) return this.json(404, { error: 'not found' });
         const fee = this.evaluationExecution.getFee(evaluationFee[1]);
-        if (!campaign || !fee || fee.owner.toLowerCase() !== session.toLowerCase()) return this.json(404, { error: 'not found' });
+        if (!fee) return { status: 204, headers: {} };
+        if (fee.owner.toLowerCase() !== session.toLowerCase()) return this.json(404, { error: 'not found' });
         return this.json(200, publicEvaluationFee(fee));
       }
       const evaluationTimeoutRefund = request.path.match(/^\/api\/evaluation-campaigns\/(sha256:[0-9a-fA-F]{64})\/fee\/timeout-refund$/);

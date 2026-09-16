@@ -49,6 +49,10 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
     return this.request('/api/account/cctp-transfers', { method: 'POST', body: JSON.stringify({ sourceChain, amount }) });
   }
 
+  listCctpTransfers(): Promise<ManagedCctpTransfer[]> {
+    return this.request('/api/account/cctp-transfers', { method: 'GET' });
+  }
+
   getCctpTransfer(operationId: string): Promise<ManagedCctpTransfer> {
     return this.request(`/api/account/cctp-transfers/${operationId}`, { method: 'GET' });
   }

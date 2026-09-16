@@ -101,7 +101,6 @@ export class ArenaApiService {
         this.registrations.set(this.registrationKey(`sha256:${registration.tournamentId.slice(2)}` as Digest, owner, `sha256:${registration.agentId.slice(2)}` as Digest), registration);
       }
       for (const pack of runtime.list<EvaluationPackRecord>("evaluation-packs")) this.evaluationPacks.set(this.packKey(pack.packId, pack.version), pack);
-      for (const campaign of runtime.list<SoloCampaignRecord>("evaluation-campaigns")) this.evaluationCampaigns.set(campaign.campaignId, campaign);
       for (const certificate of runtime.list<MarketplaceCertificate>("marketplace-certificates")) this.marketplaceCertificates.set(certificate.certificateDigest, certificate);
       for (const listing of runtime.list<MarketplaceListing>("marketplace-listings")) this.marketplaceListings.set(listing.listingId, listing);
       this.nonce = runtime.counter("api-counters", "agent-sequence");
@@ -170,7 +169,7 @@ export class ArenaApiService {
     const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agentId));
     const tournaments = registrations.map((item) => this.tournaments.get(`sha256:${item.tournamentId.slice(2)}`)!).filter(Boolean).map((item) => structuredClone(item));
     const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
-    const evaluations = [...this.evaluationCampaigns.values()].filter((campaign) => versionIds.has(campaign.agent.versionId as Digest)).map((campaign) => this.publicCampaign(campaign));
+    const evaluations = this.allEvaluationCampaigns().filter((campaign) => versionIds.has(campaign.agent.versionId as Digest)).map((campaign) => this.publicCampaign(campaign));
     return {
       ...this.publicView(agent), agentsMd: agent.versions.at(-1)!.agentsMd,
       versions: agent.versions.map(({ agentsVersion, agentsCommitment, createdAt }) => ({ agentsVersion, agentsCommitment, createdAt })),
@@ -325,7 +324,7 @@ export class ArenaApiService {
     if (!pack || pack.owner !== owner) throw new Error("unauthorized or unknown evaluation pack");
     if (!input.runtimePolicy || !input.runtimePolicy.model || !Number.isSafeInteger(input.runtimePolicy.maxOutputTokens) || input.runtimePolicy.maxOutputTokens < 1 || !Number.isFinite(input.runtimePolicy.temperature) || input.runtimePolicy.temperature < 0 || input.runtimePolicy.temperature > 2 || !Number.isSafeInteger(input.runtimePolicy.maxProviderAttempts) || input.runtimePolicy.maxProviderAttempts < 1 || input.runtimePolicy.maxProviderAttempts > 3) throw new Error("invalid evaluation runtime policy");
     const campaignId = input.campaignId;
-    const existing = this.evaluationCampaigns.get(campaignId);
+    const existing = this.evaluationCampaign(campaignId);
     if (existing) {
       this.requireSameSoloCampaign(existing, owner, version, pack, input.runtimePolicy);
       return this.publicCampaign(existing);
@@ -352,19 +351,19 @@ export class ArenaApiService {
   }
   getPublicEvaluationCampaign(campaignId: Digest): PublicEvaluationCampaign | null {
     if (!isDigest(campaignId)) throw new Error("invalid evaluation campaign ID");
-    const campaign = this.evaluationCampaigns.get(campaignId) ?? this.runtime?.get<SoloCampaignRecord>("evaluation-campaigns", campaignId);
+    const campaign = this.evaluationCampaign(campaignId);
     return campaign ? this.publicCampaign(campaign) : null;
   }
   listOwnedEvaluationCampaigns(caller: string): PublicEvaluationCampaign[] {
     const owner = this.principal(caller);
-    return [...this.evaluationCampaigns.values()].filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
+    return this.allEvaluationCampaigns().filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
   }
   createVersionComparison(caller: string, input: { comparisonId: Digest; agentId: Digest; baselineVersionId: Digest; candidateVersionId: Digest; baselineCampaignIds: Digest[]; candidateCampaignIds: Digest[]; policy: RegressionPolicy }): VersionComparisonRecord {
     const owner = this.principal(caller);
     const agent = this.requireOwner(owner, input.agentId);
     if (!agent.versions.some((version) => version.agentsVersion === input.baselineVersionId) || !agent.versions.some((version) => version.agentsVersion === input.candidateVersionId)) throw new Error("comparison Agent version not found");
     const campaigns = (ids: Digest[], versionId: Digest): SoloCampaignRecord[] => ids.map((campaignId) => {
-      const campaign = this.evaluationCampaigns.get(campaignId) ?? this.runtime?.get<SoloCampaignRecord>("evaluation-campaigns", campaignId);
+      const campaign = this.evaluationCampaign(campaignId);
       if (!campaign || campaign.owner !== owner || campaign.agent.versionId !== versionId) throw new Error("unauthorized or mismatched comparison campaign");
       return campaign;
     });
@@ -394,7 +393,7 @@ export class ArenaApiService {
     const owner = this.principal(caller); const agent = this.requireOwner(owner, input.agentId);
     const version = agent.versions.find((row) => row.agentsVersion === input.agentsVersion); if (!version) throw new Error("agent version not found");
     if (!Array.isArray(input.campaignIds) || input.campaignIds.length !== 2 || new Set(input.campaignIds).size !== 2) throw new Error("exactly two Evo campaigns are required");
-    const campaigns = input.campaignIds.map((id) => this.evaluationCampaigns.get(id) ?? this.runtime?.get<SoloCampaignRecord>("evaluation-campaigns", id));
+    const campaigns = input.campaignIds.map((id) => this.evaluationCampaign(id));
     if (campaigns.some((row) => !row || row.owner !== owner || row.state !== "FINALIZED" || row.agent.versionId !== version.agentsVersion || row.agent.commitment !== version.agentsCommitment)) throw new Error("Evo campaign is not finalized or bound to this version");
     const first = campaigns[0]!;
     if (campaigns.some((row) => row!.testPack.packId !== first.testPack.packId || row!.testPack.version !== first.testPack.version || row!.rubricVersion !== first.rubricVersion || JSON.stringify(row!.testPack.scenarios.map((s) => s.scenarioId)) !== JSON.stringify(first.testPack.scenarios.map((s) => s.scenarioId)))) throw new Error("Evo campaigns are not comparable");
@@ -463,7 +462,7 @@ export class ArenaApiService {
   private publicView(agent: Agent): PublicAgent { const latest = agent.versions.at(-1)!; return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}) }; }
   private agentStats(agent: Agent): AgentStats {
     const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
-    const evaluations = [...this.evaluationCampaigns.values()].filter((campaign) => versionIds.has(campaign.agent.versionId as Digest));
+    const evaluations = this.allEvaluationCampaigns().filter((campaign) => versionIds.has(campaign.agent.versionId as Digest));
     const scores = evaluations.flatMap((campaign) => campaign.items.map((item) => item.overallScore).filter((score): score is number => score !== undefined));
     const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agent.agentId));
     const tournamentIds = new Set(registrations.map((item) => `sha256:${item.tournamentId.slice(2)}`));
@@ -472,6 +471,12 @@ export class ArenaApiService {
     return { latestEvaluationScore: scores.at(-1) ?? null, tournamentCount: registrations.length, adversarialMatchCount: hasUnboundMatch ? null : relevantMatches.filter((match) => match.agentIdA === agent.agentId || match.agentIdB === agent.agentId).length };
   }
   private packKey(packId: string, version: string): string { return `${packId}|${version}`; }
+  private evaluationCampaign(campaignId: string): SoloCampaignRecord | undefined {
+    return this.runtime ? this.runtime.get<SoloCampaignRecord>("evaluation-campaigns", campaignId) : this.evaluationCampaigns.get(campaignId);
+  }
+  private allEvaluationCampaigns(): SoloCampaignRecord[] {
+    return this.runtime ? this.runtime.list<SoloCampaignRecord>("evaluation-campaigns") : [...this.evaluationCampaigns.values()].map((campaign) => structuredClone(campaign));
+  }
   private publicPack(pack: EvaluationPackRecord): PublicEvaluationPack { return { schema: "arena-public-evaluation-pack-v1", packId: pack.packId, version: pack.version, name: pack.name, scenarioIds: pack.scenarios.map((scenario) => scenario.scenarioId), scenarioCount: pack.scenarios.length }; }
   private publicCampaign(campaign: SoloCampaignRecord): PublicEvaluationCampaign { return { schema: "arena-public-evaluation-campaign-v1", campaignId: campaign.campaignId, agentVersionId: campaign.agent.versionId, packId: campaign.testPack.packId, packVersion: campaign.testPack.version, rubricVersion: campaign.rubricVersion, state: campaign.state, items: campaign.items.map((item) => ({ scenarioId: item.scenarioId, state: item.state, attempt: item.attempt, runIds: [...item.runIds], ...(item.scorecard ? { score: String(item.scorecard.result_class), overallScore: Number(item.scorecard.overall_score) } : {}) })) }; }
   private requireSameSoloCampaign(existing: SoloCampaignRecord, owner: string, version: AgentVersion, pack: EvaluationPackRecord, runtimePolicy: SoloCampaignRecord["runtimePolicy"]): void {

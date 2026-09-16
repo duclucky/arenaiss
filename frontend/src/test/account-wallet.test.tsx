@@ -43,7 +43,7 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
   });
 
-  it('uses the requested wallet copy, multichain balance and transfer controls', async () => {
+  it('keeps Arc wallet withdrawal available while CCTP initiation is hidden', async () => {
     render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={identity()} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
 
     expect(await screen.findByText('Arena ISS wallet', { selector: 'label' })).toBeInTheDocument();
@@ -66,7 +66,9 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.queryByRole('list', { name: 'USDC balances by network' })).not.toBeInTheDocument();
     expect(screen.getByText(/Arena ISS is live on Arc Testnet/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Faucet USDC on Arc' })).toHaveAttribute('href', 'https://faucet.circle.com/');
-    expect(screen.getByRole('heading', { name: 'Bridge USDC to Arc Testnet' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bridge USDC to Arc Testnet' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bridge to Arc Testnet' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/CCTP deposits burn USDC/)).not.toBeInTheDocument();
     fireEvent.click(balancesToggle);
     expect(balancesToggle).toHaveAttribute('aria-expanded', 'true');
     const balancesList = screen.getByRole('list', { name: 'USDC balances by network' });
@@ -74,15 +76,32 @@ describe('managed Arena ISS wallet account', () => {
     expect(within(balancesList).getByText('Base Sepolia')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Copy wallet address' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address));
-    expect(screen.getByLabelText('Source network')).toHaveValue('BASE-SEPOLIA');
-    expect(screen.getByRole('option', { name: 'Ethereum Sepolia · no USDC' })).toBeDisabled();
-    const bridgeAmount = screen.getByLabelText('Amount (USDC)', { selector: '#bridge-amount' });
-    fireEvent.change(bridgeAmount, { target: { value: '2.00' } });
-    expect(bridgeAmount).toBeValid();
+    expect(screen.queryByLabelText('Source network')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Withdraw' })).toBeInTheDocument();
     expect(screen.getByLabelText('Recipient wallet').closest('form')).toHaveClass('wallet-action-form');
     expect(screen.getByRole('button', { name: 'Withdraw USDC' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Bridge to Arc Testnet' })).toBeInTheDocument();
+  });
+
+  it('restores a pending CCTP operation after page reload', async () => {
+    const operation = { operationId: '11111111-1111-4111-8111-111111111111', state: 'APPROVING' as const, sourceChain: 'BASE-SEPOLIA', amount: '1', updatedAt: 2 };
+    const restoredIdentity = { ...identity(), listCctpTransfers: vi.fn().mockResolvedValue([operation]) };
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={restoredIdentity} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/Approving USDC spend on the source network/i)).toBeInTheDocument();
+    expect(restoredIdentity.listCctpTransfers).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not block Arc withdrawal or lose legacy CCTP status while it is pending', async () => {
+    const operation = { operationId: '11111111-1111-4111-8111-111111111111', state: 'APPROVING' as const, sourceChain: 'BASE-SEPOLIA', amount: '1', updatedAt: 2 };
+    const restoredIdentity = { ...identity(), listCctpTransfers: vi.fn().mockResolvedValue([operation]), transferUsdc: vi.fn().mockResolvedValue({ transactionId: 'transfer-1', state: 'INITIATED' as const }) };
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={restoredIdentity} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/Approving USDC spend on the source network/i)).toBeInTheDocument();
+    const withdraw = screen.getByRole('button', { name: 'Withdraw USDC' });
+    expect(withdraw).toBeEnabled();
+    fireEvent.change(screen.getByLabelText('Recipient wallet'), { target: { value: '0x1111111111111111111111111111111111111111' } });
+    fireEvent.change(screen.getByLabelText('Amount (USDC)'), { target: { value: '0.25' } });
+    fireEvent.click(withdraw);
+    await waitFor(() => expect(restoredIdentity.transferUsdc).toHaveBeenCalledWith('0x1111111111111111111111111111111111111111', '0.25'));
+    expect(screen.getByText(/Approving USDC spend on the source network/i)).toBeInTheDocument();
   });
 
   it('closes the account menu when clicking elsewhere', async () => {

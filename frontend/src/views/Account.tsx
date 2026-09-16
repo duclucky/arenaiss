@@ -1,14 +1,13 @@
 import { useAppContext } from '../context';
 import { ChevronRight, Copy, ShieldAlert } from 'lucide-react';
 import type { ManagedCctpTransfer, ManagedUsdcBalance, ManagedWalletTransaction } from '../adapters/interfaces';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type CreditRow = { tournamentId: string; credit: string };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
-type WalletAction =
-  | { kind: 'transfer'; state: 'submitting' | 'done' | 'error'; result?: ManagedWalletTransaction; message?: string }
-  | { kind: 'bridge'; state: 'submitting' | 'done' | 'error'; operation?: ManagedCctpTransfer; message?: string };
+type WalletAction = { state: 'submitting' | 'done' | 'error'; result?: ManagedWalletTransaction; message?: string };
+type LegacyBridgeAction = { state: 'submitting' | 'done' | 'error'; operation: ManagedCctpTransfer; message?: string };
 
 export function Account() {
   const { account, managedAccount, agentApi, marketplaceApi, networkConfig, disconnectWallet, wallet } = useAppContext();
@@ -29,12 +28,8 @@ export function Account() {
   const [copied, setCopied] = useState(false);
   const [destinationAddress, setDestinationAddress] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
-  const [bridgeChain, setBridgeChain] = useState('ETH-SEPOLIA');
-  const [bridgeAmount, setBridgeAmount] = useState('');
   const [walletAction, setWalletAction] = useState<WalletAction | null>(null);
-  const bridgeableBalances = useMemo(() => managedBalances.filter((row) => !row.isArc && row.available && baseUnits(row.amount) > 0n), [managedBalances]);
-  const selectedBridgeBalance = useMemo(() => managedBalances.find((row) => row.chain === bridgeChain), [bridgeChain, managedBalances]);
-  const selectedBridgeHasUsdc = Boolean(selectedBridgeBalance?.available && baseUnits(selectedBridgeBalance.amount) > 0n);
+  const [legacyBridgeAction, setLegacyBridgeAction] = useState<LegacyBridgeAction | null>(null);
 
   useEffect(() => {
     if (managedAccount && managedIdentity?.listUsdcBalances) {
@@ -57,34 +52,45 @@ export function Account() {
   }, [account, balanceReload, managedAccount, managedIdentity, networkConfig, wallet]);
 
   useEffect(() => {
-    const firstAvailable = bridgeableBalances.find((row) => CCTP_CHAINS.some(([chain]) => chain === row.chain));
-    if (firstAvailable && !selectedBridgeHasUsdc) setBridgeChain(firstAvailable.chain);
-  }, [bridgeableBalances, selectedBridgeHasUsdc]);
+    if (!managedAccount || !managedIdentity?.listCctpTransfers) return;
+    let cancelled = false;
+    managedIdentity.listCctpTransfers().then((operations) => {
+      if (cancelled || operations.length === 0) return;
+      const operation = operations[0];
+      setLegacyBridgeAction((current) => {
+        if (current) return current;
+        if (operation.state === 'FAILED' || operation.state === 'RECOVERY_REQUIRED') {
+          return { state: 'error', operation, message: operation.message || 'CCTP transfer failed.' };
+        }
+        return { state: operation.state === 'SUBMITTED' ? 'done' : 'submitting', operation };
+      });
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [managedAccount, managedIdentity]);
 
   useEffect(() => {
-    if (walletAction?.kind !== 'bridge' || walletAction.state !== 'submitting' || !walletAction.operation?.operationId || !managedIdentity?.getCctpTransfer) return;
+    if (legacyBridgeAction?.state !== 'submitting' || !managedIdentity?.getCctpTransfer) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const operation = await managedIdentity.getCctpTransfer!(walletAction.operation!.operationId);
+        const operation = await managedIdentity.getCctpTransfer!(legacyBridgeAction.operation.operationId);
         if (cancelled) return;
         if (operation.state === 'FAILED' || operation.state === 'RECOVERY_REQUIRED') {
-          setWalletAction({ kind: 'bridge', state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
+          setLegacyBridgeAction({ state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
           return;
         }
         if (operation.state === 'SUBMITTED') {
-          setWalletAction({ kind: 'bridge', state: 'done', operation });
-          setBridgeAmount('');
+          setLegacyBridgeAction({ state: 'done', operation });
           setBalanceReload((value) => value + 1);
           return;
         }
-        setWalletAction({ kind: 'bridge', state: 'submitting', operation });
+        setLegacyBridgeAction({ state: 'submitting', operation });
       } catch (reason) {
-        if (!cancelled) setWalletAction({ kind: 'bridge', state: 'error', operation: walletAction.operation, message: reason instanceof Error ? reason.message : 'Could not refresh CCTP status.' });
+        if (!cancelled) setLegacyBridgeAction({ state: 'error', operation: legacyBridgeAction.operation, message: reason instanceof Error ? reason.message : 'Could not refresh CCTP status.' });
       }
     }, 2500);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [managedIdentity, walletAction]);
+  }, [managedIdentity, legacyBridgeAction]);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,40 +191,13 @@ export function Account() {
   async function submitTransfer(event: React.FormEvent) {
     event.preventDefault();
     if (!managedIdentity?.transferUsdc) return;
-    setWalletAction({ kind: 'transfer', state: 'submitting' });
+    setWalletAction({ state: 'submitting' });
     try {
       const result = await managedIdentity.transferUsdc(destinationAddress, transferAmount);
-      setWalletAction({ kind: 'transfer', state: 'done', result });
+      setWalletAction({ state: 'done', result });
       setTransferAmount(''); setDestinationAddress(''); setBalanceReload((value) => value + 1);
     } catch (reason) {
-      setWalletAction({ kind: 'transfer', state: 'error', message: reason instanceof Error ? reason.message : 'Transfer failed.' });
-    }
-  }
-
-  async function submitBridge(event: React.FormEvent) {
-    event.preventDefault();
-    if (!managedIdentity?.bridgeUsdcToArc) return;
-    if (!selectedBridgeHasUsdc) {
-      setWalletAction({ kind: 'bridge', state: 'error', message: 'Select a source network with available USDC.' });
-      return;
-    }
-    if (selectedBridgeBalance && baseUnits(selectedBridgeBalance.amount) < baseUnits(bridgeAmount)) {
-      setWalletAction({ kind: 'bridge', state: 'error', message: 'Source network USDC balance is insufficient.' });
-      return;
-    }
-    setWalletAction({ kind: 'bridge', state: 'submitting' });
-    try {
-      const operation = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
-      if (operation.state === 'FAILED' || operation.state === 'RECOVERY_REQUIRED') {
-        setWalletAction({ kind: 'bridge', state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
-      } else if (operation.state === 'SUBMITTED') {
-        setWalletAction({ kind: 'bridge', state: 'done', operation });
-        setBridgeAmount(''); setBalanceReload((value) => value + 1);
-      } else {
-        setWalletAction({ kind: 'bridge', state: 'submitting', operation });
-      }
-    } catch (reason) {
-      setWalletAction({ kind: 'bridge', state: 'error', message: reason instanceof Error ? reason.message : 'Bridge failed.' });
+      setWalletAction({ state: 'error', message: reason instanceof Error ? reason.message : 'Transfer failed.' });
     }
   }
 
@@ -255,7 +234,7 @@ export function Account() {
             </div>
 
             <div role="note" className="border-l-4 border-amber-600 bg-amber-50/70 p-4 text-sm leading-relaxed text-amber-950">
-              <strong>Arena ISS is live on Arc Testnet.</strong> Direct deposits and withdrawals use Arc Testnet. CCTP deposits burn USDC on the selected source chain and mint it to this wallet on Arc Testnet.
+              <strong>Arena ISS is live on Arc Testnet.</strong> Use your Arc Testnet wallet address for direct USDC deposits. Withdrawals also settle on Arc Testnet.
             </div>
 
             <div>
@@ -286,23 +265,7 @@ export function Account() {
               </ul>}
             </div>}
 
-            {managedAccount && <div className="wallet-action-grid grid gap-5 border-t border-border pt-6 lg:grid-cols-2">
-              <form className="wallet-action-form" onSubmit={submitBridge}>
-                <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Bridge USDC to Arc Testnet</h2><p className="mt-1 text-sm text-muted-foreground">CCTP V2 Fast · destination is this Arena ISS wallet. The source SCA needs USDC for the transfer and CCTP fee; Gas Station sponsors source-network gas when its policy applies.</p></div>
-                <label className="block text-sm font-bold" htmlFor="bridge-chain">Source network</label>
-                <select id="bridge-chain" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
-                  {CCTP_CHAINS.map(([value, label]) => {
-                    const balance = managedBalances.find((row) => row.chain === value);
-                    const hasUsdc = Boolean(balance?.available && baseUnits(balance.amount) > 0n);
-                    return <option value={value} key={value} disabled={!hasUsdc}>{label}{hasUsdc ? ` · ${formatDisplayAmount(balance!.amount)} USDC` : ' · no USDC'}</option>;
-                  })}
-                </select>
-                <p className="wallet-action-form__hint text-xs font-semibold text-amber-900">{!selectedBridgeHasUsdc ? 'Choose a source network with available testnet USDC before bridging.' : ''}</p>
-                <label className="block text-sm font-bold" htmlFor="bridge-amount">Amount (USDC)</label>
-                <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
-                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting' || !selectedBridgeHasUsdc}>Bridge to Arc Testnet</button>
-              </form>
-
+            {managedAccount && <div className="border-t border-border pt-6">
               <form className="wallet-action-form" onSubmit={submitTransfer}>
                 <div className="wallet-action-form__intro"><h2 className="text-xl font-bold">Withdraw</h2><p className="mt-1 text-sm text-muted-foreground">Transfer testnet USDC to an EVM wallet on Arc.</p></div>
                 <label className="block text-sm font-bold" htmlFor="withdraw-address">Recipient wallet</label>
@@ -315,14 +278,19 @@ export function Account() {
             </div>}
 
             {walletAction && <div role={walletAction.state === 'error' ? 'alert' : 'status'} className={walletAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
-              {walletAction.state === 'submitting' && (walletAction.kind === 'bridge' && walletAction.operation ? cctpStatusText(walletAction.operation) : 'Submitting securely through Circle…')}
+              {walletAction.state === 'submitting' && 'Submitting securely through Circle…'}
               {walletAction.state === 'error' && walletAction.message}
-              {walletAction.state === 'done' && walletAction.kind === 'transfer' && <>Transaction submitted · {walletAction.result?.explorerUrl
+              {walletAction.state === 'done' && <>Transaction submitted · {walletAction.result?.explorerUrl
                 ? <a className="underline" href={walletAction.result.explorerUrl} target="_blank" rel="noreferrer">View transaction</a>
                 : walletAction.result?.transactionId}</>}
-              {walletAction.state === 'done' && walletAction.kind === 'bridge' && <>CCTP source burn submitted · {walletAction.operation?.explorerUrl
-                ? <a className="underline" href={walletAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
-                : walletAction.operation?.transactionId}</>}
+            </div>}
+
+            {legacyBridgeAction && <div role={legacyBridgeAction.state === 'error' ? 'alert' : 'status'} className={legacyBridgeAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
+              {legacyBridgeAction.state === 'submitting' && cctpStatusText(legacyBridgeAction.operation)}
+              {legacyBridgeAction.state === 'error' && legacyBridgeAction.message}
+              {legacyBridgeAction.state === 'done' && <>CCTP source burn submitted · {legacyBridgeAction.operation.explorerUrl
+                ? <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
+                : legacyBridgeAction.operation.transactionId}</>}
             </div>}
 
             <div className="pt-4 border-t border-border flex justify-end">
@@ -394,20 +362,9 @@ function formatDisplayAmount(value: string): string {
   return trimmed ? `${whole}.${trimmed}` : `${whole}.00`;
 }
 
-function baseUnits(value: string): bigint {
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(value)) return 0n;
-  const [whole, fraction = ''] = value.split('.');
-  return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0');
-}
-
 function cctpStatusText(operation: ManagedCctpTransfer): string {
   if (operation.state === 'PENDING') return 'CCTP transfer queued. Preparing Circle operation...';
   if (operation.state === 'APPROVING') return 'Approving USDC spend on the source network...';
   if (operation.state === 'BURNING') return 'Burning source USDC and forwarding to Arc Testnet...';
   return 'Refreshing CCTP transfer status...';
 }
-
-const CCTP_CHAINS = [
-  ['ETH-SEPOLIA', 'Ethereum Sepolia'], ['BASE-SEPOLIA', 'Base Sepolia'], ['ARB-SEPOLIA', 'Arbitrum Sepolia'],
-  ['OP-SEPOLIA', 'OP Sepolia'],
-] as const;

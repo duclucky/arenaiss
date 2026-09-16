@@ -176,6 +176,11 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal(bridge.status, 202);
     assert.match(bridge.body.operationId, /^[0-9a-f-]{36}$/);
     assert.equal(bridge.body.state, 'PENDING');
+    assert.equal((await api.handle({ method: 'GET', path: '/api/account/cctp-transfers' })).status, 401);
+    const ownTransfers = await api.handle({ method: 'GET', path: '/api/account/cctp-transfers', headers: { cookie } });
+    assert.equal(ownTransfers.status, 200);
+    assert.equal(ownTransfers.body[0].operationId, bridge.body.operationId);
+    assert.equal('burnIdempotencyKey' in ownTransfers.body[0], false);
     assert.equal((await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}` })).status, 401);
     releaseBridge();
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -192,6 +197,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     const bobAuth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: bob, signature: 'ok' } });
     const bobCookie = bobAuth.headers['set-cookie'].split(';')[0];
     assert.equal((await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}`, headers: { cookie: bobCookie } })).status, 400);
+    assert.deepEqual((await api.handle({ method: 'GET', path: '/api/account/cctp-transfers', headers: { cookie: bobCookie } })).body, []);
     assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'claim', 'bridge']);
   } finally { runtime.close(); }
 });
@@ -433,6 +439,29 @@ test('authenticated API creates immutable Test Pack and SOLO campaign, public st
   } finally {
     runtime.close();
   }
+});
+
+test('an owned legacy evaluation without an Evo fee keeps its campaign while unauthorized fee reads stay hidden', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ArenaApiService(operator, runtime);
+    const execution = { getFee: () => undefined } as any;
+    const api = new ArenaHttpApi(service, async () => true, undefined, undefined, execution);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    const agent = service.createAgent(alice, 'Legacy', 'private profile');
+    const packId = `sha256:${'3'.repeat(64)}` as const;
+    service.createEvaluationPack(alice, { packId, version: '1', name: 'Legacy Pack', scenarios: [{ schema: 'arena-test-scenario-v1', scenarioId: 'legacy_case', version: '1', level: 'RESPONSE', objective: 'Answer.', context: '', constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }] });
+    const campaignId = `sha256:${'4'.repeat(64)}` as const;
+    service.createSoloCampaign(alice, { campaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId, packVersion: '1', runtimePolicy: { model: 'fixture', maxOutputTokens: 100, temperature: 0, maxProviderAttempts: 1 } });
+    assert.equal((await api.handle({ method: 'GET', path: `/api/evaluation-campaigns/${campaignId}` })).status, 200);
+    assert.equal((await api.handle({ method: 'GET', path: `/api/evaluation-campaigns/${campaignId}/fee`, headers: { cookie } })).status, 204);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: bob } });
+    const bobAuth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: bob, signature: 'ok' } });
+    assert.equal((await api.handle({ method: 'GET', path: `/api/evaluation-campaigns/${campaignId}/fee`, headers: { cookie: bobAuth.headers['set-cookie'].split(';')[0] } })).status, 404);
+    assert.equal((await api.handle({ method: 'GET', path: `/api/evaluation-campaigns/${'sha256:' + '5'.repeat(64)}/fee`, headers: { cookie } })).status, 404);
+  } finally { runtime.close(); }
 });
 
 test('version comparison routes require the owner session and preserve cohort arrays and regression policy', async () => {

@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { HttpEvaluationAdapter } from '../adapters/evaluation-api';
 
 describe('evaluation HTTP adapter', () => {
+  it('returns null only for an owned legacy campaign without a fee record', async () => {
+    const adapter = new HttpEvaluationAdapter('https://arena.example', async () => undefined, async () => new Response(null, { status: 204 }));
+    await expect(adapter.getFee('sha256:legacy')).resolves.toBeNull();
+    const hidden = new HttpEvaluationAdapter('https://arena.example', async () => undefined, async () => new Response(JSON.stringify({ error: 'not found' }), { status: 404 }));
+    await expect(hidden.getFee('sha256:hidden')).rejects.toThrow('not found');
+  });
   it('invokes the browser fetch function with its global receiver', async () => {
     const fetcher = function (this: unknown) {
       if (this !== globalThis) throw new TypeError('Illegal invocation');

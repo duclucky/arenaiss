@@ -20,17 +20,19 @@ export interface SoloCampaignInput {
 
 export interface SoloCampaignItem {
   scenarioId: string;
-  state: "PENDING" | "GENERATING" | "RETRYABLE" | "JUDGING" | "FINALIZED" | "FAILED";
+  state: "PENDING" | "GENERATING" | "RETRYABLE" | "JUDGING" | "RECOVERY_REQUIRED" | "FINALIZED" | "FAILED";
   attempt: number;
   runIds: string[];
   currentRunId?: string;
   failure?: string;
+  failureStage?: "PROVIDER" | "PERSISTENCE" | "GENLAYER_SUBMIT" | "GENLAYER_FINALITY" | "EXECUTION";
+  failureCode?: string;
   scorecard?: Record<string, any>;
 }
 
 export interface SoloCampaignRecord extends SoloCampaignInput {
   schema: "arena-solo-campaign-v1";
-  state: "PENDING" | "RUNNING" | "FINALIZED" | "FAILED";
+  state: "PENDING" | "RUNNING" | "RECOVERY_REQUIRED" | "FINALIZED" | "FAILED";
   items: SoloCampaignItem[];
 }
 
@@ -146,18 +148,18 @@ export class SoloEvaluationRunner {
     return this.store.get(campaignId);
   }
 
-  failInfrastructure(campaignId: string): SoloCampaignRecord {
+  failInfrastructure(campaignId: string, failure: { stage: NonNullable<SoloCampaignItem["failureStage"]>; code: string } = { stage: "EXECUTION", code: "UNEXPECTED_RUNTIME_ERROR" }): SoloCampaignRecord {
     const campaign = this.requireCampaign(campaignId);
-    if (campaign.state === "FINALIZED" || campaign.state === "FAILED") return campaign;
+    if (["FINALIZED", "FAILED", "RECOVERY_REQUIRED"].includes(campaign.state)) return campaign;
     const itemIndex = campaign.items.findIndex((item) => item.state !== "FINALIZED");
     if (itemIndex < 0) return this.persist({ ...campaign, state: "FAILED" });
-    const failed: SoloCampaignItem = { ...campaign.items[itemIndex], state: "FAILED", failure: "INFRASTRUCTURE_ERROR" };
+    const failed: SoloCampaignItem = { ...campaign.items[itemIndex], state: "FAILED", failure: "INFRASTRUCTURE_ERROR", failureStage: failure.stage, failureCode: failure.code };
     return this.persist(this.updateItem(campaign, itemIndex, failed, "FAILED"));
   }
 
   private async advanceClaimed(campaignId: string): Promise<SoloCampaignRecord> {
     let campaign = this.requireCampaign(campaignId);
-    if (campaign.state === "FINALIZED" || campaign.state === "FAILED") return campaign;
+    if (["FINALIZED", "FAILED", "RECOVERY_REQUIRED"].includes(campaign.state)) return campaign;
     const itemIndex = campaign.items.findIndex((item) => item.state !== "FINALIZED");
     if (itemIndex < 0) return this.persist({ ...campaign, state: "FINALIZED" });
     let item = campaign.items[itemIndex];
@@ -197,15 +199,26 @@ export class SoloEvaluationRunner {
       return this.persistProviderFailure(campaign, itemIndex, item, run.provider.state);
     }
 
-    item = { ...item, state: "JUDGING", failure: undefined };
+    item = { ...item, state: "JUDGING", failure: undefined, failureStage: undefined, failureCode: undefined };
     campaign = this.updateItem(campaign, itemIndex, item, "RUNNING");
     this.store.put(campaign);
     run = this.tracker.get(item.currentRunId!)!;
-    if (run.judge.state === "NOT_SUBMITTED" || run.judge.state === "SUBMISSION_PERSISTED") await this.tracker.submit(run.runId);
-    const polled = await this.tracker.poll(run.runId);
+    if (run.judge.state === "NOT_SUBMITTED" || run.judge.state === "SUBMISSION_PERSISTED") {
+      try { await this.tracker.submit(run.runId); }
+      catch {
+        const persisted = this.tracker.get(run.runId);
+        if (persisted?.judge.state === "SUBMISSION_PERSISTED") {
+          const uncertain: SoloCampaignItem = { ...item, state: "RECOVERY_REQUIRED", failure: "INFRASTRUCTURE_ERROR", failureStage: "GENLAYER_SUBMIT", failureCode: "GENLAYER_TRANSACTION_UNKNOWN" };
+          return this.persist(this.updateItem(campaign, itemIndex, uncertain, "RECOVERY_REQUIRED"));
+        }
+        return this.persistInfrastructureFailure(campaign, itemIndex, item, "GENLAYER_SUBMIT", "GENLAYER_SUBMISSION_FAILED");
+      }
+    }
+    let polled;
+    try { polled = await this.tracker.poll(run.runId); }
+    catch { return this.persist(this.updateItem(campaign, itemIndex, { ...item, failureStage: "GENLAYER_FINALITY", failureCode: "GENLAYER_FINALITY_RETRY" }, "RUNNING")); }
     if (polled.judge.state === "FAILED") {
-      const failed: SoloCampaignItem = { ...item, state: "FAILED", failure: "INFRASTRUCTURE_ERROR" };
-      return this.persist(this.updateItem(campaign, itemIndex, failed, "FAILED"));
+      return this.persistInfrastructureFailure(campaign, itemIndex, item, "GENLAYER_FINALITY", "JUDGE_EXECUTION_FAILED");
     }
     if (polled.judge.state !== "FINALIZED") return this.persist(campaign);
     const finalized: SoloCampaignItem = { ...item, state: "FINALIZED", scorecard: clone(polled.scorecard!) };
@@ -240,10 +253,15 @@ export class SoloEvaluationRunner {
 
   private persistProviderFailure(campaign: SoloCampaignRecord, itemIndex: number, item: SoloCampaignItem, failure: string): SoloCampaignRecord {
     if (item.attempt < campaign.runtimePolicy.maxProviderAttempts) {
-      const retryable: SoloCampaignItem = { ...item, state: "RETRYABLE", currentRunId: undefined, failure };
+      const retryable: SoloCampaignItem = { ...item, state: "RETRYABLE", currentRunId: undefined, failure, failureStage: "PROVIDER", failureCode: failure };
       return this.persist(this.updateItem(campaign, itemIndex, retryable, "RUNNING"));
     }
-    const failed: SoloCampaignItem = { ...item, state: "FAILED", failure };
+    const failed: SoloCampaignItem = { ...item, state: "FAILED", failure, failureStage: "PROVIDER", failureCode: failure };
+    return this.persist(this.updateItem(campaign, itemIndex, failed, "FAILED"));
+  }
+
+  private persistInfrastructureFailure(campaign: SoloCampaignRecord, itemIndex: number, item: SoloCampaignItem, failureStage: NonNullable<SoloCampaignItem["failureStage"]>, failureCode: string): SoloCampaignRecord {
+    const failed: SoloCampaignItem = { ...item, state: "FAILED", failure: "INFRASTRUCTURE_ERROR", failureStage, failureCode };
     return this.persist(this.updateItem(campaign, itemIndex, failed, "FAILED"));
   }
 

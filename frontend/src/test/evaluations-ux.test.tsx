@@ -85,6 +85,23 @@ describe('evaluation product UX', () => {
     expect(screen.getByRole('link', { name: 'Open run run_1' })).toHaveAttribute('href', '/evaluation-runs/run_1');
   });
 
+  it('renders a legacy campaign and its runs when the Evo fee does not exist', async () => {
+    const api = { ...evaluationApi, async getFee() { return null; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open run run_1' })).toBeInTheDocument();
+    expect(screen.getByText(/Legacy campaign, no Evo escrow record/i)).toBeInTheDocument();
+  });
+
+  it('explains uncertain GenLayer submission without claiming a refund or final score', async () => {
+    const uncertain = { ...campaign, state: 'RECOVERY_REQUIRED', items: campaign.items.map((item) => ({ ...item, state: 'RECOVERY_REQUIRED', score: undefined, overallScore: undefined })) };
+    const api = { ...evaluationApi, async getCampaign() { return uncertain; }, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' }; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/GenLayer submission needs reconciliation/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 USDC remains held/i)).toBeInTheDocument();
+    expect(screen.queryByText(/USDC refunded/i)).not.toBeInTheDocument();
+  });
+
   it('labels unrun tests correctly after infrastructure failure and shows the real fee projection', async () => {
     const failed = { ...campaign, state: 'FAILED', items: [...campaign.items, { scenarioId: 'hidden-02', state: 'PENDING', attempt: 0, runIds: [] }] };
     const api = { ...evaluationApi, async getCampaign() { return failed; } };
