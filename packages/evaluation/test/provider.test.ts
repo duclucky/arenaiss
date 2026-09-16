@@ -94,3 +94,140 @@ test("adapter reports empty and malformed provider outputs separately", async ()
   await assert.rejects(() => providerFor("  ").generate({ model: "m", input, maxOutputTokens: 10, temperature: 0, operationKey: "empty" }), /EMPTY_OUTPUT/);
   await assert.rejects(() => providerFor("not-json").generate({ model: "m", input, maxOutputTokens: 10, temperature: 0, operationKey: "bad" }), /INVALID_OUTPUT/);
 });
+
+test("provider falls back to the secondary endpoint only after the primary endpoint times out", async () => {
+  const calls: Array<{ url: string; body: any; authorization: string | null; idempotencyKey: string | null }> = [];
+  const provider = new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1",
+    apiKey: "server-secret",
+    fallbackApiKey: "fallback-secret",
+    fallbackModel: "fallback-model",
+    timeoutMs: 5,
+    fetchImpl: async (url, init) => {
+      const headers = new Headers(init?.headers);
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)), authorization: headers.get("authorization"), idempotencyKey: headers.get("idempotency-key") });
+      if (String(url).startsWith("https://primary.example")) {
+        await new Promise<void>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "AbortError")), { once: true }));
+      }
+      return new Response(JSON.stringify({
+        id: "fallback-response-1",
+        choices: [{ message: { content: JSON.stringify({
+          schema: "arena-evaluation-output-v1",
+          mode: "ACTION_DECISION",
+          decision: "RESPOND",
+          answer: "Recovered through fallback.",
+          observable_rationale: "The primary endpoint timed out.",
+          proposed_actions: [],
+        }) } }],
+        usage: { total_tokens: 42 },
+      }), { status: 200 });
+    },
+  });
+
+  const result = await provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "eval-fallback-1" });
+
+  assert.equal(result.requestId, "fallback-response-1");
+  assert.equal(result.model, "fallback-model");
+  assert.equal(result.route, "FALLBACK");
+  assert.deepEqual(calls.map((call) => call.url), [
+    "https://primary.example/v1/chat/completions",
+    "https://api.openai.com/v1/chat/completions",
+  ]);
+  assert.deepEqual(calls.map((call) => call.body.model), ["model-1", "fallback-model"]);
+  assert.deepEqual(calls.map((call) => call.authorization), ["Bearer server-secret", "Bearer fallback-secret"]);
+  assert.deepEqual(calls[0]?.body.messages, calls[1]?.body.messages);
+  assert.equal(calls[1]?.body.max_completion_tokens, 1200);
+  assert.equal("max_tokens" in calls[1]?.body, false);
+  assert.equal("temperature" in calls[1]?.body, false);
+  assert.deepEqual(calls.map((call) => call.idempotencyKey), ["eval-fallback-1", "eval-fallback-1"]);
+});
+
+test("Tournament can lock both sides to one provider route", async () => {
+  const calls: string[] = [];
+  const provider = new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1", apiKey: "primary-secret",
+    fallbackApiKey: "fallback-secret", fallbackModel: "fallback-model", timeoutMs: 5,
+    fetchImpl: async (url, init) => {
+      calls.push(String(url));
+      if (String(url).startsWith("https://primary.example")) {
+        await new Promise<void>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "AbortError")), { once: true }));
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        schema: "arena-evaluation-output-v1", mode: "ACTION_DECISION", decision: "RESPOND",
+        answer: "Fallback answer.", observable_rationale: "Same route for the pair.", proposed_actions: [],
+      }) } }] }), { status: 200 });
+    },
+  });
+  const request = { model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "pair-route" };
+  assert.equal(provider.getFallbackModel(), "fallback-model");
+  await assert.rejects(() => provider.generate({ ...request, route: "PRIMARY" }), /PROVIDER_TIMEOUT/);
+  const result = await provider.generate({ ...request, route: "FALLBACK" });
+  assert.equal(result.model, "fallback-model");
+  assert.equal(result.route, "FALLBACK");
+  assert.deepEqual(calls, ["https://primary.example/v1/chat/completions", "https://api.openai.com/v1/chat/completions"]);
+});
+
+test("provider does not use the fallback endpoint for non-timeout failures", async () => {
+  const calls: string[] = [];
+  const provider = new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1",
+    fallbackEndpoint: "https://fallback.example/v1",
+    apiKey: "server-secret",
+    fallbackApiKey: "fallback-secret",
+    fallbackModel: "fallback-model",
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      return new Response("{}", { status: 503 });
+    },
+  });
+
+  await assert.rejects(() => provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "eval-no-fallback" }), /PROVIDER_ERROR/);
+  assert.deepEqual(calls, ["https://primary.example/v1/chat/completions"]);
+});
+
+test("provider falls back when the primary response body stalls after HTTP headers", async () => {
+  const calls: string[] = [];
+  const provider = new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1",
+    apiKey: "server-secret",
+    fallbackApiKey: "fallback-secret",
+    fallbackModel: "fallback-model",
+    timeoutMs: 5,
+    fetchImpl: async (url, init) => {
+      calls.push(String(url));
+      if (String(url).startsWith("https://primary.example")) return {
+        ok: true,
+        json: () => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "AbortError")), { once: true });
+          setTimeout(() => reject(new Error("response body stalled")), 30);
+        }),
+      } as Response;
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        schema: "arena-evaluation-output-v1", mode: "ACTION_DECISION", decision: "RESPOND",
+        answer: "Fallback answer.", observable_rationale: "Primary body timed out.", proposed_actions: [],
+      }) } }] }), { status: 200 });
+    },
+  });
+
+  const result = await provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "eval-body-timeout" });
+  assert.equal(result.output.answer, "Fallback answer.");
+  assert.deepEqual(calls, ["https://primary.example/v1/chat/completions", "https://api.openai.com/v1/chat/completions"]);
+});
+
+test("provider validates the optional fallback endpoint before making requests", () => {
+  assert.throws(() => new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1",
+    fallbackEndpoint: "http://fallback.example/v1",
+    apiKey: "server-secret",
+    fallbackApiKey: "fallback-secret",
+    fallbackModel: "fallback-model",
+  }), /fallback provider endpoint must use HTTPS/);
+});
+
+test("provider requires API key and model together for the fallback route", () => {
+  assert.throws(() => new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1",
+    fallbackEndpoint: "https://fallback.example/v1",
+    apiKey: "server-secret",
+  }), /fallback provider configuration requires API key and model/);
+});

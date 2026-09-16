@@ -65,42 +65,65 @@ export interface EvaluationProviderResult {
   output: EvaluationOutput;
   rawOutput: string;
   usageTokens?: number;
+  model?: string;
+  route?: "PRIMARY" | "FALLBACK";
 }
 
 export class OpenAICompatibleEvaluationProvider {
+  private static readonly OPENAI_ENDPOINT = "https://api.openai.com/v1";
   private endpoint: string;
+  private fallback?: { endpoint: string; apiKey: string; model: string };
   private apiKey: string;
   private style: EvaluationProviderStyle;
   private fetchImpl: FetchLike;
   private timeoutMs: number;
 
-  constructor(config: { endpoint: string; apiKey: string; style?: EvaluationProviderStyle; fetchImpl?: FetchLike; timeoutMs?: number }) {
-    let endpoint: URL;
-    try { endpoint = new URL(config.endpoint); } catch { throw new TypeError("provider endpoint must be an absolute HTTPS URL"); }
-    if (endpoint.protocol !== "https:") throw new TypeError("provider endpoint must use HTTPS");
+  constructor(config: { endpoint: string; fallbackEndpoint?: string; apiKey: string; fallbackApiKey?: string; fallbackModel?: string; style?: EvaluationProviderStyle; fetchImpl?: FetchLike; timeoutMs?: number }) {
     if (!config.apiKey) throw new TypeError("provider API key is required server-side");
     this.style = config.style ?? "chat-completions";
-    const path = endpoint.pathname.replace(/\/$/, "");
-    if (this.style === "chat-completions" && !path.endsWith("/chat/completions")) endpoint.pathname = `${path}/chat/completions`;
-    this.endpoint = endpoint.toString();
+    this.endpoint = this.normalizeEndpoint(config.endpoint, "provider");
+    const fallbackEndpoint = config.fallbackEndpoint?.trim();
+    const fallbackApiKey = config.fallbackApiKey?.trim();
+    const fallbackModel = config.fallbackModel?.trim();
+    if ((fallbackEndpoint || fallbackApiKey || fallbackModel) && (!fallbackApiKey || !fallbackModel)) throw new TypeError("fallback provider configuration requires API key and model");
+    if (fallbackApiKey && fallbackModel) this.fallback = {
+      endpoint: this.normalizeEndpoint(fallbackEndpoint || OpenAICompatibleEvaluationProvider.OPENAI_ENDPOINT, "fallback provider", "chat-completions"),
+      apiKey: fallbackApiKey,
+      model: fallbackModel,
+    };
     this.apiKey = config.apiKey;
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.timeoutMs = config.timeoutMs ?? 120_000;
   }
 
-  async generate(value: { model: string; input: EvaluationProviderInput; maxOutputTokens: number; temperature: number; operationKey: string }): Promise<EvaluationProviderResult> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+  getFallbackModel(): string | undefined { return this.fallback?.model; }
+
+  async generate(value: { model: string; input: EvaluationProviderInput; maxOutputTokens: number; temperature: number; operationKey: string; route?: "PRIMARY" | "FALLBACK" }): Promise<EvaluationProviderResult> {
     try {
-      const response = await this.fetchImpl(this.endpoint, {
-        method: "POST",
-        headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json", "idempotency-key": value.operationKey },
-        body: JSON.stringify(buildEvaluationProviderBody({ style: this.style, model: value.model, input: value.input, maxOutputTokens: value.maxOutputTokens, temperature: value.temperature })),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP_${response.status}`);
-      const payload: any = await response.json();
-      const rawOutput = this.style === "chat-completions"
+      const body = JSON.stringify(buildEvaluationProviderBody({ style: this.style, model: value.model, input: value.input, maxOutputTokens: value.maxOutputTokens, temperature: value.temperature }));
+      let payload: any;
+      let responseStyle = this.style;
+      let route: "PRIMARY" | "FALLBACK" = "PRIMARY";
+      const useFallback = async () => {
+        if (!this.fallback) throw new Error("fallback provider is unavailable");
+        const openaiBody = buildEvaluationProviderBody({ style: "chat-completions", model: this.fallback.model, input: value.input, maxOutputTokens: value.maxOutputTokens, temperature: value.temperature });
+        const { max_tokens: maxCompletionTokens, temperature: _temperature, ...fallbackParameters } = openaiBody;
+        const fallbackBody = JSON.stringify({ ...fallbackParameters, max_completion_tokens: maxCompletionTokens });
+        payload = await this.request(this.fallback.endpoint, this.fallback.apiKey, fallbackBody, value.operationKey);
+        responseStyle = "chat-completions";
+        route = "FALLBACK";
+      };
+      if (value.route === "FALLBACK") {
+        await useFallback();
+      } else {
+        try {
+          payload = await this.request(this.endpoint, this.apiKey, body, value.operationKey);
+        } catch (error) {
+          if (value.route === "PRIMARY" || !this.fallback || !this.isTimeout(error)) throw error;
+          await useFallback();
+        }
+      }
+      const rawOutput = responseStyle === "chat-completions"
         ? payload?.choices?.[0]?.message?.content
         : (typeof payload?.output_text === "string" ? payload.output_text : this.extractResponsesOutput(payload?.output));
       if (typeof rawOutput !== "string" || rawOutput.trim().length === 0) throw new Error("EMPTY_OUTPUT");
@@ -109,12 +132,42 @@ export class OpenAICompatibleEvaluationProvider {
         output: parseEvaluationOutput(rawOutput, value.input.mode),
         rawOutput,
         usageTokens: Number.isSafeInteger(payload?.usage?.total_tokens) && payload.usage.total_tokens >= 0 ? payload.usage.total_tokens : undefined,
+        model: route === "FALLBACK" ? this.fallback!.model : value.model,
+        route,
       };
     } catch (error) {
       throw new Error(classifyEvaluationProviderError(error));
+    }
+  }
+
+  private async request(endpoint: string, apiKey: string, body: string, operationKey: string): Promise<unknown> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await this.fetchImpl(endpoint, {
+        method: "POST",
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "idempotency-key": operationKey },
+        body,
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP_${response.status}`);
+      return await response.json();
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private isTimeout(error: unknown): boolean {
+    return error instanceof DOMException && error.name === "AbortError";
+  }
+
+  private normalizeEndpoint(value: string, label: string, style: EvaluationProviderStyle = this.style): string {
+    let endpoint: URL;
+    try { endpoint = new URL(value); } catch { throw new TypeError(`${label} endpoint must be an absolute HTTPS URL`); }
+    if (endpoint.protocol !== "https:") throw new TypeError(`${label} endpoint must use HTTPS`);
+    const path = endpoint.pathname.replace(/\/$/, "");
+    if (style === "chat-completions" && !path.endsWith("/chat/completions")) endpoint.pathname = `${path}/chat/completions`;
+    return endpoint.toString();
   }
 
   private extractResponsesOutput(output: unknown): string | undefined {

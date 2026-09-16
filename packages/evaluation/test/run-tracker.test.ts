@@ -256,6 +256,7 @@ test("identical create and provider replay are idempotent while conflicting byte
   tracker.recordProviderSuccess(input.run_id, providerResult());
   assert.deepEqual(tracker.recordProviderSuccess(input.run_id, providerResult()), tracker.get(input.run_id));
   assert.throws(() => tracker.recordProviderSuccess(input.run_id, { ...providerResult(), rawOutput: providerResult().rawOutput.replace("incomplete", "complete") }), /conflict/i);
+  assert.throws(() => tracker.recordProviderSuccess(input.run_id, { ...providerResult(), model: "another-model", route: "FALLBACK" }), /conflict/i);
 });
 
 test("create replay remains idempotent after the run has progressed", () => {

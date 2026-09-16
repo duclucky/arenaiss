@@ -28,6 +28,8 @@ export interface SoloCampaignItem {
   failureStage?: "PROVIDER" | "PERSISTENCE" | "GENLAYER_SUBMIT" | "GENLAYER_FINALITY" | "EXECUTION";
   failureCode?: string;
   scorecard?: Record<string, any>;
+  providerModel?: string;
+  providerRoute?: "PRIMARY" | "FALLBACK";
 }
 
 export interface SoloCampaignRecord extends SoloCampaignInput {
@@ -199,7 +201,7 @@ export class SoloEvaluationRunner {
       return this.persistProviderFailure(campaign, itemIndex, item, run.provider.state);
     }
 
-    item = { ...item, state: "JUDGING", failure: undefined, failureStage: undefined, failureCode: undefined };
+    item = { ...item, state: "JUDGING", providerModel: run.provider.model ?? campaign.runtimePolicy.model, providerRoute: run.provider.route ?? "PRIMARY", failure: undefined, failureStage: undefined, failureCode: undefined };
     campaign = this.updateItem(campaign, itemIndex, item, "RUNNING");
     this.store.put(campaign);
     run = this.tracker.get(item.currentRunId!)!;

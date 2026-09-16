@@ -67,6 +67,8 @@ export interface VersionComparisonRecord {
     packVersion: string;
     rubricVersion: string;
     runtimePolicy: SoloCampaignRecord["runtimePolicy"];
+    requestedModels?: string[];
+    executionModels?: string[];
     scenarioIds: string[];
     evaluatedScenarioIds: string[];
     requiredRunsPerScenario: number;
@@ -91,11 +93,12 @@ export function evaluateVersionComparison(_input: VersionComparisonInput): Versi
   if (mismatch) return terminal(base, "INCOMPARABLE", mismatch);
 
   const scenarioIds = canonicalScenarios(baselineReference).map((row) => row.scenarioId);
-  const binding = {
+  const binding: NonNullable<VersionComparisonRecord["binding"]> = {
     packId: baselineReference.testPack.packId,
     packVersion: baselineReference.testPack.version,
     rubricVersion: baselineReference.rubricVersion,
     runtimePolicy: structuredClone(baselineReference.runtimePolicy),
+    requestedModels: [...new Set([...input.baseline.campaigns, ...input.candidate.campaigns].map((row) => row.runtimePolicy.model))].sort((a, b) => a.localeCompare(b)),
     scenarioIds,
     evaluatedScenarioIds: [] as string[],
     requiredRunsPerScenario: input.policy.requiredRunsPerScenario,
@@ -125,6 +128,9 @@ export function evaluateVersionComparison(_input: VersionComparisonInput): Versi
 
   const baselineRows = commonlyCovered.flatMap((id) => baselineFinal.get(id)!);
   const candidateRows = commonlyCovered.flatMap((id) => candidateFinal.get(id)!);
+  const executionModels = new Set([...baselineRows, ...candidateRows].map((row) => row.providerModel));
+  if ([...executionModels].some((model) => !model)) return terminal(coveredRecord, "INCOMPARABLE", "INVALID_EXECUTION_MODEL");
+  coveredBinding.executionModels = [...executionModels].sort((a, b) => a.localeCompare(b));
   const digestMismatch = scenarioDigestMismatch(baselineRows, candidateRows, commonlyCovered);
   if (digestMismatch) return terminal(coveredRecord, "INCOMPARABLE", "SCENARIO_DIGEST_MISMATCH");
 
@@ -145,7 +151,7 @@ export function evaluateVersionComparison(_input: VersionComparisonInput): Versi
   return { ...aggregated, status: findings.length ? "REGRESSION" : "PASS", findings };
 }
 
-type FinalizedRow = { scenarioId: string; runId: string; scorecard: Record<string, any> };
+type FinalizedRow = { scenarioId: string; runId: string; scorecard: Record<string, any>; providerModel: string };
 
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const FINDING_CODE = /^[A-Z][A-Z0-9_]{0,95}$/;
@@ -209,10 +215,15 @@ function firstBindingMismatch(input: VersionComparisonInput, baseline: SoloCampa
   if ([...input.baseline.campaigns, ...input.candidate.campaigns].some((row) => row.testPack.version !== baseline.testPack.version)) return "PACK_VERSION_MISMATCH";
   if ([...input.baseline.campaigns, ...input.candidate.campaigns].some((row) => !isDeepStrictEqual(canonicalScenarios(row), canonicalScenarios(baseline)))) return "SCENARIO_SET_MISMATCH";
   if ([...input.baseline.campaigns, ...input.candidate.campaigns].some((row) => !campaignItemsMatchScenarios(row))) return "CAMPAIGN_SCENARIO_ITEMS_MISMATCH";
-  if ([...input.baseline.campaigns, ...input.candidate.campaigns].some((row) => !isDeepStrictEqual(row.runtimePolicy, baseline.runtimePolicy))) return "RUNTIME_POLICY_MISMATCH";
+  if ([...input.baseline.campaigns, ...input.candidate.campaigns].some((row) => !isDeepStrictEqual(generationPolicy(row.runtimePolicy), generationPolicy(baseline.runtimePolicy)))) return "RUNTIME_POLICY_MISMATCH";
   if ([...input.baseline.campaigns, ...input.candidate.campaigns].some((row) => row.rubricVersion !== baseline.rubricVersion)) return "SCORING_VERSION_MISMATCH";
   if (!isDeepStrictEqual(canonicalScenarios(candidate), canonicalScenarios(baseline))) return "SCENARIO_SET_MISMATCH";
   return undefined;
+}
+
+function generationPolicy(policy: SoloCampaignRecord["runtimePolicy"]): Omit<SoloCampaignRecord["runtimePolicy"], "model"> {
+  const { model: _model, ...generation } = policy;
+  return generation;
 }
 
 function canonicalScenarios(campaign: SoloCampaignRecord): SoloCampaignRecord["testPack"]["scenarios"] {
@@ -234,7 +245,7 @@ function finalizedByScenario(campaigns: SoloCampaignRecord[], versionId: string)
   for (const campaign of campaigns) {
     for (const item of campaign.items) {
       if (item.state !== "FINALIZED") continue;
-      const row = finalizedRow(item, versionId);
+      const row = finalizedRow(item, versionId, campaign.runtimePolicy.model);
       const prior = result.get(item.scenarioId) ?? [];
       result.set(item.scenarioId, [...prior, row]);
     }
@@ -242,10 +253,10 @@ function finalizedByScenario(campaigns: SoloCampaignRecord[], versionId: string)
   return result;
 }
 
-function finalizedRow(item: SoloCampaignItem, versionId: string): FinalizedRow {
+function finalizedRow(item: SoloCampaignItem, versionId: string, primaryModel: string): FinalizedRow {
   const runId = item.currentRunId ?? item.runIds.at(-1);
   if (!runId || !DIGEST.test(runId) || !item.scorecard || item.scorecard.agent_version_id !== versionId) throw new Error("invalid finalized comparison row");
-  return { scenarioId: item.scenarioId, runId, scorecard: item.scorecard };
+  return { scenarioId: item.scenarioId, runId, scorecard: item.scorecard, providerModel: item.providerModel ?? primaryModel };
 }
 
 function scenarioDigestMismatch(baseline: FinalizedRow[], candidate: FinalizedRow[], scenarioIds: string[]): boolean {

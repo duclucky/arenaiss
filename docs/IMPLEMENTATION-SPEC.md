@@ -941,19 +941,21 @@ generic/global Agent score ngoài Test Pack/runtime/scoring version.
 
 **Status:** local implementation pass. The owner-only API compares two immutable
 versions of the same Agent from separate finalized SOLO campaign cohorts. A
-versioned deterministic policy locks exact pack/scenario/runtime/model/rubric/run
+versioned deterministic policy locks exact pack/scenario/generation policy/rubric/run
 comparability, repeated-run aggregation, coverage, variance, per-dimension
 minimum/drop boundaries, aggregate drop and critical-finding zero tolerance.
+Executed models may differ between finalized runs; their identities are recorded
+without changing score or regression thresholds.
 Records are immutable, redacted and restart-readable. No provider call, GenLayer
 transaction or Arc action is performed by comparison.
 
 **Prerequisite:** `EVAL-4 PASS`.
 
-1. So sánh hai AgentVersion trên cùng exact pack/runtime policy.
+1. So sánh hai AgentVersion trên cùng exact pack/generation policy; model thực thi có thể khác nhau và phải được ghi nhận.
 2. Hỗ trợ repeated runs và policy khóa cách aggregate variance.
 3. Regression thresholds theo dimension, critical deterministic rule và minimum
    scenario coverage.
-4. Không tuyên bố cải thiện khi sample/pack/runtime/scoring version khác nhau.
+4. Không tuyên bố cải thiện khi sample/pack/generation policy/scoring version khác nhau.
 
 **Exit:** baseline/candidate isolation, threshold boundary, partial-run và
 infrastructure-error tests pass.
