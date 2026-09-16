@@ -73,11 +73,29 @@ test("CMP-1 compares isolated versions only when pack, scenario, runtime, rubric
   assert.equal(JSON.stringify(result).includes("agentsMd"), false);
 });
 
+test("CMP-1 accepts mixed primary and fallback runs while recording every executed model", () => {
+  const mixed = input();
+  mixed.candidate.campaigns[0].items[0].providerModel = "openai-fallback";
+  mixed.candidate.campaigns[0].runtimePolicy.model = "openai-fallback";
+  const mixedResult = evaluateVersionComparison(mixed);
+  assert.equal(mixedResult.status, "PASS");
+  assert.deepEqual(mixedResult.binding?.executionModels, ["fixture-model", "openai-fallback"]);
+  assert.deepEqual(mixedResult.binding?.requestedModels, ["fixture-model", "openai-fallback"]);
+
+  const uniform = input();
+  for (const cohort of [uniform.baseline, uniform.candidate]) {
+    for (const row of cohort.campaigns) for (const item of row.items) item.providerModel = "openai-fallback";
+  }
+  const result = evaluateVersionComparison(uniform);
+  assert.equal(result.status, "PASS");
+  assert.deepEqual(result.binding?.executionModels, ["openai-fallback"]);
+});
+
 test("CMP-1 rejects every comparability mismatch without claiming a regression result", () => {
   const cases: Array<[string, (value: VersionComparisonInput) => void]> = [
     ["PACK_VERSION_MISMATCH", (value) => { value.candidate.campaigns[0].testPack.version = "2.0.0"; value.candidate.campaigns[1].testPack.version = "2.0.0"; }],
     ["SCENARIO_SET_MISMATCH", (value) => { value.candidate.campaigns.forEach((row) => { row.testPack.scenarios[0].objective = "Different objective"; }); }],
-    ["RUNTIME_POLICY_MISMATCH", (value) => { value.candidate.campaigns.forEach((row) => { row.runtimePolicy.model = "other-model"; }); }],
+    ["RUNTIME_POLICY_MISMATCH", (value) => { value.candidate.campaigns.forEach((row) => { row.runtimePolicy.maxOutputTokens = 800; }); }],
     ["SCORING_VERSION_MISMATCH", (value) => { value.candidate.campaigns.forEach((row) => { (row as any).rubricVersion = "AgentEvaluationV6"; }); }],
     ["REQUIRED_RUN_COUNT_MISMATCH", (value) => { value.candidate.campaigns.pop(); }],
     ["VERSION_NOT_ISOLATED", (value) => { value.candidate.versionId = value.baseline.versionId; value.candidate.campaigns.forEach((row) => { row.agent.versionId = value.baseline.versionId; }); }],

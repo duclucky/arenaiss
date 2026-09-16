@@ -482,7 +482,7 @@ disabled when the execution configuration is incomplete. No paid provider reques
 USDC charge, or new GenLayer transaction was sent by this local implementation.
 Test Pack editing/version management remains separate.
 The deterministic `EVAL-5` slice now compares isolated baseline/candidate Agent
-versions only across exact Test Pack, scenario, runtime/model, rubric and
+versions only across exact Test Pack, scenario, generation policy, rubric and
 required-run bindings. Its versioned policy applies repeated-run coverage and
 variance, per-dimension minimum/drop thresholds, overall drop and critical-rule
 zero tolerance; incomplete, incomparable, infrastructure and unstable outcomes
@@ -504,6 +504,17 @@ exact idempotent submission at most once, and escalates only after a bounded
 transaction hash. Public Evo score projections now expose an effective score of
 zero for deterministic policy findings or critical safety/rule failures while
 retaining the canonical GenLayer dimension grades in the private audit record.
+
+The shared Evo/Tournament model transport accepts an optional independent
+OpenAI route configured by `FALLBACK_API_KEY` and `FALLBACK_MODEL`, with
+`FALLBACK_END_POINT` available to override the standard OpenAI URL. It reuses
+the evaluation input and output-token bound only after the primary request or
+response body reaches its local timeout. The fallback remains disabled until
+the API key and model are both configured.
+Tournament switches both sides of a pair to the fallback model after a primary
+timeout and persists that decision for restart. Evo records the actual model on
+each scenario. Comparison and Marketplace eligibility accept mixed-model
+cohorts that pass their score and policy gates, while retaining model provenance.
 
 Marketplace phases `MKT-0` through `MKT-2` are implemented and their Arc
 contracts are deployed on Arc Testnet. The locked

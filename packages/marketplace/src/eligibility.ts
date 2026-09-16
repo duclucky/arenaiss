@@ -9,6 +9,7 @@ export interface MarketplaceEligibilityRun {
   runId: string; scenarioId: string; state: "FINALIZED" | string;
   agentVersionId: string; agentsCommitment: string; testPackId: string; testPackVersion: string;
   rubricVersion: string; network: string; chainId: number; judgeAddress: string;
+  providerModel: string;
   overallScore: number; dimensions: Record<string, number>; criticalFindingCount: number;
 }
 
@@ -21,6 +22,7 @@ export interface MarketplaceEligibilityInput {
 export interface MarketplaceEligibilityCertificate {
   policyVersion: "arena-marketplace-eligibility-v1"; agentId: string; agentVersionId: string; agentsCommitment: string;
   testPackId: string; testPackVersion: string; rubricVersion: string; network: string; chainId: number; judgeAddress: string;
+  executionModels: string[];
   runIds: string[]; evidenceDigest: string; coverageBps: 10000; overallScore: number; dimensionScores: Record<string, number>;
   maxSpread: number; issuedAt: number; expiresAt: number;
 }
@@ -52,6 +54,8 @@ export function evaluateMarketplaceEligibility(input: MarketplaceEligibilityInpu
   if (input.requiredScenarioIds.some((id) => (counts.get(id) ?? 0) < 2)) reasons.push("INCOMPLETE_COVERAGE");
   if (input.runs.length !== input.requiredScenarioIds.length * 2) reasons.push("REQUIRED_RUN_COUNT_MISMATCH");
   if (input.runs.some((run) => run.criticalFindingCount > 0)) reasons.push("CRITICAL_POLICY_FINDING");
+  const executionModels = new Set(input.runs.map((run) => run.providerModel));
+  if ([...executionModels].some((model) => typeof model !== "string" || !model.trim())) reasons.push("INVALID_EXECUTION_MODEL");
 
   const overall = input.runs.length ? average(input.runs.map((run) => run.overallScore)) : 0;
   const spread = input.runs.length ? Math.max(...input.runs.map((run) => run.overallScore)) - Math.min(...input.runs.map((run) => run.overallScore)) : 101;
@@ -67,6 +71,8 @@ export function evaluateMarketplaceEligibility(input: MarketplaceEligibilityInpu
   const uniqueReasons = [...new Set(reasons)];
   if (uniqueReasons.length) return { eligible: false, reasons: uniqueReasons };
   const runIds = input.runs.map((run) => run.runId).sort();
-  const evidenceBinding = { agentVersionId: input.agentVersionId, agentsCommitment: input.agentsCommitment, testPackId: input.testPackId, testPackVersion: input.testPackVersion, rubricVersion: input.rubricVersion, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress.toLowerCase(), runIds };
-  return { eligible: true, reasons: [], certificate: { policyVersion: "arena-marketplace-eligibility-v1", agentId: input.agentId, agentVersionId: input.agentVersionId, agentsCommitment: input.agentsCommitment, testPackId: input.testPackId, testPackVersion: input.testPackVersion, rubricVersion: input.rubricVersion, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress.toLowerCase(), runIds, evidenceDigest: digest(evidenceBinding), coverageBps: 10_000, overallScore: overall, dimensionScores, maxSpread: spread, issuedAt: input.issuedAt, expiresAt: input.expiresAt } };
+  const models = [...executionModels].sort((a, b) => a.localeCompare(b));
+  const runModels = input.runs.map((run) => ({ runId: run.runId, model: run.providerModel })).sort((a, b) => a.runId.localeCompare(b.runId));
+  const evidenceBinding = { agentVersionId: input.agentVersionId, agentsCommitment: input.agentsCommitment, testPackId: input.testPackId, testPackVersion: input.testPackVersion, rubricVersion: input.rubricVersion, runModels, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress.toLowerCase(), runIds };
+  return { eligible: true, reasons: [], certificate: { policyVersion: "arena-marketplace-eligibility-v1", agentId: input.agentId, agentVersionId: input.agentVersionId, agentsCommitment: input.agentsCommitment, testPackId: input.testPackId, testPackVersion: input.testPackVersion, rubricVersion: input.rubricVersion, executionModels: models, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress.toLowerCase(), runIds, evidenceDigest: digest(evidenceBinding), coverageBps: 10_000, overallScore: overall, dimensionScores, maxSpread: spread, issuedAt: input.issuedAt, expiresAt: input.expiresAt } };
 }

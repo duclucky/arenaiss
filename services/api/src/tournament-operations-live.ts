@@ -248,12 +248,12 @@ export class ViemTournamentArcOperations implements TournamentArcOperations {
 }
 
 export function tournamentOperationsFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, service: ArenaApiService, operatorAddress: string): TournamentOperationsPort | undefined {
-  const values = { privateKey: environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim(), judgeAddress: environment.GENLAYER_COMPARISON_JUDGE_ADDRESS?.trim(), endpoint: environment.END_POINT?.trim(), apiKey: environment.API_KEY?.trim(), model: environment.MODEL?.trim(), escrow: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim() || environment.VITE_ARC_ESCROW_ADDRESS?.trim(), rpc: environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network' };
+  const values = { privateKey: environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim(), judgeAddress: environment.GENLAYER_COMPARISON_JUDGE_ADDRESS?.trim(), endpoint: environment.END_POINT?.trim(), fallbackEndpoint: environment.FALLBACK_END_POINT?.trim(), apiKey: environment.API_KEY?.trim(), fallbackApiKey: environment.FALLBACK_API_KEY?.trim(), fallbackModel: environment.FALLBACK_MODEL?.trim(), model: environment.MODEL?.trim(), escrow: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim() || environment.VITE_ARC_ESCROW_ADDRESS?.trim(), rpc: environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network' };
   if (!Object.values(values).some(Boolean)) return undefined;
   if (!values.privateKey || !values.judgeAddress || !values.endpoint || !values.apiKey || !values.model || !values.escrow) return undefined;
   if (privateKeyToAccount(values.privateKey as Hex).address.toLowerCase() !== operatorAddress.toLowerCase()) throw new Error('Tournament operator signer does not match ARENA_OPERATOR_ADDRESS');
   const arc = new ViemTournamentArcOperations({ rpcUrl: values.rpc, escrowAddress: values.escrow, privateKey: values.privateKey });
-  const provider = new OpenAICompatibleEvaluationProvider({ endpoint: values.endpoint, apiKey: values.apiKey, timeoutMs: 300_000 });
+  const provider = new OpenAICompatibleEvaluationProvider({ endpoint: values.endpoint, fallbackEndpoint: values.fallbackEndpoint, apiKey: values.apiKey, fallbackApiKey: values.fallbackApiKey, fallbackModel: values.fallbackModel, timeoutMs: 300_000 });
   const tracker = new ComparisonRunTracker(createStudioNextComparisonJudgePort(values.privateKey), new PersistentComparisonSubmissionStore(runtime), new ComparisonRunRegistry(runtime), values.judgeAddress, GENLAYER_CHAIN_ID);
   const orchestrator = new TournamentOrchestrator(new TournamentEvaluationPairRunner(provider, { model: values.model, maxOutputTokens: 1_500, temperature: 0.2 }, runtime), new TournamentComparisonJudgeAdapter(tracker));
   return new LiveTournamentOperations(runtime, service, operatorAddress, arc, orchestrator);

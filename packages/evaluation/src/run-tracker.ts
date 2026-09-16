@@ -453,6 +453,8 @@ export class EvaluationRunTracker {
     return stage.rawOutput === result.rawOutput
       && stage.requestId === result.requestId
       && stage.usageTokens === result.usageTokens
+      && stage.model === result.model
+      && stage.route === result.route
       && JSON.stringify(stage.output) === JSON.stringify(result.output);
   }
 

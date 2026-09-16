@@ -309,3 +309,17 @@ test("pending GenLayer finality resumes the same run without another provider ca
   assert.equal(judge.submissions.size, 1);
   assert.equal(judge.receiptReads, 2);
 });
+
+test("SOLO records the fallback model on the finalized scenario", async () => {
+  class FallbackProvider extends FixtureProvider {
+    override async generate(value: { input: EvaluationProviderInput; operationKey: string }) {
+      return { ...await super.generate(value), model: "openai-fallback", route: "FALLBACK" as const };
+    }
+  }
+  const judge = new FixtureJudge();
+  const runner = new SoloEvaluationRunner(new FallbackProvider(), new EvaluationRunTracker(judge, new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
+  runner.start({ ...campaign(), testPack: { ...campaign().testPack, scenarios: [scenarios()[0]] } });
+  const final = await runner.advance(digest("a"));
+  assert.equal(final.items[0].providerModel, "openai-fallback");
+  assert.equal(final.items[0].providerRoute, "FALLBACK");
+});

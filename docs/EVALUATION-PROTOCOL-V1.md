@@ -137,6 +137,24 @@ input, canonical scenario JSON/digest, provider operation key and one of the
 distinct terminal provider states (`SUCCESS`, `EMPTY_OUTPUT`, `PROVIDER_TIMEOUT`,
 `PROVIDER_ERROR`, `INVALID_OUTPUT`). Only `SUCCESS` may reach GenLayer.
 
+Production may configure one optional independent OpenAI fallback route with
+its own API key and model; the endpoint defaults to
+`https://api.openai.com/v1/chat/completions`. The worker sends the same
+evaluation input, output-token bound, and correlation key to that route only
+after the primary request or response body is aborted by its local timeout.
+The fallback body names its separately configured model and uses OpenAI's
+`max_completion_tokens`. HTTP failures, network errors raised before the
+timeout, empty output, and invalid output do not trigger fallback, so the
+secondary route cannot hide a provider or Agent output defect. The shared
+correlation key does not guarantee billing deduplication across providers.
+The executed model and route are persisted with each Evo provider result. A
+Tournament pair uses one route for both Agents: if either primary call times
+out, the worker records a fallback decision and regenerates both responses on
+the fallback model, including after restart. Evo version comparisons and
+Marketplace eligibility accept finalized runs from different models when the
+score and other policy gates pass. They record the model set; each run-to-model
+binding contributes to the certificate evidence digest.
+
 Before a V5 write, the service persists a submission fingerprint binding the
 judge address and all ten ABI arguments, plus bounded reconciliation metadata.
 Concurrent repeats share one operation; after the transaction hash is stored, a
