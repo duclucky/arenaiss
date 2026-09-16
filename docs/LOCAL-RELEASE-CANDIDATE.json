@@ -2,8 +2,8 @@
   "schema": "arena-local-release-candidate-v1",
   "createdAt": "2026-09-16",
   "scope": "LOCAL_ONLY",
-  "fileCount": 289,
-  "sourceBundleSha256": "f9ec2e022356c1acd2831ef8184d549b813f36fd40f169494572a0d3bab60720",
+  "fileCount": 290,
+  "sourceBundleSha256": "272f65b84eb35df3a5283d890364e2fcfa864e14e2d4eb55733c9626787f541e",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -48,7 +48,7 @@
     "frontend/package-lock.json": "9d5d7296a67a1599380da2db3c812b030d69290dabc18a304dd176735a197815",
     "package-lock.json": "9cd79018494cbed4c11d7822193f7e19fc5fc63a47ae98faea55468c2728594c",
     "package.json": "b23c174fb806132683373d7ab2fca50a388df18319648c990b9f65903e74e84b",
-    "scripts/check.ps1": "c150855c1baf328f0765f0309781d9888c657cccac6c4ca49c8a9021004f2c11",
+    "scripts/check.ps1": "577d287ddf627e44c6e5720d29bfbe82e3e90cddbe4e7267ebd65b6ee121ca1f",
     "scripts/deploy-agent-marketplace.mjs": "e96a21c6ca14e04fc580ac75f9b7a64dfeedfa5237cde8c067fca370a5c14109",
     "packages/marketplace/src/eligibility.ts": "a1e5dc7f6b343cf401708f1c2b95eb5c5176a15621d88db6c2cf25a158be61c5",
     "packages/marketplace/test/eligibility.test.ts": "36bcac03f9709e4d70435e66dc1d3587929ca45c595daec6e7a83313cd2a051c",
@@ -134,7 +134,7 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 240,
+    "typescriptTests": 241,
     "foundryTests": 24,
     "frontendTests": 81
   },

@@ -27,9 +27,9 @@ const DEFAULT_TOPICS = [
   'Explain how a Merkle proof establishes inclusion without downloading the full data set.',
 ] as const;
 
-const TOURNAMENT_ABI = parseAbi([
+export const TOURNAMENT_ABI = parseAbi([
   'function owner() view returns (address)',
-  'function getTournament(bytes32) view returns ((uint64 registrationOpensAt,uint64 registrationClosesAt,uint64 startsAt,uint64 expiresAt,uint32 minEntrants,uint32 maxEntrants,uint128 stakeAmount,address operatorAddress,address feeRecipient,uint16[5] payoutBps) policy,uint8 state,uint32 entrantCount,uint256 totalLockedStakes,uint256 totalLiability,uint256 platformFeeCredit,bytes32 rankingDigest,uint256 settlementNonce)',
+  'function getTournament(bytes32) view returns (((uint64 registrationOpensAt,uint64 registrationClosesAt,uint64 startsAt,uint64 expiresAt,uint32 minEntrants,uint32 maxEntrants,uint128 stakeAmount,address operatorAddress,address feeRecipient,uint16[5] payoutBps) policy,uint8 state,uint32 entrantCount,uint256 totalLockedStakes,uint256 totalLiability,uint256 platformFeeCredit,bytes32 rankingDigest,uint256 settlementNonce) tournament)',
   'function getEntrant(bytes32,bytes32) view returns (address wallet,bytes32 agentId,bytes32 agentsVersion,bytes32 agentsCommitment,bool registered,bool ranked)',
   'function createTournament(bytes32,(uint64 registrationOpensAt,uint64 registrationClosesAt,uint64 startsAt,uint64 expiresAt,uint32 minEntrants,uint32 maxEntrants,uint128 stakeAmount,address operatorAddress,address feeRecipient,uint16[5] payoutBps))',
   'function closeRegistration(bytes32)',
