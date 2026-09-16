@@ -24,8 +24,33 @@ export type BracketInput = {
   entrants: readonly Digest[];
   bracketRevision: number;
 };
+export type PublicBracketSeed = {
+  schema: "arena-bracket-seed-v2";
+  seedDigest: Digest;
+  rosterDigest: Digest;
+  entropyBlockHash: string;
+  entropyBlockNumber: string;
+};
+export type PublicBracketSeedInput = {
+  tournamentId: Digest;
+  entrants: readonly Digest[];
+  entropyBlockHash: string;
+  entropyBlockNumber: string;
+};
 
 function invalid(message: string): never { throw new Error(`invalid bracket: ${message}`); }
+function sha(value: string): Digest { return `sha256:${createHash("sha256").update(value).digest("hex")}`; }
+export function derivePublicBracketSeed(input: PublicBracketSeedInput): PublicBracketSeed {
+  if (!input || !isDigest(input.tournamentId)) invalid("tournament digest is required for public seed");
+  if (!/^0x[0-9a-fA-F]{64}$/.test(input.entropyBlockHash)) invalid("Arc entropy block hash is malformed");
+  if (!/^(0|[1-9][0-9]*)$/.test(input.entropyBlockNumber)) invalid("Arc entropy block number is malformed");
+  if (input.entrants.length < 8 || input.entrants.length > 32 || input.entrants.some((id) => !isDigest(id)) || new Set(input.entrants).size !== input.entrants.length) invalid("public seed roster is invalid");
+  const entrants = [...input.entrants].sort();
+  const entropyBlockHash = input.entropyBlockHash.toLowerCase();
+  const rosterDigest = sha(JSON.stringify({ schema: "arena-bracket-roster-v1", entrants }));
+  const seedDigest = sha(JSON.stringify({ schema: "arena-bracket-seed-v2", tournament_id: input.tournamentId, roster_digest: rosterDigest, entropy_block_hash: entropyBlockHash }));
+  return { schema: "arena-bracket-seed-v2", seedDigest, rosterDigest, entropyBlockHash, entropyBlockNumber: input.entropyBlockNumber };
+}
 function stableOrder(seedDigest: Digest, entrants: readonly Digest[]): Digest[] {
   return [...entrants].sort((a, b) => {
     const left = createHash("sha256").update(Buffer.concat([Buffer.from("seed-order-v1"), Buffer.from(seedDigest), Buffer.from(a)])).digest("hex");

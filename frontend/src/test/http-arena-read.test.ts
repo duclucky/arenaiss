@@ -56,9 +56,15 @@ describe('arena live-read adapter', () => {
   });
 
   it('preserves the registration deadline and confirmed entrant count', async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify([{ id: 'daily', name: 'Daily', status: 'UPCOMING', prizePool: '1', registrationClosesAt: 1789603200, entrantIds: ['sha256:entrant'] }]), { status: 200 }));
+    const bracketSeed = { schema: 'arena-bracket-seed-v2', seedDigest: `sha256:${'a'.repeat(64)}`, rosterDigest: `sha256:${'b'.repeat(64)}`, entropyBlockHash: `0x${'c'.repeat(64)}`, entropyBlockNumber: '123' };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify([{ id: 'daily', name: 'Daily', status: 'UPCOMING', prizePool: '1', registrationClosesAt: 1789603200, entrantIds: ['sha256:entrant'], bracketSeed }]), { status: 200 }));
     const adapter = new HttpArenaReadAdapter('/', fetcher as typeof fetch);
-    expect((await adapter.listTournaments())[0]).toMatchObject({ registrationClosesAt: 1789603200, entrantCount: 1 });
+    expect((await adapter.listTournaments())[0]).toMatchObject({ registrationClosesAt: 1789603200, entrantCount: 1, bracketSeed });
+  });
+
+  it('rejects a malformed public pairing proof', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify([{ id: 'daily', name: 'Daily', status: 'ACTIVE', prizePool: '8', bracketSeed: { schema: 'arena-bracket-seed-v2', seedDigest: 'bad' } }]), { status: 200 }));
+    await expect(new HttpArenaReadAdapter('/', fetcher as typeof fetch).listTournaments()).rejects.toThrow('INVALID_ARENA_RESPONSE');
   });
 
   it('accepts preliminary round zero from the canonical bracket', async () => {

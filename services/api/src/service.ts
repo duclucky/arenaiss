@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { derivePublicBracketSeed, type PublicBracketSeed } from "../../../packages/domain/src/bracket.ts";
 import { entrantId as deriveEntrantId, isDigest } from "../../../packages/protocol/src/canonical.ts";
 import type { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlite-runtime.ts";
 import type { EvaluationRunRecord } from "../../../packages/evaluation/src/run-tracker.ts";
@@ -25,7 +26,7 @@ export type AgentDetail = PublicAgent & {
   evaluations: PublicEvaluationCampaign[];
 };
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number };
+export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
 export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number };
 export type PublicVerdictCriterion = { id: string; label: string; winner: "A" | "B" | "TIE"; reason: string };
@@ -228,7 +229,14 @@ export class ArenaApiService {
       || new Set(tournament.entrantIds).size !== tournament.entrantIds.length
       || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(tournament.prizePool)
       || (tournament.stakeAmount !== undefined && !/^[1-9][0-9]*$/.test(tournament.stakeAmount))
-      || (tournament.registrationClosesAt !== undefined && (!Number.isSafeInteger(tournament.registrationClosesAt) || tournament.registrationClosesAt < 1))) throw new Error("invalid tournament");
+      || (tournament.registrationClosesAt !== undefined && (!Number.isSafeInteger(tournament.registrationClosesAt) || tournament.registrationClosesAt < 1))
+      || (tournament.bracketSeed !== undefined && (tournament.bracketSeed.schema !== "arena-bracket-seed-v2" || !isDigest(tournament.bracketSeed.seedDigest) || !isDigest(tournament.bracketSeed.rosterDigest) || !/^0x[0-9a-f]{64}$/.test(tournament.bracketSeed.entropyBlockHash) || !/^(0|[1-9][0-9]*)$/.test(tournament.bracketSeed.entropyBlockNumber)))) throw new Error("invalid tournament");
+    if (tournament.bracketSeed) {
+      const expected = derivePublicBracketSeed({ tournamentId: tournament.id as Digest, entrants: tournament.entrantIds as Digest[], entropyBlockHash: tournament.bracketSeed.entropyBlockHash, entropyBlockNumber: tournament.bracketSeed.entropyBlockNumber });
+      if (!isDeepStrictEqual(tournament.bracketSeed, expected)) throw new Error("invalid tournament bracket proof");
+      const previous = this.tournaments.get(tournament.id)?.bracketSeed;
+      if (previous && !isDeepStrictEqual(previous, tournament.bracketSeed)) throw new Error("invalid tournament bracket proof mutation");
+    } else if (this.tournaments.get(tournament.id)?.bracketSeed) throw new Error("invalid tournament bracket proof removal");
     const stored = structuredClone(tournament);
     this.tournaments.set(tournament.id, stored);
     this.runtime?.put("api-tournaments", tournament.id, stored);

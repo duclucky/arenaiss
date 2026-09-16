@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBracket } from "../src/bracket.ts";
+import { buildBracket, derivePublicBracketSeed } from "../src/bracket.ts";
 
 function entrants(n: number) { return Array.from({ length: n }, (_, i) => `sha256:${String(i + 1).padStart(64, "0")}`); }
 
@@ -48,4 +48,19 @@ test("rejects duplicate, missing, out-of-range entrants and changes domain", () 
   const a = buildBracket({ ...base, entrants: entrants(8) });
   const b = buildBracket({ ...base, tournamentId: "sha256:" + "c".repeat(64), entrants: entrants(8) });
   assert.notDeepEqual(a.matches.map((m) => m.matchId), b.matches.map((m) => m.matchId));
+});
+
+test("public bracket seed is roster-order independent and bound to Arc block entropy", () => {
+  const tournamentId = "sha256:" + "a".repeat(64) as `sha256:${string}`;
+  const roster = entrants(13) as `sha256:${string}`[];
+  const first = derivePublicBracketSeed({ tournamentId, entrants: roster, entropyBlockHash: `0x${"b".repeat(64)}`, entropyBlockNumber: "123" });
+  const reordered = derivePublicBracketSeed({ tournamentId, entrants: [...roster].reverse(), entropyBlockHash: `0x${"b".repeat(64)}`, entropyBlockNumber: "123" });
+  const nextBlock = derivePublicBracketSeed({ tournamentId, entrants: roster, entropyBlockHash: `0x${"c".repeat(64)}`, entropyBlockNumber: "124" });
+  assert.deepEqual(reordered, first);
+  assert.notEqual(nextBlock.seedDigest, first.seedDigest);
+  assert.notDeepEqual(
+    buildBracket({ tournamentId, seedDigest: nextBlock.seedDigest, entrants: roster, bracketRevision: 1 }).matches,
+    buildBracket({ tournamentId, seedDigest: first.seedDigest, entrants: roster, bracketRevision: 1 }).matches,
+  );
+  assert.throws(() => derivePublicBracketSeed({ tournamentId, entrants: roster, entropyBlockHash: "0x123", entropyBlockNumber: "123" }), /block hash/i);
 });

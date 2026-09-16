@@ -1,18 +1,23 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
-import { LiveTournamentOperations, type TournamentArcOperations } from '../src/tournament-operations-live.ts';
+import { LiveTournamentOperations, ViemTournamentArcOperations, type TournamentArcOperations } from '../src/tournament-operations-live.ts';
 
 const tournamentId = `sha256:${'1'.repeat(64)}`;
 const operator = `0x${'2'.repeat(40)}`;
 const entrants = Array.from({ length: 8 }, (_, index) => ({ entrantId: `0x${String(index + 1).padStart(64, '0')}`, agentId: `0x${String(index + 11).padStart(64, '0')}`, agentsVersion: `0x${String(index + 21).padStart(64, '0')}`, agentsCommitment: `0x${String(index + 31).padStart(64, '0')}`, stakeAmount: '1000000', tournamentId: `0x${'1'.repeat(64)}`, agentsMd: `Agent ${index}` }));
+const sha = (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
+const entropyBlockHash = `0x${'f'.repeat(64)}`;
+const entropyBlockNumber = '123';
 
 class FakeArc implements TournamentArcOperations {
   state: any = 'DRAFT'; entrantCount = 8; transactionNames: string[] = [];
   async create() { this.transactionNames.push('create'); return this.value('a'); }
   async snapshot() { return this.value(); }
   async registeredEntrants(_id: string, candidates: readonly any[]) { return candidates; }
+  async startBlockEntropy() { return { blockHash: entropyBlockHash, blockNumber: entropyBlockNumber }; }
   async closeRegistration() { this.transactionNames.push('close'); this.state = 'REGISTRATION_CLOSED'; return this.value('b'); }
   async markRunning() { this.transactionNames.push('run'); this.state = 'RUNNING'; return this.value('c'); }
   async settle() { this.transactionNames.push('settle'); this.state = 'SETTLED'; return this.value('d'); }
@@ -65,12 +70,14 @@ test('production Tournament runner opens Arc refunds when registration closes be
   } finally { runtime.close(); }
 });
 
-test('Tournament start snapshots its roster and random bracket seed across retries and restart', async () => {
+test('Tournament derives a public bracket seed from the locked roster and scheduled Arc start block across restart', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const arc = new FakeArc();
+    arc.startBlockEntropy = async (startsAt) => { assert.equal(startsAt, 20); return { blockHash: entropyBlockHash, blockNumber: entropyBlockNumber }; };
     let currentEntrants = entrants;
-    const service = { listTournamentOperatorEntrants: () => currentEntrants, publishTournament() {} } as any;
+    const published: any[] = [];
+    const service = { listTournamentOperatorEntrants: () => currentEntrants, publishTournament: (_caller: string, value: any) => published.push(value) } as any;
     const seeds: string[] = [];
     const rosterSizes: number[] = [];
     const topicSnapshots: string[][] = [];
@@ -87,9 +94,29 @@ test('Tournament start snapshots its roster and random bracket seed across retri
     assert.equal(seeds[0], seeds[1]);
     assert.deepEqual(topicSnapshots, [['new-a', 'new-b', 'new-c'], ['new-a', 'new-b', 'new-c']]);
     assert.deepEqual(selections, ['seeded-shuffle-v1', 'seeded-shuffle-v1']);
-    assert.match(seeds[0], /^sha256:[0-9a-f]{64}$/);
-    assert.notEqual(seeds[0], `sha256:${'0'.repeat(64)}`);
+    const canonicalEntrants = entrants.map((item) => `sha256:${item.entrantId.slice(2)}`).sort();
+    const rosterDigest = sha(JSON.stringify({ schema: 'arena-bracket-roster-v1', entrants: canonicalEntrants }));
+    const expectedSeed = sha(JSON.stringify({ schema: 'arena-bracket-seed-v2', tournament_id: tournamentId, roster_digest: rosterDigest, entropy_block_hash: entropyBlockHash }));
+    assert.equal(seeds[0], expectedSeed);
+    assert.deepEqual(published.at(-1).bracketSeed, {
+      schema: 'arena-bracket-seed-v2', seedDigest: expectedSeed, rosterDigest,
+      entropyBlockHash, entropyBlockNumber,
+    });
   } finally { runtime.close(); }
+});
+
+test('Arc entropy lookup selects the first block at or after the locked start time', async () => {
+  const port = Object.create(ViemTournamentArcOperations.prototype) as ViemTournamentArcOperations;
+  const calls: bigint[] = [];
+  (port as any).client = {
+    async getChainId() { return 5042002; },
+    async getBlockNumber() { return 127n; },
+    async getBlock({ blockNumber }: { blockNumber: bigint }) { calls.push(blockNumber); return { timestamp: blockNumber < 123n ? 19n : 20n, hash: blockNumber === 123n ? entropyBlockHash : `0x${'e'.repeat(64)}` }; },
+  };
+  assert.deepEqual(await port.startBlockEntropy(20), { blockHash: entropyBlockHash, blockNumber: '123' });
+  assert.ok(calls.includes(122n) && calls.includes(123n));
+  (port as any).client.getBlock = async () => ({ timestamp: 19n, hash: entropyBlockHash });
+  await assert.rejects(() => port.startBlockEntropy(20), /not available yet/i);
 });
 
 test('Tournament operation created before topic pool v2 keeps the legacy selection policy', async () => {

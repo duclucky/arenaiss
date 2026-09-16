@@ -69,11 +69,22 @@ export function TournamentDetail() {
 
       {tournament.registrationClosesAt && <p className="text-sm text-neutral-700">Registration closes at <time dateTime={new Date(tournament.registrationClosesAt * 1_000).toISOString()}>{new Date(tournament.registrationClosesAt * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time>. The roster is locked when the Tournament starts.</p>}
 
+      {tournament.bracketSeed && <section className="glass-panel rounded-[28px] p-5 md:p-6" aria-label="Public pairing proof">
+        <p className="page-kicker">Public pairing proof</p>
+        <h2 className="text-xl font-bold">Arc anchored bracket seed</h2>
+        <p className="mt-2 text-sm leading-relaxed text-neutral-700">The locked roster and Arc block #{tournament.bracketSeed.entropyBlockNumber} deterministically produce this Tournament's pairings and byes. <Link className="underline" to="/docs#tournament">How to verify pairing</Link></p>
+        <dl className="mt-4 grid gap-3 text-xs md:grid-cols-2">
+          <div className="retro-inset min-w-0 p-3"><dt className="font-semibold uppercase tracking-wider">Seed digest</dt><dd className="mt-1 break-all font-mono">{tournament.bracketSeed.seedDigest}</dd></div>
+          <div className="retro-inset min-w-0 p-3"><dt className="font-semibold uppercase tracking-wider">Roster digest</dt><dd className="mt-1 break-all font-mono">{tournament.bracketSeed.rosterDigest}</dd></div>
+          <div className="retro-inset min-w-0 p-3 md:col-span-2"><dt className="font-semibold uppercase tracking-wider">Arc entropy block hash</dt><dd className="mt-1 break-all font-mono">{tournament.bracketSeed.entropyBlockHash} <a className="font-sans underline" href={`https://testnet.arcscan.app/block/${tournament.bracketSeed.entropyBlockNumber}`} target="_blank" rel="noopener noreferrer">View block</a></dd></div>
+        </dl>
+      </section>}
+
       <div className="glass-panel rounded-[28px] p-6 md:p-8">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
           Match bracket <Info size={16} className="text-muted-foreground" aria-hidden="true" />
         </h2>
-        <p className="mb-4 text-sm leading-relaxed text-neutral-700">This is the knockout match schedule. Arena locks the entrant list and randomly pairs Agents when the Tournament starts; winners advance through later rounds.</p>
+        <p className="mb-4 text-sm leading-relaxed text-neutral-700">This is the knockout match schedule. Arena locks the entrant list and pairs Agents deterministically from a fixed seed; winners advance through later rounds. For new Tournaments, the public pairing proof above identifies the Arc block used for that seed.</p>
         {matches.length === 0 ? (
           <p className="text-muted-foreground">{tournament.status === 'UPCOMING' ? 'Pairings will appear here after registration closes and the Tournament starts.' : 'No matches scheduled yet.'}</p>
         ) : (
