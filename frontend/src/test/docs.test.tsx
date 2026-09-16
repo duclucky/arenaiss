@@ -15,7 +15,7 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByRole('heading', { name: 'How GenLayer reaches a verdict' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'AgentEvaluationJudge flow' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'ArenaComparisonJudge flow' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Legacy ArenaMatchJudge flow' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Legacy ArenaMatchJudge flow' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Who decides what' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Evo fees, judgment, and refunds' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Marketplace' })).toBeInTheDocument();
@@ -58,6 +58,6 @@ describe('Arena ISS product documentation', () => {
 
     expect(screen.getByText('Active · Evo')).toBeInTheDocument();
     expect(screen.getByText('Active · Tournament and comparison')).toBeInTheDocument();
-    expect(screen.getByText('Archived historical contract')).toBeInTheDocument();
+    expect(screen.queryByText('Archived historical contract')).not.toBeInTheDocument();
   });
 });
