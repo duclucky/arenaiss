@@ -26,14 +26,23 @@ applies locked deterministic regression thresholds. Tournament convergence is
 now implemented additively: new attempts use the Evaluation provider envelope
 and a specialized rich `ComparisonRun`, while historical Tournament records
 retain their original verdict and transaction semantics. `SOLO` creation UI,
-comparison UI, executable tool sandbox traces and full Test Pack management
-remain planned.
+executable tool sandbox traces and full Test Pack management remain planned.
+Agent detail now exposes owner-private version metadata without older AGENTS.md
+bodies and can run the locked EVAL-5 comparison against two finalized Evo
+campaigns.
 The local `EvaluationRun` core now durably records exact Agent/scenario/provider
 bindings, separates provider failure classes, submits the V5 evaluation ABI,
 tracks GenLayer finality, and accepts a scorecard only after canonical readback
 validation. The `SOLO` runner now binds a new run ID per scenario/attempt,
 resumes provider and GenLayer state after restart, and never executes proposed
 actions. This path has not been used for a new paid call or network transaction.
+The API process now owns Evo progression through a coalescing durable worker, so
+the browser submits once and polls read-only state. An authenticated Tournament
+operator control plane and UI cover create, progress, settle, expire and refund
+commands without accepting rankings or payout amounts. The production runner
+persists operations in SQLite, validates the registered roster against Arc,
+runs rich pair comparisons on Studio Next, stores the derived Top 5, and submits
+only that stored ranking to Arc settlement.
 
 The product owner approved the simplified MVP architecture on `2026-09-11`:
 

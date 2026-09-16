@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { AgentApiAdapter, EvaluationApiAdapter, ManagedIdentityAdapter } from '../adapters/interfaces';
 import { AppProvider } from '../context';
@@ -35,6 +35,7 @@ const evaluationApi: EvaluationApiAdapter = {
   async createPack() { throw new Error('creation must not be exposed before execution is wired'); }, async createSoloCampaign() { throw new Error('creation must not be exposed before execution is wired'); },
   async getExecutionConfig() { return { enabled: true, feeUsdc: '1', feeAsset: 'USDC', feeCustody: 'ESCROW', escrowAddress: '0x3333333333333333333333333333333333333333', genLayerGasPayer: 'OWNER' }; },
   async startEvo() { return campaign; }, async advanceCampaign() { return campaign; },
+  async getFee() { return { state: 'REFUNDED', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333', deposit: { transactionId: 'deposit', state: 'CONFIRMED', txHash: `0x${'1'.repeat(64)}` }, settlement: { transactionId: 'refund', state: 'CONFIRMED', txHash: `0x${'2'.repeat(64)}` } }; },
   async listComparisons() { return []; }, async getComparison() { throw new Error('not used'); }, async createVersionComparison() { throw new Error('not used'); },
 };
 const config = {
@@ -63,11 +64,40 @@ describe('evaluation product UX', () => {
     expect(screen.getByRole('button', { name: /Start evaluation/i })).toBeEnabled();
   });
 
+  it('starts Evo once and leaves progression to the durable server worker', async () => {
+    const startEvo = vi.fn().mockResolvedValue({ ...campaign, state: 'RUNNING' });
+    const advanceCampaign = vi.fn();
+    const api = { ...evaluationApi, startEvo, advanceCampaign };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Start evaluation' }));
+    await waitFor(() => expect(startEvo).toHaveBeenCalledTimes(1));
+    expect(advanceCampaign).not.toHaveBeenCalled();
+    expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();
+  });
+
   it('renders campaign outcomes as a table with a run evidence link', async () => {
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={evaluationApi}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Result' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open run run_1' })).toHaveAttribute('href', '/evaluation-runs/run_1');
+  });
+
+  it('labels unrun tests correctly after infrastructure failure and shows the real fee projection', async () => {
+    const failed = { ...campaign, state: 'FAILED', items: [...campaign.items, { scenarioId: 'hidden-02', state: 'PENDING', attempt: 0, runIds: [] }] };
+    const api = { ...evaluationApi, async getCampaign() { return failed; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('Not run')).toBeInTheDocument();
+    expect(await screen.findByText(/1 USDC refunded/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Arc refund receipt' })).toHaveAttribute('href', expect.stringContaining(`0x${'2'.repeat(64)}`));
+  });
+
+  it('enables the payer timeout refund only after the recorded 24-hour deadline', async () => {
+    const claimTimeoutRefund = vi.fn().mockResolvedValue({ state: 'REFUNDED', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' });
+    const api = { ...evaluationApi, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333', refundAvailableAt: 1 }; }, claimTimeoutRefund };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    const button = await screen.findByRole('button', { name: 'Claim 1 USDC timeout refund' });
+    expect(button).toBeEnabled(); fireEvent.click(button);
+    await waitFor(() => expect(claimTimeoutRefund).toHaveBeenCalledWith('campaign_1', expect.any(String)));
   });
 
   it('links a finalized run to its Studio Next transaction receipt', async () => {

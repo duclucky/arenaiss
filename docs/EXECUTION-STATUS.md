@@ -20,8 +20,9 @@
   executable sandbox remain open. Deterministic `EVAL-5` version comparison and
   regression is implemented locally with immutable owner-only records. The
   `EVAL-6` Tournament convergence is implemented and locally verified through
-  the specialized ComparisonRun model; comparison UI and benchmark claims remain
-  open.
+  the specialized ComparisonRun model. The owner-private Agent detail UI now
+  compares two finalized Evo-backed versions under the locked regression
+  policy; benchmark claims remain open.
 
 ## Evo fee escrow and infrastructure refund — 2026-09-16
 
@@ -493,6 +494,18 @@ failure and SQLite restart. The previously funded lifecycle belongs to archived
 V1; a funded V2 tournament/payout receipt set remains open. Hosting is active on
 the owner VPS, while repository publication and submission have not been
 performed.
+
+On 2026-09-16 the production `TournamentOperationsPort` was attached to the API
+runtime. Create, lifecycle transitions, settlement and refund use the deployed
+Arc Testnet `TournamentEscrow`; pair outputs use the shared provider policy and
+the deployed `ArenaComparisonJudge` on Studio Next. The runner checks every
+prepared entrant against canonical Arc bindings, persists provider, GenLayer
+and ranking state in SQLite, and never accepts a ranking or payout amount from
+the control-plane request. Local verification covers restart-safe settlement
+and the insufficient-entrant refund path. Read-only checks confirmed Arc chain
+ID 5042002 with escrow bytecode and Studio Next chain ID 61997 with
+`AgentComparisonV1` canonical configuration. No Tournament was created and no
+paid provider or chain write was performed during this verification.
 
 ## Coding Agent workflow (paused by owner)
 

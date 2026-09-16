@@ -49,6 +49,7 @@ test("agent detail keeps AGENTS.md private, reports exact activity, and deactiva
 
   const detail = api.getAgentDetail(ALICE, agent.agentId);
   assert.equal(detail.agentsMd, "private instructions");
+  assert.deepEqual(detail.versions, [{ agentsVersion: agent.agentsVersion, agentsCommitment: agent.agentsCommitment, createdAt: detail.createdAt }]);
   assert.equal(detail.stats.tournamentCount, 1);
   assert.equal(detail.stats.adversarialMatchCount, 1);
   assert.equal(detail.stats.latestEvaluationScore, null);
@@ -64,6 +65,7 @@ test("updating creates append-only version and old commitment remains addressabl
   const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "v1"); const v2 = api.updateAgent(ALICE, created.agentId, "v2");
   assert.notEqual(v2.agentsVersion, created.agentsVersion);
   assert.equal(api.getAgentVersion(ALICE, created.agentId, created.agentsVersion).agentsMd, "v1");
+  assert.deepEqual(api.getAgentDetail(ALICE, created.agentId).versions.map((version) => version.agentsVersion), [created.agentsVersion, v2.agentsVersion]);
 });
 
 test("operator action requires configured operator and never exposes prompt in public tournament", () => {

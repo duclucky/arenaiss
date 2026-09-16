@@ -11,12 +11,14 @@ import { circleManagedWalletFromSecrets } from './circle-managed-wallet.ts';
 import { SmtpEmailLoginSender } from './smtp-email.ts';
 import { ManagedIdentityService, type ManagedIdentityOptions } from './managed-identity.ts';
 import { ViemMarketplaceChainPort } from './marketplace-arc.ts';
-import { EvaluationExecutionService } from './evaluation-execution.ts';
+import { EvaluationExecutionService, EvaluationExecutionWorker } from './evaluation-execution.ts';
 import { ViemEvoFeeSettlement } from './evo-fee-arc.ts';
 import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
 import { EvaluationRunTracker, PersistentEvaluationRunStore } from '../../../packages/evaluation/src/run-tracker.ts';
 import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../packages/evaluation/src/solo-runner.ts';
 import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/src/evaluation-sdk-port.ts';
+import type { TournamentOperationsPort } from './tournament-operations.ts';
+import { tournamentOperationsFromEnvironment } from './tournament-operations-live.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -25,21 +27,25 @@ type ServerOptions = {
   now?: () => number;
   logger?: (entry: RequestLog) => void;
   rateLimit?: { maxRequests: number; windowMs: number };
+  tournamentOperations?: TournamentOperationsPort;
 };
 
 export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore, options: ServerOptions = {}) {
+  const service = new ArenaApiService(operator, runtime);
   const managedIdentity = runtime ? managedIdentityFromEnvironment(runtime) : undefined;
   const managedIdentityService = runtime && managedIdentity ? new ManagedIdentityService(managedIdentity) : undefined;
   const evaluationExecution = runtime && managedIdentityService ? evaluationExecutionFromEnvironment(runtime, managedIdentityService, operator) : undefined;
+  const evaluationWorker = evaluationExecution ? new EvaluationExecutionWorker(evaluationExecution, envPositiveInteger('EVALUATION_WORKER_INTERVAL_MS', 5_000)) : undefined;
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
-  const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService);
+  const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
+  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
     maxRequests: envPositiveInteger('ARENA_RATE_LIMIT_MAX', 60),
     windowMs: envPositiveInteger('ARENA_RATE_LIMIT_WINDOW_MS', 60_000),
   });
-  return createServer(async (request, response) => {
+  const server = createServer(async (request, response) => {
     const startedAt = now();
     const method = request.method || 'GET';
     let path = '/';
@@ -79,6 +85,9 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
+  server.once('listening', () => evaluationWorker?.start());
+  server.once('close', () => evaluationWorker?.stop());
+  return server;
 }
 
 function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: ManagedIdentityService, operator: string): EvaluationExecutionService | undefined {
@@ -122,7 +131,8 @@ function marketplaceChainFromEnvironment(environment: NodeJS.ProcessEnv): ViemMa
   const marketplace = environment.ARC_MARKETPLACE_ADDRESS?.trim();
   if (!registry && !marketplace) return undefined;
   if (!registry || !marketplace) throw new Error('marketplace configuration is incomplete');
-  return new ViemMarketplaceChainPort({ rpcUrl, registryAddress: registry, marketplaceAddress: marketplace });
+  const privateKey = environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim();
+  return new ViemMarketplaceChainPort({ rpcUrl, registryAddress: registry, marketplaceAddress: marketplace, privateKey });
 }
 
 class FixedWindowRateLimiter {

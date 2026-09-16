@@ -223,6 +223,7 @@ describe('App Tests', () => {
     expect(await screen.findByRole('heading', { name: 'Verified GenLayer verdict' })).toBeInTheDocument();
     expect(screen.getByText('LIVE TESTNET EVIDENCE')).toBeInTheDocument();
     expect(screen.getByText('GeneralResponseV7')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Historical GenLayer evidence');
     expect(screen.getByText('Criterion reasoning')).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
     expect(screen.getByText('A fully explains idempotency keys for retrying paid API requests; B does not address the topic.')).toBeInTheDocument();

@@ -8,6 +8,7 @@ export type EvaluationFeeRecord = {
   escrowAddress: string; approvalIdempotencyKey: string; depositIdempotencyKey: string; settlementIdempotencyKey: string;
   state: 'PENDING' | 'HELD' | 'RELEASED' | 'REFUNDED' | 'PAYMENT_FAILED' | 'SETTLEMENT_FAILED';
   approval?: WalletTransactionResult; deposit?: WalletTransactionResult; settlement?: WalletTransactionResult; error?: string;
+  heldAt?: number;
 };
 
 export interface EvaluationFeePort {
@@ -54,7 +55,7 @@ export class EvaluationExecutionService {
     if (fee.state === 'PENDING') {
       try {
         const held = await this.fees.holdEvaluationFee({ userId, escrowAddress: fee.escrowAddress, campaignId, amountUsdc: fee.amountUsdc, approvalIdempotencyKey: fee.approvalIdempotencyKey, depositIdempotencyKey: fee.depositIdempotencyKey });
-        fee = { ...fee, state: 'HELD', ...held, error: undefined };
+        fee = { ...fee, state: 'HELD', ...held, heldAt: Math.floor(Date.now() / 1000), error: undefined };
         this.runtime.put('evaluation-fees-v2', campaignId, fee);
       } catch (error) {
         fee = { ...fee, state: 'PAYMENT_FAILED', error: error instanceof Error ? error.message : 'evaluation fee failed' };
@@ -73,7 +74,27 @@ export class EvaluationExecutionService {
     return this.advanceSafely(campaign, fee);
   }
 
+  async resumePending(): Promise<{ attempted: number; succeeded: number; failed: number }> {
+    const candidates = this.runtime.list<EvaluationFeeRecord>('evaluation-fees-v2')
+      .filter((fee) => fee.state === 'HELD' || fee.state === 'SETTLEMENT_FAILED')
+      .sort((left, right) => left.campaignId.localeCompare(right.campaignId));
+    let succeeded = 0; let failed = 0;
+    for (const fee of candidates) {
+      try { await this.advance(fee.owner, fee.campaignId); succeeded += 1; }
+      catch { failed += 1; }
+    }
+    return { attempted: candidates.length, succeeded, failed };
+  }
+
   getFee(campaignId: string): EvaluationFeeRecord | undefined { return this.runtime.get<EvaluationFeeRecord>('evaluation-fees-v2', campaignId); }
+  recordTimeoutRefund(owner: string, campaignId: string, settlement: WalletTransactionResult): EvaluationFeeRecord {
+    const fee = this.getFee(campaignId);
+    if (!fee || fee.owner.toLowerCase() !== owner.toLowerCase()) throw new Error('evaluation fee not found');
+    if (fee.state === 'REFUNDED') return fee;
+    if (!['HELD', 'SETTLEMENT_FAILED'].includes(fee.state)) throw new Error('evaluation fee is not refundable');
+    const refunded = { ...fee, state: 'REFUNDED' as const, settlement, error: undefined };
+    this.runtime.put('evaluation-fees-v2', campaignId, refunded); return refunded;
+  }
   config(): { enabled: true; feeUsdc: string; feeAsset: 'USDC'; feeCustody: 'ESCROW'; escrowAddress: string; genLayerGasPayer: 'OWNER' } { return { enabled: true, feeUsdc: this.feeUsdc, feeAsset: 'USDC', feeCustody: 'ESCROW', escrowAddress: this.escrowAddress, genLayerGasPayer: 'OWNER' }; }
 
   private async advanceSafely(campaign: SoloCampaignRecord, fee: EvaluationFeeRecord): Promise<SoloCampaignRecord> {
@@ -127,5 +148,42 @@ export class EvaluationExecutionService {
     const campaign = this.runner.get(campaignId);
     if (!campaign || campaign.owner.toLowerCase() !== owner.toLowerCase()) throw new Error('evaluation campaign not found');
     return campaign;
+  }
+}
+
+export class EvaluationExecutionWorker {
+  private timer?: ReturnType<typeof setTimeout>;
+  private active?: Promise<{ attempted: number; succeeded: number; failed: number }>;
+  private stopped = true;
+  private readonly execution: Pick<EvaluationExecutionService, 'resumePending'>;
+  private readonly intervalMs: number;
+
+  constructor(execution: Pick<EvaluationExecutionService, 'resumePending'>, intervalMs = 5_000) {
+    if (!Number.isSafeInteger(intervalMs) || intervalMs < 250) throw new TypeError('evaluation worker interval is invalid');
+    this.execution = execution;
+    this.intervalMs = intervalMs;
+  }
+
+  runOnce(): Promise<{ attempted: number; succeeded: number; failed: number }> {
+    if (this.active) return this.active;
+    const operation = this.execution.resumePending().finally(() => { if (this.active === operation) this.active = undefined; });
+    this.active = operation;
+    return operation;
+  }
+
+  start(): void {
+    if (!this.stopped) return;
+    this.stopped = false;
+    const tick = async () => {
+      await this.runOnce().catch(() => undefined);
+      if (!this.stopped) this.timer = setTimeout(tick, this.intervalMs);
+    };
+    void tick();
+  }
+
+  stop(): void {
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
   }
 }

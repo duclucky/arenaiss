@@ -132,6 +132,7 @@ export type AgentProfile = {
 
 export type AgentDetail = AgentProfile & {
   agentsMd: string;
+  versions: Array<{ agentsVersion: string; agentsCommitment: string; createdAt: number }>;
   stats: NonNullable<AgentProfile['stats']>;
   tournaments: Array<{ id: string; name: string; status: string; entrantIds: readonly string[]; prizePool: string }>;
   evaluations: EvaluationCampaign[];
@@ -180,11 +181,19 @@ export type MarketplaceCertificate = { schema: string; certificateDigest: string
 export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; name: string; sellerAddress: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
 export interface MarketplaceApiAdapter {
   listListings(): Promise<MarketplaceListing[]>;
+  listPurchases?(): Promise<MarketplaceListing[]>;
   listCertificates(): Promise<MarketplaceCertificate[]>;
   createEligibility(input: { agentId: string; agentsVersion: string; campaignIds: string[]; issuedAt: number; expiresAt: number; network: string; chainId: number; judgeAddress: string }): Promise<MarketplaceCertificate>;
   createListing(input: { listingId: string; certificateDigest: string; agentId: string; agentsVersion: string; agentsCommitment: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<MarketplaceListing>;
+  cancelListing?(listingId: string, idempotencyKey: string): Promise<MarketplaceListing>;
   buy(listingId: string, approvalIdempotencyKey: string, buyIdempotencyKey: string): Promise<MarketplaceListing>;
   getDelivery(listingId: string): Promise<{ agentId: string; agentVersionId: string; agentsCommitment: string; agentsMd: string }>;
+  getCredit?(): Promise<{ amount: string }>;
+  withdrawCredit?(idempotencyKey: string): Promise<ManagedWalletTransaction>;
+  listOperatorCertificates?(): Promise<MarketplaceCertificate[]>;
+  approveCertificate?(certificateDigest: string): Promise<MarketplaceCertificate>;
+  getOperatorCredit?(): Promise<{ amount: string }>;
+  withdrawOperatorCredit?(): Promise<ManagedWalletTransaction>;
 }
 
 export interface AgentApiAdapter {
@@ -215,11 +224,30 @@ export interface EvaluationApiAdapter {
   createPack(input: { packId: string; version: string; name: string; scenarios: EvaluationScenario[] }): Promise<EvaluationPack>;
   createSoloCampaign(input: { campaignId: string; agentId: string; agentsVersion: string; packId: string; packVersion: string; runtimePolicy: { model: string; maxOutputTokens: number; temperature: number; maxProviderAttempts: number } }): Promise<EvaluationCampaign>;
   getExecutionConfig?(): Promise<{ enabled: boolean; feeUsdc?: string; feeAsset: 'USDC'; feeCustody?: 'ESCROW'; escrowAddress?: string; genLayerGasPayer: 'OWNER' }>;
+  getFee?(campaignId: string): Promise<{ state: string; amountUsdc: string; escrowAddress: string; refundAvailableAt?: number; deposit?: ManagedWalletTransaction; settlement?: ManagedWalletTransaction; error?: string }>;
+  claimTimeoutRefund?(campaignId: string, idempotencyKey: string): Promise<{ state: string; amountUsdc: string; escrowAddress: string; refundAvailableAt?: number; settlement?: ManagedWalletTransaction }>;
   startEvo?(input: { agentId: string; agentsVersion: string }): Promise<EvaluationCampaign>;
   advanceCampaign?(campaignId: string): Promise<EvaluationCampaign>;
   listComparisons(): Promise<VersionComparison[]>;
   getComparison(comparisonId: string): Promise<VersionComparison>;
   createVersionComparison(input: { comparisonId: string; agentId: string; baselineVersionId: string; candidateVersionId: string; baselineCampaignIds: string[]; candidateCampaignIds: string[]; policy: RegressionPolicy }): Promise<VersionComparison>;
+}
+
+export type TournamentOperationAction = 'PROGRESS' | 'SETTLE' | 'EXPIRE' | 'REFUND';
+export type TournamentOperationSnapshot = {
+  tournamentId: string; name: string;
+  state: 'DRAFT' | 'REGISTRATION' | 'RUNNING' | 'WAITING_FOR_JUDGE' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' | 'COMPLETED' | 'REFUNDED' | 'RECOVERY_REQUIRED';
+  entrantCount: number; matchCount: number; finalizedMatchCount: number;
+  nextActions: readonly TournamentOperationAction[];
+  arc?: { state: string; transactionHash?: string; totalLiability?: string };
+  genLayer?: { pendingCount: number; finalizedCount: number };
+  message?: string;
+};
+export interface TournamentOperationsApiAdapter {
+  list(): Promise<TournamentOperationSnapshot[]>;
+  get(tournamentId: string): Promise<TournamentOperationSnapshot>;
+  create(input: { tournamentId: string; name: string; registrationOpensAt: number; registrationClosesAt: number; startsAt: number; expiresAt: number; minEntrants: number; maxEntrants: number; stakeAmount: string }): Promise<TournamentOperationSnapshot>;
+  execute(tournamentId: string, action: TournamentOperationAction): Promise<TournamentOperationSnapshot>;
 }
 
 export type ArcNetworkConfig = {
