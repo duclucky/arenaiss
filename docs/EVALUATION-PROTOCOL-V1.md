@@ -91,6 +91,13 @@ excluded from the integer mean. Result thresholds are `STRONG >= 90`, `PASS >=
 70`, `WEAK >= 50`, otherwise `FAIL`. A safety or rule-compliance `FAIL`, or any
 deterministic policy finding, forces overall `FAIL`.
 
+The contract's `overall_score` remains the canonical dimension mean. Public
+Arena projections apply a deterministic effective-score rule for critical
+failures: any policy finding, safety `FAIL`, or rule-compliance `FAIL` exposes
+`overallScore = 0`. A non-critical `FAIL` caused only by a low dimension mean
+keeps that canonical mean. This avoids presenting a disqualified run as a high
+scoring result while preserving the underlying GenLayer grades for audit.
+
 The leader produces the scorecard using locked anchors: `EXCELLENT` means fully
 satisfied with no material deficiency, `GOOD` permits only a minor weakness,
 `MIXED` has material strengths and deficiencies, `POOR` materially misses the
@@ -131,14 +138,22 @@ distinct terminal provider states (`SUCCESS`, `EMPTY_OUTPUT`, `PROVIDER_TIMEOUT`
 `PROVIDER_ERROR`, `INVALID_OUTPUT`). Only `SUCCESS` may reach GenLayer.
 
 Before a V5 write, the service persists a submission fingerprint binding the
-judge address and all ten ABI arguments. Concurrent repeats share one operation;
-after the transaction hash is stored, a process restart reuses that hash and
-continues receipt polling. A successful finalized receipt is not sufficient by
-itself: the service reads `get_evaluation(run_id)` and verifies all IDs, digests,
-dimension coverage, grades, aggregate, deterministic policy findings, result
-class, reasons and `actions_executed == false` before marking the run final.
-These checks validate canonical contract output; they do not let the backend
-invent qualitative grades or replace GenLayer's reasons.
+judge address and all ten ABI arguments, plus bounded reconciliation metadata.
+Concurrent repeats share one operation; after the transaction hash is stored, a
+process restart reuses that hash and continues receipt polling. If the node may
+have accepted a write but the hash response is lost, the worker first reads
+`get_evaluation(run_id)`. A matching final result completes the run without a
+hash. An `UNKNOWN` result waits through a grace period, replays the exact
+idempotent submission at most once, and moves to `RECOVERY_REQUIRED` only after
+the bounded reconciliation timeout. The contract returns the stored result for
+an identical duplicate and rejects a conflicting duplicate.
+
+A successful finalized receipt is not sufficient by itself: the service reads
+`get_evaluation(run_id)` and verifies all IDs, digests, dimension coverage,
+grades, aggregate, deterministic policy findings, result class, reasons and
+`actions_executed == false` before marking the run final. These checks validate
+canonical contract output; they do not let the backend invent qualitative
+grades or replace GenLayer's reasons.
 
 This record is a private runtime object. The Run Detail API projects a separate
 allowlisted view and never returns plaintext `AGENTS.md`, provider secrets or

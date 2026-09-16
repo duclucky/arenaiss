@@ -9,7 +9,7 @@ type FlowState = 'IDLE' | 'PREPARING' | 'APPROVING' | 'REGISTERING' | 'VERIFYING
 export function SubmitEntry() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { account, managedAccount, agentApi, networkConfig, wallet } = useAppContext();
+  const { account, managedAccount, managedIdentity, agentApi, networkConfig, wallet } = useAppContext();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,9 +30,16 @@ export function SubmitEntry() {
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
-    if (managedAccount) { setError('Managed Circle transaction execution is not enabled yet. Arena will not use your sign-in wallet.'); return; }
     if (!id || !account || !agentApi || !networkConfig || !selectedAgentId) { setError('Connect a wallet, configure Arc, and select an agent.'); return; }
     try {
+      if (managedAccount) {
+        if (!managedIdentity?.registerTournamentEntrant) throw new Error('Managed Tournament registration is unavailable.');
+        setFlow('REGISTERING');
+        const transaction = await managedIdentity.registerTournamentEntrant(id, selectedAgentId);
+        if (transaction.state !== 'COMPLETE' || !transaction.txHash) throw new Error('Managed registration did not complete on Arc.');
+        setFlow('CONFIRMED');
+        return;
+      }
       setFlow('PREPARING');
       const prepared = await agentApi.prepareRegistration(id, selectedAgentId);
       setStake(prepared.stakeAmount);
@@ -72,8 +79,8 @@ export function SubmitEntry() {
       <div><label htmlFor="agent" className="mb-2 block text-sm font-semibold">Agent</label><select id="agent" className="field-control" value={selectedAgentId} onChange={(event) => setSelectedAgentId(event.target.value)} disabled={!account || !agentApi || loading || pending}><option value="">{!account ? 'Connect a wallet first' : loading ? 'Loading agents…' : agents.length ? 'Select an agent' : 'No agents available'}</option>{agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.name}</option>)}</select><p className="mt-2 text-sm text-neutral-600">The latest immutable version and commitment are resolved by the authenticated backend.</p></div>
       <div className="grid gap-3 border-y border-black/15 py-5 text-sm sm:grid-cols-3"><div><p className="text-neutral-600">Stake</p><p className="mt-1">Set by tournament</p></div><div><p className="text-neutral-600">Platform fee</p><p className="mt-1">10% of final pool</p></div><div><p className="text-neutral-600">Settlement</p><p className="mt-1">Pull-based USDC credit</p></div></div>
       <p className="text-xs leading-relaxed text-neutral-600">Trusted-operator disclosure: the platform controls model calls, match mapping, and bracket progression. Arc independently enforces registration and payout accounting.</p>
-      {managedAccount && <p role="status" className="text-sm font-semibold text-amber-900">Managed Circle transaction execution is not enabled yet. Arena will not use your sign-in wallet.</p>}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={() => navigate(`/tournaments/${id}`)} className="metal-button-ghost">Cancel</button>{!networkConfig ? <button type="button" disabled className="metal-button-solid">Submit to Arena (Disabled)</button> : <button type="submit" disabled={Boolean(managedAccount) || !account || !agentApi || !selectedAgentId || pending || flow === 'CONFIRMED'} className="metal-button-solid min-w-44">{managedAccount ? 'Managed entry unavailable' : flowLabel(flow)}</button>}</div>
+      {managedAccount && <p role="status" className="text-sm text-neutral-700">Entry will be approved and registered on Arc through your Arena managed wallet.</p>}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={() => navigate(`/tournaments/${id}`)} className="metal-button-ghost">Cancel</button>{!networkConfig ? <button type="button" disabled className="metal-button-solid">Submit to Arena (Disabled)</button> : <button type="submit" disabled={!account || !agentApi || !selectedAgentId || pending || flow === 'CONFIRMED' || (Boolean(managedAccount) && !managedIdentity?.registerTournamentEntrant)} className="metal-button-solid min-w-44">{managedAccount && flow === 'IDLE' ? 'Enter with managed wallet' : flowLabel(flow)}</button>}</div>
       {account && agents.length === 0 && !loading && <p className="text-center text-sm text-neutral-700">No AGENTS.md profile yet. <Link to="/agents/new" className="underline decoration-neutral-600 underline-offset-4 hover:decoration-black">Create an agent</Link>.</p>}
     </form>
   </section>;

@@ -34,7 +34,7 @@ describe('Tournament operator console', () => {
     ]; } } as unknown as ArenaReadAdapter;
     const agentApi = { async listOwnedRegistrations() { return [{ tournamentId: `0x${'c'.repeat(64)}`, entrantId: `0x${'d'.repeat(64)}` }]; }, async listOwnedAgents() { return []; }, async createAgent() { throw new Error('unused'); }, async prepareRegistration() { throw new Error('unused'); } } as AgentApiAdapter;
     render(<MemoryRouter><AppProvider identityAdapter={identity} arenaReadAdapter={reads} agentApiAdapter={agentApi}><Tournaments /></AppProvider></MemoryRouter>);
-    expect(await screen.findByRole('heading', { name: 'Compete with one versioned Agent' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'From registration to results' })).toBeInTheDocument();
     expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
     expect(await screen.findByText('Open Safety Cup')).toBeInTheDocument();

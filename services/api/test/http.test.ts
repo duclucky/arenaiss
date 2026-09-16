@@ -371,6 +371,40 @@ test('authenticated owner can prepare an exact Arc registration payload', async 
   assert.equal((await api.handle({ method: 'GET', path: '/api/registrations' })).status, 401);
 });
 
+test('managed account can approve and register a prepared Tournament entry through Circle', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ArenaApiService(operator, runtime);
+    const tournamentId = `sha256:${'f'.repeat(64)}`;
+    service.publishTournament(operator, { id: tournamentId, name: 'Managed Arena', status: 'UPCOMING', entrantIds: [], stakeAmount: '1000000', prizePool: '0' });
+    const entries: any[] = [];
+    const managed = {
+      runtime, identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      agentRegistryAddress: '0x3333333333333333333333333333333333333333', tournamentEscrowAddress: '0x5555555555555555555555555555555555555555',
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address: '0x4444444444444444444444444444444444444444' }),
+        registerAgent: async () => ({ transactionId: 'agent-tx', state: 'COMPLETE', txHash: `0x${'1'.repeat(64)}` }),
+        registerTournamentEntrant: async (input: any) => { entries.push(input); return { transactionId: 'entry-tx', state: 'COMPLETE', txHash: `0x${'2'.repeat(64)}` }; },
+      },
+      emailSender: { sendLoginCode: async () => undefined },
+    };
+    const api = new ArenaHttpApi(service, async () => true, managed as any);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    const agent = await api.handle({ method: 'POST', path: '/api/agents', headers: { cookie }, body: { name: 'Managed entrant', agentsMd: 'private' } });
+    const response = await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.transactionId, 'entry-tx');
+    await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
+    assert.equal(entries[0].walletId, 'wallet-id');
+    assert.equal(entries[0].stakeAmount, '1000000');
+    assert.equal(entries[0].tournamentId, `0x${'f'.repeat(64)}`);
+    assert.equal(entries[0].approvalIdempotencyKey, entries[1].approvalIdempotencyKey);
+    assert.equal(entries[0].registrationIdempotencyKey, entries[1].registrationIdempotencyKey);
+  } finally { runtime.close(); }
+});
+
 test('public read routes expose normalized tournament, match and verdict data anonymously', async () => {
   const service = new ArenaApiService(operator);
   const tournamentId = `sha256:${'c'.repeat(64)}`;

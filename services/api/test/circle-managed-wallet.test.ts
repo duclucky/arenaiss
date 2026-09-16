@@ -73,6 +73,24 @@ test('Circle adapter withdraws a Tournament credit through the beneficiary SCA',
   assert.deepEqual(executions[0].abiParameters, [`0x${'a'.repeat(64)}`]);
 });
 
+test('Circle adapter approves the stake and registers a Tournament entrant through the managed SCA', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `entry-${executions.length}` } }; },
+    async getTransaction({ id }: any) { return { data: { transaction: { id, state: 'COMPLETE', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+  await adapter.registerTournamentEntrant({
+    walletId: 'wallet-id', escrowAddress: '0x4444444444444444444444444444444444444444', stakeAmount: '1000000',
+    tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, agentId: `0x${'c'.repeat(64)}`,
+    agentsVersion: `0x${'d'.repeat(64)}`, agentsCommitment: `0x${'e'.repeat(64)}`,
+    approvalIdempotencyKey: 'approve-key', registrationIdempotencyKey: 'register-key',
+  });
+  assert.deepEqual(executions.map((row) => ({ address: row.contractAddress, signature: row.abiFunctionSignature, parameters: row.abiParameters })), [
+    { address: '0x3600000000000000000000000000000000000000', signature: 'approve(address,uint256)', parameters: ['0x4444444444444444444444444444444444444444', '1000000'] },
+    { address: '0x4444444444444444444444444444444444444444', signature: 'register(bytes32,bytes32,bytes32,bytes32,bytes32)', parameters: [`0x${'a'.repeat(64)}`, `0x${'b'.repeat(64)}`, `0x${'c'.repeat(64)}`, `0x${'d'.repeat(64)}`, `0x${'e'.repeat(64)}`] },
+  ]);
+});
+
 test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submits Arc withdrawal', async () => {
   const transfers: any[] = [];
   const adapter = new CircleManagedWalletAdapter({

@@ -8,9 +8,10 @@ type CreditRow = { tournamentId: string; credit: string };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
 type WalletAction = { state: 'submitting' | 'error'; message?: string };
 type LegacyBridgeAction = { state: 'submitting' | 'done' | 'error'; operation: ManagedCctpTransfer; message?: string };
+type EvoRefundRow = { campaignId: string; amountUsdc: string; refundAvailableAt?: number };
 
 export function Account() {
-  const { account, managedAccount, agentApi, marketplaceApi, networkConfig, disconnectWallet, wallet } = useAppContext();
+  const { account, managedAccount, agentApi, evaluationApi, marketplaceApi, networkConfig, disconnectWallet, wallet } = useAppContext();
   const { managedIdentity } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = ['claim', 'credits'].includes(searchParams.get('tab') || '') ? 'claim' : 'overview';
@@ -22,6 +23,10 @@ export function Account() {
   const [claimState, setClaimState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
   const [marketplaceCredit, setMarketplaceCredit] = useState('0');
   const [marketplaceClaimState, setMarketplaceClaimState] = useState<'idle' | 'loading' | 'submitting' | 'confirmed' | 'failed'>('idle');
+  const [evoRefunds, setEvoRefunds] = useState<EvoRefundRow[]>([]);
+  const [evoRefundsState, setEvoRefundsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [evoClaimState, setEvoClaimState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
   const [reload, setReload] = useState(0);
   const [managedBalances, setManagedBalances] = useState<ManagedUsdcBalance[]>([]);
   const [balancesExpanded, setBalancesExpanded] = useState(false);
@@ -170,6 +175,36 @@ export function Account() {
     return () => { cancelled = true; };
   }, [account, activeTab, marketplaceApi, reload]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (activeTab !== 'claim' || !account || !evaluationApi?.getFee) {
+      setEvoRefunds([]);
+      setEvoRefundsState('idle');
+      return () => { cancelled = true; };
+    }
+    setEvoRefundsState('loading');
+    evaluationApi.listCampaigns()
+      .then((campaigns) => Promise.all(campaigns.map(async (campaign) => ({
+        campaignId: campaign.campaignId, fee: await evaluationApi.getFee!(campaign.campaignId),
+      }))))
+      .then((rows) => {
+        if (cancelled) return;
+        setEvoRefunds(rows.filter((row) => row.fee?.state === 'HELD' || row.fee?.state === 'SETTLEMENT_FAILED')
+          .map((row) => ({ campaignId: row.campaignId, amountUsdc: row.fee!.amountUsdc, refundAvailableAt: row.fee!.refundAvailableAt })));
+        setEvoRefundsState('ready');
+      })
+      .catch(() => { if (!cancelled) setEvoRefundsState('error'); });
+    return () => { cancelled = true; };
+  }, [account, activeTab, evaluationApi, reload]);
+
+  useEffect(() => {
+    if (activeTab !== 'claim') return;
+    const next = evoRefunds.map((row) => row.refundAvailableAt).filter((value): value is number => value !== undefined && value > nowSeconds).sort((a, b) => a - b)[0];
+    if (next === undefined) return;
+    const timer = window.setTimeout(() => setNowSeconds(Math.floor(Date.now() / 1000)), Math.max(1, Math.min((next - nowSeconds) * 1000, 2_147_483_647)));
+    return () => window.clearTimeout(timer);
+  }, [activeTab, evoRefunds, nowSeconds]);
+
   function selectTab(tab: 'overview' | 'claim') {
     setSearchParams(tab === 'claim' ? { tab: 'claim' } : {}, { replace: true });
   }
@@ -205,6 +240,20 @@ export function Account() {
       setMarketplaceClaimState('confirmed');
       setBalanceReload((value) => value + 1);
     } catch { setMarketplaceClaimState('failed'); }
+  }
+
+  async function claimEvoRefund(campaignId: string) {
+    if (!evaluationApi?.claimTimeoutRefund) return;
+    setEvoClaimState((current) => ({ ...current, [campaignId]: 'submitting' }));
+    try {
+      const fee = await evaluationApi.claimTimeoutRefund(campaignId, crypto.randomUUID());
+      if (fee.state !== 'REFUNDED') throw new Error('Evo refund was not confirmed.');
+      setEvoRefunds((rows) => rows.filter((row) => row.campaignId !== campaignId));
+      setEvoClaimState((current) => ({ ...current, [campaignId]: 'confirmed' }));
+      setBalanceReload((value) => value + 1);
+    } catch {
+      setEvoClaimState((current) => ({ ...current, [campaignId]: 'failed' }));
+    }
   }
 
   async function copyAddress() {
@@ -348,7 +397,7 @@ export function Account() {
         <div className="glass-panel flex flex-wrap items-start justify-between gap-4 rounded-[28px] p-6 md:p-8">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">Claim assets</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Collect USDC credited to this account by Tournament rewards and Marketplace sales. Each claim is paid to the beneficiary recorded on Arc Testnet.</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Collect Tournament rewards, Marketplace proceeds, and eligible Evo timeout refunds on Arc Testnet.</p>
           </div>
           {account && <button type="button" className="metal-button-ghost" disabled={creditsState === 'loading'} onClick={() => setReload((value) => value + 1)}>Refresh</button>}
         </div>
@@ -376,6 +425,17 @@ export function Account() {
           })}
         </ul>}
         {account && <section className="glass-panel flex flex-wrap items-center justify-between gap-5 rounded-[24px] p-5 md:p-6" aria-labelledby="marketplace-claim-heading"><div><p className="page-kicker">Marketplace</p><h3 id="marketplace-claim-heading" className="mt-1 text-xl font-bold">{formatUsdc(marketplaceCredit)} USDC claimable</h3><p className="mt-2 text-sm text-muted-foreground">Net proceeds from completed Agent sales after the fixed 1% Marketplace fee.</p>{marketplaceClaimState === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Marketplace claim submitted.</p>}{marketplaceClaimState === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Marketplace credit could not be loaded or claimed.</p>}</div><button type="button" className="metal-button-solid" disabled={marketplaceClaimState === 'loading' || marketplaceClaimState === 'submitting' || BigInt(marketplaceCredit) === 0n || !marketplaceApi?.withdrawCredit} onClick={claimMarketplaceCredit}>{marketplaceClaimState === 'submitting' ? 'Claiming…' : 'Claim Marketplace proceeds'}</button></section>}
+        {account && <section aria-labelledby="evo-refunds-heading" className="space-y-3">
+          <h3 id="evo-refunds-heading" className="text-xl font-bold">Evo refunds</h3>
+          {evoRefundsState === 'loading' && <p role="status" className="glass-panel p-5 text-sm text-neutral-700">Checking Evo escrow…</p>}
+          {evoRefundsState === 'error' && <p role="alert" className="glass-panel p-5 text-sm text-red-900">Could not load Evo refunds. Use Refresh to try again.</p>}
+          {evoRefundsState === 'ready' && evoRefunds.length === 0 && <p className="glass-panel p-5 text-sm text-neutral-700">No Evo timeout refunds to claim. Automatic refunds return directly to the payer wallet.</p>}
+          {evoRefunds.map((row) => {
+            const available = row.refundAvailableAt !== undefined && nowSeconds >= row.refundAvailableAt;
+            const state = evoClaimState[row.campaignId];
+            return <div key={row.campaignId} className="glass-panel flex flex-wrap items-center justify-between gap-4 rounded-[24px] p-5"><div><p className="page-kicker">Evo campaign</p><p className="mt-2 break-all font-mono text-xs">{row.campaignId}</p><p className="mt-2 text-sm font-semibold">{row.amountUsdc} USDC held in Evo escrow</p><p className="mt-1 text-sm text-neutral-700">{row.refundAvailableAt ? available ? 'Timeout refund is available now.' : `Timeout refund available ${new Date(row.refundAvailableAt * 1000).toLocaleString()}.` : 'Waiting for the confirmed deposit time.'}</p>{state === 'failed' && <p role="alert" className="mt-2 text-sm text-red-900">Refund failed or is uncertain. Check the Arc transaction before retrying.</p>}</div><button type="button" className="metal-button-solid" disabled={!available || state === 'submitting' || !evaluationApi?.claimTimeoutRefund} onClick={() => claimEvoRefund(row.campaignId)}>{state === 'submitting' ? 'Claiming…' : `Claim ${row.amountUsdc} USDC Evo refund`}</button></div>;
+          })}
+        </section>}
       </div>}
     </div>
   );

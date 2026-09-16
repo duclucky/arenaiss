@@ -184,6 +184,7 @@ export interface ManagedIdentityAdapter {
   listCctpTransfers?(): Promise<ManagedCctpTransfer[]>;
   getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
   claimTournamentCredit?(tournamentId: string, idempotencyKey: string): Promise<ManagedWalletTransaction>;
+  registerTournamentEntrant?(tournamentId: string, agentId: string): Promise<ManagedWalletTransaction>;
   logout(): Promise<void>;
 }
 

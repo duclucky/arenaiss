@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
-import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, EntrantRegistration, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, EntrantRegistration, ManagedIdentityAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
 
 const digest = (char: string) => `sha256:${char.repeat(64)}`;
 const bytes32 = (char: string) => `0x${char.repeat(64)}`;
@@ -53,5 +53,18 @@ describe('Arc registration screen', () => {
     expect(wallet.approvals).toEqual(['100000']);
     expect(wallet.registrations).toHaveLength(1);
     expect(wallet.entrantReads).toBe(1);
+  });
+
+  it('registers through the Circle managed wallet when the session uses managed custody', async () => {
+    const registerTournamentEntrant = vi.fn().mockResolvedValue({ transactionId: 'entry', state: 'COMPLETE', txHash: `0x${'3'.repeat(64)}` });
+    const managedAccount = { userId: 'usr_owner', principal: 'owner@example.com', identity: { kind: 'EMAIL' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: '0x4444444444444444444444444444444444444444', blockchain: 'ARC-TESTNET' as const, accountType: 'SCA' as const } };
+    const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return managedAccount; }, async signInWithWallet() { return managedAccount; }, async requestEmailCode() {}, async verifyEmail() { return managedAccount; }, registerTournamentEntrant, async logout() {} };
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', usdcAddress: '0x3600000000000000000000000000000000000000', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} identityAdapter={identity} agentApiAdapter={new AgentApi()} />);
+    const option = await screen.findByRole('option', { name: 'Strategist' });
+    fireEvent.change(screen.getByLabelText('Agent'), { target: { value: option.getAttribute('value') } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enter with managed wallet' }));
+    expect(await screen.findByText('Registration confirmed on Arc.')).toBeInTheDocument();
+    expect(registerTournamentEntrant).toHaveBeenCalledWith(digest('a'), digest('b'));
   });
 });

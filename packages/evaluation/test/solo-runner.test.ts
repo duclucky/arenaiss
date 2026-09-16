@@ -162,21 +162,60 @@ test("an unexpected infrastructure exception can terminally fail the active scen
   assert.deepEqual(runner.failInfrastructure(digest("a")), failed);
 });
 
-test("uncertain GenLayer submission holds for reconciliation without replay or a premature refund", async () => {
+test("uncertain GenLayer submission stays active while automatic reconciliation is in progress", async () => {
+  let now = 1_000;
   class FailingJudge extends FixtureJudge {
     calls = 0;
     override async submit() { this.calls += 1; throw new Error("secret upstream payload must not persist"); }
+    override async getEvaluation(_address: string, runId: string) { return { status: "UNKNOWN", run_id: runId }; }
   }
   const judge = new FailingJudge();
-  const runner = new SoloEvaluationRunner(new FixtureProvider(), new EvaluationRunTracker(judge, new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
+  const tracker = new EvaluationRunTracker(judge, new MemoryEvaluationRunStore(), judgeAddress, {
+    now: () => now,
+    replayDelayMs: 100,
+    recoveryTimeoutMs: 300,
+    maxSubmissionAttempts: 2,
+  });
+  const runner = new SoloEvaluationRunner(new FixtureProvider(), tracker, new MemorySoloCampaignStore());
   runner.start({ ...campaign(), testPack: { ...campaign().testPack, scenarios: [scenarios()[0]] } });
   const held = await runner.advance(digest("a"));
-  assert.equal(held.state, "RECOVERY_REQUIRED");
-  assert.equal(held.items[0].state, "RECOVERY_REQUIRED");
-  assert.equal(held.items[0].failureStage, "GENLAYER_SUBMIT");
-  assert.equal(held.items[0].failureCode, "GENLAYER_TRANSACTION_UNKNOWN");
+  assert.equal(held.state, "RUNNING");
+  assert.equal(held.items[0].state, "JUDGING");
+  assert.equal(held.items[0].failureStage, "GENLAYER_FINALITY");
+  assert.equal(held.items[0].failureCode, "GENLAYER_RECONCILING");
   assert.equal(JSON.stringify(held).includes("secret upstream payload"), false);
-  assert.deepEqual(await runner.advance(digest("a")), held);
+  assert.equal((await runner.advance(digest("a"))).state, "RUNNING");
+  assert.equal(judge.calls, 1);
+
+  now += 100;
+  assert.equal((await runner.advance(digest("a"))).state, "RUNNING");
+  assert.equal(judge.calls, 2);
+
+  now += 200;
+  const manual = await runner.advance(digest("a"));
+  assert.equal(manual.state, "RECOVERY_REQUIRED");
+  assert.equal(manual.items[0].state, "RECOVERY_REQUIRED");
+  assert.equal(manual.items[0].failureCode, "GENLAYER_TRANSACTION_UNKNOWN");
+  assert.equal(judge.calls, 2);
+});
+
+test("SOLO completes when GenLayer stored the run but its submission response was lost", async () => {
+  class LostResponseJudge extends FixtureJudge {
+    calls = 0;
+    override async submit(value: EvaluationJudgeSubmission) {
+      this.calls += 1;
+      await super.submit(value);
+      throw new Error("RPC response lost after submission");
+    }
+  }
+  const judge = new LostResponseJudge();
+  const runner = new SoloEvaluationRunner(new FixtureProvider(), new EvaluationRunTracker(judge, new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
+  runner.start({ ...campaign(), testPack: { ...campaign().testPack, scenarios: [scenarios()[0]] } });
+
+  const final = await runner.advance(digest("a"));
+  assert.equal(final.state, "FINALIZED");
+  assert.equal(final.items[0].state, "FINALIZED");
+  assert.equal(final.items[0].scorecard?.result_class, "PASS");
   assert.equal(judge.calls, 1);
 });
 

@@ -86,9 +86,15 @@ export function LoginModal({ onClose, onAuthenticated }: { onClose: () => void; 
       onClose();
     } catch (reason) {
       setWalletStatus('error');
-      setError(reason instanceof Error && reason.message === 'NOT_CONFIGURED'
-        ? 'Network or provider not configured.'
-        : 'Connection failed.');
+      if (reason && typeof reason === 'object' && 'code' in reason && reason.code === 4001) {
+        setError('Wallet request cancelled. Try again and approve the request in your wallet.');
+      } else if (reason instanceof Error && reason.message === 'ARC_NETWORK_FAILED') {
+        setError('Could not switch to Arc Testnet. Check your wallet network request and try again.');
+      } else if (reason instanceof Error && reason.message === 'NOT_CONFIGURED') {
+        setError('Network or provider not configured.');
+      } else {
+        setError('Connection failed.');
+      }
     }
   }
 

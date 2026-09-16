@@ -9,6 +9,7 @@ const navItems = [
   ['/evaluations', 'Evaluations'],
   ['/tournaments', 'Tournaments'],
   ['/marketplace', 'Marketplace'],
+  ['/docs', 'Docs'],
 ] as const;
 
 export function Layout() {
@@ -91,7 +92,7 @@ export function Layout() {
       <div className="header-actions" ref={accountRef}>
         {account ? <>
           <button className="header-account" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen} aria-haspopup="menu">
-            <span>{account.slice(0, 6)}…{account.slice(-4)}</span>
+            <span>Account</span>
           </button>
           {accountOpen && <div role="menu" className="account-menu">
             <Link role="menuitem" to="/account">View account</Link>

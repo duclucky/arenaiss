@@ -162,10 +162,11 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
     const provider = this.providers.get(this.connectedProviderUuid);
     if (!provider) throw new Error('NOT_CONFIGURED');
 
+    const targetChainId = `0x${config.chainId.toString(16)}`;
     try {
       await provider.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${config.chainId.toString(16)}` }],
+        params: [{ chainId: targetChainId }],
       });
     } catch (switchError: any) {
       if (switchError.code === 4902) {
@@ -173,16 +174,25 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
           method: 'wallet_addEthereumChain',
           params: [
             {
-              chainId: `0x${config.chainId.toString(16)}`,
+              chainId: targetChainId,
               chainName: config.name,
               rpcUrls: [config.rpcUrl],
+              nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+              blockExplorerUrls: ['https://explorer.testnet.arc.io'],
             },
           ],
         });
+        // EIP-3085 does not require the wallet to switch after adding a network.
+        const chainAfterAdd = await provider.request({ method: 'eth_chainId' });
+        if (chainAfterAdd !== targetChainId) {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: targetChainId }] });
+        }
       } else {
         throw switchError;
       }
     }
+    const activeChainId = await provider.request({ method: 'eth_chainId' });
+    if (activeChainId !== targetChainId) throw new Error('WRONG_CHAIN');
     this.activeConfig = config;
   }
 

@@ -118,6 +118,12 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeComplete(input.walletId, input.escrowAddress, 'withdrawCredit(bytes32)', [digestBytes32(input.tournamentId)], input.idempotencyKey, 'arena-iss-tournament-credit-withdraw');
   }
 
+  async registerTournamentEntrant(input: { walletId: string; escrowAddress: string; stakeAmount: string; tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string; approvalIdempotencyKey: string; registrationIdempotencyKey: string }): Promise<WalletTransactionResult> {
+    if (!/^[1-9][0-9]*$/.test(input.stakeAmount)) throw new Error('invalid Tournament stake');
+    await this.executeComplete(input.walletId, ARC_USDC, 'approve(address,uint256)', [input.escrowAddress, input.stakeAmount], input.approvalIdempotencyKey, 'arena-iss-tournament-approve');
+    return this.executeComplete(input.walletId, input.escrowAddress, 'register(bytes32,bytes32,bytes32,bytes32,bytes32)', [input.tournamentId, input.entrantId, input.agentId, input.agentsVersion, input.agentsCommitment].map(requireBytes32), input.registrationIdempotencyKey, 'arena-iss-tournament-register');
+  }
+
   async marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {
     return this.executeRegistry(input.walletId, input.marketplaceAddress, 'createListing(bytes32,bytes32,bytes32,bytes32,uint128,uint64)', [digestBytes32(input.agentId), digestBytes32(input.version), digestBytes32(input.commitment), digestBytes32(input.certificateDigest), input.price, String(input.expiresAt)], input.idempotencyKey, 'arena-iss-marketplace-listing');
   }
@@ -225,6 +231,11 @@ function decimalToBaseUnits(value: string): string {
 function digestBytes32(value: string): string {
   if (!/^sha256:[0-9a-fA-F]{64}$/.test(value)) throw new Error('invalid agent digest');
   return `0x${value.slice(7).toLowerCase()}`;
+}
+
+function requireBytes32(value: string): string {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(value) || /^0x0{64}$/i.test(value)) throw new Error('invalid Tournament registration digest');
+  return value.toLowerCase();
 }
 
 function sourceExplorer(chain: string): string {
