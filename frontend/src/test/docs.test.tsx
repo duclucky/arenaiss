@@ -38,8 +38,8 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByText(/trusted operator/i)).toBeInTheDocument();
     expect(screen.getByText(/including AGENTS.md bytes for Evo and Tournament comparisons/i)).toBeInTheDocument();
     expect(screen.queryByText(/does not receive private AGENTS.md/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/managed Circle accounts cannot enter yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/Evo timeout refunds are handled on the Evaluation detail page/i)).toBeInTheDocument();
+    expect(screen.getByText(/Both injected wallets and Arena managed Circle wallets can register/i)).toBeInTheDocument();
+    expect(screen.getByText(/eligible Evo timeout refunds are claimable through Account/i)).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-input-v1')).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-output-v1')).toBeInTheDocument();
     expect(screen.getByText('arena-generation-input-v2')).toBeInTheDocument();

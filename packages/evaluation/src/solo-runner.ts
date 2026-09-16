@@ -203,24 +203,35 @@ export class SoloEvaluationRunner {
     campaign = this.updateItem(campaign, itemIndex, item, "RUNNING");
     this.store.put(campaign);
     run = this.tracker.get(item.currentRunId!)!;
-    if (run.judge.state === "NOT_SUBMITTED" || run.judge.state === "SUBMISSION_PERSISTED") {
+    if (run.judge.state === "NOT_SUBMITTED") {
       try { await this.tracker.submit(run.runId); }
       catch {
         const persisted = this.tracker.get(run.runId);
-        if (persisted?.judge.state === "SUBMISSION_PERSISTED") {
-          const uncertain: SoloCampaignItem = { ...item, state: "RECOVERY_REQUIRED", failure: "INFRASTRUCTURE_ERROR", failureStage: "GENLAYER_SUBMIT", failureCode: "GENLAYER_TRANSACTION_UNKNOWN" };
-          return this.persist(this.updateItem(campaign, itemIndex, uncertain, "RECOVERY_REQUIRED"));
+        if (!persisted || persisted.judge.state === "NOT_SUBMITTED") {
+          return this.persistInfrastructureFailure(campaign, itemIndex, item, "GENLAYER_SUBMIT", "GENLAYER_SUBMISSION_FAILED");
         }
-        return this.persistInfrastructureFailure(campaign, itemIndex, item, "GENLAYER_SUBMIT", "GENLAYER_SUBMISSION_FAILED");
       }
     }
     let polled;
     try { polled = await this.tracker.poll(run.runId); }
-    catch { return this.persist(this.updateItem(campaign, itemIndex, { ...item, failureStage: "GENLAYER_FINALITY", failureCode: "GENLAYER_FINALITY_RETRY" }, "RUNNING")); }
+    catch {
+      const persisted = this.tracker.get(run.runId);
+      const reconciling = persisted?.judge.state === "SUBMISSION_PERSISTED";
+      return this.persist(this.updateItem(campaign, itemIndex, { ...item, failureStage: "GENLAYER_FINALITY", failureCode: reconciling ? "GENLAYER_RECONCILING" : "GENLAYER_FINALITY_RETRY" }, "RUNNING"));
+    }
+    if (polled.judge.state === "RECOVERY_REQUIRED") {
+      const uncertain: SoloCampaignItem = { ...item, state: "RECOVERY_REQUIRED", failure: "INFRASTRUCTURE_ERROR", failureStage: "GENLAYER_SUBMIT", failureCode: "GENLAYER_TRANSACTION_UNKNOWN" };
+      return this.persist(this.updateItem(campaign, itemIndex, uncertain, "RECOVERY_REQUIRED"));
+    }
     if (polled.judge.state === "FAILED") {
       return this.persistInfrastructureFailure(campaign, itemIndex, item, "GENLAYER_FINALITY", "JUDGE_EXECUTION_FAILED");
     }
-    if (polled.judge.state !== "FINALIZED") return this.persist(campaign);
+    if (polled.judge.state !== "FINALIZED") {
+      const pending = polled.judge.state === "SUBMISSION_PERSISTED"
+        ? { ...item, failureStage: "GENLAYER_FINALITY" as const, failureCode: "GENLAYER_RECONCILING" }
+        : item;
+      return this.persist(this.updateItem(campaign, itemIndex, pending, "RUNNING"));
+    }
     const finalized: SoloCampaignItem = { ...item, state: "FINALIZED", scorecard: clone(polled.scorecard!) };
     campaign = this.updateItem(campaign, itemIndex, finalized, "RUNNING");
     if (campaign.items.every((candidate) => candidate.state === "FINALIZED")) campaign = { ...campaign, state: "FINALIZED" };

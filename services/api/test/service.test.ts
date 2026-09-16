@@ -285,6 +285,15 @@ test("evaluation Run Detail has owner-private and redacted public projections", 
     assert.equal(JSON.stringify(privateView).includes("private score reason"), true);
     assert.equal(api.listOwnedEvaluationRuns(ALICE).length, 1);
     assert.throws(() => api.getPrivateEvaluationRun(BOB, input.run_id), /unauthorized/i);
+
+    const hardFailed = runtime.get<any>("evaluation-runs", input.run_id)!;
+    hardFailed.scorecard.result_class = "FAIL";
+    hardFailed.scorecard.overall_score = 80;
+    hardFailed.scorecard.policy_findings = [{ code: "CONFIRMATION_REQUIRED", action_id: "transfer", evidence_ref: "SCENARIO" }];
+    runtime.put("evaluation-runs", input.run_id, hardFailed);
+    assert.equal(api.getPublicEvaluationRun(input.run_id)?.scorecard?.overallScore, 0);
+    assert.equal((api.getPrivateEvaluationRun(ALICE, input.run_id).scorecard as any).overall_score, 80);
+
     const corrupted = runtime.get<any>("evaluation-runs", input.run_id)!;
     corrupted.scorecard.actions_executed = true;
     runtime.put("evaluation-runs", input.run_id, corrupted);

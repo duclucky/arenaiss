@@ -165,7 +165,12 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
       throw new Error('NOT_CONFIGURED');
     }
     const address = await wallet.connect(providerUuid);
-    await wallet.switchChain(networkConfig);
+    try {
+      await wallet.switchChain(networkConfig);
+    } catch (reason) {
+      if (reason && typeof reason === 'object' && 'code' in reason && reason.code === 4001) throw reason;
+      throw new Error('ARC_NETWORK_FAILED');
+    }
     if (identity && managedIdentityEnabled) {
       const authenticated = await identity.signInWithWallet(address, (message) => wallet.signMessage(message));
       setManagedAccount(authenticated);

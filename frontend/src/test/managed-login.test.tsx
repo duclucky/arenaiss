@@ -56,7 +56,7 @@ describe('managed email login', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Verify and sign in' }));
 
     expect(await screen.findByRole('heading', { name: 'My Agents' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /0x4444/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument();
     expect(requests.find((request) => request.path.endsWith('/api/auth/email/challenge'))?.init?.credentials).toBe('include');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });

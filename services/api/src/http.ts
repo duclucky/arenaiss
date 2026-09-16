@@ -340,6 +340,17 @@ export class ArenaHttpApi {
         const agentId = requireString(request.body?.agentId);
         return this.json(200, this.service.prepareRegistration(owner, registrationMatch[1] as `sha256:${string}`, agentId as `sha256:${string}`));
       }
+      const managedRegistrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/managed-registration$/);
+      if (request.method === 'POST' && managedRegistrationMatch) {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.managedIdentity) throw new Error('managed Tournament registration unavailable');
+        const agentId = requireString(request.body?.agentId);
+        const prepared = this.service.prepareRegistration(session.principal, managedRegistrationMatch[1] as `sha256:${string}`, agentId as `sha256:${string}`);
+        const transaction = await this.managedIdentity.registerTournamentEntrant(session.userId!, {
+          ...prepared,
+        });
+        return this.json(200, transaction);
+      }
       return this.json(404, { error: 'not found' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'request failed';

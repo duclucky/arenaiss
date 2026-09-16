@@ -39,9 +39,9 @@ export type EvaluationProviderStage =
 
 export type EvaluationJudgeStage =
   | { state: "NOT_SUBMITTED" }
-  | { state: "SUBMISSION_PERSISTED"; fingerprint: string }
+  | { state: "SUBMISSION_PERSISTED" | "RECOVERY_REQUIRED"; fingerprint: string; attempts?: number; firstPersistedAt?: number; lastAttemptAt?: number }
   | { state: "SUBMITTED" | "PENDING" | "ACCEPTED"; fingerprint: string; transactionHash: string }
-  | { state: "FINALIZED" | "FAILED"; fingerprint: string; transactionHash: string };
+  | { state: "FINALIZED" | "FAILED"; fingerprint: string; transactionHash?: string; recoveredBy?: "CANONICAL_RUN_ID" };
 
 export interface EvaluationRunRecord {
   schema: "arena-evaluation-run-v1";
@@ -194,16 +194,30 @@ export class EvaluationRunTracker {
   private readonly port: EvaluationJudgePort;
   private readonly store: EvaluationRunStore;
   private readonly judgeAddress: string;
+  private readonly now: () => number;
+  private readonly replayDelayMs: number;
+  private readonly recoveryTimeoutMs: number;
+  private readonly maxSubmissionAttempts: number;
 
   constructor(
     port: EvaluationJudgePort,
     store: EvaluationRunStore,
     judgeAddress: string,
+    options: { now?: () => number; replayDelayMs?: number; recoveryTimeoutMs?: number; maxSubmissionAttempts?: number } = {},
   ) {
     this.port = port;
     this.store = store;
     this.judgeAddress = judgeAddress;
+    this.now = options.now ?? Date.now;
+    this.replayDelayMs = options.replayDelayMs ?? 30_000;
+    this.recoveryTimeoutMs = options.recoveryTimeoutMs ?? 10 * 60_000;
+    this.maxSubmissionAttempts = options.maxSubmissionAttempts ?? 2;
     if (!ADDRESS.test(judgeAddress)) throw new TypeError("invalid evaluation judge address");
+    if (!Number.isSafeInteger(this.replayDelayMs) || this.replayDelayMs < 0
+      || !Number.isSafeInteger(this.recoveryTimeoutMs) || this.recoveryTimeoutMs <= this.replayDelayMs
+      || !Number.isSafeInteger(this.maxSubmissionAttempts) || this.maxSubmissionAttempts < 1 || this.maxSubmissionAttempts > 3) {
+      throw new TypeError("evaluation reconciliation configuration is invalid");
+    }
   }
 
   createRun(value: { input: EvaluationProviderInput; rubricVersion: string; providerOperationKey: string }): EvaluationRunRecord {
@@ -279,8 +293,10 @@ export class EvaluationRunTracker {
       const current = this.requireRun(runId);
       if (current.provider.state !== "SUCCESS") throw new Error("provider success is required before GenLayer submission");
       if (current.judge.state !== "NOT_SUBMITTED" && current.judge.fingerprint !== fingerprint) throw new Error("conflicting evaluation submission");
-      if ("transactionHash" in current.judge) return current.judge.transactionHash;
-      this.store.put({ ...current, judge: { state: "SUBMISSION_PERSISTED", fingerprint } });
+      if ("transactionHash" in current.judge && current.judge.transactionHash) return current.judge.transactionHash;
+      if (current.judge.state !== "NOT_SUBMITTED") throw new Error("evaluation submission requires reconciliation");
+      const attemptedAt = this.now();
+      this.store.put({ ...current, judge: { state: "SUBMISSION_PERSISTED", fingerprint, attempts: 1, firstPersistedAt: attemptedAt, lastAttemptAt: attemptedAt } });
       const transactionHash = await this.port.submit(submission, this.judgeAddress);
       if (!TRANSACTION_HASH.test(transactionHash)) throw new Error("invalid GenLayer transaction hash");
       const persisted = this.requireRun(runId);
@@ -291,9 +307,36 @@ export class EvaluationRunTracker {
 
   poll(runId: string): Promise<EvaluationRunRecord> {
     return this.store.pollOnce(runId, async () => {
-      const record = this.requireRun(runId);
-      if (!("transactionHash" in record.judge)) throw new Error("evaluation submission transaction is unknown");
+      let record = this.requireRun(runId);
       if (record.judge.state === "FINALIZED" || record.judge.state === "FAILED") return record;
+      if (record.judge.state === "NOT_SUBMITTED") throw new Error("evaluation submission has not started");
+      if (!("transactionHash" in record.judge) || !record.judge.transactionHash) {
+        record = this.ensureRecoveryMetadata(record);
+        const recovered = await this.readCanonicalResult(record);
+        if (recovered) return recovered;
+        if (record.judge.state === "RECOVERY_REQUIRED") return record;
+
+        const attempts = record.judge.attempts ?? 1;
+        const lastAttemptAt = record.judge.lastAttemptAt ?? this.now();
+        if (attempts < this.maxSubmissionAttempts && this.now() - lastAttemptAt >= this.replayDelayMs) {
+          try { await this.replayPersistedSubmission(record); } catch { /* The canonical read below resolves a lost replay response. */ }
+          record = this.requireRun(runId);
+          const recoveredAfterReplay = await this.readCanonicalResult(record);
+          if (recoveredAfterReplay) return recoveredAfterReplay;
+        }
+
+        record = this.requireRun(runId);
+        if (!("transactionHash" in record.judge) || !record.judge.transactionHash) {
+          const firstPersistedAt = record.judge.firstPersistedAt ?? this.now();
+          const currentAttempts = record.judge.attempts ?? 1;
+          if (currentAttempts >= this.maxSubmissionAttempts && this.now() - firstPersistedAt >= this.recoveryTimeoutMs) {
+            const next: EvaluationRunRecord = { ...record, judge: { ...record.judge, state: "RECOVERY_REQUIRED" } };
+            this.store.put(next);
+            return clone(next);
+          }
+          return clone(record);
+        }
+      }
       const receipt = normalizeReceipt(await this.port.getReceipt(record.judge.transactionHash));
       if (receipt.finality !== "FINALIZED" || receipt.execution === "PENDING") {
         const state = receipt.finality === "FINALIZED" ? "PENDING" : receipt.finality;
@@ -321,6 +364,73 @@ export class EvaluationRunTracker {
     const record = this.store.get(runId);
     if (!record) throw new Error("evaluation run is unknown");
     return record;
+  }
+
+  private ensureRecoveryMetadata(record: EvaluationRunRecord): EvaluationRunRecord {
+    if (record.judge.state !== "SUBMISSION_PERSISTED" && record.judge.state !== "RECOVERY_REQUIRED") return record;
+    if (record.judge.attempts !== undefined && record.judge.firstPersistedAt !== undefined && record.judge.lastAttemptAt !== undefined) return record;
+    const observedAt = this.now();
+    const next: EvaluationRunRecord = {
+      ...record,
+      judge: {
+        ...record.judge,
+        attempts: record.judge.attempts ?? 1,
+        firstPersistedAt: record.judge.firstPersistedAt ?? observedAt,
+        lastAttemptAt: record.judge.lastAttemptAt ?? observedAt,
+      },
+    };
+    this.store.put(next);
+    return next;
+  }
+
+  private async readCanonicalResult(record: EvaluationRunRecord): Promise<EvaluationRunRecord | undefined> {
+    const raw = await this.port.getEvaluation(this.judgeAddress, record.runId);
+    let value: any = raw;
+    if (typeof raw === "string") {
+      try { value = JSON.parse(raw); } catch { /* validateCanonical returns the specific malformed JSON error. */ }
+    }
+    if (value?.status === "UNKNOWN") {
+      if (value.run_id !== record.runId) throw new Error("canonical evaluation binding mismatch");
+      return undefined;
+    }
+    const scorecard = this.validateCanonical(raw, record);
+    const next: EvaluationRunRecord = {
+      ...record,
+      judge: { state: "FINALIZED", fingerprint: record.judge.fingerprint, recoveredBy: "CANONICAL_RUN_ID" },
+      scorecard,
+    };
+    this.store.put(next);
+    return clone(next);
+  }
+
+  private replayPersistedSubmission(record: EvaluationRunRecord): Promise<string> {
+    if (record.provider.state !== "SUCCESS" || (record.judge.state !== "SUBMISSION_PERSISTED" && record.judge.state !== "RECOVERY_REQUIRED")) {
+      return Promise.reject(new Error("evaluation submission cannot be replayed"));
+    }
+    const submission = this.submission(record);
+    const fingerprint = sha(JSON.stringify({ judgeAddress: this.judgeAddress, submission }));
+    if (record.judge.fingerprint !== fingerprint) return Promise.reject(new Error("conflicting evaluation submission"));
+    return this.store.submitOnce(record.runId, fingerprint, async () => {
+      const current = this.ensureRecoveryMetadata(this.requireRun(record.runId));
+      if ("transactionHash" in current.judge && current.judge.transactionHash) return current.judge.transactionHash;
+      if (current.judge.state === "RECOVERY_REQUIRED") throw new Error("evaluation submission requires manual recovery");
+      const attemptedAt = this.now();
+      const persisted: EvaluationRunRecord = {
+        ...current,
+        judge: {
+          ...current.judge,
+          state: "SUBMISSION_PERSISTED",
+          attempts: (current.judge.attempts ?? 1) + 1,
+          lastAttemptAt: attemptedAt,
+        },
+      };
+      this.store.put(persisted);
+      const transactionHash = await this.port.submit(submission, this.judgeAddress);
+      if (!TRANSACTION_HASH.test(transactionHash)) throw new Error("invalid GenLayer transaction hash");
+      const latest = this.requireRun(record.runId);
+      this.store.put({ ...latest, judge: { state: "SUBMITTED", fingerprint, transactionHash } });
+      return transactionHash;
+    });
   }
 
   private submission(record: EvaluationRunRecord): EvaluationJudgeSubmission {

@@ -14,6 +14,63 @@ const config: ArcNetworkConfig = {
 const bytes32 = (suffix: string) => `0x${suffix.padStart(64, '0')}`;
 
 describe('live Arc wallet adapter', () => {
+  it('adds Arc Testnet with native USDC details and switches a MetaMask wallet without the network', async () => {
+    const requests: Array<{ method: string; params?: unknown[] }> = [];
+    let chainId = '0x1';
+    let added = false;
+    const provider = {
+      request: async (request: { method: string; params?: unknown[] }) => {
+        requests.push(request);
+        if (request.method === 'eth_requestAccounts') return [account];
+        if (request.method === 'eth_chainId') return chainId;
+        if (request.method === 'wallet_switchEthereumChain') {
+          if (!added) throw { code: 4902 };
+          chainId = '0x4cef52';
+          return null;
+        }
+        if (request.method === 'wallet_addEthereumChain') {
+          added = true;
+          return null;
+        }
+        return null;
+      },
+    };
+    const adapter = new BrowserArcWalletAdapter();
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: { info: { uuid: 'metamask-new', name: 'MetaMask', icon: '' }, provider },
+    }));
+    await adapter.connect('metamask-new');
+    await adapter.switchChain(config);
+
+    expect(requests.map(({ method }) => method)).toEqual([
+      'eth_requestAccounts', 'wallet_switchEthereumChain', 'wallet_addEthereumChain',
+      'eth_chainId', 'wallet_switchEthereumChain', 'eth_chainId',
+    ]);
+    expect(requests.find(({ method }) => method === 'wallet_addEthereumChain')?.params?.[0]).toEqual({
+      chainId: '0x4cef52', chainName: 'Arc Testnet', rpcUrls: [config.rpcUrl],
+      nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+      blockExplorerUrls: ['https://explorer.testnet.arc.io'],
+    });
+  });
+
+  it('does not add a network when the user rejects the chain switch', async () => {
+    const requests: string[] = [];
+    const provider = { request: async ({ method }: { method: string }) => {
+      requests.push(method);
+      if (method === 'eth_requestAccounts') return [account];
+      if (method === 'wallet_switchEthereumChain') throw { code: 4001 };
+      return null;
+    } };
+    const adapter = new BrowserArcWalletAdapter();
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: { info: { uuid: 'metamask-reject', name: 'MetaMask', icon: '' }, provider },
+    }));
+    await adapter.connect('metamask-reject');
+
+    await expect(adapter.switchChain(config)).rejects.toMatchObject({ code: 4001 });
+    expect(requests).toEqual(['eth_requestAccounts', 'wallet_switchEthereumChain']);
+  });
+
   it('uses the selected account client and encodes approve, register and withdrawal writes', async () => {
     const requests: Array<{ method: string; params?: unknown[] }> = [];
     const provider = {

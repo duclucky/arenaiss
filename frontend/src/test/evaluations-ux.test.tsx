@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentApiAdapter, EvaluationApiAdapter, ManagedIdentityAdapter } from '../adapters/interfaces';
 import { AppProvider } from '../context';
 import { EvaluationDetail } from '../views/EvaluationDetail';
+import { Account } from '../views/Account';
 import { EvaluationRunDetail } from '../views/EvaluationRunDetail';
 import { Evaluations } from '../views/Evaluations';
 
@@ -103,6 +104,15 @@ describe('evaluation product UX', () => {
     expect(screen.getByRole('link', { name: 'Open evaluation results' })).toHaveAttribute('href', `/evaluations/${campaignId}`);
   });
 
+  it('keeps a running Evo campaign at the top of My evaluations', async () => {
+    const failed = { ...campaign, campaignId: 'campaign_failed', state: 'FAILED' };
+    const running = { ...campaign, campaignId: 'campaign_running', state: 'RUNNING' };
+    const api = { ...evaluationApi, async listCampaigns() { return [failed, running]; } };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    const links = await screen.findAllByRole('link', { name: 'Open evaluation results' });
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/evaluations/campaign_running', '/evaluations/campaign_failed']);
+  });
+
   it('keeps campaign and run IDs out of the detail page while preserving deep links', async () => {
     const campaignId = `sha256:${'d'.repeat(64)}`;
     const runId = `sha256:${'e'.repeat(64)}`;
@@ -120,8 +130,24 @@ describe('evaluation product UX', () => {
     const api = { ...evaluationApi, async getCampaign() { return uncertain; }, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' }; } };
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByText(/GenLayer submission needs reconciliation/i)).toBeInTheDocument();
-    expect(screen.getByText(/1 USDC remains held/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evo fee remains in escrow/i)).toBeInTheDocument();
     expect(screen.queryByText(/USDC refunded/i)).not.toBeInTheDocument();
+  });
+
+  it('shows automatic GenLayer reconciliation as active processing', async () => {
+    const reconciling = { ...campaign, state: 'RUNNING', items: campaign.items.map((item) => ({ ...item, state: 'JUDGING', score: undefined, overallScore: undefined, failureStage: 'GENLAYER_FINALITY', failureCode: 'GENLAYER_RECONCILING' })) };
+    const api = { ...evaluationApi, async getCampaign() { return reconciling; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/Arena is reconciling the submission automatically/i)).toBeInTheDocument();
+    expect(screen.queryByText(/needs reconciliation/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a hard-failed scenario with a zero effective score and a clear explanation', async () => {
+    const hardFailed = { ...campaign, items: campaign.items.map((item) => ({ ...item, score: 'FAIL', overallScore: 0 })) };
+    const api = { ...evaluationApi, async getCampaign() { return hardFailed; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('0/100')).toBeInTheDocument();
+    expect(screen.getByText(/A critical policy, safety, or rule failure sets the effective score to 0/i)).toBeInTheDocument();
   });
 
   it('labels unrun tests correctly after infrastructure failure and shows the real fee projection', async () => {
@@ -144,13 +170,20 @@ describe('evaluation product UX', () => {
     expect(within(table).getByText('N/A')).toBeInTheDocument();
   });
 
-  it('enables the payer timeout refund only after the recorded 24-hour deadline', async () => {
+  it('places a held Evo timeout refund in Account Claim instead of evaluation results', async () => {
     const claimTimeoutRefund = vi.fn().mockResolvedValue({ state: 'REFUNDED', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' });
     const api = { ...evaluationApi, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333', refundAvailableAt: 1 }; }, claimTimeoutRefund };
-    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
-    const button = await screen.findByRole('button', { name: 'Claim 1 USDC timeout refund' });
+    render(<MemoryRouter initialEntries={['/account?tab=claim']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Routes><Route path="/account" element={<Account />} /></Routes></AppProvider></MemoryRouter>);
+    const button = await screen.findByRole('button', { name: 'Claim 1 USDC Evo refund' });
     expect(button).toBeEnabled(); fireEvent.click(button);
     await waitFor(() => expect(claimTimeoutRefund).toHaveBeenCalledWith('campaign_1', expect.any(String)));
+  });
+
+  it('does not offer Evo refunds on the result page', async () => {
+    const api = { ...evaluationApi, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333', refundAvailableAt: 1 }; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Evo refund|timeout refund/i })).not.toBeInTheDocument();
   });
 
   it('links a finalized run to its Studio Next transaction receipt', async () => {
@@ -158,5 +191,12 @@ describe('evaluation product UX', () => {
     expect(await screen.findByRole('table', { name: 'Score dimensions' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View Studio Next transaction/i })).toHaveAttribute('href', `${config.genLayer.explorerUrl}/transactions/${run.judge.transactionHash}`);
     expect(screen.queryByText(run.runId)).not.toBeInTheDocument();
+  });
+
+  it('explains the zero effective score on a hard-failed run', async () => {
+    const failedRun = { ...run, scorecard: { ...run.scorecard, resultClass: 'FAIL', overallScore: 0 } };
+    const api = { ...evaluationApi, async getRun() { return failedRun; } };
+    render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/A critical policy, safety, or rule failure sets the effective score to 0/i)).toBeInTheDocument();
   });
 });

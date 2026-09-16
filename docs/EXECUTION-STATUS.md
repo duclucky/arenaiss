@@ -497,6 +497,14 @@ refund and zero-liability rules remain unchanged.
 The executable tool sandbox remains an optional compute-dependent Level 3
 roadmap item, not the current critical path.
 
+The EvaluationRun worker now reconciles an ambiguous GenLayer submission by
+canonical `run_id` readback before retrying. It waits 30 seconds, replays the
+exact idempotent submission at most once, and escalates only after a bounded
+10-minute timeout. A matching canonical result can finalize without a recovered
+transaction hash. Public Evo score projections now expose an effective score of
+zero for deterministic policy findings or critical safety/rule failures while
+retaining the canonical GenLayer dimension grades in the private audit record.
+
 Marketplace phases `MKT-0` through `MKT-2` are implemented and their Arc
 contracts are deployed on Arc Testnet. The locked
 eligibility policy requires six scenarios with two finalized runs each, exact

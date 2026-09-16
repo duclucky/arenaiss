@@ -71,6 +71,19 @@ describe('App Tests', () => {
     expect(testAdapter.connectCalls).toHaveLength(0);
   });
 
+  it('explains a failed Arc Testnet switch in the wallet login dialog', async () => {
+    const testAdapter = new TestWalletAdapter();
+    testAdapter.switchChain = async () => { throw new Error('WRONG_CHAIN'); };
+    render(<AppProvider
+      config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet' }}
+      walletAdapter={testAdapter}
+    ><LoginModal onClose={() => {}} /></AppProvider>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+    fireEvent.click((await screen.findByText('Test Provider')).closest('button')!);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not switch to Arc Testnet');
+  });
+
   it('3. selecting/disconnecting a wallet clears write capability', async () => {
     const testAdapter = new TestWalletAdapter();
     const env = { VITE_ARC_CHAIN_ID: '5042002', VITE_ARC_RPC_URL: 'https://rpc.testnet.arc.io', VITE_ARC_NETWORK_NAME: 'Arc Testnet', VITE_ARC_USDC_ADDRESS: '0x0000000000000000000000000000000000000001' };
@@ -87,7 +100,7 @@ describe('App Tests', () => {
     fireEvent.click(providerBtn!);
 
     await screen.findByRole('heading', { name: 'My Agents' });
-    fireEvent.click(await screen.findByRole('button', { name: /0xTest/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
     const disconnectBtn = await screen.findByText('Disconnect');
     expect(disconnectBtn).toBeInTheDocument();
     
@@ -312,8 +325,8 @@ describe('App Tests', () => {
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
     fireEvent.click(providerBtn!);
 
-    // Account is intentionally available only from the signed-in address menu.
-    const accountMenu = await screen.findByRole('button', { name: /0xTest/i });
+    // Account details stay inside the signed-in Account menu.
+    const accountMenu = await screen.findByRole('button', { name: 'Account' });
     fireEvent.click(accountMenu);
     fireEvent.click(screen.getByRole('menuitem', { name: 'View account' }));
     

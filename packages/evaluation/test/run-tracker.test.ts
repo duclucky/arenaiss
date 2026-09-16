@@ -179,6 +179,62 @@ test("EvaluationRun persists provider success, one GenLayer transaction and cano
   }
 });
 
+test("a lost GenLayer submission response recovers from the canonical run result without a transaction hash", async () => {
+  class LostResponsePort extends FixtureEvaluationPort {
+    override async submit(value: EvaluationJudgeSubmission): Promise<string> {
+      this.submissions.push(structuredClone(value));
+      throw new Error("RPC response lost after submission");
+    }
+  }
+  const port = new LostResponsePort();
+  const tracker = new EvaluationRunTracker(port, new MemoryEvaluationRunStore(), judgeAddress);
+  const input = prepared(tracker);
+
+  await assert.rejects(() => tracker.submit(input.run_id), /response lost/i);
+  assert.equal(tracker.get(input.run_id)?.judge.state, "SUBMISSION_PERSISTED");
+
+  const recovered = await tracker.poll(input.run_id);
+  assert.equal(recovered.judge.state, "FINALIZED");
+  assert.equal("transactionHash" in recovered.judge, false);
+  assert.equal(recovered.scorecard?.result_class, "PASS");
+  assert.equal(port.submissions.length, 1);
+});
+
+test("an unknown canonical run is retried once after the reconciliation grace period and then requires recovery", async () => {
+  let now = 1_000;
+  class UnknownPort extends FixtureEvaluationPort {
+    calls = 0;
+    override async submit(): Promise<string> {
+      this.calls += 1;
+      throw new Error("ambiguous submission timeout");
+    }
+    override async getEvaluation(_address: string, runId: string) {
+      return { status: "UNKNOWN", run_id: runId };
+    }
+  }
+  const port = new UnknownPort();
+  const tracker = new EvaluationRunTracker(port, new MemoryEvaluationRunStore(), judgeAddress, {
+    now: () => now,
+    replayDelayMs: 100,
+    recoveryTimeoutMs: 300,
+    maxSubmissionAttempts: 2,
+  });
+  const input = prepared(tracker);
+
+  await assert.rejects(() => tracker.submit(input.run_id), /ambiguous/i);
+  assert.equal(port.calls, 1);
+  assert.equal((await tracker.poll(input.run_id)).judge.state, "SUBMISSION_PERSISTED");
+  assert.equal(port.calls, 1);
+
+  now += 100;
+  assert.equal((await tracker.poll(input.run_id)).judge.state, "SUBMISSION_PERSISTED");
+  assert.equal(port.calls, 2);
+
+  now += 200;
+  assert.equal((await tracker.poll(input.run_id)).judge.state, "RECOVERY_REQUIRED");
+  assert.equal(port.calls, 2);
+});
+
 test("provider timeout, empty output and provider error stay distinct and never reach GenLayer", async () => {
   for (const failure of ["PROVIDER_TIMEOUT", "EMPTY_OUTPUT", "PROVIDER_ERROR", "INVALID_OUTPUT"] as const) {
     const port = new FixtureEvaluationPort();

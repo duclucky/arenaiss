@@ -69,6 +69,10 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
     return this.request(`/api/account/tournament-credits/${encodeURIComponent(tournamentId)}/withdraw`, { method: 'POST', body: JSON.stringify({ idempotencyKey }) });
   }
 
+  registerTournamentEntrant(tournamentId: string, agentId: string): Promise<ManagedWalletTransaction> {
+    return this.request(`/api/tournaments/${encodeURIComponent(tournamentId)}/managed-registration`, { method: 'POST', body: JSON.stringify({ agentId }) });
+  }
+
   async logout(): Promise<void> {
     await this.request<void>('/api/auth/logout', { method: 'POST' }, true);
   }
