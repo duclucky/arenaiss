@@ -19,6 +19,7 @@ export function Tournaments() {
   const [operationBusy, setOperationBusy] = useState('');
   const [name, setName] = useState('Arena ISS Tournament');
   const [stakeUsdc, setStakeUsdc] = useState('1');
+  const [startsInSeconds, setStartsInSeconds] = useState(86_400);
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export function Tournaments() {
     const tournamentId = `sha256:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
     setOperationBusy('create'); setOperationError('');
     try {
-      const created = await tournamentOperationsApi.create({ tournamentId, name, registrationOpensAt: now, registrationClosesAt: now + 86_400, startsAt: now + 86_400, expiresAt: now + 7 * 86_400, minEntrants: 8, maxEntrants: 8, stakeAmount: usdcBaseUnits(stakeUsdc) });
+      const created = await tournamentOperationsApi.create({ tournamentId, name, registrationOpensAt: now, registrationClosesAt: now + startsInSeconds, startsAt: now + startsInSeconds, expiresAt: now + 7 * 86_400, minEntrants: 8, maxEntrants: 8, stakeAmount: usdcBaseUnits(stakeUsdc) });
       setOperations((current) => [created, ...(current || []).filter((item) => item.tournamentId !== created.tournamentId)]);
     } catch (reason) { setOperationError(reason instanceof Error ? reason.message : 'Could not create tournament.'); }
     finally { setOperationBusy(''); }
@@ -88,11 +89,13 @@ export function Tournaments() {
       <p className="page-kicker">Restricted control plane</p><h2 id="operator-lifecycle-heading" className="text-2xl font-bold">Operator lifecycle</h2>
       <p className="mt-2 max-w-3xl text-sm text-neutral-600">The runner derives brackets, ranking and Arc payouts from canonical evidence. No ranking or payout amount can be entered here.</p>
       {operationError && <p role="alert" className="mt-4 text-sm text-red-900">{operationError}</p>}
-      <div className="mt-5 grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+      <div className="mt-5 grid gap-3 md:grid-cols-[1fr_160px_160px_auto] md:items-end">
         <label className="text-sm font-semibold">Tournament name<input className="field-control mt-1" value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label className="text-sm font-semibold">Stake in USDC<input className="field-control mt-1" inputMode="decimal" value={stakeUsdc} onChange={(event) => setStakeUsdc(event.target.value)} /></label>
+        <label className="text-sm font-semibold">Starts in<select className="field-control mt-1" value={startsInSeconds} onChange={(event) => setStartsInSeconds(Number(event.target.value))}><option value={86_400}>24 hours</option><option value={1_800}>30 minutes</option></select></label>
         <button type="button" className="metal-button-solid" disabled={operationBusy !== '' || !name.trim()} onClick={createTournament}>{operationBusy === 'create' ? 'Creating...' : 'Create tournament'}</button>
       </div>
+      <p className="mt-3 text-xs text-neutral-600">Registration opens when created and closes at the start time. Confirm all entrants are ready before choosing 30 minutes.</p>
       <div className="mt-6 space-y-3">{operations.length === 0 ? <p className="text-sm text-neutral-600">No operator tournaments yet.</p> : operations.map((item) => <article key={item.tournamentId} className="retro-inset p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold">{item.name}</h3><p className="mt-1 text-xs text-neutral-600">{item.state} · {item.entrantCount} entrants · {item.finalizedMatchCount}/{item.matchCount} matches final</p></div><div className="flex flex-wrap gap-2">{item.nextActions.map((action) => <button key={action} type="button" className="metal-button-ghost" disabled={operationBusy !== ''} onClick={() => executeTournament(item, action)} aria-label={`${actionLabel(action)} ${item.name}`}>{operationBusy === `${item.tournamentId}:${action}` ? 'Working...' : actionLabel(action)}</button>)}</div></div>{item.message && <p className="mt-3 text-sm">{item.message}</p>}</article>)}</div>
     </section>}
   </section>;

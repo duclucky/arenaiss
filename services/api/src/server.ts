@@ -20,6 +20,7 @@ import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../pack
 import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/src/evaluation-sdk-port.ts';
 import type { TournamentOperationsPort } from './tournament-operations.ts';
 import { tournamentOperationsFromEnvironment } from './tournament-operations-live.ts';
+import { launchReferenceTournament } from './reference-tournament-launch.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -29,6 +30,7 @@ type ServerOptions = {
   logger?: (entry: RequestLog) => void;
   rateLimit?: { maxRequests: number; windowMs: number };
   tournamentOperations?: TournamentOperationsPort;
+  onTournamentOperationsReady?: (operations: TournamentOperationsPort | undefined) => void;
 };
 
 export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore, options: ServerOptions = {}) {
@@ -40,6 +42,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
   const agentRegistry = agentRegistryFromEnvironment(process.env);
   const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
+  options.onTournamentOperationsReady?.(tournamentOperations);
   const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
@@ -232,12 +235,19 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const resolvedDatabasePath = resolve(databasePath);
   mkdirSync(dirname(resolvedDatabasePath), { recursive: true });
   const runtime = new SqliteRuntimeStore(resolvedDatabasePath);
-  const server = createArenaServer(operator, runtime);
+  let tournamentOperations: TournamentOperationsPort | undefined;
+  const server = createArenaServer(operator, runtime, { onTournamentOperationsReady: (operations) => { tournamentOperations = operations; } });
   server.once('close', () => runtime.close());
   const shutdown = () => server.close();
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ event: 'server_listening', host, port })}\n`);
+    if (process.env.ARENA_ONE_SHOT_TOURNAMENT === 'reference-8x1-30m-v1') {
+      if (!tournamentOperations) process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_launch_failed', error: 'Tournament operations unavailable' })}\n`);
+      else void launchReferenceTournament(runtime, tournamentOperations, Math.floor(Date.now() / 1_000))
+        .then(({ input, snapshot }) => process.stdout.write(`${JSON.stringify({ event: 'reference_tournament_launch_confirmed', tournamentId: input.tournamentId, registrationClosesAt: input.registrationClosesAt, startsAt: input.startsAt, stakeAmount: input.stakeAmount, minEntrants: input.minEntrants, maxEntrants: input.maxEntrants, transactionHash: snapshot.arc?.transactionHash ?? null })}\n`))
+        .catch((error) => process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_launch_failed', error: error instanceof Error ? error.message : 'unknown error' })}\n`));
+    }
   });
 }
