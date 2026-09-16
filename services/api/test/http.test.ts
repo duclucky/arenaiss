@@ -6,6 +6,7 @@ import { ArenaHttpApi } from '../src/http.ts';
 import { viemSignatureVerifier } from '../src/viem-verifier.ts';
 import { privateKeyToAccount } from 'viem/accounts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
+import { entrantId } from '../../../packages/protocol/src/canonical.ts';
 
 const alice = '0x1111111111111111111111111111111111111111';
 const bob = '0x2222222222222222222222222222222222222222';
@@ -396,12 +397,42 @@ test('managed account can approve and register a prepared Tournament entry throu
     const response = await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
     assert.equal(response.status, 200);
     assert.equal(response.body.transactionId, 'entry-tx');
+    assert.equal(entries[0].entrantId, `0x${entrantId(tournamentId, '0x4444444444444444444444444444444444444444', agent.body.agentId, 1).slice(7)}`);
     await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
     assert.equal(entries[0].walletId, 'wallet-id');
     assert.equal(entries[0].stakeAmount, '1000000');
     assert.equal(entries[0].tournamentId, `0x${'f'.repeat(64)}`);
     assert.equal(entries[0].approvalIdempotencyKey, entries[1].approvalIdempotencyKey);
     assert.equal(entries[0].registrationIdempotencyKey, entries[1].registrationIdempotencyKey);
+  } finally { runtime.close(); }
+});
+
+test('email-managed Tournament registration derives the entrant from the managed wallet', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ArenaApiService(operator, runtime);
+    const tournamentId = `sha256:${'f'.repeat(64)}`;
+    service.publishTournament(operator, { id: tournamentId, name: 'Email Arena', status: 'UPCOMING', entrantIds: [], stakeAmount: '1000000', prizePool: '0' });
+    let submitted: any;
+    const managed = {
+      runtime, identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      agentRegistryAddress: '0x3333333333333333333333333333333333333333', tournamentEscrowAddress: '0x5555555555555555555555555555555555555555',
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address: '0x4444444444444444444444444444444444444444' }),
+        registerAgent: async () => ({ transactionId: 'agent-tx', state: 'COMPLETE', txHash: `0x${'1'.repeat(64)}` }),
+        registerTournamentEntrant: async (input: any) => { submitted = input; return { transactionId: 'entry-tx', state: 'COMPLETE', txHash: `0x${'2'.repeat(64)}` }; },
+      },
+      emailSender: { sendLoginCode: async () => undefined }, generateEmailCode: () => '654321',
+    };
+    const api = new ArenaHttpApi(service, async () => false, managed as any);
+    await api.handle({ method: 'POST', path: '/api/auth/email/challenge', body: { email: 'owner@example.com' } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/email/verify', body: { email: 'owner@example.com', code: '654321' } });
+    assert.equal(auth.status, 204);
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    const agent = await api.handle({ method: 'POST', path: '/api/agents', headers: { cookie }, body: { name: 'Email entrant', agentsMd: 'private' } });
+    const response = await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
+    assert.equal(response.status, 200);
+    assert.equal(submitted.entrantId, `0x${entrantId(tournamentId, '0x4444444444444444444444444444444444444444', agent.body.agentId, 1).slice(7)}`);
   } finally { runtime.close(); }
 });
 
