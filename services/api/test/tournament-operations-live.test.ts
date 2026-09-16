@@ -64,3 +64,26 @@ test('production Tournament runner opens Arc refunds when registration closes be
     assert.deepEqual(arc.transactionNames, ['create', 'refund']);
   } finally { runtime.close(); }
 });
+
+test('Tournament start snapshots its roster and random bracket seed across retries and restart', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const arc = new FakeArc();
+    let currentEntrants = entrants;
+    const service = { listTournamentOperatorEntrants: () => currentEntrants, publishTournament() {} } as any;
+    const seeds: string[] = [];
+    const rosterSizes: number[] = [];
+    const orchestrator = { async run(input: any) { seeds.push(input.seedDigest); rosterSizes.push(input.entrants.length); return { state: 'WAITING_FOR_JUDGE', attemptId: tournamentId, results: new Map() }; } } as any;
+    const input = { tournamentId, name: 'Daily', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 8, stakeAmount: '1000000' };
+    const first = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
+    await first.create(input);
+    await first.execute({ tournamentId, action: 'PROGRESS' });
+    currentEntrants = [];
+    const restored = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
+    await restored.execute({ tournamentId, action: 'PROGRESS' });
+    assert.deepEqual(rosterSizes, [8, 8]);
+    assert.equal(seeds[0], seeds[1]);
+    assert.match(seeds[0], /^sha256:[0-9a-f]{64}$/);
+    assert.notEqual(seeds[0], `sha256:${'0'.repeat(64)}`);
+  } finally { runtime.close(); }
+});

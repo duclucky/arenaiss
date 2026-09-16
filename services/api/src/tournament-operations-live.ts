@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
@@ -53,6 +53,8 @@ export interface TournamentArcOperations {
 type OperationRecord = {
   input: CreateTournamentOperation;
   state: TournamentOperationState;
+  seedDigest?: `sha256:${string}`;
+  entrants?: Entrant[];
   ranking?: string[];
   finalizedMatchCount: number;
   transactionHash?: string;
@@ -123,13 +125,18 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
       arc = await this.arc.markRunning(record.input.tournamentId);
     }
     if (arc.state !== 'RUNNING') { this.applyArcTerminal(record, arc); return; }
-    const candidates = this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`);
-    const registered = await this.arc.registeredEntrants(record.input.tournamentId, candidates);
-    if (registered.length !== arc.entrantCount || registered.length < record.input.minEntrants) throw new Error('Arc roster and API registration bindings do not match');
-    const entrants: Entrant[] = registered.map((item) => ({ entrantId: fromBytes32(item.entrantId), agentId: fromBytes32(item.agentId), agentsVersion: fromBytes32(item.agentsVersion), agentsCommitment: fromBytes32(item.agentsCommitment), agentsMd: item.agentsMd }));
-    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: digest(`${record.input.tournamentId}|arena-production-seed-v1`), entrants, topics: this.topics, bracketRevision: 1, retryCap: 3, expiresAt: record.input.expiresAt, now: this.now });
+    if (!record.entrants) {
+      const candidates = this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`);
+      const registered = await this.arc.registeredEntrants(record.input.tournamentId, candidates);
+      if (registered.length !== arc.entrantCount || registered.length < record.input.minEntrants) throw new Error('Arc roster and API registration bindings do not match');
+      record.entrants = registered.map((item) => ({ entrantId: fromBytes32(item.entrantId), agentId: fromBytes32(item.agentId), agentsVersion: fromBytes32(item.agentsVersion), agentsCommitment: fromBytes32(item.agentsCommitment), agentsMd: item.agentsMd }));
+      record.seedDigest = `sha256:${randomBytes(32).toString('hex')}`;
+      this.runtime.put('tournament-operations', record.input.tournamentId, record);
+    }
+    const entrants = record.entrants;
+    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: this.topics, bracketRevision: 1, retryCap: 3, expiresAt: record.input.expiresAt, now: this.now });
     this.applyOrchestrator(record, result, entrants.length);
-    this.publish(record, arc, registered.map((item) => fromBytes32(item.entrantId)));
+    this.publish(record, arc, entrants.map((item) => item.entrantId));
   }
 
   private async settle(record: OperationRecord): Promise<void> {
@@ -157,10 +164,9 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   private async refresh(record: OperationRecord): Promise<TournamentOperationSnapshot> {
     const arc = await this.arc.snapshot(record.input.tournamentId);
     this.applyArcTerminal(record, arc);
-    const candidates = this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`);
-    const registered = await this.arc.registeredEntrants(record.input.tournamentId, candidates);
+    const registered = record.entrants ?? await this.arc.registeredEntrants(record.input.tournamentId, this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`));
     this.runtime.put('tournament-operations', record.input.tournamentId, record);
-    this.publish(record, arc, registered.map((item) => fromBytes32(item.entrantId)));
+    this.publish(record, arc, registered.map((item) => item.entrantId.startsWith('sha256:') ? item.entrantId : fromBytes32(item.entrantId)));
     return this.toSnapshot(record, arc, registered);
   }
 
@@ -172,7 +178,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
 
   private publish(record: OperationRecord, arc: ArcSnapshot, entrants: readonly string[]): void {
     const status = record.state === 'COMPLETED' ? 'COMPLETED' : record.state === 'REFUNDED' ? 'CANCELLED' : ['RUNNING', 'WAITING_FOR_JUDGE', 'SETTLEMENT_PENDING', 'RECOVERY_REQUIRED', 'REFUND_PENDING'].includes(record.state) ? 'ACTIVE' : 'UPCOMING';
-    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6) });
+    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt });
   }
 
   private toSnapshot(record: OperationRecord, arc: ArcSnapshot, entrants: readonly unknown[]): TournamentOperationSnapshot {

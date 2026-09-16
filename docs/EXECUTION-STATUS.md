@@ -547,6 +547,26 @@ ID 5042002 with escrow bytecode and Studio Next chain ID 61997 with
 `AgentComparisonV1` canonical configuration. No Tournament was created and no
 paid provider or chain write was performed during this verification.
 
+## Daily Tournament scheduling (local implementation)
+
+The API can run one opt-in Daily Tournament sequence when
+`ARENA_DAILY_TOURNAMENT_STAKE_UNITS` is set to a positive Arc ERC-20 USDC amount
+in six-decimal base units. The first registration opens after the worker creates
+its Arc Tournament. Its roster closes and the bracket begins at the next
+00:00 UTC. Daily intents are persisted before the Arc creation attempt, so a
+restart retries the same policy and ID. The worker progresses judging,
+settlement or refunds and creates the next registration only after Arc reports
+`COMPLETED` or `REFUNDED`. If a run overlaps a UTC midnight, that day's start is
+skipped. The start snapshots the accepted roster and stores a random bracket
+seed before processing the first match. The public API rejects registration
+preparation at or after closing time and while a run is active.
+
+The owner set the daily stake to 1 Arc Testnet USDC per Agent and authorized
+commit, push and VPS deployment on 2026-09-16. Compose passes `1000000`
+six-decimal base units to the API and no longer starts the one-shot reference
+Tournament. The local checks do not themselves prove a live Arc creation;
+production readback is required after deployment.
+
 ## Coding Agent workflow (paused by owner)
 
 The documented handoff workflow remains available, but the owner currently

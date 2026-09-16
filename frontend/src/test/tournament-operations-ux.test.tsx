@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AgentApiAdapter, ArenaReadAdapter, ManagedIdentityAdapter, TournamentOperationsApiAdapter } from '../adapters/interfaces';
 import { AppProvider } from '../context';
 import { Tournaments } from '../views/Tournaments';
+import { TournamentDetail } from '../views/TournamentDetail';
 
 const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, identity: { kind: 'WALLET' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: `0x${'9'.repeat(40)}`, blockchain: 'ARC-TESTNET' as const, accountType: 'EOA' as const } };
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
@@ -12,6 +13,16 @@ const arenaRead = { async listTournaments() { return []; } } as unknown as Arena
 const snapshot = { tournamentId: `sha256:${'a'.repeat(64)}`, name: 'Safety Cup', state: 'REGISTRATION' as const, entrantCount: 3, matchCount: 0, finalizedMatchCount: 0, nextActions: ['PROGRESS', 'EXPIRE'] as const, arc: { state: 'REGISTRATION' } };
 
 describe('Tournament operator console', () => {
+  it('shows UTC registration deadline and hides registration after the roster closes', async () => {
+    const id = `sha256:${'e'.repeat(64)}`;
+    const reads = { async getTournament() { return { id, name: 'Arena ISS Daily', status: 'ACTIVE', entrantIds: [], prizePool: '8', registrationClosesAt: Date.UTC(2026, 8, 17) / 1_000 }; }, async getMatches() { return []; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider arenaReadAdapter={reads}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Arena ISS Daily' })).toBeInTheDocument();
+    expect(screen.getByText('Registration closed')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Register Agent' })).not.toBeInTheDocument();
+    expect(screen.getByText(/UTC/)).toBeInTheDocument();
+  });
+
   it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {
     const archived = `sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
     const live = `sha256:${'b'.repeat(64)}`;

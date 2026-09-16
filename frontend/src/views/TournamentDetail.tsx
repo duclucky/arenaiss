@@ -50,12 +50,9 @@ export function TournamentDetail() {
           <p className="page-kicker">Tournament</p><h1 className="page-title">{tournament.name}</h1>
           <p className="page-lede">Prize Pool: {tournament.prizePool} USDC</p>
         </div>
-        <Link
-          to={`/tournaments/${tournament.id}/submit`}
-          className="metal-button-solid"
-        >
-          Enter Arena
-        </Link>
+        {tournament.status === 'UPCOMING' && (!tournament.registrationClosesAt || Date.now() < tournament.registrationClosesAt * 1_000)
+          ? <Link to={`/tournaments/${tournament.id}/submit`} className="metal-button-solid">Register Agent</Link>
+          : <span className="retro-chip px-4 py-2 text-sm">Registration closed</span>}
       </div>
 
       {!networkConfig && (
@@ -69,6 +66,8 @@ export function TournamentDetail() {
       )}
 
       {tournament.demo && <DemoTournamentDetail detail={tournament.demo} />}
+
+      {tournament.registrationClosesAt && <p className="text-sm text-neutral-700">Registration closes at <time dateTime={new Date(tournament.registrationClosesAt * 1_000).toISOString()}>{new Date(tournament.registrationClosesAt * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time>. The roster is locked when the Tournament starts.</p>}
 
       <div className="glass-panel rounded-[28px] p-6 md:p-8">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
