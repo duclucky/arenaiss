@@ -42,7 +42,15 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByText(/eligible evaluation timeout refunds are claimable through Account/i)).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-input-v1')).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-output-v1')).toBeInTheDocument();
-    expect(screen.getByText('arena-generation-input-v2')).toBeInTheDocument();
+    expect(screen.queryByText('arena-generation-input-v2')).not.toBeInTheDocument();
+    expect(screen.getByText(/single-Agent runs can use the fallback after a timeout, rate limit, or temporary upstream failure/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tournament retries the whole pair on the fallback route only when a primary call times out/i)).toBeInTheDocument();
+    expect(screen.getByText(/A critical policy finding or a FAIL grade in safety or rule compliance sets the effective score to 0/i)).toBeInTheDocument();
+    expect(screen.getByText(/Marketplace eligibility requires 12 finalized runs/i)).toBeInTheDocument();
+    expect(screen.getByText(/registration closes at 00:00 UTC/i)).toBeInTheDocument();
+    expect(screen.getByText(/8 to 32 registered Agents/i)).toBeInTheDocument();
+    expect(screen.getByText(/10% platform fee/i)).toBeInTheDocument();
+    expect(screen.getByText(/40%.*25%.*15%.*10%.*10%/i)).toBeInTheDocument();
     expect(screen.getByText(/a leader proposes a scorecard or comparison/i)).toBeInTheDocument();
     expect(screen.getByText(/a second validator audits the proposal/i)).toBeInTheDocument();
     expect(screen.getByText(/does not read hidden chain of thought/i)).toBeInTheDocument();
@@ -62,6 +70,8 @@ describe('Arena ISS product documentation', () => {
 
     expect(screen.getByText('Active · Agent evaluation')).toBeInTheDocument();
     expect(screen.getByText('Active · Tournament and comparison')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'GenLayer Studio development preview' })).toBeInTheDocument();
+    expect(screen.getByText(/formerly reached through the Studio Next alias/i)).toBeInTheDocument();
     expect(screen.queryByText('Archived historical contract')).not.toBeInTheDocument();
   });
 });
