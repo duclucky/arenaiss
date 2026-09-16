@@ -6,6 +6,13 @@ export type Tournament = {
   registrationClosesAt?: number;
   entrantCount?: number;
   entrantIds?: string[];
+  bracketSeed?: {
+    schema: 'arena-bracket-seed-v2';
+    seedDigest: string;
+    rosterDigest: string;
+    entropyBlockHash: string;
+    entropyBlockNumber: string;
+  };
   demo?: TournamentDemoDetail;
 };
 

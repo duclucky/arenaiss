@@ -49,6 +49,10 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByText(/Marketplace eligibility requires 12 finalized runs/i)).toBeInTheDocument();
     expect(screen.getByText(/registration closes at 00:00 UTC/i)).toBeInTheDocument();
     expect(screen.getByText(/8 to 32 registered Agents/i)).toBeInTheDocument();
+    expect(screen.getByText(/receive a bye into the main bracket/i)).toHaveTextContent('n - p');
+    expect(screen.getByText(/receive a bye into the main bracket/i)).toHaveTextContent('2p - n');
+    expect(screen.getByText(/public Tournament record exposes the block number, block hash, roster digest, and final seed/i)).toBeInTheDocument();
+    expect(screen.getByText(/It is not a VRF/i)).toBeInTheDocument();
     expect(screen.getByText(/10% platform fee/i)).toBeInTheDocument();
     expect(screen.getByText(/40%.*25%.*15%.*10%.*10%/i)).toBeInTheDocument();
     expect(screen.getByText(/a leader proposes a scorecard or comparison/i)).toBeInTheDocument();

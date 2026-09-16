@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ArenaApiService } from "../src/service.ts";
+import { derivePublicBracketSeed } from "../../../packages/domain/src/bracket.ts";
 import { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlite-runtime.ts";
 import { buildEvaluationInput, sha256Text } from "../../../packages/evaluation/src/protocol.ts";
 import { EVO_CORE_PACK_ID } from "../../../packages/evaluation/src/evo-core.ts";
@@ -277,6 +278,18 @@ test("public tournament status is restricted to the frontend-readable lifecycle"
     api.publishTournament(ALICE, { id: `t-${status}`, name: `${status} Arena`, status, entrantIds: [], prizePool: "0" });
   }
   assert.throws(() => api.publishTournament(ALICE, { id: "t-invalid", name: "Invalid Arena", status: "SCHEDULED", entrantIds: [], prizePool: "0" } as any), /invalid tournament/i);
+});
+
+test("public bracket proof must reproduce from the published roster and cannot be changed", () => {
+  const api = new ArenaApiService(ALICE);
+  const id = `sha256:${"a".repeat(64)}` as const;
+  const entrantIds = Array.from({ length: 9 }, (_, index) => `sha256:${String(index + 1).padStart(64, "0")}` as const);
+  const bracketSeed = derivePublicBracketSeed({ tournamentId: id, entrants: entrantIds, entropyBlockHash: `0x${"b".repeat(64)}`, entropyBlockNumber: "123" });
+  const row = { id, name: "Public bracket", status: "ACTIVE" as const, entrantIds, prizePool: "9", bracketSeed };
+  api.publishTournament(ALICE, row);
+  assert.deepEqual(api.getTournament(id)?.bracketSeed, bracketSeed);
+  assert.throws(() => api.publishTournament(ALICE, { ...row, bracketSeed: { ...bracketSeed, seedDigest: `sha256:${"c".repeat(64)}` as const } }), /invalid tournament|bracket proof/i);
+  assert.throws(() => api.publishTournament(ALICE, { ...row, entrantIds: entrantIds.slice(1) }), /invalid tournament|bracket proof/i);
 });
 
 test("public match accepts preliminary round zero and rejects impossible state or winner", () => {

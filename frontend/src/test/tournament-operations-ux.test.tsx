@@ -23,6 +23,19 @@ describe('Tournament operator console', () => {
     expect(screen.getByText(/UTC/)).toBeInTheDocument();
   });
 
+  it('shows the reproducible Arc pairing proof and verification links when available', async () => {
+    const id = `sha256:${'e'.repeat(64)}`;
+    const bracketSeed = { schema: 'arena-bracket-seed-v2' as const, seedDigest: `sha256:${'a'.repeat(64)}`, rosterDigest: `sha256:${'b'.repeat(64)}`, entropyBlockHash: `0x${'c'.repeat(64)}`, entropyBlockNumber: '123' };
+    const reads = { async getTournament() { return { id, name: 'Proof Cup', status: 'ACTIVE', entrantIds: [], prizePool: '8', bracketSeed }; }, async getMatches() { return []; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider arenaReadAdapter={reads}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
+    const proof = await screen.findByRole('region', { name: 'Public pairing proof' });
+    expect(proof).toHaveTextContent(bracketSeed.seedDigest);
+    expect(proof).toHaveTextContent(bracketSeed.rosterDigest);
+    expect(proof).toHaveTextContent(bracketSeed.entropyBlockHash);
+    expect(screen.getByRole('link', { name: 'How to verify pairing' })).toHaveAttribute('href', '/docs#tournament');
+    expect(screen.getByRole('link', { name: 'View block' })).toHaveAttribute('href', 'https://testnet.arcscan.app/block/123');
+  });
+
   it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {
     const archived = `sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
     const live = `sha256:${'b'.repeat(64)}`;

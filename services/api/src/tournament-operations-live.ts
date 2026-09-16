@@ -1,9 +1,9 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
 
-import { buildBracket } from '../../../packages/domain/src/bracket.ts';
+import { buildBracket, derivePublicBracketSeed, type PublicBracketSeed } from '../../../packages/domain/src/bracket.ts';
 import { TournamentEvaluationPairRunner, TournamentComparisonJudgeAdapter } from '../../../packages/evaluation/src/tournament-runner.ts';
 import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
 import { ComparisonRunRegistry } from '../../../packages/evaluation/src/tournament-comparison.ts';
@@ -72,6 +72,7 @@ export interface TournamentArcOperations {
   registeredEntrants(tournamentId: string, candidates: readonly TournamentOperatorEntrant[]): Promise<TournamentOperatorEntrant[]>;
   closeRegistration(tournamentId: string): Promise<ArcSnapshot>;
   markRunning(tournamentId: string): Promise<ArcSnapshot>;
+  startBlockEntropy(startsAt: number): Promise<{ blockHash: string; blockNumber: string }>;
   settle(tournamentId: string, ranking: readonly string[], rankingDigest: string, nonce: number): Promise<ArcSnapshot>;
   refund(tournamentId: string, reasonDigest: string): Promise<ArcSnapshot>;
 }
@@ -82,6 +83,7 @@ type OperationRecord = {
   topicPoolVersion?: 2;
   topics?: string[];
   seedDigest?: `sha256:${string}`;
+  bracketSeed?: PublicBracketSeed;
   entrants?: Entrant[];
   ranking?: string[];
   finalizedMatchCount: number;
@@ -153,13 +155,22 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
       arc = await this.arc.markRunning(record.input.tournamentId);
     }
     if (arc.state !== 'RUNNING') { this.applyArcTerminal(record, arc); return; }
+    let bracketChanged = false;
     if (!record.entrants) {
       const candidates = this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`);
       const registered = await this.arc.registeredEntrants(record.input.tournamentId, candidates);
       if (registered.length !== arc.entrantCount || registered.length < record.input.minEntrants) throw new Error('Arc roster and API registration bindings do not match');
       record.entrants = registered.map((item) => ({ entrantId: fromBytes32(item.entrantId), agentId: fromBytes32(item.agentId), agentsVersion: fromBytes32(item.agentsVersion), agentsCommitment: fromBytes32(item.agentsCommitment), agentsMd: item.agentsMd }));
-      record.seedDigest = `sha256:${randomBytes(32).toString('hex')}`;
       if (record.topicPoolVersion === 2) record.topics = [...this.topics];
+      bracketChanged = true;
+    }
+    if (!record.seedDigest) {
+      const entropy = await this.arc.startBlockEntropy(record.input.startsAt);
+      record.bracketSeed = derivePublicBracketSeed({ tournamentId: record.input.tournamentId as `sha256:${string}`, entrants: record.entrants.map((item) => item.entrantId), entropyBlockHash: entropy.blockHash, entropyBlockNumber: entropy.blockNumber });
+      record.seedDigest = record.bracketSeed.seedDigest;
+      bracketChanged = true;
+    }
+    if (bracketChanged) {
       this.runtime.put('tournament-operations', record.input.tournamentId, record);
     }
     const entrants = record.entrants;
@@ -207,7 +218,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
 
   private publish(record: OperationRecord, arc: ArcSnapshot, entrants: readonly string[]): void {
     const status = record.state === 'COMPLETED' ? 'COMPLETED' : record.state === 'REFUNDED' ? 'CANCELLED' : ['RUNNING', 'WAITING_FOR_JUDGE', 'SETTLEMENT_PENDING', 'RECOVERY_REQUIRED', 'REFUND_PENDING'].includes(record.state) ? 'ACTIVE' : 'UPCOMING';
-    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt });
+    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt, ...(record.bracketSeed ? { bracketSeed: record.bracketSeed } : {}) });
   }
 
   private toSnapshot(record: OperationRecord, arc: ArcSnapshot, entrants: readonly unknown[]): TournamentOperationSnapshot {
@@ -240,6 +251,23 @@ export class ViemTournamentArcOperations implements TournamentArcOperations {
   async registeredEntrants(tournamentId: string, candidates: readonly TournamentOperatorEntrant[]): Promise<TournamentOperatorEntrant[]> { const rows = await Promise.all(candidates.map(async (candidate) => ({ candidate, row: await this.client.readContract({ address: this.escrow, abi: TOURNAMENT_ABI, functionName: 'getEntrant', args: [toBytes32(tournamentId), candidate.entrantId as Hex] }) }))); return rows.filter(({ candidate, row }) => row[4] && row[1].toLowerCase() === candidate.agentId.toLowerCase() && row[2].toLowerCase() === candidate.agentsVersion.toLowerCase() && row[3].toLowerCase() === candidate.agentsCommitment.toLowerCase()).map(({ candidate }) => candidate); }
   closeRegistration(id: string) { return this.write(id, 'closeRegistration', [toBytes32(id)]); }
   markRunning(id: string) { return this.write(id, 'markRunning', [toBytes32(id)]); }
+  async startBlockEntropy(startsAt: number): Promise<{ blockHash: string; blockNumber: string }> {
+    await this.requireChain();
+    if (!Number.isSafeInteger(startsAt) || startsAt <= 0) throw new Error('invalid Arc Tournament start timestamp');
+    let upper = await this.client.getBlockNumber();
+    const latest = await this.client.getBlock({ blockNumber: upper });
+    if (latest.timestamp < BigInt(startsAt)) throw new Error('Arc Tournament start block is not available yet');
+    let lower = 0n;
+    while (lower < upper) {
+      const middle = (lower + upper) / 2n;
+      const block = await this.client.getBlock({ blockNumber: middle });
+      if (block.timestamp >= BigInt(startsAt)) upper = middle;
+      else lower = middle + 1n;
+    }
+    const selected = await this.client.getBlock({ blockNumber: lower });
+    if (!selected.hash || selected.timestamp < BigInt(startsAt)) throw new Error('canonical Arc Tournament start block is unavailable');
+    return { blockHash: selected.hash, blockNumber: lower.toString() };
+  }
   settle(id: string, ranking: readonly string[], rankingDigest: string, nonce: number) { return this.write(id, 'settleByOperator', [toBytes32(id), ranking.map(toBytes32), toBytes32(rankingDigest), BigInt(nonce)]); }
   refund(id: string, reasonDigest: string) { return this.write(id, 'cancelAndOpenRefunds', [toBytes32(id), toBytes32(reasonDigest)]); }
   private raw(id: string) { return this.client.readContract({ address: this.escrow, abi: TOURNAMENT_ABI, functionName: 'getTournament', args: [toBytes32(id)] }); }

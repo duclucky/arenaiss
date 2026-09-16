@@ -144,9 +144,18 @@ function normalizeTournament(value: unknown): Tournament {
   if (!TOURNAMENT_STATES.has(status)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.registrationClosesAt !== undefined && (!Number.isSafeInteger(item.registrationClosesAt) || (item.registrationClosesAt as number) < 1)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.entrantIds !== undefined && (!Array.isArray(item.entrantIds) || item.entrantIds.some((id) => typeof id !== 'string'))) throw new Error('INVALID_ARENA_RESPONSE');
+  let bracketSeed: Tournament['bracketSeed'];
+  if (item.bracketSeed !== undefined) {
+    const proof = record(item.bracketSeed);
+    const schema = text(proof.schema); const seedDigest = text(proof.seedDigest); const rosterDigest = text(proof.rosterDigest);
+    const entropyBlockHash = text(proof.entropyBlockHash); const entropyBlockNumber = text(proof.entropyBlockNumber);
+    if (schema !== 'arena-bracket-seed-v2' || !/^sha256:[0-9a-f]{64}$/.test(seedDigest) || !/^sha256:[0-9a-f]{64}$/.test(rosterDigest) || !/^0x[0-9a-f]{64}$/.test(entropyBlockHash) || !/^(0|[1-9][0-9]*)$/.test(entropyBlockNumber)) throw new Error('INVALID_ARENA_RESPONSE');
+    bracketSeed = { schema, seedDigest, rosterDigest, entropyBlockHash, entropyBlockNumber };
+  }
   return { id: text(item.id), name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
     ...(item.registrationClosesAt !== undefined ? { registrationClosesAt: item.registrationClosesAt as number } : {}),
-    ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}) };
+    ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}),
+    ...(bracketSeed ? { bracketSeed } : {}) };
 }
 function normalizeMatch(value: unknown): Match {
   const item = record(value);
