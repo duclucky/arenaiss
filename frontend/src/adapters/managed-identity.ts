@@ -1,4 +1,4 @@
-import type { ManagedAccount, ManagedCctpTransfer, ManagedIdentityAdapter, ManagedUsdcBalance, ManagedWalletTransaction } from './interfaces';
+import type { ManagedAccount, ManagedCctpTransfer, ManagedIdentityAdapter, ManagedUsdcBalance, ManagedUsdcTransfer, ManagedWalletTransaction } from './interfaces';
 
 type Fetcher = typeof fetch;
 
@@ -41,8 +41,16 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
     return this.request('/api/account/usdc-balances', { method: 'GET' });
   }
 
-  transferUsdc(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction> {
+  transferUsdc(destinationAddress: string, amount: string): Promise<ManagedUsdcTransfer> {
     return this.request('/api/account/usdc-transfers', { method: 'POST', body: JSON.stringify({ destinationAddress, amount }) });
+  }
+
+  listUsdcTransfers(): Promise<ManagedUsdcTransfer[]> {
+    return this.request('/api/account/usdc-transfers', { method: 'GET' });
+  }
+
+  getUsdcTransfer(operationId: string): Promise<ManagedUsdcTransfer> {
+    return this.request(`/api/account/usdc-transfers/${encodeURIComponent(operationId)}`, { method: 'GET' });
   }
 
   bridgeUsdcToArc(sourceChain: string, amount: string): Promise<ManagedCctpTransfer> {

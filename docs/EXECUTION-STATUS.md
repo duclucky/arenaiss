@@ -1,5 +1,18 @@
 # Implementation execution status
 
+## 2026-09-16 product-flow hardening
+
+This source revision reconciles submitted Marketplace listings, persists and reuses Circle
+intent keys for listing, purchase, cancellation and managed USDC withdrawal, and
+restore withdrawal status from the API after a browser reload. Evo failure views
+distinguish provider timeout from an unfinished score. Agent and Docs copy now
+discloses the exact profile bytes sent to providers and GenLayer validators.
+The release-candidate manifest covers this reviewed source revision. Local
+tests and the production build are the release checks; live Arc/Circle/GenLayer
+payment and recovery journeys remain unverified. Frontend-wide lint has
+existing failures outside this batch. This source release does not advance an
+evaluation or evidence-authenticity phase gate.
+
 ## Snapshot
 
 - Date: `2026-09-16`

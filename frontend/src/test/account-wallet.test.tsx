@@ -22,7 +22,11 @@ function identity(): ManagedIdentityAdapter {
       { chain: 'ARC-TESTNET', label: 'Arc Testnet', amount: '2.5', isArc: true, available: true },
       { chain: 'BASE-SEPOLIA', label: 'Base Sepolia', amount: '1', isArc: false, available: true },
     ],
-    transferUsdc: async () => ({ transactionId: 'transfer-1', state: 'INITIATED' }),
+    transferUsdc: async () => ({ operationId: '22222222-2222-4222-8222-222222222222', destinationAddress: address,
+      amount: '0.25', transactionId: 'transfer-1', state: 'SUBMITTED', updatedAt: 1 }),
+    listUsdcTransfers: async () => [],
+    getUsdcTransfer: async () => ({ operationId: '22222222-2222-4222-8222-222222222222', destinationAddress: address,
+      amount: '0.25', transactionId: 'transfer-1', state: 'SUBMITTED', updatedAt: 1 }),
     bridgeUsdcToArc: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'PENDING', sourceChain: 'BASE-SEPOLIA', amount: '1', updatedAt: 1 }),
     getCctpTransfer: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED', sourceChain: 'BASE-SEPOLIA', amount: '1', transactionId: 'bridge-1', txHash: `0x${'1'.repeat(64)}`, explorerUrl: `https://sepolia.basescan.org/tx/0x${'1'.repeat(64)}`, updatedAt: 2 }),
   };
@@ -88,6 +92,20 @@ describe('managed Arena ISS wallet account', () => {
     render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={restoredIdentity} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByText(/Approving USDC spend on the source network/i)).toBeInTheDocument();
     expect(restoredIdentity.listCctpTransfers).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a submitted Arc withdrawal and blocks a duplicate after reload', async () => {
+    const operation = { operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED' as const,
+      destinationAddress: '0x2222222222222222222222222222222222222222', amount: '1.25',
+      transactionId: 'circle-tx', txHash: `0x${'7'.repeat(64)}`,
+      explorerUrl: `https://testnet.arcscan.app/tx/0x${'7'.repeat(64)}`, updatedAt: 2 };
+    const restoredIdentity = { ...identity(), listUsdcTransfers: vi.fn().mockResolvedValue([operation]),
+      getUsdcTransfer: vi.fn().mockResolvedValue(operation), transferUsdc: vi.fn() };
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={restoredIdentity} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/USDC transfer submitted/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Withdraw USDC' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'View transaction' })).toHaveAttribute('href', operation.explorerUrl);
+    expect(restoredIdentity.transferUsdc).not.toHaveBeenCalled();
   });
 
   it('does not block Arc withdrawal or lose legacy CCTP status while it is pending', async () => {

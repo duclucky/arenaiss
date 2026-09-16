@@ -37,6 +37,7 @@ export class ArenaHttpApi {
     this.agentRegistry = agentRegistry;
     this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
+    void this.managedIdentity?.resumeUsdcTransfers().catch(() => undefined);
   }
 
   async handle(request: ApiRequest): Promise<ApiResponse> {
@@ -100,7 +101,16 @@ export class ArenaHttpApi {
       }
       if (request.method === 'POST' && request.path === '/api/account/usdc-transfers') {
         const session = this.requireManagedSession(request.headers);
-        return this.json(202, await this.managedIdentity!.transferUsdc(session.userId!, requireString(request.body?.destinationAddress), requireString(request.body?.amount)));
+        return this.json(202, await this.managedIdentity!.startUsdcTransfer(session.userId!, requireString(request.body?.destinationAddress), requireString(request.body?.amount)));
+      }
+      if (request.method === 'GET' && request.path === '/api/account/usdc-transfers') {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(200, this.managedIdentity!.listUsdcTransfers(session.userId!));
+      }
+      const usdcTransferMatch = request.path.match(/^\/api\/account\/usdc-transfers\/([0-9a-fA-F-]{36})$/);
+      if (request.method === 'GET' && usdcTransferMatch) {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(200, await this.managedIdentity!.getUsdcTransfer(session.userId!, usdcTransferMatch[1]));
       }
       if (request.method === 'POST' && request.path === '/api/account/cctp-transfers') {
         const session = this.requireManagedSession(request.headers);
@@ -128,29 +138,33 @@ export class ArenaHttpApi {
       }
       const certificateMatch = request.path.match(/^\/api\/marketplace\/certificates\/(sha256:[0-9a-fA-F]{64})\/approve$/);
       if (request.method === 'POST' && certificateMatch) { const operator = this.requireSession(request.headers); if (operator.toLowerCase() !== this.service.operatorAddress || !this.marketplaceChain?.approveEligibility) throw new Error('unauthorized operator'); const certificate = this.service.listMarketplaceCertificatesForOperator(operator).find((row) => row.certificateDigest === certificateMatch[1]); if (!certificate) throw new Error('marketplace certificate not found'); const transaction = await this.marketplaceChain.approveEligibility({ digest: certificate.certificateDigest, agentId: certificate.agentId, version: certificate.agentVersionId, commitment: certificate.agentsCommitment, validUntil: certificate.expiresAt }); return this.json(200, this.service.approveMarketplaceEligibility(operator, certificate.certificateDigest, transaction)); }
-      if (request.method === 'GET' && request.path === '/api/marketplace/my-listings') { const owner = this.requireSession(request.headers); return this.json(200, this.service.listMarketplaceListings().filter((row) => row.sellerAddress.toLowerCase() === owner.toLowerCase())); }
+      if (request.method === 'GET' && request.path === '/api/marketplace/my-listings') { const owner = this.requireSession(request.headers); return this.json(200, this.service.listOwnedMarketplaceListings(owner)); }
       if (request.method === 'POST' && request.path === '/api/marketplace/listings') {
-        const session = this.requireManagedSession(request.headers); const body = request.body || {}; if (!this.managedIdentity) throw new Error('marketplace unavailable');
-        const transaction = await this.managedIdentity.marketplaceCreateListing(session.userId!, { agentId: requireDigest(body.agentId), version: requireDigest(body.agentsVersion), commitment: requireDigest(body.agentsCommitment), certificateDigest: requireDigest(body.certificateDigest), price: requireUint(body.price), expiresAt: requireInteger(body.expiresAt), idempotencyKey: requireString(body.idempotencyKey) });
+        const session = this.requireManagedSession(request.headers); const body = request.body || {}; if (!this.managedIdentity || !this.marketplaceChain?.resolveCreatedListingId) throw new Error('marketplace unavailable');
         const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!);
-        const requestedListingId = requireString(body.listingId);
-        const listingId = transaction.txHash && this.marketplaceChain?.resolveCreatedListingId ? await this.marketplaceChain.resolveCreatedListingId(transaction.txHash) : requestedListingId;
-        const listing = this.service.createMarketplaceListing(session.principal, { listingId, certificateDigest: requireDigest(body.certificateDigest), sellerAddress: account.managedWallet.address, price: requireUint(body.price), expiresAt: requireInteger(body.expiresAt), transaction });
+        const intent = this.service.beginMarketplaceListing(session.principal, { agentId: requireDigest(body.agentId), agentsVersion: requireDigest(body.agentsVersion), agentsCommitment: requireDigest(body.agentsCommitment), certificateDigest: requireDigest(body.certificateDigest), sellerAddress: account.managedWallet.address, price: requireUint(body.price), expiresAt: requireInteger(body.expiresAt), idempotencyKey: requireString(body.idempotencyKey) });
+        if (intent.listingId) return this.json(202, this.service.finishMarketplaceListing(session.principal, intent.certificateDigest, intent.listingId));
+        const transaction = intent.transaction ?? await this.managedIdentity.marketplaceCreateListing(session.userId!, { agentId: intent.agentId, version: intent.agentsVersion, commitment: intent.agentsCommitment, certificateDigest: intent.certificateDigest, price: intent.price, expiresAt: intent.expiresAt, idempotencyKey: intent.idempotencyKey });
+        this.service.recordMarketplaceListingTransaction(session.principal, intent.certificateDigest, transaction);
+        const listingId = await this.marketplaceChain.resolveCreatedListingId(transaction.txHash!);
+        const listing = this.service.finishMarketplaceListing(session.principal, intent.certificateDigest, listingId);
         return this.json(202, listing);
       }
       const listingCancel = request.path.match(/^\/api\/marketplace\/listings\/([1-9][0-9]*)\/cancel$/);
       if (request.method === 'POST' && listingCancel) {
         const session = this.requireManagedSession(request.headers); if (!this.managedIdentity || !this.marketplaceChain) throw new Error('marketplace unavailable');
         const listing = this.service.listMarketplaceListings().find((row) => row.listingId === listingCancel[1]);
-        if (!listing || listing.state !== 'ACTIVE') throw new Error('active marketplace listing unavailable');
+        if (!listing || (listing.state !== 'ACTIVE' && listing.state !== 'CANCEL_SUBMITTED')) throw new Error('active marketplace listing unavailable');
         const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!);
         if (listing.sellerAddress.toLowerCase() !== account.managedWallet.address.toLowerCase()) throw new Error('marketplace seller required');
-        await this.managedIdentity.marketplaceCancel(session.userId!, listing.listingId, requireString(request.body?.idempotencyKey));
+        const idempotencyKey = this.service.beginMarketplaceCancellation(session.principal, listing.listingId, account.managedWallet.address, requireString(request.body?.idempotencyKey));
+        try { await this.managedIdentity.marketplaceCancel(session.userId!, listing.listingId, idempotencyKey); }
+        catch { throw new Error('marketplace cancellation unavailable'); }
         const snapshot = await this.marketplaceChain.snapshot(listing.listingId);
-        return this.json(200, this.service.publishMarketplaceListing(this.service.operatorAddress, snapshot));
+        return this.json(202, this.service.publishMarketplaceListing(this.service.operatorAddress, snapshot));
       }
       const listingBuy = request.path.match(/^\/api\/marketplace\/listings\/([1-9][0-9]*)\/buy$/);
-      if (request.method === 'POST' && listingBuy) { const session = this.requireManagedSession(request.headers); if (!this.managedIdentity) throw new Error('marketplace unavailable'); const listing = this.service.listMarketplaceListings().find((row) => row.listingId === listingBuy[1]); if (!listing) throw new Error('marketplace listing unavailable'); const transaction = await this.managedIdentity.marketplaceBuy(session.userId!, listingBuy[1], listing.price, requireString(request.body?.approvalIdempotencyKey), requireString(request.body?.buyIdempotencyKey)); const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!); const projected = this.service.submitMarketplacePurchase(session.principal, listingBuy[1], account.managedWallet.address, transaction); return this.json(202, projected); }
+      if (request.method === 'POST' && listingBuy) { const session = this.requireManagedSession(request.headers); if (!this.managedIdentity) throw new Error('marketplace unavailable'); const listing = this.service.listMarketplaceListings().find((row) => row.listingId === listingBuy[1]); if (!listing) throw new Error('marketplace listing unavailable'); const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!); const keys = this.service.beginMarketplacePurchase(session.principal, listingBuy[1], account.managedWallet.address, { approvalIdempotencyKey: requireString(request.body?.approvalIdempotencyKey), buyIdempotencyKey: requireString(request.body?.buyIdempotencyKey) }); const transaction = await this.managedIdentity.marketplaceBuy(session.userId!, listingBuy[1], listing.price, keys.approvalIdempotencyKey, keys.buyIdempotencyKey); const projected = this.service.submitMarketplacePurchase(session.principal, listingBuy[1], account.managedWallet.address, transaction); return this.json(202, projected); }
       const listingDelivery = request.path.match(/^\/api\/marketplace\/listings\/([1-9][0-9]*)\/delivery$/);
       if (request.method === 'GET' && listingDelivery) { const session = this.requireSessionRecord(request.headers); if (!this.marketplaceChain) throw new Error('marketplace unavailable'); const snapshot = await this.marketplaceChain.snapshot(listingDelivery[1]); this.service.publishMarketplaceListing(this.service.operatorAddress, snapshot); return this.json(200, this.service.getMarketplaceDelivery(session.principal, listingDelivery[1], snapshot)); }
       if (request.method === 'GET' && request.path === '/api/marketplace/credit') { const session = this.requireManagedSession(request.headers); if (!this.marketplaceChain?.creditOf || !this.managedIdentity) throw new Error('marketplace credit unavailable'); const account = await this.managedIdentity.getAccount(session.userId!, session.identityKind!); return this.json(200, { amount: await this.marketplaceChain.creditOf(account.managedWallet.address) }); }
@@ -409,10 +423,8 @@ export class ArenaHttpApi {
 
   private async reconcileMarketplaceListings(): Promise<any[]> {
     if (!this.marketplaceChain) return this.service.listMarketplaceListings();
-    for (const listing of this.service.listMarketplaceListings()) {
-      if (listing.state === 'SUBMITTED' || listing.state === 'BUY_SUBMITTED') {
-        try { this.service.publishMarketplaceListing(this.service.operatorAddress, await this.marketplaceChain.snapshot(listing.listingId)); } catch { /* pending Arc transaction remains projected */ }
-      }
+    for (const listing of this.service.listMarketplaceListingsForReconciliation()) {
+      try { this.service.publishMarketplaceListing(this.service.operatorAddress, await this.marketplaceChain.snapshot(listing.listingId)); } catch { /* pending Arc transaction remains projected */ }
     }
     return this.service.listMarketplaceListings();
   }

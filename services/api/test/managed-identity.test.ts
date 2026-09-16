@@ -205,3 +205,62 @@ test('CCTP failure returns a safe message without upstream request data', async 
     assert.equal(JSON.stringify(result).includes('upstream private request payload'), false);
   } finally { runtime.close(); }
 });
+
+test('Arc USDC transfer persists one intent before Circle and survives duplicate requests', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const userId = `usr_${'e'.repeat(64)}`;
+    runtime.put('circle-wallets', userId, { state: 'READY', userId, walletId: 'wallet-id', address,
+      blockchain: 'ARC-TESTNET', accountType: 'SCA', idempotencyKey: 'wallet-key', updatedAt: 1 });
+    let calls = 0;
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: { createWallet: async () => ({ walletId: 'wallet-id', address }),
+        transferUsdc: async (input: any) => {
+          calls += 1;
+          const stored = runtime.list<any>('circle-usdc-transfers');
+          assert.equal(stored.length, 1);
+          assert.equal(stored[0].state, 'PENDING');
+          assert.equal(stored[0].idempotencyKey, input.idempotencyKey);
+          return { transactionId: 'circle-tx', state: 'SENT', txHash: `0x${'7'.repeat(64)}` };
+        },
+        getTransfer: async () => ({ transactionId: 'circle-tx', state: 'COMPLETE', txHash: `0x${'7'.repeat(64)}` }),
+      },
+    } as any);
+    const destination = '0x2222222222222222222222222222222222222222';
+    const first = await service.startUsdcTransfer(userId, destination, '1.25');
+    const duplicate = await service.startUsdcTransfer(userId, destination, '1.25');
+    assert.equal(first.state, 'SUBMITTED');
+    assert.equal(duplicate.operationId, first.operationId);
+    assert.equal(calls, 1);
+    await assert.rejects(service.startUsdcTransfer(userId, destination, '2'), /unresolved USDC transfer/);
+    const confirmed = await service.getUsdcTransfer(userId, first.operationId);
+    assert.equal(confirmed.state, 'CONFIRMED');
+    assert.equal(JSON.stringify(confirmed).includes('idempotencyKey'), false);
+    assert.equal((await service.startUsdcTransfer(userId, destination, '1.25')).operationId === first.operationId, false);
+    assert.equal(calls, 2);
+  } finally { runtime.close(); }
+});
+
+test('uncertain Arc USDC transfer remains owner-visible after restart without a second send', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const userId = `usr_${'f'.repeat(64)}`;
+    runtime.put('circle-wallets', userId, { state: 'READY', userId, walletId: 'wallet-id', address,
+      blockchain: 'ARC-TESTNET', accountType: 'SCA', idempotencyKey: 'wallet-key', updatedAt: 1 });
+    let calls = 0;
+    const walletPort = { createWallet: async () => ({ walletId: 'wallet-id', address }),
+      transferUsdc: async () => { calls += 1; throw new Error('private upstream payload'); } };
+    const first = new ManagedIdentityService({ ...options(runtime, async () => ({ walletId: 'wallet-id', address })), circleWallets: walletPort } as any);
+    const destination = '0x2222222222222222222222222222222222222222';
+    const operation = await first.startUsdcTransfer(userId, destination, '1');
+    assert.equal(operation.state, 'RECOVERY_REQUIRED');
+    const restarted = new ManagedIdentityService({ ...options(runtime, async () => ({ walletId: 'wallet-id', address })), circleWallets: walletPort } as any);
+    assert.deepEqual(restarted.listUsdcTransfers(userId).map((row) => row.operationId), [operation.operationId]);
+    assert.equal(JSON.stringify(restarted.listUsdcTransfers(userId)).includes('private upstream payload'), false);
+    assert.equal(JSON.stringify(restarted.listUsdcTransfers(userId)).includes('idempotencyKey'), false);
+    assert.deepEqual(restarted.listUsdcTransfers(`usr_${'a'.repeat(64)}`), []);
+    assert.equal((await restarted.startUsdcTransfer(userId, destination, '1')).operationId, operation.operationId);
+    assert.equal(calls, 1);
+  } finally { runtime.close(); }
+});

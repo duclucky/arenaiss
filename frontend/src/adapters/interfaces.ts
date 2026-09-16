@@ -152,6 +152,11 @@ export type ManagedAccount = {
 
 export type ManagedUsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
 export type ManagedWalletTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
+export type ManagedUsdcTransfer = {
+  operationId: string; state: 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED' | 'RECOVERY_REQUIRED';
+  destinationAddress: string; amount: string; transactionId?: string; txHash?: string;
+  explorerUrl?: string; message?: string; updatedAt: number;
+};
 export type ManagedCctpTransfer = {
   operationId: string;
   state: 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED' | 'RECOVERY_REQUIRED';
@@ -171,7 +176,9 @@ export interface ManagedIdentityAdapter {
   requestEmailCode(email: string): Promise<void>;
   verifyEmail(email: string, code: string): Promise<ManagedAccount>;
   listUsdcBalances?(): Promise<ManagedUsdcBalance[]>;
-  transferUsdc?(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction>;
+  transferUsdc?(destinationAddress: string, amount: string): Promise<ManagedUsdcTransfer>;
+  listUsdcTransfers?(): Promise<ManagedUsdcTransfer[]>;
+  getUsdcTransfer?(operationId: string): Promise<ManagedUsdcTransfer>;
   bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedCctpTransfer>;
   listCctpTransfers?(): Promise<ManagedCctpTransfer[]>;
   getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
@@ -180,7 +187,7 @@ export interface ManagedIdentityAdapter {
 }
 
 export type MarketplaceCertificate = { schema: string; certificateDigest: string; evidenceDigest: string; owner: string; agentId: string; agentVersionId: string; agentsCommitment: string; packId: string; packVersion: string; rubricVersion: string; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: 'ELIGIBLE' | 'APPROVED'; authorization?: ManagedWalletTransaction };
-export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; name: string; sellerAddress: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
+export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; name: string; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'CANCEL_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
 export interface MarketplaceApiAdapter {
   listListings(): Promise<MarketplaceListing[]>;
   listPurchases?(): Promise<MarketplaceListing[]>;
@@ -214,7 +221,7 @@ export type EvaluationScenario = {
   forbiddenActionIds: string[]; confirmationRequiredActionIds: string[]; maxProposedActions: number;
 };
 export type EvaluationPack = { schema: string; packId: string; version: string; name: string; scenarioIds: string[]; scenarioCount: number };
-export type EvaluationCampaign = { schema: string; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number }> };
+export type EvaluationCampaign = { schema: string; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; failureStage?: string; failureCode?: string }> };
 export type EvaluationRun = { schema: string; runId: string; agentVersionId: string; mode: string; rubricVersion: string; scenario: { scenarioId: string; version: string; mode: string; digest: string }; provider: { state: string }; judge: { state: string; transactionHash?: string }; scorecard?: { resultClass: string; overallScore: number; dimensions: Array<{ dimensionId: string; grade: string }>; actionsExecuted: false } };
 export type RegressionPolicy = { schema: 'arena-regression-policy-v1'; requiredRunsPerScenario: number; minimumScenarioCoverageBps: number; maximumOverallDrop: number; maximumDimensionDrop: number; maximumOverallSpread: number; maximumDimensionSpread: number; minimumDimensionScores: Partial<Record<'instruction_adherence' | 'reasoning_quality' | 'action_selection' | 'rule_compliance' | 'task_completion' | 'safety', number>>; criticalFindingCodes: string[] };
 export type VersionComparison = { schema: 'arena-version-comparison-v1'; comparisonId: string; inputDigest: string; status: 'PASS' | 'REGRESSION' | 'INCOMPARABLE' | 'INCOMPLETE' | 'INFRASTRUCTURE_ERROR' | 'UNSTABLE'; agentId: string; baselineVersionId: string; candidateVersionId: string; coverageBps: number; findings: Array<{ code: string; dimension?: string; observed?: number; threshold?: number }>; baseline?: { overallScore: number }; candidate?: { overallScore: number } };

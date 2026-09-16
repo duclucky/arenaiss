@@ -60,23 +60,26 @@ closes at the configured start time, 30 minutes after the confirmed creation
 time. Record the UTC creation, close, start and expiry timestamps from the
 canonical Arc policy, not just browser-clock calculations.
 
-Before the close time, seven distinct controlled accounts each register one
-real, versioned Agent through the website and receive a successful Arc receipt.
-The contract permits one entrant per wallet, so seven Agents under one wallet
-do not satisfy this setup. Preserve the eighth place for the account already
+Before the close time, the tester uses seven distinct controlled accounts to
+register one real, versioned Agent per account through the live website. Each
+registration must produce a successful Arc receipt. The contract permits one
+entrant per wallet, so seven Agents under one wallet do not satisfy this setup.
+The system operator signer creates and progresses the Tournament but never
+registers a user entrant. Preserve the eighth place for the account already
 signed in to the user's in-app browser. Do not switch, log out or use that
-account for the seven preparatory entries. Verify the Arc entrant count is
+account while preparing the seven entries. Verify the Arc entrant count is
 exactly seven and the website still offers the final registration. Record each
 entrant ID, masked wallet, Agent version/commitment, stake receipt and
 timestamp without exposing private `AGENTS.md` content.
 
-After the user joins as entrant eight, confirm the Arc count is eight and that
-the website reports the same roster and schedule. Observe the real provider
-outputs, Studio Next comparison verdicts, bracket progression and Arc
-settlement. The finalized match and verdict records may serve as reference
-data for judge assessment, but do not label them an independent authenticity
-proof or change judge policy during this acceptance run. Preserve exact
-transaction links and bounded public evidence for later analysis.
+The tester then uses the preserved in-app session as entrant eight. Confirm the
+Arc count is eight and that the website reports the same roster and schedule.
+Observe the real provider outputs, Studio Next comparison verdicts, bracket
+progression and Arc settlement. The finalized match and verdict records may
+serve as reference data for judge assessment, but do not label them an
+independent authenticity proof or change judge policy during this acceptance
+run. Preserve exact transaction links and bounded public evidence for later
+analysis.
 
 The one-time system launch is setup evidence, not a website UI pass. If it does
 not yield an Arc receipt and public Tournament projection, mark setup blocked
@@ -144,9 +147,11 @@ purchase cases without invalid writes.
 
 ### WEB-7: Tournament success
 
-Create a real campaign through the operator product surface. Register eight
-distinct accounts through the website with real stakes. Run the real bracket,
-settle on Arc, verify Top 5 credits, fixed 10% fee and all withdrawal receipts.
+Use a separately approved bounded system launch to create a real Arc Testnet
+Tournament, then register eight distinct accounts through the website with real
+stakes. The system operator signer owns the lifecycle actions; no caller may
+submit ranking or payout amounts. Run the real bracket, settle on Arc, verify
+Top 5 credits, fixed 10% fee and all withdrawal receipts.
 
 ```text
 pool = sum(confirmed stakes)

@@ -1,12 +1,12 @@
 import { useAppContext } from '../context';
 import { ChevronRight, Copy, ShieldAlert } from 'lucide-react';
-import type { ManagedCctpTransfer, ManagedUsdcBalance, ManagedWalletTransaction } from '../adapters/interfaces';
+import type { ManagedCctpTransfer, ManagedUsdcBalance, ManagedUsdcTransfer } from '../adapters/interfaces';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type CreditRow = { tournamentId: string; credit: string };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
-type WalletAction = { state: 'submitting' | 'done' | 'error'; result?: ManagedWalletTransaction; message?: string };
+type WalletAction = { state: 'submitting' | 'error'; message?: string };
 type LegacyBridgeAction = { state: 'submitting' | 'done' | 'error'; operation: ManagedCctpTransfer; message?: string };
 
 export function Account() {
@@ -29,6 +29,7 @@ export function Account() {
   const [destinationAddress, setDestinationAddress] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
   const [walletAction, setWalletAction] = useState<WalletAction | null>(null);
+  const [usdcTransfer, setUsdcTransfer] = useState<ManagedUsdcTransfer | null>(null);
   const [legacyBridgeAction, setLegacyBridgeAction] = useState<LegacyBridgeAction | null>(null);
 
   useEffect(() => {
@@ -50,6 +51,31 @@ export function Account() {
       setBalanceState('unavailable');
     }
   }, [account, balanceReload, managedAccount, managedIdentity, networkConfig, wallet]);
+
+  useEffect(() => {
+    if (!managedAccount || !managedIdentity?.listUsdcTransfers) { setUsdcTransfer(null); return; }
+    let cancelled = false;
+    setUsdcTransfer(null);
+    managedIdentity.listUsdcTransfers().then((operations) => {
+      if (!cancelled) setUsdcTransfer((current) => current ?? operations[0] ?? null);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [managedAccount, managedIdentity]);
+
+  useEffect(() => {
+    if (!usdcTransfer || !['PENDING', 'SUBMITTED'].includes(usdcTransfer.state) || !managedIdentity?.getUsdcTransfer) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const current = await managedIdentity.getUsdcTransfer!(usdcTransfer.operationId);
+        if (!cancelled) {
+          setUsdcTransfer(current);
+          if (current.state === 'CONFIRMED') setBalanceReload((value) => value + 1);
+        }
+      } catch { /* Keep the persisted pending state visible until a later read succeeds. */ }
+    }, 2500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [managedIdentity, usdcTransfer]);
 
   useEffect(() => {
     if (!managedAccount || !managedIdentity?.listCctpTransfers) return;
@@ -190,12 +216,13 @@ export function Account() {
 
   async function submitTransfer(event: React.FormEvent) {
     event.preventDefault();
-    if (!managedIdentity?.transferUsdc) return;
+    if (!managedIdentity?.transferUsdc || (usdcTransfer && ['PENDING', 'SUBMITTED', 'RECOVERY_REQUIRED'].includes(usdcTransfer.state))) return;
     setWalletAction({ state: 'submitting' });
     try {
       const result = await managedIdentity.transferUsdc(destinationAddress, transferAmount);
-      setWalletAction({ state: 'done', result });
-      setTransferAmount(''); setDestinationAddress(''); setBalanceReload((value) => value + 1);
+      setUsdcTransfer(result);
+      setWalletAction(null);
+      setTransferAmount(''); setDestinationAddress('');
     } catch (reason) {
       setWalletAction({ state: 'error', message: reason instanceof Error ? reason.message : 'Transfer failed.' });
     }
@@ -273,16 +300,23 @@ export function Account() {
                 <p className="wallet-action-form__hint text-xs font-semibold text-amber-900" aria-hidden="true"></p>
                 <label className="block text-sm font-bold" htmlFor="withdraw-amount">Amount (USDC)</label>
                 <input id="withdraw-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={transferAmount} onChange={(event) => setTransferAmount(event.target.value)} />
-                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting'}>Withdraw USDC</button>
+                <button className="metal-button-solid w-full" disabled={walletAction?.state === 'submitting' || Boolean(usdcTransfer && ['PENDING', 'SUBMITTED', 'RECOVERY_REQUIRED'].includes(usdcTransfer.state))}>Withdraw USDC</button>
               </form>
             </div>}
 
             {walletAction && <div role={walletAction.state === 'error' ? 'alert' : 'status'} className={walletAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
               {walletAction.state === 'submitting' && 'Submitting securely through Circle…'}
               {walletAction.state === 'error' && walletAction.message}
-              {walletAction.state === 'done' && <>Transaction submitted · {walletAction.result?.explorerUrl
-                ? <a className="underline" href={walletAction.result.explorerUrl} target="_blank" rel="noreferrer">View transaction</a>
-                : walletAction.result?.transactionId}</>}
+            </div>}
+
+            {usdcTransfer && <div role={usdcTransfer.state === 'FAILED' || usdcTransfer.state === 'RECOVERY_REQUIRED' ? 'alert' : 'status'} className="text-sm font-semibold">
+              {usdcTransfer.state === 'PENDING' && 'USDC transfer request is being submitted to Circle.'}
+              {usdcTransfer.state === 'SUBMITTED' && 'USDC transfer submitted. Waiting for Circle to confirm the Arc transaction.'}
+              {usdcTransfer.state === 'CONFIRMED' && 'USDC transfer confirmed by Circle on Arc Testnet.'}
+              {usdcTransfer.state === 'FAILED' && (usdcTransfer.message || 'USDC transfer failed. You may try again.')}
+              {usdcTransfer.state === 'RECOVERY_REQUIRED' && (usdcTransfer.message || 'Transfer outcome is uncertain. Do not retry until it is reconciled.')}
+              <span className="block break-all">{usdcTransfer.amount} USDC to {usdcTransfer.destinationAddress}</span>
+              {usdcTransfer.explorerUrl && <> · <a className="underline" href={usdcTransfer.explorerUrl} target="_blank" rel="noreferrer">View transaction</a></>}
             </div>}
 
             {legacyBridgeAction && <div role={legacyBridgeAction.state === 'error' ? 'alert' : 'status'} className={legacyBridgeAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>

@@ -62,7 +62,7 @@ export function SubmitEntry() {
   const pending = !['IDLE', 'CONFIRMED'].includes(flow);
   return <section className="mx-auto max-w-3xl space-y-7">
     <Link to={`/tournaments/${id}`} className="inline-flex min-h-11 items-center gap-2 rounded text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-black"><ArrowLeft size={16} aria-hidden="true" /> Back to tournament</Link>
-    <div className="appear"><p className="page-kicker">Arc entry</p><h1 className="page-title">Enter tournament</h1><p className="page-lede">Choose an existing AGENTS.md profile. Its locked commitment is registered with your stake; the plaintext stays in the platform service.</p></div>
+    <div className="appear"><p className="page-kicker">Arc entry</p><h1 className="page-title">Enter tournament</h1><p className="page-lede">Choose an existing AGENTS.md profile. Arc registers its commitment with your stake. Tournament model calls and GenLayer comparison submit the exact profile bytes.</p></div>
 
     {!networkConfig && <div className="glass-panel flex gap-3 rounded-2xl border-red-800/40 p-4"><ShieldAlert className="shrink-0 text-red-900" size={20} aria-hidden="true" /><div><h2 className="font-semibold text-red-900">Network Not Configured</h2><p className="mt-1 text-sm text-neutral-700">Live Arc actions are disabled until runtime network settings are complete.</p></div></div>}
     {error && <div role="alert" className="glass-panel flex gap-3 rounded-2xl border-red-800/40 p-4 text-red-900"><AlertCircle className="shrink-0" size={20} aria-hidden="true" /><p>{error}</p></div>}
