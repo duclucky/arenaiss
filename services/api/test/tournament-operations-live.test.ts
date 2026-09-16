@@ -73,17 +73,40 @@ test('Tournament start snapshots its roster and random bracket seed across retri
     const service = { listTournamentOperatorEntrants: () => currentEntrants, publishTournament() {} } as any;
     const seeds: string[] = [];
     const rosterSizes: number[] = [];
-    const orchestrator = { async run(input: any) { seeds.push(input.seedDigest); rosterSizes.push(input.entrants.length); return { state: 'WAITING_FOR_JUDGE', attemptId: tournamentId, results: new Map() }; } } as any;
+    const topicSnapshots: string[][] = [];
+    const selections: string[] = [];
+    const orchestrator = { async run(input: any) { seeds.push(input.seedDigest); rosterSizes.push(input.entrants.length); topicSnapshots.push([...input.topics]); selections.push(input.topicSelection); return { state: 'WAITING_FOR_JUDGE', attemptId: tournamentId, results: new Map() }; } } as any;
     const input = { tournamentId, name: 'Daily', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 8, stakeAmount: '1000000' };
-    const first = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
+    const first = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40, ['new-a', 'new-b', 'new-c']);
     await first.create(input);
     await first.execute({ tournamentId, action: 'PROGRESS' });
     currentEntrants = [];
-    const restored = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
+    const restored = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40, ['changed-a']);
     await restored.execute({ tournamentId, action: 'PROGRESS' });
     assert.deepEqual(rosterSizes, [8, 8]);
     assert.equal(seeds[0], seeds[1]);
+    assert.deepEqual(topicSnapshots, [['new-a', 'new-b', 'new-c'], ['new-a', 'new-b', 'new-c']]);
+    assert.deepEqual(selections, ['seeded-shuffle-v1', 'seeded-shuffle-v1']);
     assert.match(seeds[0], /^sha256:[0-9a-f]{64}$/);
     assert.notEqual(seeds[0], `sha256:${'0'.repeat(64)}`);
+  } finally { runtime.close(); }
+});
+
+test('Tournament operation created before topic pool v2 keeps the legacy selection policy', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const arc = new FakeArc();
+    const service = { listTournamentOperatorEntrants: () => entrants, publishTournament() {} } as any;
+    const seen: any[] = [];
+    const orchestrator = { async run(input: any) { seen.push(input); return { state: 'WAITING_FOR_JUDGE', attemptId: tournamentId, results: new Map() }; } } as any;
+    const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40, ['new-topic']);
+    await operations.create({ tournamentId, name: 'Legacy', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 8, stakeAmount: '1000000' });
+    const legacy = runtime.get<any>('tournament-operations', tournamentId)!;
+    delete legacy.topicPoolVersion;
+    runtime.put('tournament-operations', tournamentId, legacy);
+    await operations.execute({ tournamentId, action: 'PROGRESS' });
+    assert.equal(seen[0].topicSelection, undefined);
+    assert.equal(seen[0].topics.length, 6);
+    assert.equal(seen[0].topics.includes('new-topic'), false);
   } finally { runtime.close(); }
 });

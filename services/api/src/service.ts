@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { entrantId as deriveEntrantId, isDigest } from "../../../packages/protocol/src/canonical.ts";
 import type { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlite-runtime.ts";
@@ -7,7 +7,7 @@ import { validateEvaluationScenario, type EvaluationScenario } from "../../../pa
 import type { SoloCampaignRecord } from "../../../packages/evaluation/src/solo-runner.ts";
 import { VersionComparisonRegistry, type RegressionPolicy, type VersionComparisonRecord } from "../../../packages/evaluation/src/comparison.ts";
 import { evaluateMarketplaceEligibility } from "../../../packages/marketplace/src/eligibility.ts";
-import { EVO_CORE_PACK_ID, EVO_CORE_SCENARIOS, EVO_CORE_VERSION } from "../../../packages/evaluation/src/evo-core.ts";
+import { EVO_CORE_SCENARIOS, EVO_CORE_VERSION, selectEvoCoreScenarios } from "../../../packages/evaluation/src/evo-core.ts";
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
@@ -81,6 +81,7 @@ export class ArenaApiService {
   private registrations = new Map<string, PreparedRegistration>();
   private evaluationPacks = new Map<string, EvaluationPackRecord>();
   private evaluationCampaigns = new Map<string, SoloCampaignRecord>();
+  private evoSelections = new Map<string, string[]>();
   private versionComparisons: VersionComparisonRegistry;
   private marketplaceCertificates = new Map<Digest, MarketplaceCertificate>();
   private marketplaceListings = new Map<string, MarketplaceListing>();
@@ -348,10 +349,30 @@ export class ArenaApiService {
   }
   createEvoCampaign(caller: string, input: { agentId: Digest; agentsVersion: Digest; model: string }): PublicEvaluationCampaign {
     const owner = this.principal(caller);
-    this.createEvaluationPack(owner, { packId: EVO_CORE_PACK_ID, version: EVO_CORE_VERSION, name: 'Arena ISS Evo Core', scenarios: EVO_CORE_SCENARIOS });
+    const agent = this.requireOwner(owner, input.agentId);
+    if (agent.active === false) throw new Error('agent is inactive');
+    if (!agent.versions.some((version) => version.agentsVersion === input.agentsVersion)) throw new Error('agent version not found');
+    if (!input.model) throw new Error('evaluation model is required');
+    const selectionKey = `${input.agentId}:${EVO_CORE_VERSION}`;
+    let scenarioIds = this.runtime?.get<string[]>('evaluation-evo-selections', selectionKey) ?? this.evoSelections.get(selectionKey);
+    if (!scenarioIds) {
+      const proposed = selectEvoCoreScenarios(randomBytes(32).toString('hex')).map((scenario) => scenario.scenarioId);
+      if (this.runtime) {
+        this.runtime.putIfAbsent('evaluation-evo-selections', selectionKey, proposed);
+        scenarioIds = this.runtime.get<string[]>('evaluation-evo-selections', selectionKey)!;
+      } else {
+        this.evoSelections.set(selectionKey, proposed);
+        scenarioIds = proposed;
+      }
+    }
+    const scenarios = scenarioIds.map((id) => EVO_CORE_SCENARIOS.find((scenario) => scenario.scenarioId === id));
+    if (scenarios.length !== 6 || scenarios.some((scenario) => !scenario) || new Set(scenarioIds).size !== 6 || new Set(scenarioIds.map((id) => id.split('_')[0])).size !== 6) throw new Error('stored Evo selection is invalid');
+    const selectedScenarios = scenarios as EvaluationScenario[];
+    const packId = sha(JSON.stringify({ owner, scenarios: selectedScenarios }));
+    this.createEvaluationPack(owner, { packId, version: EVO_CORE_VERSION, name: 'Arena ISS Evo Core', scenarios: selectedScenarios });
     return this.createSoloCampaign(owner, {
       campaignId: sha(`arena-evo-campaign-v1|${owner}|${input.agentId}|${input.agentsVersion}|${randomUUID()}`),
-      agentId: input.agentId, agentsVersion: input.agentsVersion, packId: EVO_CORE_PACK_ID, packVersion: EVO_CORE_VERSION,
+      agentId: input.agentId, agentsVersion: input.agentsVersion, packId, packVersion: EVO_CORE_VERSION,
       runtimePolicy: { model: input.model, maxOutputTokens: 1200, temperature: 0, maxProviderAttempts: 2 },
     });
   }

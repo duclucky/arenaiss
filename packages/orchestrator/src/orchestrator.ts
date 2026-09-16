@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { attemptId, type Digest } from "../../protocol/src/canonical.ts";
 import { buildBracket, type MatchBlueprint, type SlotRef } from "../../domain/src/bracket.ts";
 import { advanceBracket, type MatchResult } from "../../domain/src/progression.ts";
@@ -33,6 +34,7 @@ export type OrchestratorInput = {
   seedDigest: Digest;
   entrants: readonly Entrant[];
   topics: readonly string[];
+  topicSelection?: "seeded-shuffle-v1";
   bracketRevision: number;
   retryCap: number;
   expiresAt: number;
@@ -54,15 +56,23 @@ export class TournamentOrchestrator {
   async run(input: OrchestratorInput): Promise<OrchestratorResult> {
     if (input.now() >= input.expiresAt) return { state: "REFUND_REQUIRED", reason: "TOURNAMENT_EXPIRED" };
     if (!input.topics.length || input.topics.some((topic) => !topic)) throw new Error("topic deck is empty or invalid");
+    if (input.topicSelection === "seeded-shuffle-v1" && new Set(input.topics).size !== input.topics.length) throw new Error("seeded topic deck contains duplicates");
     if (!Number.isSafeInteger(input.retryCap) || input.retryCap < 1) throw new Error("retry cap is invalid");
     const abandonedAttemptIds = new Set(input.abandonedAttemptIds ?? []);
     if (abandonedAttemptIds.size !== (input.abandonedAttemptIds?.length ?? 0)) throw new Error("duplicate abandoned attempt ID");
     const entrantMap = new Map(input.entrants.map((entrant) => [entrant.entrantId, entrant]));
     if (entrantMap.size !== input.entrants.length) throw new Error("duplicate tournament entrant");
     const bracket = buildBracket({ tournamentId: input.tournamentId, seedDigest: input.seedDigest, entrants: input.entrants.map((entrant) => entrant.entrantId), bracketRevision: input.bracketRevision });
+    const selectedTopics = input.topicSelection === "seeded-shuffle-v1"
+      ? [...input.topics].sort((left, right) => {
+        const leftRank = createHash("sha256").update(`arena-topic-shuffle-v1|${input.seedDigest}|${left}`).digest("hex");
+        const rightRank = createHash("sha256").update(`arena-topic-shuffle-v1|${input.seedDigest}|${right}`).digest("hex");
+        return leftRank < rightRank ? -1 : leftRank > rightRank ? 1 : left < right ? -1 : left > right ? 1 : 0;
+      })
+      : input.topics;
     const results = new Map<Digest, MatchResult>();
 
-    for (const match of bracket.matches) {
+    for (const [matchOrdinal, match] of bracket.matches.entries()) {
       const sideAId = this.resolveSlot(match.slotA, bracket.matches, results);
       const sideBId = this.resolveSlot(match.slotB, bracket.matches, results);
       if (!sideAId || !sideBId) throw new Error(`predecessor is not terminal for ${match.matchId}`);
@@ -73,7 +83,8 @@ export class TournamentOrchestrator {
         if (input.now() >= input.expiresAt) return { state: "REFUND_REQUIRED", reason: "TOURNAMENT_EXPIRED" };
         const currentAttempt = attemptId(match.matchId, number);
         if (abandonedAttemptIds.has(currentAttempt)) continue;
-        const context: InferenceInput = { tournamentId: input.tournamentId, matchId: match.matchId, attemptId: currentAttempt, topic: input.topics[(match.matchIndex + number - 1) % input.topics.length], agentA, agentB };
+        const topicIndex = input.topicSelection === "seeded-shuffle-v1" ? matchOrdinal + number - 1 : match.matchIndex + number - 1;
+        const context: InferenceInput = { tournamentId: input.tournamentId, matchId: match.matchId, attemptId: currentAttempt, topic: selectedTopics[topicIndex % selectedTopics.length], agentA, agentB };
         const pair = await this.inference.run(context);
         if (pair.state !== "OUTPUTS_READY" || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt };
         let outcome: OrchestratorJudgeOutcome;

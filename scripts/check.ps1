@@ -26,6 +26,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\packages\evaluation\test\policy.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\provider.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\corpus.test.ts" `
+  "$PSScriptRoot\..\packages\evaluation\test\evo-core.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\run-tracker.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\solo-runner.test.ts" `
   "$PSScriptRoot\..\packages\evaluation\test\comparison.test.ts" `
