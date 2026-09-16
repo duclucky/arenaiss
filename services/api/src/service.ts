@@ -25,7 +25,7 @@ export type AgentDetail = PublicAgent & {
   evaluations: PublicEvaluationCampaign[];
 };
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string };
+export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
 export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number };
 export type PublicVerdictCriterion = { id: string; label: string; winner: "A" | "B" | "TIE"; reason: string };
@@ -87,10 +87,12 @@ export class ArenaApiService {
   private marketplaceListingIntents = new Map<Digest, MarketplaceListingIntent>();
   private nonce = 0;
   private runtime?: SqliteRuntimeStore;
+  private readonly nowSeconds: () => number;
 
-  constructor(operator: string, runtime?: SqliteRuntimeStore) {
+  constructor(operator: string, runtime?: SqliteRuntimeStore, nowSeconds: () => number = () => Math.floor(Date.now() / 1_000)) {
     this.operator = this.address(operator);
     this.runtime = runtime;
+    this.nowSeconds = nowSeconds;
     this.versionComparisons = new VersionComparisonRegistry(runtime);
     if (runtime) {
       for (const agent of runtime.list<Agent>("api-agents")) this.agents.set(agent.agentId, agent);
@@ -224,7 +226,8 @@ export class ArenaApiService {
       || !Array.isArray(tournament.entrantIds) || tournament.entrantIds.some((id) => typeof id !== "string" || !id)
       || new Set(tournament.entrantIds).size !== tournament.entrantIds.length
       || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(tournament.prizePool)
-      || (tournament.stakeAmount !== undefined && !/^[1-9][0-9]*$/.test(tournament.stakeAmount))) throw new Error("invalid tournament");
+      || (tournament.stakeAmount !== undefined && !/^[1-9][0-9]*$/.test(tournament.stakeAmount))
+      || (tournament.registrationClosesAt !== undefined && (!Number.isSafeInteger(tournament.registrationClosesAt) || tournament.registrationClosesAt < 1))) throw new Error("invalid tournament");
     const stored = structuredClone(tournament);
     this.tournaments.set(tournament.id, stored);
     this.runtime?.put("api-tournaments", tournament.id, stored);
@@ -517,6 +520,7 @@ export class ArenaApiService {
     if (!isDigest(tournamentId) || !isDigest(agentId)) throw new Error("invalid registration identity");
     const tournament = this.tournaments.get(tournamentId);
     if (!tournament || !/^[1-9][0-9]*$/.test(tournament.stakeAmount || "")) throw new Error("tournament registration is unavailable");
+    if (tournament.status !== "UPCOMING" || (tournament.registrationClosesAt !== undefined && this.nowSeconds() >= tournament.registrationClosesAt)) throw new Error("tournament registration is closed");
     const agent = this.requireOwner(owner, agentId);
     if (agent.active === false) throw new Error("agent is inactive");
     const latest = agent.versions.at(-1)!;

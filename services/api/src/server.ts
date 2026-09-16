@@ -21,6 +21,7 @@ import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/
 import type { TournamentOperationsPort } from './tournament-operations.ts';
 import { tournamentOperationsFromEnvironment } from './tournament-operations-live.ts';
 import { launchReferenceTournament, runReferenceTournamentTick } from './reference-tournament-launch.ts';
+import { DailyTournamentWorker } from './daily-tournament.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -42,6 +43,9 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
   const agentRegistry = agentRegistryFromEnvironment(process.env);
   const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
+  const dailyStake = process.env.ARENA_DAILY_TOURNAMENT_STAKE_UNITS?.trim();
+  if (dailyStake && (!runtime || !tournamentOperations)) throw new Error('daily Tournament requires persistent runtime and Tournament operations');
+  const dailyWorker = dailyStake ? new DailyTournamentWorker(runtime!, tournamentOperations!, dailyStake) : undefined;
   options.onTournamentOperationsReady?.(tournamentOperations);
   const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry);
   const now = options.now ?? Date.now;
@@ -90,8 +94,8 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
-  server.once('listening', () => evaluationWorker?.start());
-  server.once('close', () => evaluationWorker?.stop());
+  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); });
+  server.once('close', () => { evaluationWorker?.stop(); dailyWorker?.stop(); });
   return server;
 }
 

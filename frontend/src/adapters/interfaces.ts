@@ -3,6 +3,7 @@ export type Tournament = {
   name: string;
   status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   prizePool: string;
+  registrationClosesAt?: number;
   demo?: TournamentDemoDetail;
 };
 

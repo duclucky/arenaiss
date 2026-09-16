@@ -52,6 +52,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\services\api\test\evaluation-execution.test.ts" `
   "$PSScriptRoot\..\services\api\test\tournament-operations-http.test.ts" `
   "$PSScriptRoot\..\services\api\test\tournament-operations-live.test.ts" `
+  "$PSScriptRoot\..\services\api\test\daily-tournament.test.ts" `
   "$PSScriptRoot\..\services\api\test\tournament-arc-abi.test.ts" `
   "$PSScriptRoot\..\services\api\test\reference-tournament-launch.test.ts" `
   "$PSScriptRoot\..\services\api\test\server.test.ts" `

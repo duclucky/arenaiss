@@ -39,8 +39,9 @@ test("agent detail keeps AGENTS.md private, reports exact activity, and deactiva
   const tournamentId = `sha256:${"8".repeat(64)}` as const;
   const matchId = `sha256:${"7".repeat(64)}` as const;
   const agent = api.createAgent(ALICE, "Delete me", "private instructions");
-  api.publishTournament(ALICE, { id: tournamentId, name: "Bound arena", status: "ACTIVE", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
+  api.publishTournament(ALICE, { id: tournamentId, name: "Bound arena", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
   api.prepareRegistration(ALICE, tournamentId, agent.agentId);
+  api.publishTournament(ALICE, { id: tournamentId, name: "Bound arena", status: "ACTIVE", entrantIds: [], stakeAmount: "100000", prizePool: "0" });
   api.publishMatch(ALICE, {
     id: matchId, tournamentId, state: "FINALIZED", agentA: "Delete me", agentB: "Other", winner: "Delete me", round: 1,
     agentIdA: agent.agentId,
@@ -59,6 +60,23 @@ test("agent detail keeps AGENTS.md private, reports exact activity, and deactiva
   api.deactivateAgent(ALICE, agent.agentId, "Delete me");
   assert.equal(api.listOwnedAgents(ALICE).length, 0);
   assert.throws(() => api.updateAgent(ALICE, agent.agentId, "v2"), /inactive/i);
+});
+
+test('registration preparation closes at the UTC start and stays closed while Tournament is active', () => {
+  let now = 99;
+  const api = new ArenaApiService(ALICE, undefined, () => now);
+  const tournamentId = `sha256:${'f'.repeat(64)}` as const;
+  const agent = api.createAgent(ALICE, 'Daily entrant', 'agent instructions');
+  const closesAt = 100;
+  api.publishTournament(ALICE, { id: tournamentId, name: 'Daily', status: 'UPCOMING', entrantIds: [], stakeAmount: '1000000', prizePool: '0', registrationClosesAt: closesAt });
+  assert.equal(api.prepareRegistration(ALICE, tournamentId, agent.agentId).stakeAmount, '1000000');
+  api.publishTournament(ALICE, { id: tournamentId, name: 'Daily', status: 'ACTIVE', entrantIds: [], stakeAmount: '1000000', prizePool: '0', registrationClosesAt: closesAt });
+  assert.throws(() => api.prepareRegistration(ALICE, tournamentId, agent.agentId), /registration.*closed/i);
+  api.publishTournament(ALICE, { id: tournamentId, name: 'Daily', status: 'UPCOMING', entrantIds: [], stakeAmount: '1000000', prizePool: '0', registrationClosesAt: closesAt });
+  now = closesAt;
+  assert.throws(() => api.prepareRegistration(ALICE, tournamentId, agent.agentId), /registration.*closed/i);
+  now = closesAt + 1;
+  assert.throws(() => api.prepareRegistration(ALICE, tournamentId, agent.agentId), /registration.*closed/i);
 });
 
 test("updating creates append-only version and old commitment remains addressable", () => {
