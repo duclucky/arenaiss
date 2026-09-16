@@ -26,7 +26,7 @@ const withdrawOperatorCredit = vi.fn().mockResolvedValue({ transactionId: 'platf
 const cancelListing = vi.fn().mockResolvedValue({ ...ownedActive, state: 'CANCELLED' });
 const marketplaceApi: MarketplaceApiAdapter = { async listListings() { return [sold, ownedActive]; }, async listCertificates() { return [certificate]; }, async listPurchases() { return [sold]; }, async getCredit() { return { amount: '990000' }; }, withdrawCredit, async listOperatorCertificates() { return [eligible]; }, approveCertificate, async getOperatorCredit() { return { amount: '10000' }; }, withdrawOperatorCredit, cancelListing, createEligibility, createListing, async buy() { return sold; }, getDelivery };
 const config = { chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', genLayer: { chainId: 61997 as const, rpcUrl: 'https://studio-next.genlayer.com/api', name: 'Studio Next', explorerUrl: 'https://explorer-studio-dev.genlayer.com', evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d' as const, comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB' as const } };
-function mount() { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={marketplaceApi}><Marketplace /></AppProvider></MemoryRouter>); }
+function mount(api: MarketplaceApiAdapter = marketplaceApi) { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
 
 describe('Marketplace website UX', () => {
   it('selects an owned Agent and its finalized Evo campaigns without asking for raw digests or judge address', async () => {
@@ -44,6 +44,10 @@ describe('Marketplace website UX', () => {
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
     expect(await screen.findByText('1.000000 USDC')).toBeInTheDocument();
+    expect(screen.queryByText('Listing #1')).not.toBeInTheDocument();
+    expect(screen.queryByText(certificateDigest)).not.toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(certificateDigest.slice(0, 20)))).not.toBeInTheDocument();
+    expect(screen.queryByText(eligible.certificateDigest)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Sell my Agent' }));
     fireEvent.change(screen.getByLabelText('Approved certificate'), { target: { value: certificateDigest } });
     fireEvent.change(screen.getByLabelText('Price (USDC)'), { target: { value: '2.50' } });
@@ -53,9 +57,10 @@ describe('Marketplace website UX', () => {
 
   it('shows private delivery only for a canonical purchase returned by the buyer-private endpoint', async () => {
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Open purchased Agent 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open purchased Agent Safety Scout' }));
     expect(await screen.findByRole('heading', { name: 'Purchased Agent' })).toBeInTheDocument();
     expect(screen.getByText('# Private Agent')).toBeInTheDocument();
+    expect(screen.queryByText(/Listing #/)).not.toBeInTheDocument();
     expect(getDelivery).toHaveBeenCalledWith('1');
   });
 
@@ -81,8 +86,20 @@ describe('Marketplace website UX', () => {
 
   it('lets only the current seller cancel an active Arc listing', async () => {
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel listing 2' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel Safety Scout listing' }));
     await waitFor(() => expect(cancelListing).toHaveBeenCalledWith('2', expect.any(String)));
-    expect(screen.queryByRole('button', { name: 'Cancel listing 1' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Cancel Safety Scout listing' })).toHaveLength(1);
+  });
+
+  it('offers a safe retry for the original buyer or seller while an Arc write is unresolved', async () => {
+    const buy = vi.fn().mockResolvedValue({ ...sold, state: 'BUY_SUBMITTED' });
+    mount({ ...marketplaceApi, async listListings() { return [
+      { ...sold, listingId: '3', state: 'BUY_SUBMITTED', buyerAddress: address },
+      { ...ownedActive, state: 'CANCEL_SUBMITTED' },
+    ]; }, buy });
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume Safety Scout purchase' }));
+    await waitFor(() => expect(buy).toHaveBeenCalledWith('3', expect.any(String), expect.any(String)));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Safety Scout cancellation' }));
+    await waitFor(() => expect(cancelListing).toHaveBeenCalledWith('2', expect.any(String)));
   });
 });

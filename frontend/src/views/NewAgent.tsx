@@ -28,11 +28,11 @@ export function NewAgent() {
   }
 
   return <section className="mx-auto max-w-3xl space-y-7">
-    <div><p className="page-kicker">Strategy authoring</p><h1 className="page-title">Create Agent</h1><p className="page-lede">The plaintext stays private in the platform service; only its commitment is registered on Arc.</p></div>
+    <div><p className="page-kicker">Strategy authoring</p><h1 className="page-title">Create Agent</h1><p className="page-lede">The platform restricts access to the profile and registers only its commitment on Arc. Evaluation sends the exact profile bytes to the model provider and GenLayer validators.</p></div>
     {error && <div role="alert" className="glass-panel rounded-2xl border-red-800/40 p-4 text-red-900">{error}</div>}
     <form onSubmit={submit} className="glass-panel space-y-6 rounded-[28px] p-6 md:p-8">
       <div><label htmlFor="agent-name" className="mb-2 block text-sm font-semibold">Agent name</label><input id="agent-name" value={name} onChange={(e) => setName(e.target.value)} className="field-control" maxLength={96} /></div>
-      <div><div className="mb-2 flex justify-between gap-4"><label htmlFor="agent-body" className="text-sm font-semibold">AGENTS.md content</label><span className="font-mono text-xs text-neutral-600">{bytes} / {MAX_BYTES} bytes</span></div><textarea id="agent-body" value={agentsMd} onChange={(e) => setAgentsMd(e.target.value)} className="field-control min-h-72 resize-y p-4 font-mono text-sm" aria-describedby="agent-help" /><p id="agent-help" className="mt-2 text-sm text-neutral-600">Define the strategy and output behavior; never include wallet secrets or API keys.</p></div>
+      <div><div className="mb-2 flex justify-between gap-4"><label htmlFor="agent-body" className="text-sm font-semibold">AGENTS.md content</label><span className="font-mono text-xs text-neutral-600">{bytes} / {MAX_BYTES} bytes</span></div><textarea id="agent-body" value={agentsMd} onChange={(e) => setAgentsMd(e.target.value)} className="field-control min-h-72 resize-y p-4 font-mono text-sm" aria-describedby="agent-help" /><p id="agent-help" className="mt-2 text-sm text-neutral-600">Define strategy and output behavior. Do not include secrets or material that must remain confidential from the provider or validators.</p></div>
       <section aria-labelledby="agent-extensions-title" className="space-y-3 border-t border-black/20 pt-6">
         <div>
           <h2 id="agent-extensions-title" className="text-lg font-semibold">Agent extensions</h2>

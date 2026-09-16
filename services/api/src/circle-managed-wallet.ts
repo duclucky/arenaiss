@@ -85,9 +85,13 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     });
     const transactionId = response.data?.id;
     if (!transactionId) throw new Error('Circle returned an invalid transaction response');
-    const submitted = await this.client.getTransaction({ id: transactionId, waitForTxHash: true, pollingInterval: 1000 });
-    const result = this.transactionResult(submitted.data?.transaction, 'https://testnet.arcscan.app/tx/');
-    if (!result.txHash) throw new Error('Circle did not return an Arc USDC transaction hash');
+    return { transactionId, state: response.data?.state || 'INITIATED' };
+  }
+
+  async getTransfer(transactionId: string): Promise<WalletTransactionResult> {
+    const response = await this.client.getTransaction({ id: transactionId });
+    const result = this.transactionResult(response.data?.transaction, 'https://testnet.arcscan.app/tx/');
+    if (result.transactionId !== transactionId) throw new Error('Circle returned a mismatched transaction');
     return result;
   }
 

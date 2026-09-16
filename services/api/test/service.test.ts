@@ -326,10 +326,12 @@ test("evaluation campaign reads use the durable runtime state after a worker tra
     const transitioned = runtime.get<any>("evaluation-campaigns", campaignId)!;
     const runId = sha256Text("runtime-canonical-run");
     transitioned.state = "FAILED";
-    transitioned.items[0] = { scenarioId: "runtime_01", state: "FAILED", attempt: 1, runIds: [runId], currentRunId: runId, failure: "INFRASTRUCTURE_ERROR" };
+    transitioned.items[0] = { scenarioId: "runtime_01", state: "FAILED", attempt: 1, runIds: [runId], currentRunId: runId, failure: "PROVIDER_TIMEOUT", failureStage: "PROVIDER", failureCode: "PROVIDER_TIMEOUT" };
     runtime.put("evaluation-campaigns", campaignId, transitioned);
 
     assert.equal(api.getPublicEvaluationCampaign(campaignId)?.state, "FAILED");
+    assert.deepEqual(api.getPublicEvaluationCampaign(campaignId)?.items[0].failureStage, "PROVIDER");
+    assert.deepEqual(api.getPublicEvaluationCampaign(campaignId)?.items[0].failureCode, "PROVIDER_TIMEOUT");
     assert.equal(api.getPublicEvaluationCampaign(campaignId)?.items[0].runIds[0], runId);
     assert.equal(api.listOwnedEvaluationCampaigns(ALICE)[0].state, "FAILED");
     assert.equal(api.getAgentDetail(ALICE, agent.agentId).evaluations[0].state, "FAILED");

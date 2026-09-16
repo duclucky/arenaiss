@@ -31,10 +31,16 @@ export type CctpTransferOperation = {
   message?: string;
   updatedAt: number;
 };
+export type UsdcTransferState = 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED' | 'RECOVERY_REQUIRED';
+export type UsdcTransferOperation = {
+  operationId: string; state: UsdcTransferState; destinationAddress: string; amount: string;
+  transactionId?: string; txHash?: string; explorerUrl?: string; message?: string; updatedAt: number;
+};
 export type CircleWalletPort = {
   createWallet(input: { userId: string; idempotencyKey: string }): Promise<{ walletId: string; address: string }>;
   listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
   transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  getTransfer(transactionId: string): Promise<WalletTransactionResult>;
   holdEvaluationFee(input: { walletId: string; escrowAddress: string; campaignId: string; amountUsdc: string; approvalIdempotencyKey: string; depositIdempotencyKey: string }): Promise<{ approval: WalletTransactionResult; deposit: WalletTransactionResult }>;
   claimEvaluationTimeoutRefund(input: { walletId: string; escrowAddress: string; campaignId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
@@ -63,6 +69,7 @@ type CctpTransferRecord = CctpTransferOperation & {
   burnIdempotencyKey?: string;
   idempotencyKey?: string;
 };
+type UsdcTransferRecord = UsdcTransferOperation & { userId: string; walletId: string; idempotencyKey: string };
 type EmailChallenge = { digest: Buffer; expiresAt: number; attempts: number };
 
 export type ManagedIdentityOptions = {
@@ -92,6 +99,7 @@ export class ManagedIdentityService {
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
   private readonly cctpTransfers = new Map<string, Promise<void>>();
+  private readonly usdcTransfers = new Map<string, Promise<void>>();
 
   constructor(options: ManagedIdentityOptions) {
     if (Buffer.byteLength(options.identityPepper || '', 'utf8') < 32) throw new Error('ARENA_IDENTITY_PEPPER is invalid');
@@ -160,19 +168,96 @@ export class ManagedIdentityService {
     return this.circleWallets.listUsdcBalances({ walletId: wallet.walletId, address: wallet.address });
   }
 
-  async transferUsdc(userId: string, destinationAddress: string, amount: string): Promise<WalletTransactionResult> {
-    return this.transferUsdcWithIdempotency(userId, destinationAddress, amount, randomUUID());
+  async startUsdcTransfer(userId: string, destinationAddress: string, amount: string): Promise<UsdcTransferOperation> {
+    const wallet = this.requireReadyWallet(userId);
+    const destination = requireAddress(destinationAddress);
+    const normalizedAmount = requireUsdcAmount(amount);
+    const operation = this.runtime.transaction(() => {
+      const activeId = this.runtime.get<string>('circle-usdc-active', userId);
+      const active = activeId ? this.runtime.get<UsdcTransferRecord>('circle-usdc-transfers', activeId) : undefined;
+      if (active && !['CONFIRMED', 'FAILED'].includes(active.state)) return active;
+      if (activeId) this.runtime.delete('circle-usdc-active', userId);
+      const created: UsdcTransferRecord = { operationId: randomUUID(), state: 'PENDING', userId,
+        walletId: wallet.walletId, destinationAddress: destination, amount: normalizedAmount,
+        idempotencyKey: randomUUID(), updatedAt: this.now() };
+      this.runtime.put('circle-usdc-transfers', created.operationId, created);
+      this.runtime.put('circle-usdc-active', userId, created.operationId);
+      return created;
+    });
+    if (operation.destinationAddress !== destination || operation.amount !== normalizedAmount) throw new Error('unresolved USDC transfer must be reconciled first');
+    if (operation.state === 'PENDING') await this.runUsdcTransfer(operation.operationId);
+    return this.publicUsdcTransfer(this.runtime.get<UsdcTransferRecord>('circle-usdc-transfers', operation.operationId)!);
   }
 
-  async transferUsdcWithIdempotency(userId: string, destinationAddress: string, amount: string, idempotencyKey: string): Promise<WalletTransactionResult> {
-    const wallet = this.requireReadyWallet(userId);
-    if (!idempotencyKey || idempotencyKey.length > 256) throw new TypeError('idempotency key is invalid');
-    return this.circleWallets.transferUsdc({
-      walletId: wallet.walletId,
-      destinationAddress: requireAddress(destinationAddress),
-      amount: requireUsdcAmount(amount),
-      idempotencyKey,
+  async getUsdcTransfer(userId: string, operationId: string): Promise<UsdcTransferOperation> {
+    const operation = this.runtime.get<UsdcTransferRecord>('circle-usdc-transfers', requireIdentifier(operationId, 'operation ID'));
+    if (!operation || operation.userId !== userId) throw new Error('USDC transfer not found');
+    if (operation.state === 'SUBMITTED' && operation.transactionId) {
+      try {
+        const current = await this.circleWallets.getTransfer(operation.transactionId);
+        if (current.transactionId !== operation.transactionId || (operation.txHash && current.txHash && operation.txHash.toLowerCase() !== current.txHash.toLowerCase())) {
+          this.updateUsdcTransfer(operation.operationId, { state: 'RECOVERY_REQUIRED', message: 'Transfer reference mismatch. Reconcile the Circle and Arc transaction before another withdrawal.' });
+        } else if (current.state === 'COMPLETE' && current.txHash) {
+          this.updateUsdcTransfer(operation.operationId, { state: 'CONFIRMED', txHash: current.txHash, explorerUrl: current.explorerUrl });
+        } else if (['FAILED', 'DENIED', 'CANCELLED'].includes(current.state)) {
+          this.updateUsdcTransfer(operation.operationId, { state: 'FAILED', message: 'Circle reports that the transfer did not complete.' });
+        } else {
+          this.updateUsdcTransfer(operation.operationId, { txHash: current.txHash ?? operation.txHash, explorerUrl: current.explorerUrl ?? operation.explorerUrl });
+        }
+      } catch { /* Keep the submitted transaction visible; a read failure must not trigger another send. */ }
+    }
+    return this.publicUsdcTransfer(this.runtime.get<UsdcTransferRecord>('circle-usdc-transfers', operation.operationId)!);
+  }
+
+  listUsdcTransfers(userId: string): UsdcTransferOperation[] {
+    return this.runtime.list<UsdcTransferRecord>('circle-usdc-transfers')
+      .filter((operation) => operation.userId === userId)
+      .sort((a, b) => b.updatedAt - a.updatedAt || b.operationId.localeCompare(a.operationId))
+      .slice(0, 20).map((operation) => this.publicUsdcTransfer(operation));
+  }
+
+  async resumeUsdcTransfers(): Promise<void> {
+    await Promise.all(this.runtime.list<UsdcTransferRecord>('circle-usdc-transfers')
+      .filter((operation) => operation.state === 'PENDING').map((operation) => this.runUsdcTransfer(operation.operationId)));
+  }
+
+  private runUsdcTransfer(operationId: string): Promise<void> {
+    const active = this.usdcTransfers.get(operationId);
+    if (active) return active;
+    const run = this.performUsdcTransfer(operationId).finally(() => {
+      if (this.usdcTransfers.get(operationId) === run) this.usdcTransfers.delete(operationId);
     });
+    this.usdcTransfers.set(operationId, run);
+    return run;
+  }
+
+  private async performUsdcTransfer(operationId: string): Promise<void> {
+    const operation = this.runtime.get<UsdcTransferRecord>('circle-usdc-transfers', operationId);
+    if (!operation || operation.state !== 'PENDING') return;
+    try {
+      const result = await this.circleWallets.transferUsdc({ walletId: operation.walletId,
+        destinationAddress: operation.destinationAddress, amount: operation.amount, idempotencyKey: operation.idempotencyKey });
+      if (!result.transactionId) throw new Error('Circle transfer reference missing');
+      this.updateUsdcTransfer(operationId, { state: 'SUBMITTED', transactionId: result.transactionId,
+        txHash: result.txHash, explorerUrl: result.explorerUrl });
+    } catch {
+      this.updateUsdcTransfer(operationId, { state: 'RECOVERY_REQUIRED', message: 'Transfer outcome is uncertain. Reconcile the Circle and Arc transaction before another withdrawal.' });
+    }
+  }
+
+  private updateUsdcTransfer(operationId: string, patch: Partial<UsdcTransferRecord>): void {
+    this.runtime.transaction(() => {
+      const current = this.runtime.get<UsdcTransferRecord>('circle-usdc-transfers', operationId);
+      if (!current || ['CONFIRMED', 'FAILED', 'RECOVERY_REQUIRED'].includes(current.state)) return;
+      const next = { ...current, ...patch, updatedAt: this.now() };
+      this.runtime.put('circle-usdc-transfers', operationId, next);
+      if (['CONFIRMED', 'FAILED'].includes(next.state) && this.runtime.get<string>('circle-usdc-active', current.userId) === operationId) this.runtime.delete('circle-usdc-active', current.userId);
+    });
+  }
+
+  private publicUsdcTransfer(operation: UsdcTransferRecord): UsdcTransferOperation {
+    const { operationId, state, destinationAddress, amount, transactionId, txHash, explorerUrl, message, updatedAt } = operation;
+    return { operationId, state, destinationAddress, amount, transactionId, txHash, explorerUrl, message, updatedAt };
   }
 
   async holdEvaluationFee(input: { userId: string; campaignId: string; amountUsdc: string; approvalIdempotencyKey: string; depositIdempotencyKey: string }): Promise<{ approval: WalletTransactionResult; deposit: WalletTransactionResult }> {

@@ -36,6 +36,10 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByText(/1 USDC is held in the Evo fee escrow/i)).toBeInTheDocument();
     expect(screen.getByText(/fixed 1% platform fee/i)).toBeInTheDocument();
     expect(screen.getByText(/trusted operator/i)).toBeInTheDocument();
+    expect(screen.getByText(/including AGENTS.md bytes for Evo and Tournament comparisons/i)).toBeInTheDocument();
+    expect(screen.queryByText(/does not receive private AGENTS.md/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/managed Circle accounts cannot enter yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evo timeout refunds are handled on the Evaluation detail page/i)).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-input-v1')).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-output-v1')).toBeInTheDocument();
     expect(screen.getByText('arena-generation-input-v2')).toBeInTheDocument();
