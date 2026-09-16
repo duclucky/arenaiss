@@ -98,6 +98,10 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return { approval, deposit };
   }
 
+  async claimEvaluationTimeoutRefund(input: { walletId: string; escrowAddress: string; campaignId: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeComplete(input.walletId, input.escrowAddress, 'claimTimeoutRefund(bytes32)', [digestBytes32(input.campaignId)], input.idempotencyKey, 'arena-iss-evo-timeout-refund');
+  }
+
   async registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
     return this.executeRegistry(input.walletId, input.registryAddress, 'registerAgent(bytes32,bytes32,bytes32)', [digestBytes32(input.agentId), digestBytes32(input.agentsVersion), digestBytes32(input.agentsCommitment)], input.idempotencyKey, 'arena-iss-agent-register');
   }
@@ -118,6 +122,14 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     if (!approval.data?.id) throw new Error('Circle returned an invalid marketplace approval response');
     await this.client.getTransaction({ id: approval.data.id, waitForState: 'COMPLETE', pollingInterval: 1000 });
     return this.executeRegistry(input.walletId, input.marketplaceAddress, 'buy(uint256)', [input.listingId], input.buyIdempotencyKey, 'arena-iss-marketplace-buy');
+  }
+
+  async marketplaceWithdraw(input: { walletId: string; marketplaceAddress: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeRegistry(input.walletId, input.marketplaceAddress, 'withdraw()', [], input.idempotencyKey, 'arena-iss-marketplace-withdraw');
+  }
+
+  async marketplaceCancel(input: { walletId: string; marketplaceAddress: string; listingId: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeRegistry(input.walletId, input.marketplaceAddress, 'cancel(uint256)', [input.listingId], input.idempotencyKey, 'arena-iss-marketplace-cancel');
   }
 
   async bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: 'APPROVING' | 'BURNING') => void }): Promise<WalletTransactionResult> {

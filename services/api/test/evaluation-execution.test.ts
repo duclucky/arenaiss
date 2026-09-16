@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
-import { EvaluationExecutionService } from '../src/evaluation-execution.ts';
+import { EvaluationExecutionService, EvaluationExecutionWorker } from '../src/evaluation-execution.ts';
 
 const campaignId = `sha256:${'a'.repeat(64)}`;
 const owner = `0x${'1'.repeat(40)}`;
@@ -120,9 +120,47 @@ test('a refunded fee can never be released by a conflicting campaign projection'
   } finally { runtime.close(); }
 });
 
+test('payer timeout refund readback becomes terminal without exposing a second settlement path', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    runtime.put('evaluation-fees-v2', campaignId, { schema: 'arena-evaluation-fee-v2', campaignId, owner, amountUsdc: '1', escrowAddress: escrow, approvalIdempotencyKey: 'approval', depositIdempotencyKey: 'deposit', settlementIdempotencyKey: 'settlement', state: 'HELD', heldAt: 1 });
+    const service = new EvaluationExecutionService({ runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol', fees: {} as any, settlement: {} as any, runner: {} as any });
+    const refunded = service.recordTimeoutRefund(owner, campaignId, tx('5'));
+    assert.equal(refunded.state, 'REFUNDED'); assert.equal(refunded.settlement?.txHash, tx('5').txHash);
+    assert.equal(service.recordTimeoutRefund(owner, campaignId, tx('6')).settlement?.txHash, tx('5').txHash);
+    assert.throws(() => service.recordTimeoutRefund(`0x${'9'.repeat(40)}`, campaignId, tx('6')), /not found/);
+  } finally { runtime.close(); }
+});
+
 test('Evo requires the shared model and escrow configuration', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     assert.throws(() => new EvaluationExecutionService({ runtime, operatorAddress: operator, feeUsdc: '1', fees: {} as any, settlement: {} as any, runner: {} as any }), /escrow|model/i);
   } finally { runtime.close(); }
+});
+
+test('durable Evo recovery advances every held campaign without stopping on one failure', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const second = `sha256:${'b'.repeat(64)}`;
+    for (const [id, feeOwner] of [[campaignId, owner], [second, `0x${'4'.repeat(40)}`]]) runtime.put('evaluation-fees-v2', id, { schema: 'arena-evaluation-fee-v2', campaignId: id, owner: feeOwner, amountUsdc: '1', escrowAddress: escrow, approvalIdempotencyKey: 'approval', depositIdempotencyKey: 'deposit', settlementIdempotencyKey: 'settlement', state: 'HELD' });
+    const attempted: string[] = [];
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol', fees: {} as any, settlement: { async refund() { return tx('7'); } } as any,
+      runner: { get(id: string) { return { campaignId: id, owner: id === campaignId ? owner : `0x${'4'.repeat(40)}`, state: 'RUNNING' }; }, async advance(id: string) { attempted.push(id); if (id === campaignId) throw new Error('temporary'); return { campaignId: id, owner: `0x${'4'.repeat(40)}`, state: 'RUNNING' }; }, failInfrastructure(id: string) { return { campaignId: id, owner, state: 'FAILED' }; } } as any,
+    });
+    const result = await service.resumePending();
+    assert.deepEqual(attempted, [campaignId, second]);
+    assert.deepEqual(result, { attempted: 2, succeeded: 2, failed: 0 });
+  } finally { runtime.close(); }
+});
+
+test('Evo worker coalesces overlapping ticks into one recovery pass', async () => {
+  let calls = 0; let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  const worker = new EvaluationExecutionWorker({ async resumePending() { calls += 1; await blocked; return { attempted: 0, succeeded: 0, failed: 0 }; } } as any, 1000);
+  const first = worker.runOnce(); const second = worker.runOnce();
+  release();
+  assert.deepEqual(await first, await second);
+  assert.equal(calls, 1);
 });

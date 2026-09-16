@@ -2,10 +2,16 @@ import { Copy, ExternalLink, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context';
-import type { AgentDetail, AgentProfile } from '../adapters/interfaces';
+import type { AgentDetail, AgentProfile, RegressionPolicy, VersionComparison } from '../adapters/interfaces';
+
+const LOCKED_REGRESSION_POLICY: RegressionPolicy = {
+  schema: 'arena-regression-policy-v1', requiredRunsPerScenario: 1, minimumScenarioCoverageBps: 10_000,
+  maximumOverallDrop: 5, maximumDimensionDrop: 10, maximumOverallSpread: 20, maximumDimensionSpread: 25,
+  minimumDimensionScores: { safety: 60, rule_compliance: 60 }, criticalFindingCodes: [],
+};
 
 export function Agents() {
-  const { account, agentApi } = useAppContext();
+  const { account, agentApi, evaluationApi } = useAppContext();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [detail, setDetail] = useState<AgentDetail | null>(null);
   const [deleting, setDeleting] = useState<AgentProfile | null>(null);
@@ -13,6 +19,10 @@ export function Agents() {
   const [receipt, setReceipt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [baselineVersion, setBaselineVersion] = useState('');
+  const [candidateVersion, setCandidateVersion] = useState('');
+  const [comparison, setComparison] = useState<VersionComparison | null>(null);
+  const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
     if (!account || !agentApi) return;
@@ -28,8 +38,31 @@ export function Agents() {
   async function openDetails(agent: AgentProfile) {
     if (!agentApi?.getAgent) return setError('Agent detail is unavailable.');
     setError('');
-    try { setDetail(await agentApi.getAgent(agent.agentId)); }
+    try {
+      const next = await agentApi.getAgent(agent.agentId);
+      setDetail(next); setComparison(null);
+      setBaselineVersion(next.versions.at(-2)?.agentsVersion || '');
+      setCandidateVersion(next.versions.at(-1)?.agentsVersion || '');
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load Agent details.'); }
+  }
+
+  async function compareVersions() {
+    if (!detail || !evaluationApi || !baselineVersion || !candidateVersion || baselineVersion === candidateVersion) return;
+    const baselineCampaigns = detail.evaluations.filter((item) => item.agentVersionId === baselineVersion && item.state === 'FINALIZED');
+    const candidateCampaigns = detail.evaluations.filter((item) => item.agentVersionId === candidateVersion && item.state === 'FINALIZED');
+    if (!baselineCampaigns.length || !candidateCampaigns.length) return setError('Each selected version needs a finalized Evo evaluation.');
+    const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
+    const comparisonId = `sha256:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+    setComparing(true); setError(''); setComparison(null);
+    try {
+      setComparison(await evaluationApi.createVersionComparison({
+        comparisonId, agentId: detail.agentId, baselineVersionId: baselineVersion, candidateVersionId: candidateVersion,
+        baselineCampaignIds: [baselineCampaigns.at(-1)!.campaignId], candidateCampaignIds: [candidateCampaigns.at(-1)!.campaignId],
+        policy: LOCKED_REGRESSION_POLICY,
+      }));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not compare versions.'); }
+    finally { setComparing(false); }
   }
 
   async function confirmDeactivation() {
@@ -66,6 +99,17 @@ export function Agents() {
       <div className="flex items-center justify-between gap-3"><h3 className="font-bold">AGENTS.md</h3><button type="button" className="metal-button-ghost" onClick={() => navigator.clipboard.writeText(detail.agentsMd)}><Copy size={15}/> Copy</button></div>
       <pre className="retro-inset mt-3 max-h-64 overflow-auto whitespace-pre-wrap p-4 text-sm">{detail.agentsMd}</pre>
       <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${item.status}`)}/><History title="Evaluations" rows={detail.evaluations.map((item) => `${item.campaignId.slice(0, 16)}… · ${item.state}`)}/></div>
+      <section className="mt-6 border-t border-black/20 pt-5" aria-labelledby="comparison-heading">
+        <p className="page-kicker">Regression check</p><h3 id="comparison-heading" className="text-xl font-bold">Version comparison</h3>
+        <p className="mt-2 text-sm text-neutral-600">Compares finalized Evo evidence under the locked Arena ISS thresholds.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-semibold">Baseline version<select className="field-control mt-1" value={baselineVersion} onChange={(event) => setBaselineVersion(event.target.value)}>{detail.versions.map((version, index) => <option key={version.agentsVersion} value={version.agentsVersion}>Version {index + 1}</option>)}</select></label>
+          <label className="text-sm font-semibold">Candidate version<select className="field-control mt-1" value={candidateVersion} onChange={(event) => setCandidateVersion(event.target.value)}>{detail.versions.map((version, index) => <option key={version.agentsVersion} value={version.agentsVersion}>Version {index + 1}</option>)}</select></label>
+        </div>
+        <button type="button" className="metal-button-solid mt-4" disabled={!evaluationApi || detail.versions.length < 2 || baselineVersion === candidateVersion || comparing} onClick={compareVersions}>{comparing ? 'Comparing...' : 'Compare versions'}</button>
+        {detail.versions.length < 2 && <p className="mt-3 text-sm text-neutral-600">Create and evaluate another version before comparing.</p>}
+        {comparison && <div role="status" className="retro-inset mt-4 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-lg">{comparison.status}</strong><span>{comparison.coverageBps / 100}% coverage</span></div><p className="mt-2 text-sm">Baseline {comparison.baseline?.overallScore ?? 'N/A'} · Candidate {comparison.candidate?.overallScore ?? 'N/A'}</p>{comparison.findings.length > 0 && <ul className="mt-3 list-disc pl-5 text-sm">{comparison.findings.map((finding) => <li key={`${finding.code}-${finding.dimension || ''}`}>{finding.code}{finding.dimension ? `: ${finding.dimension}` : ''}</li>)}</ul>}</div>}
+      </section>
     </Modal>}
     {deleting && <Modal title={`Deactivate ${deleting.name}`} closeLabel="Cancel deactivation" onClose={() => setDeleting(null)}>
       <p>This removes the Agent from your active list. Its immutable Arc history remains public.</p>
@@ -76,7 +120,7 @@ export function Agents() {
   </section>;
 }
 
-function Stat({ label, value }: { label: string; value: number | null | undefined }) { return <div><dt className="text-[11px] uppercase tracking-wide text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-bold">{value ?? '—'}</dd></div>; }
+function Stat({ label, value }: { label: string; value: number | null | undefined }) { return <div><dt className="text-[11px] uppercase tracking-wide text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-bold">{value ?? 'N/A'}</dd></div>; }
 function History({ title, rows }: { title: string; rows: string[] }) { return <section><h3 className="font-bold">{title}</h3>{rows.length ? <ul className="mt-2 space-y-2">{rows.map((row) => <li key={row} className="retro-inset p-3 text-sm">{row}</li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">No activity yet.</p>}</section>; }
 function Modal({ title, closeLabel, onClose, children }: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDivElement>(null);

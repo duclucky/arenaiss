@@ -36,11 +36,14 @@ export type CircleWalletPort = {
   listUsdcBalances(input: { walletId: string; address: string }): Promise<UsdcBalance[]>;
   transferUsdc(input: { walletId: string; destinationAddress: string; amount: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   holdEvaluationFee(input: { walletId: string; escrowAddress: string; campaignId: string; amountUsdc: string; approvalIdempotencyKey: string; depositIdempotencyKey: string }): Promise<{ approval: WalletTransactionResult; deposit: WalletTransactionResult }>;
+  claimEvaluationTimeoutRefund(input: { walletId: string; escrowAddress: string; campaignId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  marketplaceCancel(input: { walletId: string; marketplaceAddress: string; listingId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult>;
+  marketplaceWithdraw(input: { walletId: string; marketplaceAddress: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
 };
 export type UsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
 export type WalletTransactionResult = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
@@ -175,6 +178,12 @@ export class ManagedIdentityService {
     return this.circleWallets.holdEvaluationFee({ walletId: wallet.walletId, escrowAddress: this.evaluationEscrowAddress, ...fee });
   }
 
+  async claimEvaluationTimeoutRefund(userId: string, campaignId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.evaluationEscrowAddress) throw new Error('evaluation fee escrow unavailable');
+    return this.circleWallets.claimEvaluationTimeoutRefund({ walletId: wallet.walletId, escrowAddress: this.evaluationEscrowAddress, campaignId, idempotencyKey });
+  }
+
   async startBridgeUsdcToArc(userId: string, sourceChain: string, amount: string): Promise<CctpTransferOperation> {
     const wallet = this.requireReadyWallet(userId);
     const normalizedSource = requireIdentifier(sourceChain, 'source chain');
@@ -229,6 +238,16 @@ export class ManagedIdentityService {
   async marketplaceBuy(userId: string, listingId: string, price: string, approvalIdempotencyKey: string, buyIdempotencyKey: string): Promise<WalletTransactionResult> {
     const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
     return this.circleWallets.marketplaceBuy({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, listingId, price, approvalIdempotencyKey, buyIdempotencyKey });
+  }
+
+  async marketplaceCancel(userId: string, listingId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
+    return this.circleWallets.marketplaceCancel({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, listingId, idempotencyKey });
+  }
+
+  async marketplaceWithdraw(userId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
+    return this.circleWallets.marketplaceWithdraw({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, idempotencyKey });
   }
 
   private async login(identityKey: string, kind: LoginIdentityKind, principal: string): Promise<ManagedAccount> {

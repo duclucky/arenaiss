@@ -109,6 +109,23 @@ test('Circle adapter holds an Evo fee through completed Arc approval and escrow 
   assert.equal(result.deposit.state, 'COMPLETE');
 });
 
+test('Circle adapter cancels a Marketplace listing through the seller SCA', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: 'cancel-id' } }; },
+    async getTransaction() { return { data: { transaction: { id: 'cancel-id', state: 'COMPLETE', txHash: `0x${'5'.repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+
+  const result = await adapter.marketplaceCancel({
+    walletId: 'wallet-id', marketplaceAddress: '0x4444444444444444444444444444444444444444',
+    listingId: '7', idempotencyKey: '11111111-1111-4111-8111-111111111111',
+  });
+
+  assert.equal(executions[0].abiFunctionSignature, 'cancel(uint256)');
+  assert.deepEqual(executions[0].abiParameters, ['7']);
+  assert.equal(result.state, 'COMPLETE');
+});
+
 test('Circle adapter reuses separately persisted approval and burn idempotency keys', async () => {
   const executions: any[] = [];
   const progress: string[] = [];

@@ -146,6 +146,7 @@ export function MatchDetail() {
 
           {verdict.source === 'LIVE' && (
             <div className="glass-panel rounded-[28px] p-6 md:p-8">
+              {verdict.chainId && verdict.chainId !== 61997 && <div role="status" className="mb-5 border border-amber-700 bg-amber-50 p-4 text-sm text-amber-950"><strong>Historical GenLayer evidence.</strong> This match finalized on chain {verdict.chainId}, before Arena ISS moved active Evo and Tournament judging to Studio Next chain 61997.</div>}
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Proof trail</p>
@@ -189,7 +190,7 @@ function DetailFact({ label, value, mono = false }: { label: string; value?: str
   return (
     <div className="retro-inset min-w-0 p-3">
       <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`${mono ? 'font-mono text-xs break-all' : 'text-sm font-semibold'} leading-relaxed`}>{value || '—'}</p>
+      <p className={`${mono ? 'font-mono text-xs break-all' : 'text-sm font-semibold'} leading-relaxed`}>{value || 'N/A'}</p>
     </div>
   );
 }
@@ -201,7 +202,7 @@ function ScoreCard({ label, score, winner }: { label: string; score?: number; wi
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="mt-1 text-sm font-bold">{winner ? 'MATCH WINNER' : 'FINAL SCORE'}</p>
       </div>
-      <p className="font-mono text-4xl font-bold tabular-nums">{score ?? '—'}</p>
+      <p className="font-mono text-4xl font-bold tabular-nums">{score ?? 'N/A'}</p>
     </div>
   );
 }

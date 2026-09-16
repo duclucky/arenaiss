@@ -49,6 +49,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\services\api\test\http.test.ts" `
   "$PSScriptRoot\..\services\api\test\managed-identity.test.ts" `
   "$PSScriptRoot\..\services\api\test\circle-managed-wallet.test.ts" `
+  "$PSScriptRoot\..\services\api\test\evaluation-execution.test.ts" `
+  "$PSScriptRoot\..\services\api\test\tournament-operations-http.test.ts" `
+  "$PSScriptRoot\..\services\api\test\tournament-operations-live.test.ts" `
   "$PSScriptRoot\..\services\api\test\server.test.ts" `
   "$PSScriptRoot\..\tests\ops\backup.test.ts" `
   "$PSScriptRoot\..\tests\ops\seed-live-demo.test.ts" `

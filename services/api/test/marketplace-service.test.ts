@@ -21,6 +21,8 @@ test('Marketplace projection requires exact Arc bindings and delivery requires c
     assert.throws(() => service.publishMarketplaceListing(operator, { ...snapshot, registryOwner: seller }), /buyer/);
     assert.throws(() => service.publishMarketplaceListing(operator, { ...snapshot, price: '1000001' }), /binding/);
     assert.equal(service.publishMarketplaceListing(operator, snapshot).state, 'SOLD');
+    assert.deepEqual(service.listOwnedMarketplacePurchases(buyer).map((row) => row.listingId), ['1']);
+    assert.deepEqual(service.listOwnedMarketplacePurchases(seller), []);
     assert.throws(() => service.getMarketplaceDelivery(buyer, '1', { ...snapshot, registryOwner: seller }), /delivery/);
     assert.throws(() => service.getMarketplaceDelivery(seller, '1', snapshot), /delivery/);
     assert.equal(JSON.stringify(service.listMarketplaceListings()).includes('seller"'), false);

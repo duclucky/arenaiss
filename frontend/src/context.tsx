@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { ArcWalletAdapter, ArcNetworkConfig, ArenaWriteAdapter, AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, ManagedAccount, ManagedIdentityAdapter, MarketplaceApiAdapter } from './adapters/interfaces';
+import { ArcWalletAdapter, ArcNetworkConfig, ArenaWriteAdapter, AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, ManagedAccount, ManagedIdentityAdapter, MarketplaceApiAdapter, TournamentOperationsApiAdapter } from './adapters/interfaces';
 import { LazyBrowserArcWalletAdapter } from './adapters/wallet-lazy';
 import { HttpAgentAdapter } from './adapters/agent-api';
 import { createArenaReadAdapter } from './adapters/arena-read';
@@ -7,6 +7,7 @@ import { HttpEvaluationAdapter } from './adapters/evaluation-api';
 import type { EvaluationApiAdapter } from './adapters/interfaces';
 import { HttpManagedIdentityAdapter } from './adapters/managed-identity';
 import { HttpMarketplaceAdapter } from './adapters/marketplace-api';
+import { HttpTournamentOperationsAdapter } from './adapters/tournament-operations-api';
 
 interface AppContextType {
   arenaRead: ArenaReadAdapter;
@@ -21,6 +22,7 @@ interface AppContextType {
   managedIdentity: ManagedIdentityAdapter | null;
   managedIdentityEnabled: boolean;
   marketplaceApi: MarketplaceApiAdapter | null;
+  tournamentOperationsApi: TournamentOperationsApiAdapter | null;
   connectWallet: (providerUuid: string) => Promise<void>;
   requestEmailCode: (email: string) => Promise<void>;
   signInWithEmail: (email: string, code: string) => Promise<void>;
@@ -130,9 +132,10 @@ interface AppProviderProps {
   genLayerReadAdapter?: GenLayerReadAdapter;
   identityAdapter?: ManagedIdentityAdapter;
   marketplaceApiAdapter?: MarketplaceApiAdapter;
+  tournamentOperationsApiAdapter?: TournamentOperationsApiAdapter;
 }
 
-export function AppProvider({ children, config, env, walletAdapter, agentApiAdapter, evaluationApiAdapter, arenaReadAdapter, genLayerReadAdapter, identityAdapter, marketplaceApiAdapter }: AppProviderProps) {
+export function AppProvider({ children, config, env, walletAdapter, agentApiAdapter, evaluationApiAdapter, arenaReadAdapter, genLayerReadAdapter, identityAdapter, marketplaceApiAdapter, tournamentOperationsApiAdapter }: AppProviderProps) {
   const [account, setAccount] = useState<string | null>(null);
   const [managedAccount, setManagedAccount] = useState<ManagedAccount | null>(null);
   const [managedIdentityEnabled, setManagedIdentityEnabled] = useState(Boolean(identityAdapter));
@@ -155,6 +158,7 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
     return new HttpEvaluationAdapter(networkConfig?.apiUrl || '', async () => { await agentApi.listOwnedAgents(); });
   }, [account, agentApi, evaluationApiAdapter, networkConfig?.apiUrl]);
   const marketplaceApi = useMemo(() => marketplaceApiAdapter || (networkConfig?.apiUrl ? new HttpMarketplaceAdapter(networkConfig.apiUrl) : null), [marketplaceApiAdapter, networkConfig?.apiUrl]);
+  const tournamentOperationsApi = useMemo(() => tournamentOperationsApiAdapter || (networkConfig?.apiUrl ? new HttpTournamentOperationsAdapter(networkConfig.apiUrl) : null), [networkConfig?.apiUrl, tournamentOperationsApiAdapter]);
 
   const connectWallet = async (providerUuid: string) => {
     if (!networkConfig) {
@@ -220,6 +224,7 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
         managedIdentity: identity,
         managedIdentityEnabled,
         marketplaceApi,
+        tournamentOperationsApi,
         connectWallet,
         requestEmailCode,
         signInWithEmail,

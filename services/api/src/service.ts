@@ -11,6 +11,7 @@ import { EVO_CORE_PACK_ID, EVO_CORE_SCENARIOS, EVO_CORE_VERSION } from "../../..
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
+export type TournamentOperatorEntrant = PreparedRegistration & { agentsMd: string };
 export type AgentChainTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string; registryAddress?: string };
 type Agent = { agentId: Digest; owner: string; name: string; versions: AgentVersion[]; active?: boolean; registrationPending?: boolean; registrationIdempotencyKey?: string; deactivationIdempotencyKey?: string; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction };
 export type AgentDraft = AgentVersion & { owner: string; name: string; idempotencyKey: string };
@@ -18,6 +19,7 @@ export type AgentStats = { latestEvaluationScore: number | null; tournamentCount
 export type PublicAgent = Omit<AgentVersion, "agentsMd"> & { owner: string; name: string; active: boolean; stats?: AgentStats; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction };
 export type AgentDetail = PublicAgent & {
   agentsMd: string;
+  versions: Array<Pick<AgentVersion, "agentsVersion" | "agentsCommitment" | "createdAt">>;
   stats: AgentStats;
   tournaments: PublicTournament[];
   evaluations: PublicEvaluationCampaign[];
@@ -171,6 +173,7 @@ export class ArenaApiService {
     const evaluations = [...this.evaluationCampaigns.values()].filter((campaign) => versionIds.has(campaign.agent.versionId as Digest)).map((campaign) => this.publicCampaign(campaign));
     return {
       ...this.publicView(agent), agentsMd: agent.versions.at(-1)!.agentsMd,
+      versions: agent.versions.map(({ agentsVersion, agentsCommitment, createdAt }) => ({ agentsVersion, agentsCommitment, createdAt })),
       stats: this.agentStats(agent),
       tournaments, evaluations,
     };
@@ -198,6 +201,20 @@ export class ArenaApiService {
       .filter((registration) => this.agents.get(`sha256:${registration.agentId.slice(2)}` as Digest)?.owner === owner)
       .map(({ tournamentId, entrantId }) => ({ tournamentId, entrantId }))
       .sort((left, right) => left.tournamentId.localeCompare(right.tournamentId) || left.entrantId.localeCompare(right.entrantId));
+  }
+  listTournamentOperatorEntrants(caller: string, tournamentId: Digest): TournamentOperatorEntrant[] {
+    this.requireOperator(caller);
+    if (!isDigest(tournamentId)) throw new Error("invalid tournament identity");
+    const tournamentBytes = digestBytes32(tournamentId);
+    return [...this.registrations.values()]
+      .filter((registration) => registration.tournamentId === tournamentBytes)
+      .map((registration) => {
+        const agent = this.agents.get(`sha256:${registration.agentId.slice(2)}` as Digest);
+        const version = agent?.versions.find((candidate) => digestBytes32(candidate.agentsVersion) === registration.agentsVersion);
+        if (!agent || !version || digestBytes32(version.agentsCommitment) !== registration.agentsCommitment) throw new Error("tournament registration binding is invalid");
+        return { ...structuredClone(registration), agentsMd: version.agentsMd };
+      })
+      .sort((left, right) => left.entrantId.localeCompare(right.entrantId));
   }
   publishTournament(caller: string, tournament: PublicTournament): void {
     if (this.address(caller) !== this.operator) throw new Error("unauthorized operator");
@@ -400,6 +417,7 @@ export class ArenaApiService {
   }
   approveMarketplaceEligibility(caller: string, digest: Digest, transaction: MarketplaceTransaction): MarketplaceCertificate { this.requireOperator(caller); const record = this.marketplaceCertificates.get(digest); if (!record) throw new Error("marketplace certificate not found"); if (record.state === "APPROVED") return structuredClone(record); record.state = "APPROVED"; record.authorization = structuredClone(transaction); this.runtime?.put("marketplace-certificates", digest, record); return structuredClone(record); }
   listOwnedMarketplaceCertificates(caller: string): MarketplaceCertificate[] { const owner = this.principal(caller); return [...this.marketplaceCertificates.values()].filter((row) => row.owner === owner).map((row) => structuredClone(row)); }
+  listMarketplaceCertificatesForOperator(caller: string): MarketplaceCertificate[] { this.requireOperator(caller); return [...this.marketplaceCertificates.values()].map((row) => structuredClone(row)).sort((a, b) => b.issuedAt - a.issuedAt); }
   createMarketplaceListing(caller: string, input: { listingId: string; certificateDigest: Digest; sellerAddress: string; price: string; expiresAt: number; transaction: MarketplaceTransaction }): PublicMarketplaceListing {
     const owner = this.principal(caller); const certificate = this.marketplaceCertificates.get(input.certificateDigest); if (!certificate || certificate.owner !== owner || certificate.state !== "APPROVED") throw new Error("approved marketplace certificate is required");
     if (!/^[1-9][0-9]*$/.test(input.listingId) || !/^[1-9][0-9]*$/.test(input.price) || !Number.isSafeInteger(input.expiresAt) || input.expiresAt > certificate.expiresAt || !ADDRESS.test(input.sellerAddress)) throw new Error("invalid marketplace listing");
@@ -416,6 +434,7 @@ export class ArenaApiService {
     row.state = snapshot.state; this.runtime?.put("marketplace-listings", row.listingId, row); return this.publicMarketplaceListing(row); }
   submitMarketplacePurchase(caller: string, listingId: string, buyerAddress: string, transaction: MarketplaceTransaction): PublicMarketplaceListing { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "ACTIVE" || row.seller === buyer || !ADDRESS.test(buyerAddress)) throw new Error("marketplace listing is unavailable"); row.state = "BUY_SUBMITTED"; row.buyer = buyer; row.buyerAddress = buyerAddress.toLowerCase(); row.purchase = structuredClone(transaction); this.runtime?.put("marketplace-listings", row.listingId, row); return this.publicMarketplaceListing(row); }
   listMarketplaceListings(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state !== "SUBMITTED").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
+  listOwnedMarketplacePurchases(caller: string): PublicMarketplaceListing[] { const buyer = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.buyer === buyer && row.state === "SOLD").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   getMarketplaceDelivery(caller: string, listingId: string, snapshot: MarketplaceArcSnapshot): { agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; agentsMd: string } { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "SOLD" || row.buyer !== buyer || snapshot.state !== "SOLD" || snapshot.registryOwner.toLowerCase() !== row.buyerAddress || snapshot.buyerAddress?.toLowerCase() !== row.buyerAddress || snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment) throw new Error("marketplace delivery unavailable"); const agent = this.agents.get(row.agentId)!; const version = agent.versions.find((item) => item.agentsVersion === row.agentVersionId)!; return { agentId: row.agentId, agentVersionId: row.agentVersionId, agentsCommitment: row.agentsCommitment, agentsMd: version.agentsMd }; }
   prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest): PreparedRegistration {
     const owner = this.principal(caller);
