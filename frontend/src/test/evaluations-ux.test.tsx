@@ -61,6 +61,9 @@ describe('evaluation product UX', () => {
     await waitFor(() => expect(selector).toHaveValue('agent_1'));
     expect(screen.queryByLabelText('Scenario objective')).not.toBeInTheDocument();
     expect(screen.getByText('1 USDC')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'How Agent evaluation works' })).toBeInTheDocument();
+    expect(screen.getByText('Evaluation fee')).toBeInTheDocument();
+    expect(screen.queryByText(/\bEvo\b/i)).not.toBeInTheDocument();
     expect(screen.getByText(/GenVM validators assess the exact submitted evidence/i)).toBeInTheDocument();
     expect(screen.getByText(/fixed USDC fee is held on Arc Testnet/i)).toBeInTheDocument();
     expect(screen.queryByText(/gas is paid/i)).not.toBeInTheDocument();
@@ -87,19 +90,19 @@ describe('evaluation product UX', () => {
     expect(screen.getByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', '/evaluation-runs/run_1');
   });
 
-  it('renders a legacy campaign and its runs when the Evo fee does not exist', async () => {
+  it('renders a legacy campaign and its runs when the evaluation fee does not exist', async () => {
     const api = { ...evaluationApi, async getFee() { return null; } };
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open attempt 1' })).toBeInTheDocument();
-    expect(screen.getByText(/Legacy campaign, no Evo escrow record/i)).toBeInTheDocument();
+    expect(screen.getByText(/Legacy campaign, no evaluation escrow record/i)).toBeInTheDocument();
   });
 
   it('keeps backend evaluation IDs out of the user-facing list', async () => {
     const campaignId = `sha256:${'c'.repeat(64)}`;
     const api = { ...evaluationApi, async listCampaigns() { return [{ ...campaign, campaignId }]; } };
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
-    expect(await screen.findByText('Date unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Time not recorded')).toBeInTheDocument();
     expect(screen.queryByText(/Pack 2026\.09/i)).not.toBeInTheDocument();
     expect(screen.queryByText(campaignId)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open evaluation results' })).toHaveAttribute('href', `/evaluations/${campaignId}`);
@@ -117,13 +120,14 @@ describe('evaluation product UX', () => {
   });
 
   it('preserves API chronology when historical campaigns have no creation timestamp', async () => {
-    const recent = { ...campaign, campaignId: 'legacy_recent', state: 'FAILED' };
-    const older = { ...campaign, campaignId: 'legacy_older', state: 'RUNNING' };
+    const recent = { ...campaign, campaignId: 'legacy_recent', startedAt: Date.UTC(2026, 8, 17, 12, 30), state: 'FAILED' };
+    const older = { ...campaign, campaignId: 'legacy_older', startedAt: Date.UTC(2026, 8, 16, 11, 0), state: 'RUNNING' };
     const api = { ...evaluationApi, async listCampaigns() { return [recent, older]; } };
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
     const links = await screen.findAllByRole('link', { name: 'Open evaluation results' });
     expect(links.map((link) => link.getAttribute('href'))).toEqual(['/evaluations/legacy_recent', '/evaluations/legacy_older']);
-    expect(screen.getAllByText('Date unavailable')).toHaveLength(2);
+    expect(screen.getByText(/17 Sept? 2026.*12:30 UTC/)).toBeInTheDocument();
+    expect(screen.queryByText('Evo evaluation')).not.toBeInTheDocument();
   });
 
   it('keeps campaign and run IDs out of the detail page while preserving deep links', async () => {
@@ -143,7 +147,7 @@ describe('evaluation product UX', () => {
     const api = { ...evaluationApi, async getCampaign() { return uncertain; }, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' }; } };
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByText(/GenLayer submission needs reconciliation/i)).toBeInTheDocument();
-    expect(screen.getByText(/Evo fee remains in escrow/i)).toBeInTheDocument();
+    expect(screen.getByText(/evaluation fee remains in escrow/i)).toBeInTheDocument();
     expect(screen.queryByText(/USDC refunded/i)).not.toBeInTheDocument();
   });
 
@@ -183,20 +187,20 @@ describe('evaluation product UX', () => {
     expect(within(table).getByText('N/A')).toBeInTheDocument();
   });
 
-  it('places a held Evo timeout refund in Account Claim instead of evaluation results', async () => {
+  it('places a held evaluation timeout refund in Account Claim instead of evaluation results', async () => {
     const claimTimeoutRefund = vi.fn().mockResolvedValue({ state: 'REFUNDED', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' });
     const api = { ...evaluationApi, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333', refundAvailableAt: 1 }; }, claimTimeoutRefund };
     render(<MemoryRouter initialEntries={['/account?tab=claim']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Routes><Route path="/account" element={<Account />} /></Routes></AppProvider></MemoryRouter>);
-    const button = await screen.findByRole('button', { name: 'Claim 1 USDC Evo refund' });
+    const button = await screen.findByRole('button', { name: 'Claim 1 USDC evaluation refund' });
     expect(button).toBeEnabled(); fireEvent.click(button);
     await waitFor(() => expect(claimTimeoutRefund).toHaveBeenCalledWith('campaign_1', expect.any(String)));
   });
 
-  it('does not offer Evo refunds on the result page', async () => {
+  it('does not offer evaluation refunds on the result page', async () => {
     const api = { ...evaluationApi, async getFee() { return { state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333', refundAvailableAt: 1 }; } };
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Evo refund|timeout refund/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /evaluation refund|timeout refund/i })).not.toBeInTheDocument();
   });
 
   it('links a finalized run to its Studio Next transaction receipt', async () => {
@@ -204,6 +208,14 @@ describe('evaluation product UX', () => {
     expect(await screen.findByRole('table', { name: 'Score dimensions' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View Studio Next transaction/i })).toHaveAttribute('href', `${config.genLayer.explorerUrl}/transactions/${run.judge.transactionHash}`);
     expect(screen.queryByText(run.runId)).not.toBeInTheDocument();
+  });
+
+  it('names the public topic without revealing the hidden scenario prompt', async () => {
+    const batchRun = { ...run, scenario: { ...run.scenario, scenarioId: 'planning_batch' } };
+    const api = { ...evaluationApi, async getRun() { return batchRun; } };
+    render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('Planning · Batch recovery')).toBeInTheDocument();
+    expect(screen.queryByText(/A job stopped after 700 of 1,000 records/i)).not.toBeInTheDocument();
   });
 
   it('explains the zero effective score on a hard-failed run', async () => {

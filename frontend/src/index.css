@@ -83,7 +83,7 @@ button:disabled { cursor: not-allowed; }
 }
 .brand-lockup:focus-visible, .nav-link:focus-visible, .header-cta:focus-visible, .header-account:focus-visible,
 .hero-pill:focus-visible, .menu-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
-.brand-star { font-family: var(--font-body); font-size: 1.14em; letter-spacing: -.02em; user-select: none; }
+.brand-mark { display: block; width: 32px; height: 32px; object-fit: contain; user-select: none; }
 .primary-nav { display: flex; align-items: center; justify-self: center; gap: 8px; font-size: 16px; line-height: 1; }
 .nav-link {
   display: inline-flex;

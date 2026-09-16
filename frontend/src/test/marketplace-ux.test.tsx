@@ -29,12 +29,15 @@ const config = { chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', na
 function mount(api: MarketplaceApiAdapter = marketplaceApi) { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
 
 describe('Marketplace website UX', () => {
-  it('selects an owned Agent and its finalized Evo campaigns without asking for raw digests or judge address', async () => {
+  it('explains evaluation eligibility and the platform fee without internal Evo terminology', async () => {
     mount();
+    expect(await screen.findByText(/passed Arena ISS evaluation/i)).toBeInTheDocument();
+    expect(screen.getByText('Platform fee · 1%')).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
     expect(await screen.findByRole('option', { name: 'Safety Scout' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Agent to certify'), { target: { value: agentId } });
-    expect(screen.getByText(/2 finalized Evo campaigns available/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 finalized evaluations available/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\bEvo\b/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Version digest')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('GenLayer judge address')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Check eligibility' }));

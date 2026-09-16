@@ -51,7 +51,7 @@ export function Agents() {
     if (!detail || !evaluationApi || !baselineVersion || !candidateVersion || baselineVersion === candidateVersion) return;
     const baselineCampaigns = detail.evaluations.filter((item) => item.agentVersionId === baselineVersion && item.state === 'FINALIZED');
     const candidateCampaigns = detail.evaluations.filter((item) => item.agentVersionId === candidateVersion && item.state === 'FINALIZED');
-    if (!baselineCampaigns.length || !candidateCampaigns.length) return setError('Each selected version needs a finalized Evo evaluation.');
+    if (!baselineCampaigns.length || !candidateCampaigns.length) return setError('Each selected version needs a finalized evaluation.');
     const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
     const comparisonId = `sha256:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
     setComparing(true); setError(''); setComparison(null);
@@ -78,7 +78,7 @@ export function Agents() {
 
   return <section className="mx-auto max-w-5xl space-y-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div><p className="page-kicker">Strategy vault</p><h1 className="page-title">My Agents</h1><p className="page-lede">Create private AGENTS.md profiles, evolve them through versioned updates, run Evo evaluations, and qualify strong Agents for Tournaments or Marketplace.</p></div>
+      <div><p className="page-kicker">Strategy vault</p><h1 className="page-title">My Agents</h1><p className="page-lede">Create private AGENTS.md profiles, evolve them through versioned updates, run evaluations, and qualify strong Agents for Tournaments or Marketplace.</p></div>
       <Link to="/agents/new" className="metal-button-solid">Create Agent</Link>
     </div>
     {receipt && <div role="status" className="glass-panel flex items-center justify-between gap-4 p-4"><span>Agent deactivated on Arc.</span><a href={receipt} target="_blank" rel="noreferrer" className="font-semibold underline">View Arc transaction <ExternalLink className="inline" size={14}/></a></div>}
@@ -98,10 +98,10 @@ export function Agents() {
       {detail.registration?.explorerUrl && <a href={detail.registration.explorerUrl} target="_blank" rel="noreferrer" className="mb-5 inline-block font-semibold underline">Registered on Arc <ExternalLink className="inline" size={14}/></a>}
       <div className="flex items-center justify-between gap-3"><h3 className="font-bold">AGENTS.md</h3><button type="button" className="metal-button-ghost" onClick={() => navigator.clipboard.writeText(detail.agentsMd)}><Copy size={15}/> Copy</button></div>
       <pre className="retro-inset mt-3 max-h-64 overflow-auto whitespace-pre-wrap p-4 text-sm">{detail.agentsMd}</pre>
-      <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${item.status}`)}/><History title="Evaluations" rows={detail.evaluations.map((item) => `Evo evaluation · ${item.state}`)}/></div>
+      <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${item.status}`)}/><History title="Evaluations" rows={detail.evaluations.map((item) => `Agent evaluation · ${item.state}`)}/></div>
       <section className="mt-6 border-t border-black/20 pt-5" aria-labelledby="comparison-heading">
         <p className="page-kicker">Regression check</p><h3 id="comparison-heading" className="text-xl font-bold">Version comparison</h3>
-        <p className="mt-2 text-sm text-neutral-600">Compares finalized Evo evidence under the locked Arena ISS thresholds.</p>
+        <p className="mt-2 text-sm text-neutral-600">Compares finalized evaluation evidence under the locked Arena ISS thresholds.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-semibold">Baseline version<select className="field-control mt-1" value={baselineVersion} onChange={(event) => setBaselineVersion(event.target.value)}>{detail.versions.map((version, index) => <option key={version.agentsVersion} value={version.agentsVersion}>Version {index + 1}</option>)}</select></label>
           <label className="text-sm font-semibold">Candidate version<select className="field-control mt-1" value={candidateVersion} onChange={(event) => setCandidateVersion(event.target.value)}>{detail.versions.map((version, index) => <option key={version.agentsVersion} value={version.agentsVersion}>Version {index + 1}</option>)}</select></label>

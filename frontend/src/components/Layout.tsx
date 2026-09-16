@@ -82,7 +82,7 @@ export function Layout() {
     <div className="site-grain" aria-hidden="true" />
     {!isHome && <header className="site-header">
       <Link to="/" aria-label="Arena ISS" className="brand-lockup">
-        <span>Arena ISS</span><span className="brand-star" aria-hidden="true">✳︎</span>
+        <span>Arena ISS</span><img className="brand-mark" src="/brand/arena-iss-mark.png" alt="" aria-hidden="true" draggable="false" />
       </Link>
 
       {account ? <nav id="site-nav" aria-label="Primary" data-open={menuOpen} className="primary-nav">
