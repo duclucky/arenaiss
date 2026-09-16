@@ -20,7 +20,7 @@ import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../pack
 import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/src/evaluation-sdk-port.ts';
 import type { TournamentOperationsPort } from './tournament-operations.ts';
 import { tournamentOperationsFromEnvironment } from './tournament-operations-live.ts';
-import { launchReferenceTournament } from './reference-tournament-launch.ts';
+import { launchReferenceTournament, runReferenceTournamentTick } from './reference-tournament-launch.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -237,7 +237,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const runtime = new SqliteRuntimeStore(resolvedDatabasePath);
   let tournamentOperations: TournamentOperationsPort | undefined;
   const server = createArenaServer(operator, runtime, { onTournamentOperationsReady: (operations) => { tournamentOperations = operations; } });
-  server.once('close', () => runtime.close());
+  let referenceWorkerTimer: NodeJS.Timeout | undefined;
+  let referenceWorkerStopped = false;
+  server.once('close', () => { referenceWorkerStopped = true; if (referenceWorkerTimer) clearTimeout(referenceWorkerTimer); runtime.close(); });
   const shutdown = () => server.close();
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
@@ -246,7 +248,24 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     if (process.env.ARENA_ONE_SHOT_TOURNAMENT === 'reference-8x1-30m-v1') {
       if (!tournamentOperations) process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_launch_failed', error: 'Tournament operations unavailable' })}\n`);
       else void launchReferenceTournament(runtime, tournamentOperations, Math.floor(Date.now() / 1_000))
-        .then(({ input, snapshot }) => process.stdout.write(`${JSON.stringify({ event: 'reference_tournament_launch_confirmed', tournamentId: input.tournamentId, registrationClosesAt: input.registrationClosesAt, startsAt: input.startsAt, stakeAmount: input.stakeAmount, minEntrants: input.minEntrants, maxEntrants: input.maxEntrants, transactionHash: snapshot.arc?.transactionHash ?? null })}\n`))
+        .then(({ input, snapshot }) => {
+          process.stdout.write(`${JSON.stringify({ event: 'reference_tournament_launch_confirmed', tournamentId: input.tournamentId, registrationClosesAt: input.registrationClosesAt, startsAt: input.startsAt, stakeAmount: input.stakeAmount, minEntrants: input.minEntrants, maxEntrants: input.maxEntrants, transactionHash: snapshot.arc?.transactionHash ?? null })}\n`);
+          const tick = async () => {
+            if (referenceWorkerStopped) return;
+            try {
+              const result = await runReferenceTournamentTick(tournamentOperations!, input, Math.floor(Date.now() / 1_000));
+              if (result.action) process.stdout.write(`${JSON.stringify({ event: 'reference_tournament_progressed', tournamentId: input.tournamentId, action: result.action, state: result.snapshot?.state })}\n`);
+              if (result.snapshot && ['COMPLETED', 'REFUNDED', 'RECOVERY_REQUIRED'].includes(result.snapshot.state)) {
+                if (result.snapshot.state === 'RECOVERY_REQUIRED') process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_attention_required', tournamentId: input.tournamentId, state: result.snapshot.state })}\n`);
+                return;
+              }
+            } catch (error) {
+              process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_progress_failed', tournamentId: input.tournamentId, error: error instanceof Error ? error.message : 'unknown error' })}\n`);
+            }
+            if (!referenceWorkerStopped) referenceWorkerTimer = setTimeout(tick, 30_000);
+          };
+          if (!referenceWorkerStopped) referenceWorkerTimer = setTimeout(tick, Math.max(1_000, Math.min(30_000, (input.startsAt - Math.floor(Date.now() / 1_000)) * 1_000)));
+        })
         .catch((error) => process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_launch_failed', error: error instanceof Error ? error.message : 'unknown error' })}\n`));
     }
   });
