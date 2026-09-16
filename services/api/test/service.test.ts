@@ -141,6 +141,7 @@ test("owner registration listing is scoped and exposes only identifiers needed f
   assert.deepEqual((api as any).listOwnedRegistrations(ALICE), [{
     tournamentId: aliceRegistration.tournamentId,
     entrantId: aliceRegistration.entrantId,
+    agentId: aliceRegistration.agentId,
   }]);
   assert.equal(JSON.stringify((api as any).listOwnedRegistrations(ALICE)).includes("agentsCommitment"), false);
   assert.equal((api as any).listOwnedRegistrations(BOB).length, 1);
@@ -166,7 +167,7 @@ test("agent versions, tournaments and prepared registrations survive API restart
     const restarted = new ArenaApiService(ALICE, restartedDatabase);
     assert.equal(restarted.getPrivateAgent(ALICE, agent.agentId).agentsMd, "version one");
     assert.deepEqual(restarted.listTournaments(), [{ id: tournamentId, name: "Persistent Arena", status: "UPCOMING", entrantIds: [], stakeAmount: "100000", prizePool: "0" }]);
-    assert.deepEqual(restarted.listOwnedRegistrations(ALICE), [{ tournamentId: prepared.tournamentId, entrantId: prepared.entrantId }]);
+    assert.deepEqual(restarted.listOwnedRegistrations(ALICE), [{ tournamentId: prepared.tournamentId, entrantId: prepared.entrantId, agentId: prepared.agentId }]);
     assert.deepEqual(restarted.prepareRegistration(ALICE, tournamentId, agent.agentId), prepared);
     const updated = restarted.updateAgent(ALICE, agent.agentId, "version two");
     assert.notEqual(updated.agentsVersion, agent.agentsVersion);

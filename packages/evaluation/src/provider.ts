@@ -119,7 +119,7 @@ export class OpenAICompatibleEvaluationProvider {
         try {
           payload = await this.request(this.endpoint, this.apiKey, body, value.operationKey);
         } catch (error) {
-          if (value.route === "PRIMARY" || !this.fallback || !this.isTimeout(error)) throw error;
+          if (value.route === "PRIMARY" || !this.fallback || !this.isTemporaryFailure(error)) throw error;
           await useFallback();
         }
       }
@@ -157,8 +157,9 @@ export class OpenAICompatibleEvaluationProvider {
     }
   }
 
-  private isTimeout(error: unknown): boolean {
-    return error instanceof DOMException && error.name === "AbortError";
+  private isTemporaryFailure(error: unknown): boolean {
+    return (error instanceof DOMException && error.name === "AbortError")
+      || (error instanceof Error && /^HTTP_(429|5\d\d)$/.test(error.message));
   }
 
   private normalizeEndpoint(value: string, label: string, style: EvaluationProviderStyle = this.style): string {

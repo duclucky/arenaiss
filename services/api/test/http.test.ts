@@ -368,7 +368,7 @@ test('authenticated owner can prepare an exact Arc registration payload', async 
 
   const owned = await api.handle({ method: 'GET', path: '/api/registrations', headers: { cookie } });
   assert.equal(owned.status, 200);
-  assert.deepEqual(owned.body, [{ tournamentId: prepared.body.tournamentId, entrantId: prepared.body.entrantId }]);
+  assert.deepEqual(owned.body, [{ tournamentId: prepared.body.tournamentId, entrantId: prepared.body.entrantId, agentId: prepared.body.agentId }]);
   assert.equal((await api.handle({ method: 'GET', path: '/api/registrations' })).status, 401);
 });
 
@@ -398,12 +398,14 @@ test('managed account can approve and register a prepared Tournament entry throu
     assert.equal(response.status, 200);
     assert.equal(response.body.transactionId, 'entry-tx');
     assert.equal(entries[0].entrantId, `0x${entrantId(tournamentId, '0x4444444444444444444444444444444444444444', agent.body.agentId, 1).slice(7)}`);
-    await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
+    const duplicate = await api.handle({ method: 'POST', path: `/api/tournaments/${tournamentId}/managed-registration`, headers: { cookie }, body: { agentId: agent.body.agentId } });
+    assert.equal(duplicate.status, 400);
+    assert.match(duplicate.body.error, /already registered/i);
+    assert.equal(entries.length, 1);
     assert.equal(entries[0].walletId, 'wallet-id');
     assert.equal(entries[0].stakeAmount, '1000000');
     assert.equal(entries[0].tournamentId, `0x${'f'.repeat(64)}`);
-    assert.equal(entries[0].approvalIdempotencyKey, entries[1].approvalIdempotencyKey);
-    assert.equal(entries[0].registrationIdempotencyKey, entries[1].registrationIdempotencyKey);
+    assert.equal(service.getTournament(tournamentId)?.entrantIds.length, 1);
   } finally { runtime.close(); }
 });
 

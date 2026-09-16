@@ -142,7 +142,11 @@ function normalizeTournament(value: unknown): Tournament {
   const item = record(value);
   const status = text(item.status);
   if (!TOURNAMENT_STATES.has(status)) throw new Error('INVALID_ARENA_RESPONSE');
-  return { id: text(item.id), name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool) };
+  if (item.registrationClosesAt !== undefined && (!Number.isSafeInteger(item.registrationClosesAt) || (item.registrationClosesAt as number) < 1)) throw new Error('INVALID_ARENA_RESPONSE');
+  if (item.entrantIds !== undefined && (!Array.isArray(item.entrantIds) || item.entrantIds.some((id) => typeof id !== 'string'))) throw new Error('INVALID_ARENA_RESPONSE');
+  return { id: text(item.id), name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
+    ...(item.registrationClosesAt !== undefined ? { registrationClosesAt: item.registrationClosesAt as number } : {}),
+    ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}) };
 }
 function normalizeMatch(value: unknown): Match {
   const item = record(value);

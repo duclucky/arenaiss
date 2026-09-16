@@ -167,7 +167,7 @@ test("Tournament can lock both sides to one provider route", async () => {
   assert.deepEqual(calls, ["https://primary.example/v1/chat/completions", "https://api.openai.com/v1/chat/completions"]);
 });
 
-test("provider does not use the fallback endpoint for non-timeout failures", async () => {
+test("provider does not use the fallback endpoint for permanent client failures", async () => {
   const calls: string[] = [];
   const provider = new OpenAICompatibleEvaluationProvider({
     endpoint: "https://primary.example/v1",
@@ -177,12 +177,31 @@ test("provider does not use the fallback endpoint for non-timeout failures", asy
     fallbackModel: "fallback-model",
     fetchImpl: async (url) => {
       calls.push(String(url));
-      return new Response("{}", { status: 503 });
+      return new Response("{}", { status: 400 });
     },
   });
 
   await assert.rejects(() => provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "eval-no-fallback" }), /PROVIDER_ERROR/);
   assert.deepEqual(calls, ["https://primary.example/v1/chat/completions"]);
+});
+
+test("provider uses fallback for a temporary upstream HTTP failure", async () => {
+  const calls: string[] = [];
+  const provider = new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1", apiKey: "server-secret",
+    fallbackApiKey: "fallback-secret", fallbackModel: "fallback-model",
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (String(url).startsWith("https://primary.example")) return new Response("{}", { status: 503 });
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        schema: "arena-evaluation-output-v1", mode: "ACTION_DECISION", decision: "RESPOND",
+        answer: "Recovered.", observable_rationale: "Fallback completed.", proposed_actions: [],
+      }) } }] }), { status: 200 });
+    },
+  });
+  const result = await provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "eval-upstream-503" });
+  assert.equal(result.route, "FALLBACK");
+  assert.deepEqual(calls, ["https://primary.example/v1/chat/completions", "https://api.openai.com/v1/chat/completions"]);
 });
 
 test("provider falls back when the primary response body stalls after HTTP headers", async () => {

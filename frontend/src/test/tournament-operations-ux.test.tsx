@@ -29,7 +29,7 @@ describe('Tournament operator console', () => {
     const joined = `sha256:${'c'.repeat(64)}`;
     const reads = { async listTournaments() { return [
       { id: archived, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', entrantIds: [], prizePool: '0.008' },
-      { id: live, name: 'Open Safety Cup', status: 'ACTIVE', entrantIds: [], prizePool: '8' },
+      { id: live, name: 'Open Safety Cup', status: 'UPCOMING', entrantCount: 3, registrationClosesAt: Math.floor(Date.now() / 1_000) + 3_600, prizePool: '3' },
       { id: joined, name: 'Joined Cup', status: 'COMPLETED', entrantIds: [], prizePool: '8' },
     ]; } } as unknown as ArenaReadAdapter;
     const agentApi = { async listOwnedRegistrations() { return [{ tournamentId: `0x${'c'.repeat(64)}`, entrantId: `0x${'d'.repeat(64)}` }]; }, async listOwnedAgents() { return []; }, async createAgent() { throw new Error('unused'); }, async prepareRegistration() { throw new Error('unused'); } } as AgentApiAdapter;
@@ -38,6 +38,8 @@ describe('Tournament operator console', () => {
     expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
     expect(await screen.findByText('Open Safety Cup')).toBeInTheDocument();
+    expect(screen.getByText(/Registered Agents:/).parentElement).toHaveTextContent('3');
+    expect(screen.getByText(/Starts in:/).parentElement).toHaveTextContent('00:');
     expect(screen.queryByText('Joined Cup')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Tournaments joined' }));
     expect(await screen.findByText('Joined Cup')).toBeInTheDocument();

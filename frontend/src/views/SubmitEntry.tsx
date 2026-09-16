@@ -9,8 +9,9 @@ type FlowState = 'IDLE' | 'PREPARING' | 'APPROVING' | 'REGISTERING' | 'VERIFYING
 export function SubmitEntry() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { account, managedAccount, managedIdentity, agentApi, networkConfig, wallet } = useAppContext();
+  const { account, managedAccount, managedIdentity, agentApi, arenaRead, networkConfig, wallet } = useAppContext();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
+  const [registeredCount, setRegisteredCount] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [flow, setFlow] = useState<FlowState>('IDLE');
@@ -21,12 +22,17 @@ export function SubmitEntry() {
     if (!account || !agentApi) { setAgents([]); setSelectedAgentId(''); return; }
     let active = true;
     setLoading(true); setError('');
-    agentApi.listOwnedAgents()
-      .then((items) => { if (active) { setAgents(items); setSelectedAgentId((current) => current || items[0]?.agentId || ''); } })
+    Promise.all([agentApi.listOwnedAgents(), agentApi.listOwnedRegistrations().catch(() => []), id ? arenaRead.getTournament(id).catch(() => null) : Promise.resolve(null)])
+      .then(([items, registrations, tournament]) => { if (active) {
+        const confirmed = new Set((tournament?.entrantIds || []).map((entrant) => entrant.toLowerCase().replace(/^sha256:/, '0x')));
+        const alreadyEntered = new Set(registrations.filter((row) => confirmed.has(row.entrantId.toLowerCase())).map((row) => row.agentId?.toLowerCase().replace(/^0x/, 'sha256:')));
+        const available = items.filter((agent) => !alreadyEntered.has(agent.agentId.toLowerCase()));
+        setRegisteredCount(items.length - available.length); setAgents(available); setSelectedAgentId((current) => available.some((agent) => agent.agentId === current) ? current : available[0]?.agentId || '');
+      } })
       .catch((reason) => { if (active) setError(messageOf(reason, 'Could not load your agents.')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [account, agentApi]);
+  }, [account, agentApi, arenaRead, id]);
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setError('');
@@ -81,7 +87,7 @@ export function SubmitEntry() {
       <p className="text-xs leading-relaxed text-neutral-600">Trusted-operator disclosure: the platform controls model calls, match mapping, and bracket progression. Arc independently enforces registration and payout accounting.</p>
       {managedAccount && <p role="status" className="text-sm text-neutral-700">Entry will be approved and registered on Arc through your Arena managed wallet.</p>}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={() => navigate(`/tournaments/${id}`)} className="metal-button-ghost">Cancel</button>{!networkConfig ? <button type="button" disabled className="metal-button-solid">Submit to Arena (Disabled)</button> : <button type="submit" disabled={!account || !agentApi || !selectedAgentId || pending || flow === 'CONFIRMED' || (Boolean(managedAccount) && !managedIdentity?.registerTournamentEntrant)} className="metal-button-solid min-w-44">{managedAccount && flow === 'IDLE' ? 'Enter with managed wallet' : flowLabel(flow)}</button>}</div>
-      {account && agents.length === 0 && !loading && <p className="text-center text-sm text-neutral-700">No AGENTS.md profile yet. <Link to="/agents/new" className="underline decoration-neutral-600 underline-offset-4 hover:decoration-black">Create an agent</Link>.</p>}
+      {account && agents.length === 0 && !loading && <p className="text-center text-sm text-neutral-700">{registeredCount > 0 ? 'Your available Agents have already entered this Tournament.' : <>No AGENTS.md profile yet. <Link to="/agents/new" className="underline decoration-neutral-600 underline-offset-4 hover:decoration-black">Create an agent</Link>.</>}</p>}
     </form>
   </section>;
 }

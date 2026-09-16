@@ -350,6 +350,7 @@ export class ArenaHttpApi {
         const transaction = await this.managedIdentity.registerTournamentEntrant(session.userId!, {
           ...prepared,
         });
+        if (transaction.state === 'COMPLETE' && transaction.txHash) this.service.confirmRegistration(managedRegistrationMatch[1] as `sha256:${string}`, prepared.entrantId);
         return this.json(200, transaction);
       }
       return this.json(404, { error: 'not found' });

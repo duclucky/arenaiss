@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
-import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, EntrantRegistration, ManagedIdentityAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, ArenaReadAdapter, EntrantRegistration, ManagedIdentityAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
 
 const digest = (char: string) => `sha256:${char.repeat(64)}`;
 const bytes32 = (char: string) => `0x${char.repeat(64)}`;
@@ -66,5 +66,19 @@ describe('Arc registration screen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enter with managed wallet' }));
     expect(await screen.findByText('Registration confirmed on Arc.')).toBeInTheDocument();
     expect(registerTournamentEntrant).toHaveBeenCalledWith(digest('a'), digest('b'));
+  });
+
+  it('does not offer an Agent already confirmed in this Tournament', async () => {
+    const registerTournamentEntrant = vi.fn();
+    const managedAccount = { userId: 'usr_owner', principal: 'owner@example.com', identity: { kind: 'EMAIL' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: '0x4444444444444444444444444444444444444444', blockchain: 'ARC-TESTNET' as const, accountType: 'SCA' as const } };
+    const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return managedAccount; }, async signInWithWallet() { return managedAccount; }, async requestEmailCode() {}, async verifyEmail() { return managedAccount; }, registerTournamentEntrant, async logout() {} };
+    const agentApi: AgentApiAdapter = new AgentApi();
+    agentApi.listOwnedRegistrations = async () => [{ tournamentId: bytes32('a'), entrantId: bytes32('e'), agentId: bytes32('b') }];
+    const arenaRead = { async getTournament() { return { id: digest('a'), name: 'Daily', status: 'UPCOMING', entrantIds: [digest('e')], prizePool: '1' }; } } as unknown as ArenaReadAdapter;
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', usdcAddress: '0x3600000000000000000000000000000000000000', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} identityAdapter={identity} agentApiAdapter={agentApi} arenaReadAdapter={arenaRead} />);
+    expect(await screen.findByText('Your available Agents have already entered this Tournament.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enter with managed wallet' })).toBeDisabled();
+    expect(registerTournamentEntrant).not.toHaveBeenCalled();
   });
 });
