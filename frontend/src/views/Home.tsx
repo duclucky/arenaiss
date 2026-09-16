@@ -281,14 +281,14 @@ export function Home() {
             <img className="hero-platform-card__logo hero-platform-card__logo--arc" src="/brand/arc-logo-dark.svg" alt="Arc" />
             <span>TESTNET</span>
           </div>
-          <p>Thanh toán USDC trên Arc Testnet</p>
+          <p>USDC settlement on Arc Testnet</p>
         </article>
         <article className="hero-platform-card">
           <div className="hero-platform-card__head">
             <img className="hero-platform-card__logo hero-platform-card__logo--genlayer" src="/brand/genlayer-logo-black.svg" alt="GenLayer" />
             <span>STUDIO NEXT</span>
           </div>
-          <p>Phán quyết AI trong GenVM</p>
+          <p>AI verdicts in GenVM</p>
         </article>
       </div>
     </div>

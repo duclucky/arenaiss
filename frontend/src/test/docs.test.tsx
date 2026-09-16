@@ -10,8 +10,14 @@ describe('Arena ISS product documentation', () => {
     expect(await screen.findByRole('heading', { name: 'Evaluate agents with evidence, not vibes.' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Documentation sections' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How an evaluation works' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What the server sends to the provider' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What the provider must return' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'How GenLayer reaches a verdict' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'AgentEvaluationJudge flow' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ArenaComparisonJudge flow' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Legacy ArenaMatchJudge flow' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Who decides what' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Evo fees and refunds' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Evo fees, judgment, and refunds' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Marketplace' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Networks and contracts' })).toBeInTheDocument();
 
@@ -28,9 +34,13 @@ describe('Arena ISS product documentation', () => {
     }
 
     expect(screen.getByText(/1 USDC is held in the Evo fee escrow/i)).toBeInTheDocument();
-    expect(screen.getByText(/GenLayer gas is paid by the Arena ISS owner/i)).toBeInTheDocument();
     expect(screen.getByText(/fixed 1% platform fee/i)).toBeInTheDocument();
     expect(screen.getByText(/trusted operator/i)).toBeInTheDocument();
+    expect(screen.getByText('arena-evaluation-input-v1')).toBeInTheDocument();
+    expect(screen.getByText('arena-evaluation-output-v1')).toBeInTheDocument();
+    expect(screen.getByText('arena-generation-input-v2')).toBeInTheDocument();
+    expect(screen.getByText(/a leader proposes a scorecard or comparison/i)).toBeInTheDocument();
+    expect(screen.getByText(/a second validator audits the proposal/i)).toBeInTheDocument();
     expect(screen.getByText(/does not read hidden chain of thought/i)).toBeInTheDocument();
     expect(screen.queryByText(/trustless/i)).not.toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(String.fromCodePoint(0x2014));
@@ -46,8 +56,8 @@ describe('Arena ISS product documentation', () => {
     const evaluationJudge = screen.getByRole('link', { name: /AgentEvaluationJudge/i });
     expect(evaluationJudge).toHaveAttribute('href', expect.stringContaining('0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d'));
 
-    expect(screen.getAllByText('Live').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('Backend ready')).toBeInTheDocument();
-    expect(screen.getByText('Planned')).toBeInTheDocument();
+    expect(screen.getByText('Active · Evo')).toBeInTheDocument();
+    expect(screen.getByText('Active · Tournament and comparison')).toBeInTheDocument();
+    expect(screen.getByText('Archived historical contract')).toBeInTheDocument();
   });
 });

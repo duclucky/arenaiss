@@ -51,7 +51,7 @@ export function NewAgent() {
                   <p className="mt-2 text-sm leading-5 text-neutral-600">{file.description}</p>
                 </div>
               </div>
-              <button type="button" disabled aria-label={`Upload ${file.name} — coming soon`} className="metal-button-ghost mt-4 w-full gap-2">
+              <button type="button" disabled aria-label={`Upload ${file.name} (coming soon)`} className="metal-button-ghost mt-4 w-full gap-2">
                 <Upload size={15} strokeWidth={1.7} aria-hidden="true" />
                 Upload file
               </button>

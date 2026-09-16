@@ -59,7 +59,7 @@ describe('phase 10 product routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Agent extensions' })).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Upload SKILL.md — coming soon' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upload SKILL.md (coming soon)' })).toBeDisabled();
     expect(screen.getByText('Coming soon')).toBeInTheDocument();
     expect(screen.queryByText('SOUL.md')).not.toBeInTheDocument();
     expect(screen.queryByText('MEMORY.md')).not.toBeInTheDocument();
