@@ -37,7 +37,7 @@ export type PublicVerdict = {
   arcTournamentId?: string; arcEscrowAddress?: string; grossPoolUsdc?: string; netPayoutUsdc?: string; platformFeeUsdc?: string; arcState?: string;
 };
 export type PreparedRegistration = { tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string; stakeAmount: string };
-export type OwnedRegistration = Pick<PreparedRegistration, "tournamentId" | "entrantId">;
+export type OwnedRegistration = Pick<PreparedRegistration, "tournamentId" | "entrantId" | "agentId">;
 export type PublicEvaluationRun = {
   schema: "arena-public-evaluation-run-v1";
   runId: string;
@@ -204,7 +204,7 @@ export class ArenaApiService {
     const owner = this.principal(caller);
     return [...this.registrations.values()]
       .filter((registration) => this.agents.get(`sha256:${registration.agentId.slice(2)}` as Digest)?.owner === owner)
-      .map(({ tournamentId, entrantId }) => ({ tournamentId, entrantId }))
+      .map(({ tournamentId, entrantId, agentId }) => ({ tournamentId, entrantId, agentId }))
       .sort((left, right) => left.tournamentId.localeCompare(right.tournamentId) || left.entrantId.localeCompare(right.entrantId));
   }
   listTournamentOperatorEntrants(caller: string, tournamentId: Digest): TournamentOperatorEntrant[] {
@@ -549,6 +549,7 @@ export class ArenaApiService {
     const key = this.registrationKey(tournamentId, owner, agentId);
     const existing = this.registrations.get(key);
     const entrantId = digestBytes32(deriveEntrantId(tournamentId, entrantWallet, agentId, 1));
+    if (tournament.entrantIds.some((id) => id.toLowerCase() === `sha256:${entrantId.slice(2)}` || id.toLowerCase() === entrantId)) throw new Error("agent is already registered for this Tournament");
     if (existing) {
       if (existing.entrantId !== entrantId) throw new Error("registration entrant does not match the managed wallet; reconciliation required");
       return structuredClone(existing);
@@ -564,6 +565,16 @@ export class ArenaApiService {
     this.registrations.set(key, prepared);
     this.runtime?.put("api-registrations", key, prepared);
     return structuredClone(prepared);
+  }
+
+  confirmRegistration(tournamentId: Digest, entrantId: string): void {
+    const tournament = this.tournaments.get(tournamentId);
+    if (!tournament || ![...this.registrations.values()].some((row) => row.tournamentId === digestBytes32(tournamentId) && row.entrantId === entrantId)) throw new Error("registration confirmation is invalid");
+    const canonicalId = `sha256:${entrantId.slice(2)}`;
+    if (tournament.entrantIds.includes(canonicalId)) return;
+    const updated = { ...tournament, entrantIds: [...tournament.entrantIds, canonicalId] };
+    this.tournaments.set(tournamentId, updated);
+    this.runtime?.put("api-tournaments", tournamentId, updated);
   }
 
   private publicView(agent: Agent): PublicAgent { const latest = agent.versions.at(-1)!; return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}) }; }

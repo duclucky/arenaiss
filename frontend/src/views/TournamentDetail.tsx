@@ -71,10 +71,11 @@ export function TournamentDetail() {
 
       <div className="glass-panel rounded-[28px] p-6 md:p-8">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          Bracket <Info size={16} className="text-muted-foreground" />
+          Match bracket <Info size={16} className="text-muted-foreground" aria-hidden="true" />
         </h2>
+        <p className="mb-4 text-sm leading-relaxed text-neutral-700">This is the knockout match schedule. Arena locks the entrant list and randomly pairs Agents when the Tournament starts; winners advance through later rounds.</p>
         {matches.length === 0 ? (
-          <p className="text-muted-foreground">No matches scheduled yet.</p>
+          <p className="text-muted-foreground">{tournament.status === 'UPCOMING' ? 'Pairings will appear here after registration closes and the Tournament starts.' : 'No matches scheduled yet.'}</p>
         ) : (
           <div className="space-y-4">
             {matches.map((m) => (

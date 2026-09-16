@@ -21,6 +21,9 @@ export function Tournaments() {
   const [stakeUsdc, setStakeUsdc] = useState('1');
   const [startsInSeconds, setStartsInSeconds] = useState(86_400);
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, []);
 
   useEffect(() => {
     let active = true;
@@ -92,6 +95,7 @@ export function Tournaments() {
       : <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{visible.map((t, index) => <Link key={t.id} to={`/tournaments/${t.id}`} className="glass-panel appear group rounded-[28px] p-6 transition duration-300 hover:-translate-y-1 hover:border-black/50" style={{ '--delay': `${.08 + index * .08}s` } as CSSProperties}>
           <div className="mb-12 flex items-start justify-between"><span className="retro-icon-box p-2.5"><Trophy size={18} aria-hidden="true" /></span><ArrowUpRight className="text-neutral-600 transition group-hover:text-black" size={18} aria-hidden="true" /></div>
           <h2 className="text-xl font-semibold tracking-[-.025em]">{t.name}</h2>
+          <div className="mt-4 grid gap-1 text-sm text-neutral-700"><p>Registered Agents: <strong>{t.entrantCount ?? 'N/A'}</strong></p>{t.status === 'UPCOMING' && t.registrationClosesAt && <p>Starts in: <strong className="tabular-nums">{countdown(t.registrationClosesAt * 1_000 - now)}</strong></p>}</div>
           <div className="mt-4 flex items-center justify-between text-sm"><span className="retro-chip px-3 py-1 text-xs text-neutral-700">{t.status}</span><span className="tabular-nums text-neutral-700">{t.prizePool} USDC</span></div>
           {t.registrationClosesAt && <p className="mt-3 text-xs text-neutral-700">Registration closes <time dateTime={new Date(t.registrationClosesAt * 1_000).toISOString()}>{new Date(t.registrationClosesAt * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time></p>}
         </Link>)}</div>; })())}
@@ -112,4 +116,5 @@ export function Tournaments() {
 }
 
 function actionLabel(action: TournamentOperationAction): string { return action.charAt(0) + action.slice(1).toLowerCase(); }
+function countdown(remainingMs: number): string { const seconds = Math.max(0, Math.ceil(remainingMs / 1_000)); const days = Math.floor(seconds / 86_400); const hours = Math.floor(seconds % 86_400 / 3_600); const minutes = Math.floor(seconds % 3_600 / 60); const rest = seconds % 60; return days > 0 ? `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m` : `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`; }
 function usdcBaseUnits(value: string): string { if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(value) || Number(value) <= 0) throw new Error('Stake must be a positive USDC amount with at most 6 decimals.'); const [whole, fraction = ''] = value.split('.'); return (BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'))).toString(); }

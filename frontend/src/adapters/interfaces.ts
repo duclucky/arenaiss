@@ -4,6 +4,8 @@ export type Tournament = {
   status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   prizePool: string;
   registrationClosesAt?: number;
+  entrantCount?: number;
+  entrantIds?: string[];
   demo?: TournamentDemoDetail;
 };
 
@@ -139,7 +141,7 @@ export type AgentDetail = AgentProfile & {
   evaluations: EvaluationCampaign[];
 };
 
-export type OwnedRegistration = Pick<EntrantRegistration, 'tournamentId' | 'entrantId'>;
+export type OwnedRegistration = Pick<EntrantRegistration, 'tournamentId' | 'entrantId'> & { agentId?: string };
 
 export type ManagedAccount = {
   userId: string;
