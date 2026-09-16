@@ -52,15 +52,16 @@ describe('evaluation product UX', () => {
     expect(screen.queryByLabelText('Scenario objective')).not.toBeInTheDocument();
   });
 
-  it('lets an authenticated user select an Agent and states the USDC/owner-gas split', async () => {
+  it('lets an authenticated user select an Agent and explains GenLayer scoring with Arc settlement', async () => {
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi}><Evaluations /></AppProvider></MemoryRouter>);
     const selector = await screen.findByLabelText('Agent to evaluate');
     await screen.findByRole('option', { name: 'Safety Scout · v7' });
     await waitFor(() => expect(selector).toHaveValue('agent_1'));
     expect(screen.queryByLabelText('Scenario objective')).not.toBeInTheDocument();
     expect(screen.getByText('1 USDC')).toBeInTheDocument();
-    expect(screen.getByText(/held in Arc escrow and refunded if the evaluation fails because of infrastructure/i)).toBeInTheDocument();
-    expect(screen.getByText(/GenLayer transaction gas is paid by the Arena ISS owner wallet/i)).toBeInTheDocument();
+    expect(screen.getByText(/GenVM validators assess the exact submitted evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/fixed USDC fee is held on Arc Testnet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/gas is paid/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Start evaluation/i })).toBeEnabled();
   });
 
@@ -69,7 +70,9 @@ describe('evaluation product UX', () => {
     const advanceCampaign = vi.fn();
     const api = { ...evaluationApi, startEvo, advanceCampaign };
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
-    fireEvent.click(await screen.findByRole('button', { name: 'Start evaluation' }));
+    const button = await screen.findByRole('button', { name: 'Start evaluation' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
     await waitFor(() => expect(startEvo).toHaveBeenCalledTimes(1));
     expect(advanceCampaign).not.toHaveBeenCalled();
     expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();

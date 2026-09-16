@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
-import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, CanonicalEntrant, EntrantRegistration, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, CanonicalEntrant, EntrantRegistration, MarketplaceApiAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
 
 const account = '0x1111111111111111111111111111111111111111';
 const tournamentA = `0x${'a'.repeat(64)}`;
@@ -65,11 +65,29 @@ describe('Account tournament credits', () => {
     expect(screen.getByText(tournamentB)).toBeInTheDocument();
     expect(screen.queryByText(tournamentNotRegistered)).not.toBeInTheDocument();
     expect(screen.getByText('2.5 USDC claimable')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Claim' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Claim Tournament reward' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Claim' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Claim Tournament reward' }));
     expect(await screen.findByText('Claim confirmed.')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Claim' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Claim Tournament reward' })).not.toBeInTheDocument());
     expect(wallet.withdrawn).toEqual([tournamentB]);
+  });
+
+  it('claims Marketplace sale proceeds from the same Claim page', async () => {
+    const withdrawCredit = vi.fn().mockResolvedValue({ transactionId: 'withdraw', state: 'COMPLETE' });
+    let reads = 0;
+    const marketplaceApi = {
+      async getCredit() { reads += 1; return { amount: reads === 1 ? '990000' : '0' }; }, withdrawCredit,
+      async listListings() { return []; }, async listCertificates() { return []; }, async createEligibility() { throw new Error('unused'); }, async createListing() { throw new Error('unused'); }, async buy() { throw new Error('unused'); }, async getDelivery() { throw new Error('unused'); },
+    } as MarketplaceApiAdapter;
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} walletAdapter={new CreditsWallet()} agentApiAdapter={new CreditsAgentApi()} marketplaceApiAdapter={marketplaceApi} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Test Wallet' }));
+    expect(await screen.findByRole('heading', { name: '0.99 USDC claimable' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Claim Marketplace proceeds' }));
+    await waitFor(() => expect(withdrawCredit).toHaveBeenCalledWith(expect.any(String)));
+    expect(await screen.findByText('Marketplace claim submitted.')).toBeInTheDocument();
   });
 });

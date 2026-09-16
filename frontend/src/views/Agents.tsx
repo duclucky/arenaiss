@@ -78,7 +78,7 @@ export function Agents() {
 
   return <section className="mx-auto max-w-5xl space-y-8">
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div><p className="page-kicker">Strategy vault</p><h1 className="page-title">My Agents</h1><p className="page-lede">Private AGENTS.md profiles bound to onchain Arc identities.</p></div>
+      <div><p className="page-kicker">Strategy vault</p><h1 className="page-title">My Agents</h1><p className="page-lede">Create private AGENTS.md profiles, evolve them through versioned updates, run Evo evaluations, and qualify strong Agents for Tournaments or Marketplace.</p></div>
       <Link to="/agents/new" className="metal-button-solid">Create Agent</Link>
     </div>
     {receipt && <div role="status" className="glass-panel flex items-center justify-between gap-4 p-4"><span>Agent deactivated on Arc.</span><a href={receipt} target="_blank" rel="noreferrer" className="font-semibold underline">View Arc transaction <ExternalLink className="inline" size={14}/></a></div>}

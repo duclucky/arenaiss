@@ -40,9 +40,10 @@ test('Circle adapter rejects incomplete or multiple-wallet responses', async () 
 
 test('Circle adapter registers and deactivates an Agent through the Arc registry', async () => {
   const executions: any[] = [];
+  const waits: any[] = [];
   const adapter = new CircleManagedWalletAdapter({
     async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `tx-${executions.length}` } }; },
-    async getTransaction({ id }: any) { return { data: { transaction: { id, state: 'SENT', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+    async getTransaction(input: any) { waits.push(input); return { data: { transaction: { id: input.id, state: 'COMPLETE', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
   } as any, 'wallet-set-id');
   const registryAddress = '0x3333333333333333333333333333333333333333';
   const agentId = `sha256:${'a'.repeat(64)}`;
@@ -58,6 +59,18 @@ test('Circle adapter registers and deactivates an Agent through the Arc registry
   assert.deepEqual(executions[1].abiParameters, [`0x${'a'.repeat(64)}`]);
   assert.match(registered.explorerUrl!, /^https:\/\/testnet\.arcscan\.app\/tx\//);
   assert.match(deactivated.explorerUrl!, /^https:\/\/testnet\.arcscan\.app\/tx\//);
+  assert.deepEqual(waits.map((row) => row.waitForState), ['COMPLETE', 'COMPLETE']);
+});
+
+test('Circle adapter withdraws a Tournament credit through the beneficiary SCA', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: 'claim-id' } }; },
+    async getTransaction() { return { data: { transaction: { id: 'claim-id', state: 'COMPLETE', txHash: `0x${'7'.repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+  await adapter.withdrawTournamentCredit({ walletId: 'wallet-id', escrowAddress: '0x4444444444444444444444444444444444444444', tournamentId: `sha256:${'a'.repeat(64)}`, idempotencyKey: 'claim-key' });
+  assert.equal(executions[0].abiFunctionSignature, 'withdrawCredit(bytes32)');
+  assert.deepEqual(executions[0].abiParameters, [`0x${'a'.repeat(64)}`]);
 });
 
 test('Circle adapter reads Arc plus non-zero crosschain USDC balances and submits Arc withdrawal', async () => {

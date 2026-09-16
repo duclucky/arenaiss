@@ -35,7 +35,7 @@ describe('phase 10 product routes', () => {
     expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
   });
 
-  it('renders agent creation and redirects the legacy credits route to Account credits', async () => {
+  it('renders agent creation and redirects the legacy credits route to Account Claim', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
     await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
     act(() => {
@@ -50,7 +50,7 @@ describe('phase 10 product routes', () => {
       window.history.pushState({}, '', '/credits');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(await screen.findByRole('tab', { name: 'Tournament credits' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('tab', { name: 'Claim' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('previews only the portable SKILL.md extension without enabling it', async () => {
