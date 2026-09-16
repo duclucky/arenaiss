@@ -197,6 +197,8 @@ describe('Arena ISS visual shell', () => {
 
     expect(await screen.findByRole('heading', { name: 'Tournaments' })).toBeInTheDocument();
     expect(container.querySelector('.app-shell')).toHaveAttribute('data-surface', 'editorial');
+    expect(container.querySelector('.brand-mark')).toHaveAttribute('src', '/brand/arena-iss-mark.png');
+    expect(container.querySelector('.brand-star')).not.toBeInTheDocument();
     expect(container.querySelector('.page-kicker')).toHaveTextContent('Open competition');
     expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveClass('pill-button-dark');
   });

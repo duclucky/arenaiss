@@ -146,7 +146,7 @@ export function MatchDetail() {
 
           {verdict.source === 'LIVE' && (
             <div className="glass-panel rounded-[28px] p-6 md:p-8">
-              {verdict.chainId && verdict.chainId !== 61997 && <div role="status" className="mb-5 border border-amber-700 bg-amber-50 p-4 text-sm text-amber-950"><strong>Historical GenLayer evidence.</strong> This match finalized on chain {verdict.chainId}, before Arena ISS moved active Evo and Tournament judging to Studio Next chain 61997.</div>}
+              {verdict.chainId && verdict.chainId !== 61997 && <div role="status" className="mb-5 border border-amber-700 bg-amber-50 p-4 text-sm text-amber-950"><strong>Historical GenLayer evidence.</strong> This match finalized on chain {verdict.chainId}, before Arena ISS moved active evaluation and Tournament judging to Studio Next chain 61997.</div>}
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Proof trail</p>

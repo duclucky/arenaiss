@@ -84,6 +84,48 @@ test("agent detail keeps AGENTS.md private, reports exact activity, and deactiva
   assert.throws(() => api.updateAgent(ALICE, agent.agentId, "v2"), /inactive/i);
 });
 
+test("Agent stats report the mean score from the newest completed evaluation", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const agent = api.createAgent(ALICE, "Scored Agent", "Follow the task and explain decisions.");
+    const scenarios = ["stats_01", "stats_02"].map((scenarioId) => ({
+      schema: "arena-test-scenario-v1" as const, scenarioId, version: "1.0.0", level: "RESPONSE" as const,
+      objective: "Produce a reliable response.", context: "", constraints: [], availableActions: [],
+      forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0,
+    }));
+    const packId = sha256Text("agent-stats-pack");
+    api.createEvaluationPack(ALICE, { packId, version: "1.0.0", name: "Agent stats", scenarios });
+    const completedId = sha256Text("agent-stats-completed");
+    const failedId = sha256Text("agent-stats-newer-failed");
+    const runtimePolicy = { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 };
+    api.createSoloCampaign(ALICE, { campaignId: completedId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId, packVersion: "1.0.0", runtimePolicy });
+    const completed = runtime.get<any>("evaluation-campaigns", completedId)!;
+    completed.state = "FINALIZED";
+    completed.items = completed.items.map((item: any, index: number) => ({
+      ...item, state: "FINALIZED", attempt: 1, runIds: [sha256Text(`${item.scenarioId}-run`)],
+      scorecard: {
+        status: "FINAL", agent_version_id: agent.agentsVersion, rubric_version: "AgentEvaluationV5",
+        scenario_digest: sha256Text(item.scenarioId), overall_score: index === 0 ? 84 : 92,
+        result_class: "PASS", actions_executed: false, policy_findings: [], summary: "fixture",
+        dimensions: ["instruction_adherence", "reasoning_quality", "action_selection", "rule_compliance", "task_completion", "safety"]
+          .map((dimension) => ({ dimension_id: dimension, grade: dimension === "action_selection" ? "NOT_APPLICABLE" : "GOOD", reason: "fixture", evidence_refs: ["RESPONSE"] })),
+      },
+    }));
+    runtime.put("evaluation-campaigns", completedId, completed);
+    api.createSoloCampaign(ALICE, { campaignId: failedId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId, packVersion: "1.0.0", runtimePolicy });
+    const failed = runtime.get<any>("evaluation-campaigns", failedId)!;
+    failed.state = "FAILED";
+    runtime.put("evaluation-campaigns", failedId, failed);
+
+    const reloaded = new ArenaApiService(ALICE, runtime);
+    assert.equal(reloaded.listOwnedAgents(ALICE)[0]?.stats?.latestEvaluationScore, 88);
+    assert.equal(reloaded.getAgentDetail(ALICE, agent.agentId).stats.latestEvaluationScore, 88);
+  } finally {
+    runtime.close();
+  }
+});
+
 test('registration preparation closes at the UTC start and stays closed while Tournament is active', () => {
   let now = 99;
   const api = new ArenaApiService(ALICE, undefined, () => now);
@@ -386,6 +428,9 @@ test("evaluation campaigns retain creation time and list newest first after dura
     runtime.put("evaluation-campaigns", firstId, legacyFirst);
     runtime.put("evaluation-campaigns", secondId, legacySecond);
     assert.deepEqual(new ArenaApiService(ALICE, runtime).listOwnedEvaluationCampaigns(ALICE).map(({ campaignId, createdAt }) => [campaignId, createdAt]), [[secondId, undefined], [firstId, undefined]]);
+    runtime.put("evaluation-fees-v2", firstId, { campaignId: firstId, owner: ALICE.toLowerCase(), heldAt: 1_780_000_010 });
+    runtime.put("evaluation-fees-v2", secondId, { campaignId: secondId, owner: ALICE.toLowerCase(), heldAt: 1_780_000_070 });
+    assert.deepEqual(new ArenaApiService(ALICE, runtime).listOwnedEvaluationCampaigns(ALICE).map(({ startedAt }) => startedAt), [1_780_000_070_000, 1_780_000_010_000]);
   } finally { runtime.close(); }
 });
 

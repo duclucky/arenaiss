@@ -247,7 +247,7 @@ export function Account() {
     setEvoClaimState((current) => ({ ...current, [campaignId]: 'submitting' }));
     try {
       const fee = await evaluationApi.claimTimeoutRefund(campaignId, crypto.randomUUID());
-      if (fee.state !== 'REFUNDED') throw new Error('Evo refund was not confirmed.');
+      if (fee.state !== 'REFUNDED') throw new Error('Evaluation refund was not confirmed.');
       setEvoRefunds((rows) => rows.filter((row) => row.campaignId !== campaignId));
       setEvoClaimState((current) => ({ ...current, [campaignId]: 'confirmed' }));
       setBalanceReload((value) => value + 1);
@@ -397,7 +397,7 @@ export function Account() {
         <div className="glass-panel flex flex-wrap items-start justify-between gap-4 rounded-[28px] p-6 md:p-8">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">Claim assets</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Collect Tournament rewards, Marketplace proceeds, and eligible Evo timeout refunds on Arc Testnet.</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Collect Tournament rewards, Marketplace proceeds, and eligible evaluation timeout refunds on Arc Testnet.</p>
           </div>
           {account && <button type="button" className="metal-button-ghost" disabled={creditsState === 'loading'} onClick={() => setReload((value) => value + 1)}>Refresh</button>}
         </div>
@@ -426,14 +426,14 @@ export function Account() {
         </ul>}
         {account && <section className="glass-panel flex flex-wrap items-center justify-between gap-5 rounded-[24px] p-5 md:p-6" aria-labelledby="marketplace-claim-heading"><div><p className="page-kicker">Marketplace</p><h3 id="marketplace-claim-heading" className="mt-1 text-xl font-bold">{formatUsdc(marketplaceCredit)} USDC claimable</h3><p className="mt-2 text-sm text-muted-foreground">Net proceeds from completed Agent sales after the fixed 1% Marketplace fee.</p>{marketplaceClaimState === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Marketplace claim submitted.</p>}{marketplaceClaimState === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Marketplace credit could not be loaded or claimed.</p>}</div><button type="button" className="metal-button-solid" disabled={marketplaceClaimState === 'loading' || marketplaceClaimState === 'submitting' || BigInt(marketplaceCredit) === 0n || !marketplaceApi?.withdrawCredit} onClick={claimMarketplaceCredit}>{marketplaceClaimState === 'submitting' ? 'Claiming…' : 'Claim Marketplace proceeds'}</button></section>}
         {account && <section aria-labelledby="evo-refunds-heading" className="space-y-3">
-          <h3 id="evo-refunds-heading" className="text-xl font-bold">Evo refunds</h3>
-          {evoRefundsState === 'loading' && <p role="status" className="glass-panel p-5 text-sm text-neutral-700">Checking Evo escrow…</p>}
-          {evoRefundsState === 'error' && <p role="alert" className="glass-panel p-5 text-sm text-red-900">Could not load Evo refunds. Use Refresh to try again.</p>}
-          {evoRefundsState === 'ready' && evoRefunds.length === 0 && <p className="glass-panel p-5 text-sm text-neutral-700">No Evo timeout refunds to claim. Automatic refunds return directly to the payer wallet.</p>}
+          <h3 id="evo-refunds-heading" className="text-xl font-bold">Evaluation refunds</h3>
+          {evoRefundsState === 'loading' && <p role="status" className="glass-panel p-5 text-sm text-neutral-700">Checking evaluation escrow…</p>}
+          {evoRefundsState === 'error' && <p role="alert" className="glass-panel p-5 text-sm text-red-900">Could not load evaluation refunds. Use Refresh to try again.</p>}
+          {evoRefundsState === 'ready' && evoRefunds.length === 0 && <p className="glass-panel p-5 text-sm text-neutral-700">No evaluation timeout refunds to claim. Automatic refunds return directly to the payer wallet.</p>}
           {evoRefunds.map((row) => {
             const available = row.refundAvailableAt !== undefined && nowSeconds >= row.refundAvailableAt;
             const state = evoClaimState[row.campaignId];
-            return <div key={row.campaignId} className="glass-panel flex flex-wrap items-center justify-between gap-4 rounded-[24px] p-5"><div><p className="page-kicker">Evo campaign</p><p className="mt-2 break-all font-mono text-xs">{row.campaignId}</p><p className="mt-2 text-sm font-semibold">{row.amountUsdc} USDC held in Evo escrow</p><p className="mt-1 text-sm text-neutral-700">{row.refundAvailableAt ? available ? 'Timeout refund is available now.' : `Timeout refund available ${new Date(row.refundAvailableAt * 1000).toLocaleString()}.` : 'Waiting for the confirmed deposit time.'}</p>{state === 'failed' && <p role="alert" className="mt-2 text-sm text-red-900">Refund failed or is uncertain. Check the Arc transaction before retrying.</p>}</div><button type="button" className="metal-button-solid" disabled={!available || state === 'submitting' || !evaluationApi?.claimTimeoutRefund} onClick={() => claimEvoRefund(row.campaignId)}>{state === 'submitting' ? 'Claiming…' : `Claim ${row.amountUsdc} USDC Evo refund`}</button></div>;
+            return <div key={row.campaignId} className="glass-panel flex flex-wrap items-center justify-between gap-4 rounded-[24px] p-5"><div><p className="page-kicker">Evaluation campaign</p><p className="mt-2 break-all font-mono text-xs">{row.campaignId}</p><p className="mt-2 text-sm font-semibold">{row.amountUsdc} USDC held in evaluation escrow</p><p className="mt-1 text-sm text-neutral-700">{row.refundAvailableAt ? available ? 'Timeout refund is available now.' : `Timeout refund available ${new Date(row.refundAvailableAt * 1000).toLocaleString()}.` : 'Waiting for the confirmed deposit time.'}</p>{state === 'failed' && <p role="alert" className="mt-2 text-sm text-red-900">Refund failed or is uncertain. Check the Arc transaction before retrying.</p>}</div><button type="button" className="metal-button-solid" disabled={!available || state === 'submitting' || !evaluationApi?.claimTimeoutRefund} onClick={() => claimEvoRefund(row.campaignId)}>{state === 'submitting' ? 'Claiming…' : `Claim ${row.amountUsdc} USDC evaluation refund`}</button></div>;
           })}
         </section>}
       </div>}
