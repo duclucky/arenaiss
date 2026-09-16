@@ -1,6 +1,6 @@
 # Arena ISS live website acceptance plan
 
-- Status: `ACTIVE`, core-flow priority updated 2026-09-16
+- Status: `ACTIVE`, observation-only live acceptance, updated 2026-09-16
 - Target: `https://arenaiss.xyz`
 - Networks: Arc Testnet and GenLayer Studio Next
 - Evidence: real browser actions, real hosted services, real testnet receipts
@@ -18,6 +18,17 @@ evidence.
 Before financial execution, record the approved test accounts, maximum Arc
 Testnet USDC budget, maximum provider-call budget and maintenance window. Never
 use mainnet or expose credentials, sessions, private Agent content or keys.
+The owner authorized Arc Testnet USDC funding from the owner wallet to the
+seven preparatory wallets if needed. Verify each destination wallet belongs to
+the intended test account, fund only the shortfall for its 1 USDC stake and
+required gas, and record each confirmed funding receipt before registration.
+Do not treat a sent transaction as a confirmed balance or expose wallet keys.
+
+During live acceptance, do not edit source, deploy, change configuration, seed
+or rewrite database state, restart workers to manufacture a failure, or repair
+an observed defect. Record the defect, its evidence and impact, then continue
+only with independent safe cases. Release fixes belong to a later, separately
+authorized phase.
 
 ## Pass condition for one case
 
@@ -33,11 +44,45 @@ use mainnet or expose credentials, sessions, private Agent content or keys.
 
 ## Ordered execution
 
-Core path: complete public/authentication and Agent prerequisites, then two
-successful Evo campaigns, Evo refund cases and Marketplace eligibility through
-purchase, delivery and claims. Tournament success and refund use a separate
-set of entrants. Arc account deposits and withdrawals support these paths and
-are verified with them. CCTP is not a prerequisite for any core case.
+First prepare the time-bound Tournament case below. Then run public/auth and
+Agent prerequisites, two Evo campaigns, Marketplace eligibility through
+purchase, delivery and claims, and remaining Tournament/refund cases. Arc
+account deposits and withdrawals support these paths. CCTP is not a
+prerequisite for any core case.
+
+### WEB-0: Time-bound Tournament setup and judge reference
+
+Use the bounded one-time system launch backed by the configured operator signer
+to create one real Arc Testnet Tournament
+with exactly eight places, minimum eight entrants, and a stake of 1 USDC
+(`1000000` ERC-20 base units) per wallet. Registration opens immediately and
+closes at the configured start time, 30 minutes after the confirmed creation
+time. Record the UTC creation, close, start and expiry timestamps from the
+canonical Arc policy, not just browser-clock calculations.
+
+Before the close time, seven distinct controlled accounts each register one
+real, versioned Agent through the website and receive a successful Arc receipt.
+The contract permits one entrant per wallet, so seven Agents under one wallet
+do not satisfy this setup. Preserve the eighth place for the account already
+signed in to the user's in-app browser. Do not switch, log out or use that
+account for the seven preparatory entries. Verify the Arc entrant count is
+exactly seven and the website still offers the final registration. Record each
+entrant ID, masked wallet, Agent version/commitment, stake receipt and
+timestamp without exposing private `AGENTS.md` content.
+
+After the user joins as entrant eight, confirm the Arc count is eight and that
+the website reports the same roster and schedule. Observe the real provider
+outputs, Studio Next comparison verdicts, bracket progression and Arc
+settlement. The finalized match and verdict records may serve as reference
+data for judge assessment, but do not label them an independent authenticity
+proof or change judge policy during this acceptance run. Preserve exact
+transaction links and bounded public evidence for later analysis.
+
+The one-time system launch is setup evidence, not a website UI pass. If it does
+not yield an Arc receipt and public Tournament projection, mark setup blocked
+and do not substitute a 24-hour Tournament. It is `BLOCKED_BY_ACCESS` if seven
+distinct funded user accounts are unavailable. Test their registration only
+through the live website and report the actual result.
 
 ### WEB-1: Public product and authentication
 
@@ -68,9 +113,10 @@ not the user, pays Studio Next gas.
 
 ### WEB-5: Evo refunds
 
-For an infrastructure failure, use a dedicated campaign and stop only its real
-worker after the Arc deposit is final. Do not forge state. Verify the operator
-refund returns exactly 1 USDC.
+For an infrastructure failure, observe a naturally occurring dedicated
+campaign if one occurs. Do not stop a worker or forge state to manufacture it.
+Verify the operator refund returns exactly 1 USDC; otherwise mark this case
+`NOT_OBSERVED`, not `PASS`.
 
 For timeout recovery, isolate a second real campaign, wait the full 24-hour
 contract delay, then claim from the website. Verify an early claim is disabled,
@@ -118,16 +164,21 @@ and campaign liability reaches zero.
 
 ### WEB-9: Recovery and concurrency
 
-During dedicated cases, close or reload the browser, let a session expire,
-restart the real API after a durable external operation ID exists, and retry from
-two tabs. Verify the original operation resumes and no extra charge is created.
+During dedicated cases, close or reload the browser, let a session expire and
+retry from two tabs where safe. Observe a naturally occurring API restart only;
+do not restart production to manufacture the condition. Verify the original
+operation resumes and no extra charge is created, or mark it `NOT_OBSERVED`.
 
 ## Evidence
 
 For every case record the deployed Git revision, UTC timestamps, masked account,
 page URL, browser actions, before and after balances, transaction hashes, blocks,
 contract states, API projection, screenshots, console errors and reconciliation.
-Use `PASS`, `FAIL`, `BLOCKED_BY_UI` or `BLOCKED_BY_CONFIGURATION`.
+Use `PASS`, `FAIL`, `BLOCKED_BY_UI`, `BLOCKED_BY_ACCESS`,
+`BLOCKED_BY_CONFIGURATION` or `NOT_OBSERVED`. Report each defect with a stable
+ID, severity, exact reproduction, expected versus actual result, monetary
+exposure, receipt links and the last safe state. Summarize case totals and
+unreconciled liabilities without repairing them during the test phase.
 
 Stop all financial cases on any lost, duplicate, misdirected or unreconciled
 funds, wrong network, wrong spender, ownership mismatch or private-data leak.

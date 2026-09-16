@@ -48,4 +48,21 @@ describe('Tournament operator console', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Progress Safety Cup' }));
     await waitFor(() => expect(execute).toHaveBeenCalledWith(snapshot.tournamentId, 'PROGRESS'));
   });
+
+  it('lets the operator schedule a one USDC tournament to start in 30 minutes', async () => {
+    const create = vi.fn().mockResolvedValue(snapshot);
+    const operations: TournamentOperationsApiAdapter = { async list() { return []; }, async get() { return snapshot; }, create, async execute() { return snapshot; } };
+    render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '/api' }} identityAdapter={identity} arenaReadAdapter={arenaRead} tournamentOperationsApiAdapter={operations}><Tournaments /></AppProvider></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Operator lifecycle' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Starts in'), { target: { value: '1800' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create tournament' }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const input = create.mock.calls[0][0];
+    expect(input.registrationClosesAt - input.registrationOpensAt).toBe(1_800);
+    expect(input.startsAt).toBe(input.registrationClosesAt);
+    expect(input.minEntrants).toBe(8);
+    expect(input.maxEntrants).toBe(8);
+    expect(input.stakeAmount).toBe('1000000');
+  });
 });
