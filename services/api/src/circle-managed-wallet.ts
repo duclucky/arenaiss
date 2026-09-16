@@ -110,6 +110,10 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeRegistry(input.walletId, input.registryAddress, 'deactivateAgent(bytes32)', [digestBytes32(input.agentId)], input.idempotencyKey, 'arena-iss-agent-deactivate');
   }
 
+  async withdrawTournamentCredit(input: { walletId: string; escrowAddress: string; tournamentId: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeComplete(input.walletId, input.escrowAddress, 'withdrawCredit(bytes32)', [digestBytes32(input.tournamentId)], input.idempotencyKey, 'arena-iss-tournament-credit-withdraw');
+  }
+
   async marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {
     return this.executeRegistry(input.walletId, input.marketplaceAddress, 'createListing(bytes32,bytes32,bytes32,bytes32,uint128,uint64)', [digestBytes32(input.agentId), digestBytes32(input.version), digestBytes32(input.commitment), digestBytes32(input.certificateDigest), input.price, String(input.expiresAt)], input.idempotencyKey, 'arena-iss-marketplace-listing');
   }
@@ -184,9 +188,10 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
       fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey, refId,
     });
     if (!response.data?.id) throw new Error('Circle returned an invalid transaction response');
-    const submitted = await this.client.getTransaction({ id: response.data.id, waitForTxHash: true, pollingInterval: 1000 });
-    if (!submitted.data?.transaction?.txHash) throw new Error('Circle did not return an Arc transaction hash');
-    return this.transactionResult(submitted.data?.transaction, 'https://testnet.arcscan.app/tx/');
+    const completed = await this.client.getTransaction({ id: response.data.id, waitForState: 'COMPLETE', pollingInterval: 1000 });
+    const result = this.transactionResult(completed.data?.transaction, 'https://testnet.arcscan.app/tx/');
+    if (result.state !== 'COMPLETE' || !result.txHash) throw new Error('Circle Arc registry execution did not complete');
+    return result;
   }
 
   private async executeComplete(walletId: string, contractAddress: string, abiFunctionSignature: string, abiParameters: string[], idempotencyKey: string, refId: string): Promise<WalletTransactionResult> {

@@ -11,16 +11,18 @@ type WalletAction =
   | { kind: 'bridge'; state: 'submitting' | 'done' | 'error'; operation?: ManagedCctpTransfer; message?: string };
 
 export function Account() {
-  const { account, managedAccount, agentApi, networkConfig, disconnectWallet, wallet } = useAppContext();
+  const { account, managedAccount, agentApi, marketplaceApi, networkConfig, disconnectWallet, wallet } = useAppContext();
   const { managedIdentity } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') === 'credits' ? 'credits' : 'overview';
+  const activeTab = ['claim', 'credits'].includes(searchParams.get('tab') || '') ? 'claim' : 'overview';
   const [balanceState, setBalanceState] = useState<'loading' | 'unavailable' | string>('loading');
   const [balanceReload, setBalanceReload] = useState(0);
   const [creditRows, setCreditRows] = useState<CreditRow[]>([]);
   const [creditsState, setCreditsState] = useState<CreditsState>('idle');
   const [creditsError, setCreditsError] = useState('');
   const [claimState, setClaimState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
+  const [marketplaceCredit, setMarketplaceCredit] = useState('0');
+  const [marketplaceClaimState, setMarketplaceClaimState] = useState<'idle' | 'loading' | 'submitting' | 'confirmed' | 'failed'>('idle');
   const [reload, setReload] = useState(0);
   const [managedBalances, setManagedBalances] = useState<ManagedUsdcBalance[]>([]);
   const [balancesExpanded, setBalancesExpanded] = useState(false);
@@ -86,7 +88,7 @@ export function Account() {
 
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== 'credits' || !account || !networkConfig || !agentApi) {
+    if (activeTab !== 'claim' || !account || !networkConfig || !agentApi) {
       setCreditsState('idle');
       setCreditRows([]);
       return () => { cancelled = true; };
@@ -122,17 +124,36 @@ export function Account() {
     return () => { cancelled = true; };
   }, [account, activeTab, agentApi, networkConfig, reload, wallet]);
 
-  function selectTab(tab: 'overview' | 'credits') {
-    setSearchParams(tab === 'credits' ? { tab: 'credits' } : {}, { replace: true });
+  useEffect(() => {
+    let cancelled = false;
+    if (activeTab !== 'claim' || !account || !marketplaceApi?.getCredit) {
+      setMarketplaceCredit('0');
+      setMarketplaceClaimState('idle');
+      return () => { cancelled = true; };
+    }
+    setMarketplaceClaimState('loading');
+    marketplaceApi.getCredit().then(({ amount }) => {
+      if (!cancelled) { setMarketplaceCredit(amount); setMarketplaceClaimState('idle'); }
+    }).catch(() => { if (!cancelled) setMarketplaceClaimState('failed'); });
+    return () => { cancelled = true; };
+  }, [account, activeTab, marketplaceApi, reload]);
+
+  function selectTab(tab: 'overview' | 'claim') {
+    setSearchParams(tab === 'claim' ? { tab: 'claim' } : {}, { replace: true });
   }
 
   async function claim(tournamentId: string) {
-    if (!account || !networkConfig || managedAccount) return;
+    if (!account || !networkConfig) return;
     setClaimState((current) => ({ ...current, [tournamentId]: 'submitting' }));
     try {
-      const transaction = await wallet.withdrawCredit(tournamentId, networkConfig);
-      const receipt = await wallet.waitForTransaction(transaction.hash, networkConfig);
-      if (receipt !== 'CONFIRMED') throw new Error('Claim transaction failed on Arc.');
+      if (managedAccount) {
+        if (!managedIdentity?.claimTournamentCredit) throw new Error('Managed claim is unavailable.');
+        await managedIdentity.claimTournamentCredit(tournamentId, crypto.randomUUID());
+      } else {
+        const transaction = await wallet.withdrawCredit(tournamentId, networkConfig);
+        const receipt = await wallet.waitForTransaction(transaction.hash, networkConfig);
+        if (receipt !== 'CONFIRMED') throw new Error('Claim transaction failed on Arc.');
+      }
       const credit = await wallet.getCredit(tournamentId, account, networkConfig);
       setCreditRows((rows) => rows.map((row) => row.tournamentId === tournamentId ? { ...row, credit } : row));
       setBalanceReload((value) => value + 1);
@@ -140,6 +161,18 @@ export function Account() {
     } catch {
       setClaimState((current) => ({ ...current, [tournamentId]: 'failed' }));
     }
+  }
+
+  async function claimMarketplaceCredit() {
+    if (!marketplaceApi?.withdrawCredit || BigInt(marketplaceCredit) === 0n) return;
+    setMarketplaceClaimState('submitting');
+    try {
+      await marketplaceApi.withdrawCredit(crypto.randomUUID());
+      const current = await marketplaceApi.getCredit?.();
+      setMarketplaceCredit(current?.amount ?? '0');
+      setMarketplaceClaimState('confirmed');
+      setBalanceReload((value) => value + 1);
+    } catch { setMarketplaceClaimState('failed'); }
   }
 
   async function copyAddress() {
@@ -206,7 +239,7 @@ export function Account() {
       <div className="glass-panel rounded-[28px] p-2">
         <div role="tablist" aria-label="Account sections" className="grid grid-cols-2 gap-2">
           <button id="account-overview-tab" role="tab" aria-selected={activeTab === 'overview'} aria-controls="account-overview-panel" onClick={() => selectTab('overview')} className={activeTab === 'overview' ? 'metal-button-solid' : 'metal-button-ghost'}>Overview</button>
-          <button id="account-credits-tab" role="tab" aria-selected={activeTab === 'credits'} aria-controls="account-credits-panel" onClick={() => selectTab('credits')} className={activeTab === 'credits' ? 'metal-button-solid' : 'metal-button-ghost'}>Tournament credits</button>
+          <button id="account-claim-tab" role="tab" aria-selected={activeTab === 'claim'} aria-controls="account-claim-panel" onClick={() => selectTab('claim')} className={activeTab === 'claim' ? 'metal-button-solid' : 'metal-button-ghost'}>Claim</button>
         </div>
       </div>
 
@@ -309,12 +342,11 @@ export function Account() {
         )}
       </div>}
 
-      {activeTab === 'credits' && <div id="account-credits-panel" role="tabpanel" aria-labelledby="account-credits-tab" className="space-y-4">
+      {activeTab === 'claim' && <div id="account-claim-panel" role="tabpanel" aria-labelledby="account-claim-tab" className="space-y-4">
         <div className="glass-panel flex flex-wrap items-start justify-between gap-4 rounded-[28px] p-6 md:p-8">
           <div className="max-w-2xl">
-            <h2 className="text-2xl font-bold tracking-tight">Tournament credits</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Every confirmed tournament participation for this account is verified against the Arc escrow. A positive credit is claimable only by its recorded beneficiary.</p>
-            {managedAccount && <p className="mt-3 text-sm font-semibold text-amber-900">Circle contract execution is not enabled yet. Arena will not fall back to your sign-in wallet for claims.</p>}
+            <h2 className="text-2xl font-bold tracking-tight">Claim assets</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Collect USDC credited to this account by Tournament rewards and Marketplace sales. Each claim is paid to the beneficiary recorded on Arc Testnet.</p>
           </div>
           {account && <button type="button" className="metal-button-ghost" disabled={creditsState === 'loading'} onClick={() => setReload((value) => value + 1)}>Refresh</button>}
         </div>
@@ -337,11 +369,11 @@ export function Account() {
                 {state === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Claim confirmed.</p>}
                 {state === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Claim failed or was rejected. No payout was recorded.</p>}
               </div>
-              {claimable && !managedAccount && <button type="button" className="metal-button-solid shrink-0" disabled={state === 'submitting'} onClick={() => claim(row.tournamentId)}>{state === 'submitting' ? 'Claiming…' : 'Claim'}</button>}
-              {claimable && managedAccount && <span className="text-sm font-semibold text-amber-900">Claim unavailable until managed execution is enabled</span>}
+              {claimable && <button type="button" className="metal-button-solid shrink-0" disabled={state === 'submitting'} onClick={() => claim(row.tournamentId)}>{state === 'submitting' ? 'Claiming…' : 'Claim Tournament reward'}</button>}
             </li>;
           })}
         </ul>}
+        {account && <section className="glass-panel flex flex-wrap items-center justify-between gap-5 rounded-[24px] p-5 md:p-6" aria-labelledby="marketplace-claim-heading"><div><p className="page-kicker">Marketplace</p><h3 id="marketplace-claim-heading" className="mt-1 text-xl font-bold">{formatUsdc(marketplaceCredit)} USDC claimable</h3><p className="mt-2 text-sm text-muted-foreground">Net proceeds from completed Agent sales after the fixed 1% Marketplace fee.</p>{marketplaceClaimState === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Marketplace claim submitted.</p>}{marketplaceClaimState === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Marketplace credit could not be loaded or claimed.</p>}</div><button type="button" className="metal-button-solid" disabled={marketplaceClaimState === 'loading' || marketplaceClaimState === 'submitting' || BigInt(marketplaceCredit) === 0n || !marketplaceApi?.withdrawCredit} onClick={claimMarketplaceCredit}>{marketplaceClaimState === 'submitting' ? 'Claiming…' : 'Claim Marketplace proceeds'}</button></section>}
       </div>}
     </div>
   );

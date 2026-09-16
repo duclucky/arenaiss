@@ -5,6 +5,7 @@ import { ManagedIdentityService, type LoginIdentityKind, type ManagedIdentityOpt
 import type { MarketplaceChainPort } from './marketplace-arc.ts';
 import type { EvaluationExecutionService } from './evaluation-execution.ts';
 import type { TournamentOperationAction, TournamentOperationsPort } from './tournament-operations.ts';
+import type { AgentRegistryPort } from './agent-registry-arc.ts';
 
 type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
@@ -25,13 +26,15 @@ export class ArenaHttpApi {
 
   private evaluationExecution?: EvaluationExecutionService;
   private tournamentOperations?: TournamentOperationsPort;
+  private agentRegistry?: AgentRegistryPort;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort) {
     this.service = service;
     this.verifySignature = verifySignature;
     this.marketplaceChain = marketplaceChain;
     this.evaluationExecution = evaluationExecution;
     this.tournamentOperations = tournamentOperations;
+    this.agentRegistry = agentRegistry;
     this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
   }
@@ -89,6 +92,11 @@ export class ArenaHttpApi {
       if (request.method === 'GET' && request.path === '/api/account/usdc-balances') {
         const session = this.requireManagedSession(request.headers);
         return this.json(200, await this.managedIdentity!.listUsdcBalances(session.userId!));
+      }
+      const tournamentCreditWithdrawal = request.path.match(/^\/api\/account\/tournament-credits\/(sha256:[0-9a-fA-F]{64})\/withdraw$/);
+      if (request.method === 'POST' && tournamentCreditWithdrawal) {
+        const session = this.requireManagedSession(request.headers);
+        return this.json(202, await this.managedIdentity!.withdrawTournamentCredit(session.userId!, tournamentCreditWithdrawal[1], requireString(request.body?.idempotencyKey)));
       }
       if (request.method === 'POST' && request.path === '/api/account/usdc-transfers') {
         const session = this.requireManagedSession(request.headers);
@@ -283,9 +291,13 @@ export class ArenaHttpApi {
         const agentId = agentMatch[1] as `sha256:${string}`;
         const exactName = requireString(request.body?.name);
         const idempotencyKey = this.service.prepareAgentDeactivation(session.principal, agentId, exactName);
-        const transaction = this.managedIdentity
-          ? await this.managedIdentity.deactivateAgent(this.requireManagedSession(request.headers).userId!, agentId, idempotencyKey)
-          : undefined;
+        let transaction;
+        if (this.managedIdentity) {
+          const record = this.agentRegistry ? await this.agentRegistry.readAgent(agentId) : undefined;
+          transaction = record && (record.owner === '0x0000000000000000000000000000000000000000' || !record.active)
+            ? { transactionId: `arc-readback:${agentId}`, state: 'COMPLETE' }
+            : await this.managedIdentity.deactivateAgent(this.requireManagedSession(request.headers).userId!, agentId, idempotencyKey);
+        }
         return this.json(202, this.service.deactivateAgent(session.principal, agentId, exactName, transaction));
       }
       if (request.method === 'GET' && request.path === '/api/registrations') {

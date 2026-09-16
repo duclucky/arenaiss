@@ -134,6 +134,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     const managed = {
       runtime,
       identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      tournamentEscrowAddress: '0x6666666666666666666666666666666666666666',
       circleWallets: {
         createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' }),
         listUsdcBalances: async () => [
@@ -141,6 +142,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
           { chain: 'ARB-SEPOLIA', label: 'Arbitrum Sepolia', amount: '3', isArc: false, available: true },
         ],
         transferUsdc: async (input: any) => { calls.push(['transfer', input]); return { transactionId: 'tx-1', state: 'SENT' }; },
+        withdrawTournamentCredit: async (input: any) => { calls.push(['claim', input]); return { transactionId: 'claim-1', state: 'COMPLETE' }; },
         bridgeUsdcToArc: async (input: any) => {
           calls.push(['bridge', input]);
           input.onProgress?.('APPROVING');
@@ -161,6 +163,8 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: 'bad', amount: '1' } })).status, 400);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.0000001' } })).status, 400);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.25' } })).status, 202);
+    const tournamentId = `sha256:${'a'.repeat(64)}`;
+    assert.equal((await api.handle({ method: 'POST', path: `/api/account/tournament-credits/${tournamentId}/withdraw`, headers: { cookie }, body: { idempotencyKey: '11111111-1111-4111-8111-111111111111' } })).status, 202);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ETH-SEPOLIA', amount: '2' } })).status, 400);
     const bridgePromise = api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ARB-SEPOLIA', amount: '2' } });
     const bridge = await Promise.race([
@@ -188,7 +192,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     const bobAuth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: bob, signature: 'ok' } });
     const bobCookie = bobAuth.headers['set-cookie'].split(';')[0];
     assert.equal((await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}`, headers: { cookie: bobCookie } })).status, 400);
-    assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'bridge']);
+    assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'claim', 'bridge']);
   } finally { runtime.close(); }
 });
 
@@ -311,6 +315,34 @@ test('production verifier accepts only the address that signed the exact challen
   assert.equal(await viemSignatureVerifier({ address: account.address, message, signature }), true);
   assert.equal(await viemSignatureVerifier({ address: bob, message, signature }), false);
   assert.equal(await viemSignatureVerifier({ address: account.address, message: `${message}!`, signature }), false);
+});
+
+test('deleting a legacy Agent missing from Arc cleans the orphan without submitting a reverting transaction', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    let deactivateCalls = 0;
+    const managed = {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      agentRegistryAddress: '0x3333333333333333333333333333333333333333',
+      circleWallets: {
+        createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x4444444444444444444444444444444444444444' }),
+        registerAgent: async () => ({ transactionId: 'legacy-registration', state: 'SENT', txHash: `0x${'a'.repeat(64)}` }),
+        deactivateAgent: async () => { deactivateCalls += 1; throw new Error('must not submit'); },
+      },
+      emailSender: { sendLoginCode: async () => undefined },
+    };
+    const registry = { async readAgent() { return { owner: '0x0000000000000000000000000000000000000000', active: false }; } };
+    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any, undefined, undefined, undefined, undefined, registry);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    const created = await api.handle({ method: 'POST', path: '/api/agents', headers: { cookie }, body: { name: 'Orphan Agent', agentsMd: 'private' } });
+    const deleted = await api.handle({ method: 'DELETE', path: `/api/agents/${created.body.agentId}`, headers: { cookie }, body: { name: 'Orphan Agent' } });
+    assert.equal(deleted.status, 202);
+    assert.match(deleted.body.deactivation.transactionId, /^arc-readback:/);
+    assert.equal(deactivateCalls, 0);
+  } finally { runtime.close(); }
 });
 
 test('authenticated owner can prepare an exact Arc registration payload', async () => {

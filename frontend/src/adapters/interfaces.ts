@@ -174,6 +174,7 @@ export interface ManagedIdentityAdapter {
   transferUsdc?(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction>;
   bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedCctpTransfer>;
   getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
+  claimTournamentCredit?(tournamentId: string, idempotencyKey: string): Promise<ManagedWalletTransaction>;
   logout(): Promise<void>;
 }
 

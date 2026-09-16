@@ -49,7 +49,7 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
             <Route path="matches/:id" element={deferred(<MatchDetail />)} />
             <Route path="agents" element={deferred(<Agents />)} />
             <Route path="agents/new" element={deferred(<NewAgent />)} />
-            <Route path="credits" element={<Navigate to="/account?tab=credits" replace />} />
+            <Route path="credits" element={<Navigate to="/account?tab=claim" replace />} />
             <Route path="account" element={deferred(<Account />)} />
             <Route path="evaluations" element={deferred(<Evaluations />)} />
             <Route path="evaluations/:id" element={deferred(<EvaluationDetail />)} />

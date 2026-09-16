@@ -31,6 +31,7 @@ function mount() { render(<MemoryRouter><AppProvider config={config} identityAda
 describe('Marketplace website UX', () => {
   it('selects an owned Agent and its finalized Evo campaigns without asking for raw digests or judge address', async () => {
     mount();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
     expect(await screen.findByRole('option', { name: 'Safety Scout' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Agent to certify'), { target: { value: agentId } });
     expect(screen.getByText(/2 finalized Evo campaigns available/i)).toBeInTheDocument();
@@ -43,6 +44,7 @@ describe('Marketplace website UX', () => {
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
     expect(await screen.findByText('1.000000 USDC')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Sell my Agent' }));
     fireEvent.change(screen.getByLabelText('Approved certificate'), { target: { value: certificateDigest } });
     fireEvent.change(screen.getByLabelText('Price (USDC)'), { target: { value: '2.50' } });
     fireEvent.click(screen.getByRole('button', { name: 'List on Arc' }));
@@ -57,16 +59,16 @@ describe('Marketplace website UX', () => {
     expect(getDelivery).toHaveBeenCalledWith('1');
   });
 
-  it('shows seller proceeds in USDC and withdraws with an idempotent managed-wallet action', async () => {
+  it('moves seller proceeds to Account Claim instead of duplicating withdrawal controls', async () => {
     mount();
-    expect(await screen.findByText('0.990000 USDC available')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Withdraw Marketplace proceeds' }));
-    await waitFor(() => expect(withdrawCredit).toHaveBeenCalledWith(expect.any(String)));
-    expect(await screen.findByText(/Withdrawal submitted/i)).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Agents for sale' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('button', { name: 'Withdraw Marketplace proceeds' })).not.toBeInTheDocument();
+    expect(withdrawCredit).not.toHaveBeenCalled();
   });
 
   it('shows operator approval with score and coverage before the Arc transaction', async () => {
     mount();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
     expect(await screen.findByRole('heading', { name: 'Operator review' })).toBeInTheDocument();
     expect(screen.getByText(/90\/100.*100% coverage/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Approve certificate on Arc' }));

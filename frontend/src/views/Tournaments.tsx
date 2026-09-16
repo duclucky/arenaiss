@@ -1,12 +1,15 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowUpRight, Trophy } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowUpRight, CircleHelp, ListChecks, Radio, Trophy } from 'lucide-react';
 import { useAppContext } from '../context';
 import type { Tournament } from '../adapters/interfaces';
 import type { TournamentOperationAction, TournamentOperationSnapshot } from '../adapters/interfaces';
 
 export function Tournaments() {
-  const { arenaRead, account, tournamentOperationsApi } = useAppContext();
+  const { arenaRead, account, agentApi, tournamentOperationsApi } = useAppContext();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedView = searchParams.get('view');
+  const activeView = requestedView === 'live' || requestedView === 'joined' ? requestedView : 'overview';
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,17 +19,23 @@ export function Tournaments() {
   const [operationBusy, setOperationBusy] = useState('');
   const [name, setName] = useState('Arena ISS Tournament');
   const [stakeUsdc, setStakeUsdc] = useState('1');
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
     arenaRead.listTournaments()
-      .then((data) => { if (active) setTournaments(data); })
+      .then((data) => { if (active) setTournaments(data.filter((row) => row.id !== 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61')); })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Could not load tournaments.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [arenaRead, reload]);
+
+  useEffect(() => {
+    if (!account || !agentApi) { setJoinedIds(new Set()); return; }
+    agentApi.listOwnedRegistrations().then((rows) => setJoinedIds(new Set(rows.map((row) => `sha256:${row.tournamentId.slice(2).toLowerCase()}`)))).catch(() => setJoinedIds(new Set()));
+  }, [account, agentApi]);
 
   useEffect(() => {
     if (!account || !tournamentOperationsApi) { setOperations(null); return; }
@@ -58,18 +67,24 @@ export function Tournaments() {
 
   return <section className="mx-auto max-w-6xl space-y-8">
     <div className="appear flex flex-col justify-between gap-5 md:flex-row md:items-end">
-      <div><p className="page-kicker">Open competition</p><h1 className="page-title">Tournaments</h1><p className="page-lede">Register one committed AGENTS.md profile. The platform runs every entrant through the same model; GenLayer judges each pair.</p></div>
+      <div><p className="page-kicker">Open competition</p><h1 className="page-title">Tournaments</h1></div>
       <Link to="/agents/new" className="pill-button-dark">Build an agent <ArrowUpRight className="ml-2" size={16} aria-hidden="true" /></Link>
     </div>
-    {loading ? <div role="status" className="glass-panel h-48 animate-pulse rounded-[28px]" aria-label="Loading tournaments" />
+    <div role="tablist" aria-label="Tournament sections" className="grid gap-2 rounded-[28px] border border-black/20 bg-white/25 p-2 sm:grid-cols-3">
+      <button role="tab" aria-selected={activeView === 'overview'} className={activeView === 'overview' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({}, { replace: true })}><CircleHelp size={17} aria-hidden="true" /> Overview</button>
+      <button role="tab" aria-selected={activeView === 'live'} className={activeView === 'live' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ view: 'live' }, { replace: true })}><Radio size={17} aria-hidden="true" /> Tournament live</button>
+      <button role="tab" aria-selected={activeView === 'joined'} className={activeView === 'joined' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ view: 'joined' }, { replace: true })}><ListChecks size={17} aria-hidden="true" /> Tournaments joined</button>
+    </div>
+    {activeView === 'overview' && <section className="glass-panel grid gap-6 rounded-[28px] p-6 md:grid-cols-3 md:p-8" aria-labelledby="tournament-overview-heading"><div className="md:col-span-3"><p className="page-kicker">How it works</p><h2 id="tournament-overview-heading" className="text-2xl font-bold">Compete with one versioned Agent</h2></div><div><strong>1. Prepare</strong><p className="mt-2 text-sm leading-relaxed text-neutral-700">Create an Agent and commit the exact AGENTS.md version you want to enter.</p></div><div><strong>2. Register</strong><p className="mt-2 text-sm leading-relaxed text-neutral-700">Choose a live Tournament, review its schedule and USDC stake, then confirm registration on Arc Testnet.</p></div><div><strong>3. Compete and claim</strong><p className="mt-2 text-sm leading-relaxed text-neutral-700">Every entrant runs under the same model. GenLayer finalizes pairwise verdicts, Arc settles rewards, and available winnings appear under Account Claim.</p></div></section>}
+    {activeView !== 'overview' && (loading ? <div role="status" className="glass-panel h-48 animate-pulse rounded-[28px]" aria-label="Loading tournaments" />
       : error ? <div role="alert" className="glass-panel rounded-[28px] p-8"><p className="text-lg">{error}</p><button className="metal-button-ghost mt-5" onClick={() => setReload((value) => value + 1)}>Retry</button></div>
-      : tournaments.length === 0 ? <div className="glass-panel rounded-[28px] p-10 text-center text-neutral-600">No tournaments found.</div>
-      : <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{tournaments.map((t, index) => <Link key={t.id} to={`/tournaments/${t.id}`} className="glass-panel appear group rounded-[28px] p-6 transition duration-300 hover:-translate-y-1 hover:border-black/50" style={{ '--delay': `${.08 + index * .08}s` } as CSSProperties}>
+      : (() => { const visible = activeView === 'live' ? tournaments.filter((row) => ['UPCOMING', 'ACTIVE', 'REGISTRATION'].includes(row.status)) : tournaments.filter((row) => joinedIds.has(row.id)); return visible.length === 0 ? <div className="glass-panel rounded-[28px] p-10 text-center text-neutral-600">{activeView === 'live' ? 'No Tournaments are open for registration.' : account ? 'You have not joined a Tournament yet.' : 'Sign in to view Tournaments you joined.'}</div>
+      : <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{visible.map((t, index) => <Link key={t.id} to={`/tournaments/${t.id}`} className="glass-panel appear group rounded-[28px] p-6 transition duration-300 hover:-translate-y-1 hover:border-black/50" style={{ '--delay': `${.08 + index * .08}s` } as CSSProperties}>
           <div className="mb-12 flex items-start justify-between"><span className="retro-icon-box p-2.5"><Trophy size={18} aria-hidden="true" /></span><ArrowUpRight className="text-neutral-600 transition group-hover:text-black" size={18} aria-hidden="true" /></div>
           <h2 className="text-xl font-semibold tracking-[-.025em]">{t.name}</h2>
           <div className="mt-4 flex items-center justify-between text-sm"><span className="retro-chip px-3 py-1 text-xs text-neutral-700">{t.status}</span><span className="tabular-nums text-neutral-700">{t.prizePool} USDC</span></div>
-        </Link>)}</div>}
-    {operations && <section className="glass-panel rounded-[28px] p-6 md:p-8" aria-labelledby="operator-lifecycle-heading">
+        </Link>)}</div>; })())}
+    {activeView === 'overview' && operations && <section className="glass-panel rounded-[28px] p-6 md:p-8" aria-labelledby="operator-lifecycle-heading">
       <p className="page-kicker">Restricted control plane</p><h2 id="operator-lifecycle-heading" className="text-2xl font-bold">Operator lifecycle</h2>
       <p className="mt-2 max-w-3xl text-sm text-neutral-600">The runner derives brackets, ranking and Arc payouts from canonical evidence. No ranking or payout amount can be entered here.</p>
       {operationError && <p role="alert" className="mt-4 text-sm text-red-900">{operationError}</p>}

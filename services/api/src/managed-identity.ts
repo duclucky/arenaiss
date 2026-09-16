@@ -40,6 +40,7 @@ export type CircleWalletPort = {
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  withdrawTournamentCredit(input: { walletId: string; escrowAddress: string; tournamentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceCancel(input: { walletId: string; marketplaceAddress: string; listingId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -74,6 +75,7 @@ export type ManagedIdentityOptions = {
   agentRegistryAddress?: string;
   marketplaceAddress?: string;
   evaluationEscrowAddress?: string;
+  tournamentEscrowAddress?: string;
 };
 
 export class ManagedIdentityService {
@@ -86,6 +88,7 @@ export class ManagedIdentityService {
   private readonly agentRegistryAddress?: string;
   private readonly marketplaceAddress?: string;
   private readonly evaluationEscrowAddress?: string;
+  private readonly tournamentEscrowAddress?: string;
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
   private readonly cctpTransfers = new Map<string, Promise<void>>();
@@ -101,6 +104,7 @@ export class ManagedIdentityService {
     this.agentRegistryAddress = options.agentRegistryAddress ? requireAddress(options.agentRegistryAddress) : undefined;
     this.marketplaceAddress = options.marketplaceAddress ? requireAddress(options.marketplaceAddress) : undefined;
     this.evaluationEscrowAddress = options.evaluationEscrowAddress ? requireAddress(options.evaluationEscrowAddress) : undefined;
+    this.tournamentEscrowAddress = options.tournamentEscrowAddress ? requireAddress(options.tournamentEscrowAddress) : undefined;
   }
 
   async loginWallet(address: string): Promise<ManagedAccount> {
@@ -228,6 +232,12 @@ export class ManagedIdentityService {
     const wallet = this.requireReadyWallet(userId);
     if (!this.agentRegistryAddress) throw new Error('agent registry unavailable');
     return this.circleWallets.deactivateAgent({ walletId: wallet.walletId, registryAddress: this.agentRegistryAddress, agentId, idempotencyKey });
+  }
+
+  async withdrawTournamentCredit(userId: string, tournamentId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.tournamentEscrowAddress) throw new Error('tournament escrow unavailable');
+    return this.circleWallets.withdrawTournamentCredit({ walletId: wallet.walletId, escrowAddress: this.tournamentEscrowAddress, tournamentId, idempotencyKey });
   }
 
   async marketplaceCreateListing(userId: string, input: { agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {

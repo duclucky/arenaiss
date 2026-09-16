@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ArenaReadAdapter, ManagedIdentityAdapter, TournamentOperationsApiAdapter } from '../adapters/interfaces';
+import type { AgentApiAdapter, ArenaReadAdapter, ManagedIdentityAdapter, TournamentOperationsApiAdapter } from '../adapters/interfaces';
 import { AppProvider } from '../context';
 import { Tournaments } from '../views/Tournaments';
 
@@ -12,6 +12,27 @@ const arenaRead = { async listTournaments() { return []; } } as unknown as Arena
 const snapshot = { tournamentId: `sha256:${'a'.repeat(64)}`, name: 'Safety Cup', state: 'REGISTRATION' as const, entrantCount: 3, matchCount: 0, finalizedMatchCount: 0, nextActions: ['PROGRESS', 'EXPIRE'] as const, arc: { state: 'REGISTRATION' } };
 
 describe('Tournament operator console', () => {
+  it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {
+    const archived = `sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
+    const live = `sha256:${'b'.repeat(64)}`;
+    const joined = `sha256:${'c'.repeat(64)}`;
+    const reads = { async listTournaments() { return [
+      { id: archived, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', entrantIds: [], prizePool: '0.008' },
+      { id: live, name: 'Open Safety Cup', status: 'ACTIVE', entrantIds: [], prizePool: '8' },
+      { id: joined, name: 'Joined Cup', status: 'COMPLETED', entrantIds: [], prizePool: '8' },
+    ]; } } as unknown as ArenaReadAdapter;
+    const agentApi = { async listOwnedRegistrations() { return [{ tournamentId: `0x${'c'.repeat(64)}`, entrantId: `0x${'d'.repeat(64)}` }]; }, async listOwnedAgents() { return []; }, async createAgent() { throw new Error('unused'); }, async prepareRegistration() { throw new Error('unused'); } } as AgentApiAdapter;
+    render(<MemoryRouter><AppProvider identityAdapter={identity} arenaReadAdapter={reads} agentApiAdapter={agentApi}><Tournaments /></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Compete with one versioned Agent' })).toBeInTheDocument();
+    expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
+    expect(await screen.findByText('Open Safety Cup')).toBeInTheDocument();
+    expect(screen.queryByText('Joined Cup')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Tournaments joined' }));
+    expect(await screen.findByText('Joined Cup')).toBeInTheDocument();
+    expect(screen.queryByText('Open Safety Cup')).not.toBeInTheDocument();
+  });
+
   it('creates and progresses a tournament without exposing ranking or payout inputs', async () => {
     const create = vi.fn().mockResolvedValue(snapshot);
     const execute = vi.fn().mockResolvedValue({ ...snapshot, state: 'RUNNING' });

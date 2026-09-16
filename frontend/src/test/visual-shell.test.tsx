@@ -73,6 +73,10 @@ describe('Arena ISS visual shell', () => {
     expect(screen.queryByRole('link', { name: 'Evaluations' })).not.toBeInTheDocument();
     const start = screen.getByRole('button', { name: 'Start with Agent' });
     expect(screen.getByRole('link', { name: 'Read Docs' })).toHaveAttribute('href', '/docs');
+    expect(screen.getByRole('img', { name: 'Arc' })).toHaveAttribute('src', '/brand/arc-logo-dark.svg');
+    expect(screen.getByText('Thanh toán USDC trên Arc Testnet')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'GenLayer' })).toHaveAttribute('src', '/brand/genlayer-logo-black.svg');
+    expect(screen.getByText('Phán quyết AI trong GenVM')).toBeInTheDocument();
     fireEvent.click(start);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Explore tournaments' })).not.toBeInTheDocument();
@@ -207,6 +211,7 @@ describe('Arena ISS visual shell', () => {
     const arenaRead = new RecoveringArenaRead();
     render(<App walletAdapter={new VisualWallet()} arenaReadAdapter={arenaRead} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('temporary read failure');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('heading', { name: 'Recovered Arena' })).toBeInTheDocument();

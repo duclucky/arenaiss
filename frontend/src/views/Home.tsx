@@ -275,6 +275,22 @@ export function Home() {
           : <button className="hero-pill hero-pill--light" type="button" onClick={() => openLogin('/agents')}>Start with Agent</button>}
         <Link className="hero-pill hero-pill--outline" to="/docs">Read Docs</Link>
       </div>
+      <div className="hero-platforms" aria-label="Settlement and evaluation networks">
+        <article className="hero-platform-card">
+          <div className="hero-platform-card__head">
+            <img className="hero-platform-card__logo hero-platform-card__logo--arc" src="/brand/arc-logo-dark.svg" alt="Arc" />
+            <span>TESTNET</span>
+          </div>
+          <p>Thanh toán USDC trên Arc Testnet</p>
+        </article>
+        <article className="hero-platform-card">
+          <div className="hero-platform-card__head">
+            <img className="hero-platform-card__logo hero-platform-card__logo--genlayer" src="/brand/genlayer-logo-black.svg" alt="GenLayer" />
+            <span>STUDIO NEXT</span>
+          </div>
+          <p>Phán quyết AI trong GenVM</p>
+        </article>
+      </div>
     </div>
     <div className="hero-footnote" aria-label="Technology stack">
       <span>Arc-native USDC escrow</span><span>GenLayer semantic verdicts</span><span>Asynchronous by design</span>

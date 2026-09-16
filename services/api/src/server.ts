@@ -11,6 +11,7 @@ import { circleManagedWalletFromSecrets } from './circle-managed-wallet.ts';
 import { SmtpEmailLoginSender } from './smtp-email.ts';
 import { ManagedIdentityService, type ManagedIdentityOptions } from './managed-identity.ts';
 import { ViemMarketplaceChainPort } from './marketplace-arc.ts';
+import { ViemAgentRegistryPort } from './agent-registry-arc.ts';
 import { EvaluationExecutionService, EvaluationExecutionWorker } from './evaluation-execution.ts';
 import { ViemEvoFeeSettlement } from './evo-fee-arc.ts';
 import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
@@ -37,8 +38,9 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const evaluationExecution = runtime && managedIdentityService ? evaluationExecutionFromEnvironment(runtime, managedIdentityService, operator) : undefined;
   const evaluationWorker = evaluationExecution ? new EvaluationExecutionWorker(evaluationExecution, envPositiveInteger('EVALUATION_WORKER_INTERVAL_MS', 5_000)) : undefined;
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
+  const agentRegistry = agentRegistryFromEnvironment(process.env);
   const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
-  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations);
+  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
@@ -120,9 +122,16 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
     agentRegistryAddress: values.ARC_AGENT_REGISTRY_ADDRESS,
     marketplaceAddress: environment.ARC_MARKETPLACE_ADDRESS?.trim(),
     evaluationEscrowAddress: environment.ARC_EVO_FEE_ESCROW_ADDRESS?.trim(),
+    tournamentEscrowAddress: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim(),
     circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
     emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
   };
+}
+
+function agentRegistryFromEnvironment(environment: NodeJS.ProcessEnv): ViemAgentRegistryPort | undefined {
+  const address = environment.ARC_AGENT_REGISTRY_ADDRESS?.trim();
+  if (!address) return undefined;
+  return new ViemAgentRegistryPort({ rpcUrl: environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network', address });
 }
 
 function marketplaceChainFromEnvironment(environment: NodeJS.ProcessEnv): ViemMarketplaceChainPort | undefined {

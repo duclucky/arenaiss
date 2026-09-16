@@ -204,6 +204,14 @@ button:disabled { cursor: not-allowed; }
 .hero-pill--light, .hero-pill--outline { background: var(--retro-face); color: #000; }
 .hero-pill--light:hover { background: var(--retro-face-hover); color: #000; }
 .hero-pill--light:active { box-shadow: var(--retro-pressed); }
+.hero-platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 460px); gap: 10px; margin-top: 22px; }
+.hero-platform-card { min-width: 0; padding: 14px 15px 15px; border: 1px solid rgba(5,5,5,.5); background: rgba(242,239,232,.58); box-shadow: inset 1px 1px 0 rgba(255,255,255,.78), 2px 2px 0 rgba(5,5,5,.2); backdrop-filter: blur(8px); }
+.hero-platform-card__head { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 12px; }
+.hero-platform-card__head > span { flex: none; font-family: var(--font-mono); font-size: 9px; letter-spacing: .11em; color: rgba(5,5,5,.68); }
+.hero-platform-card__logo { display: block; width: auto; max-width: 92px; object-fit: contain; object-position: left center; }
+.hero-platform-card__logo--arc { height: 27px; }
+.hero-platform-card__logo--genlayer { height: 22px; }
+.hero-platform-card p { margin: 10px 0 0; font-size: 13px; font-weight: 600; line-height: 1.35; }
 .hero-footnote {
   position: absolute;
   right: 40px;
@@ -448,6 +456,14 @@ button:disabled { cursor: not-allowed; }
   .hero-line--brand { margin-bottom: 6px; font-size: clamp(30px, 9vw, 40px); }
   .hero-line--standard, .hero-line--promise { font-size: clamp(11px, 3.15vw, 15px); }
   .hero-pill { min-height: 44px; }
+  .hero-platforms { gap: 8px; margin-top: 16px; }
+  .hero-platform-card { padding: 11px 12px 12px; }
+  .hero-platform-card__head { min-height: 24px; gap: 6px; }
+  .hero-platform-card__head > span { font-size: 7px; }
+  .hero-platform-card__logo { max-width: 76px; }
+  .hero-platform-card__logo--arc { height: 23px; }
+  .hero-platform-card__logo--genlayer { height: 18px; }
+  .hero-platform-card p { margin-top: 8px; font-size: 11px; }
   .hero-footnote { right: 20px; bottom: 18px; left: 20px; justify-content: space-between; gap: 8px; font-size: 10px; }
   .hero-footnote span:not(:last-child)::after { display: none; }
   .docs-hero { grid-template-columns: 1fr; gap: 44px; padding: 6px 0 42px; }
