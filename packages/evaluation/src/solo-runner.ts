@@ -34,6 +34,7 @@ export interface SoloCampaignItem {
 
 export interface SoloCampaignRecord extends SoloCampaignInput {
   schema: "arena-solo-campaign-v1";
+  createdAt?: number;
   state: "PENDING" | "RUNNING" | "RECOVERY_REQUIRED" | "FINALIZED" | "FAILED";
   items: SoloCampaignItem[];
 }

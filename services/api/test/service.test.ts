@@ -358,6 +358,37 @@ test("same Agent version and Test Pack can create multiple idempotent SOLO campa
   }
 });
 
+test("evaluation campaigns retain creation time and list newest first after durable updates", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    let now = 1_780_000_000;
+    const api = new ArenaApiService(ALICE, runtime, () => now);
+    const agent = api.createAgent(ALICE, "Chronology Agent", "Follow the locked policy.");
+    const packId = sha256Text("chronology-pack");
+    api.createEvaluationPack(ALICE, { packId, version: "1.0.0", name: "Chronology Pack", scenarios: [{ schema: "arena-test-scenario-v1", scenarioId: "chronology_01", version: "1.0.0", level: "RESPONSE", objective: "Answer.", context: "", constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }] });
+    const input = { agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId, packVersion: "1.0.0", runtimePolicy: { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 } };
+    const firstId = sha256Text("chronology-first");
+    const secondId = sha256Text("chronology-second");
+    const first = api.createSoloCampaign(ALICE, { ...input, campaignId: firstId });
+    now += 60;
+    const second = api.createSoloCampaign(ALICE, { ...input, campaignId: secondId });
+    assert.equal(first.createdAt, 1_780_000_000_000);
+    assert.equal(second.createdAt, 1_780_000_060_000);
+    assert.equal(api.createSoloCampaign(ALICE, { ...input, campaignId: firstId }).createdAt, first.createdAt);
+    const updated = runtime.get<any>("evaluation-campaigns", firstId)!;
+    updated.state = "RUNNING";
+    runtime.put("evaluation-campaigns", firstId, updated);
+    assert.deepEqual(new ArenaApiService(ALICE, runtime).listOwnedEvaluationCampaigns(ALICE).map(({ campaignId }) => campaignId), [secondId, firstId]);
+    const legacyFirst = runtime.get<any>("evaluation-campaigns", firstId)!;
+    const legacySecond = runtime.get<any>("evaluation-campaigns", secondId)!;
+    delete legacyFirst.createdAt;
+    delete legacySecond.createdAt;
+    runtime.put("evaluation-campaigns", firstId, legacyFirst);
+    runtime.put("evaluation-campaigns", secondId, legacySecond);
+    assert.deepEqual(new ArenaApiService(ALICE, runtime).listOwnedEvaluationCampaigns(ALICE).map(({ campaignId, createdAt }) => [campaignId, createdAt]), [[secondId, undefined], [firstId, undefined]]);
+  } finally { runtime.close(); }
+});
+
 test("evaluation campaign reads use the durable runtime state after a worker transition", () => {
   const runtime = new SqliteRuntimeStore(":memory:");
   try {
