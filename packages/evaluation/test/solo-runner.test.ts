@@ -141,6 +141,8 @@ test("transient provider failure gets a new bound attempt while second empty out
   const failed = await runner.advance(digest("a"));
   assert.equal(failed.state, "FAILED");
   assert.equal(failed.items[0].failure, "EMPTY_OUTPUT");
+  assert.equal(failed.items[0].failureStage, "PROVIDER");
+  assert.equal(failed.items[0].failureCode, "EMPTY_OUTPUT");
   assert.equal(failed.items[0].scorecard, undefined);
   assert.equal(failed.items[0].runIds.length, 2);
   assert.equal(judge.submissions.size, 0);
@@ -149,13 +151,57 @@ test("transient provider failure gets a new bound attempt while second empty out
 test("an unexpected infrastructure exception can terminally fail the active scenario without inventing a score", () => {
   const runner = new SoloEvaluationRunner(new FixtureProvider(), new EvaluationRunTracker(new FixtureJudge(), new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
   runner.start(campaign());
-  const failed = runner.failInfrastructure(digest("a"));
+  const failed = runner.failInfrastructure(digest("a"), { stage: "PERSISTENCE", code: "CAMPAIGN_READ_FAILED" });
   assert.equal(failed.state, "FAILED");
   assert.equal(failed.items[0].state, "FAILED");
   assert.equal(failed.items[0].failure, "INFRASTRUCTURE_ERROR");
+  assert.equal(failed.items[0].failureStage, "PERSISTENCE");
+  assert.equal(failed.items[0].failureCode, "CAMPAIGN_READ_FAILED");
   assert.equal(failed.items[0].scorecard, undefined);
   assert.equal(failed.items[1].state, "PENDING");
   assert.deepEqual(runner.failInfrastructure(digest("a")), failed);
+});
+
+test("uncertain GenLayer submission holds for reconciliation without replay or a premature refund", async () => {
+  class FailingJudge extends FixtureJudge {
+    calls = 0;
+    override async submit() { this.calls += 1; throw new Error("secret upstream payload must not persist"); }
+  }
+  const judge = new FailingJudge();
+  const runner = new SoloEvaluationRunner(new FixtureProvider(), new EvaluationRunTracker(judge, new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
+  runner.start({ ...campaign(), testPack: { ...campaign().testPack, scenarios: [scenarios()[0]] } });
+  const held = await runner.advance(digest("a"));
+  assert.equal(held.state, "RECOVERY_REQUIRED");
+  assert.equal(held.items[0].state, "RECOVERY_REQUIRED");
+  assert.equal(held.items[0].failureStage, "GENLAYER_SUBMIT");
+  assert.equal(held.items[0].failureCode, "GENLAYER_TRANSACTION_UNKNOWN");
+  assert.equal(JSON.stringify(held).includes("secret upstream payload"), false);
+  assert.deepEqual(await runner.advance(digest("a")), held);
+  assert.equal(judge.calls, 1);
+});
+
+test("transient GenLayer receipt errors keep the same run pending and never resubmit", async () => {
+  class FlakyReceiptJudge extends FixtureJudge {
+    polls = 0;
+    submissionsCount = 0;
+    override async submit(value: EvaluationJudgeSubmission) { this.submissionsCount += 1; return super.submit(value); }
+    override async getReceipt() {
+      this.polls += 1;
+      if (this.polls === 1) throw new Error("temporary RPC timeout");
+      return super.getReceipt();
+    }
+  }
+  const judge = new FlakyReceiptJudge();
+  const runner = new SoloEvaluationRunner(new FixtureProvider(), new EvaluationRunTracker(judge, new MemoryEvaluationRunStore(), judgeAddress), new MemorySoloCampaignStore());
+  runner.start({ ...campaign(), testPack: { ...campaign().testPack, scenarios: [scenarios()[0]] } });
+  const pending = await runner.advance(digest("a"));
+  assert.equal(pending.state, "RUNNING");
+  assert.equal(pending.items[0].state, "JUDGING");
+  assert.equal(pending.items[0].failureCode, "GENLAYER_FINALITY_RETRY");
+  const finalized = await runner.advance(digest("a"));
+  assert.equal(finalized.state, "FINALIZED");
+  assert.equal(judge.submissionsCount, 1);
+  assert.deepEqual(finalized.items[0].runIds, pending.items[0].runIds);
 });
 
 test("concurrent SOLO advance shares one paid operation", async () => {

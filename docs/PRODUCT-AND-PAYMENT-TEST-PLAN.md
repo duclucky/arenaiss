@@ -1,6 +1,6 @@
 # Arena ISS live website acceptance plan
 
-- Status: `PROPOSED`
+- Status: `ACTIVE`, core-flow priority updated 2026-09-16
 - Target: `https://arenaiss.xyz`
 - Networks: Arc Testnet and GenLayer Studio Next
 - Evidence: real browser actions, real hosted services, real testnet receipts
@@ -33,18 +33,25 @@ use mainnet or expose credentials, sessions, private Agent content or keys.
 
 ## Ordered execution
 
+Core path: complete public/authentication and Agent prerequisites, then two
+successful Evo campaigns, Evo refund cases and Marketplace eligibility through
+purchase, delivery and claims. Tournament success and refund use a separate
+set of entrants. Arc account deposits and withdrawals support these paths and
+are verified with them. CCTP is not a prerequisite for any core case.
+
 ### WEB-1: Public product and authentication
 
 Open every route in a clean browser. Verify navigation, Docs, responsive layout,
 loading and error states. Run email and wallet login, logout, session expiry and
 cross-account isolation.
 
-### WEB-2: Account payments
+### WEB-2: Arc account payments
 
-Run one real CCTP deposit from the Account page through burn, attestation and
-mint. Reload while pending and confirm tracking resumes. Then run one direct Arc
-USDC withdrawal to an external address. Reconcile source and destination ERC-20
-balances, keeping native Arc gas separate.
+Run one direct Arc USDC deposit to the managed wallet and one direct Arc USDC
+withdrawal to an external address. Reconcile sender and recipient ERC-20
+balances, keeping native Arc gas separate. The Account page must not offer a new
+CCTP transfer while that feature is deferred. Existing CCTP operations must
+remain readable after reload so pending users are not stranded.
 
 ### WEB-3: Agent lifecycle
 
@@ -125,12 +132,20 @@ Use `PASS`, `FAIL`, `BLOCKED_BY_UI` or `BLOCKED_BY_CONFIGURATION`.
 Stop all financial cases on any lost, duplicate, misdirected or unreconciled
 funds, wrong network, wrong spender, ownership mismatch or private-data leak.
 
+## Deferred: CCTP
+
+CCTP initiation and destination-mint acceptance are outside the current core
+release. Resume this lane only after Tour, Evo and Marketplace pass their live
+website cases. Before exposing it again, verify an actual source burn,
+attestation, destination mint, cross-chain balance reconciliation and recovery
+after reload. A source `SUBMITTED` status alone is not destination completion.
+
 ## Exit criteria
 
 All released flows must pass from the deployed website with real services and
 testnet receipts. Evo success and both refund paths, Marketplace settlement and
-delivery, Tournament settlement and refund, CCTP and direct Arc withdrawal must
-all reconcile. There must be no open fund-safety or authorization defect.
+delivery, Tournament settlement and refund, and direct Arc deposit and withdrawal
+must all reconcile. There must be no open fund-safety or authorization defect.
 
 Backend-ready version comparison is not a released website feature until its
 dedicated UI passes this same process. Planned sandbox and trust-minimization

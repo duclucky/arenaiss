@@ -76,7 +76,7 @@ export class EvaluationExecutionService {
 
   async resumePending(): Promise<{ attempted: number; succeeded: number; failed: number }> {
     const candidates = this.runtime.list<EvaluationFeeRecord>('evaluation-fees-v2')
-      .filter((fee) => fee.state === 'HELD' || fee.state === 'SETTLEMENT_FAILED')
+      .filter((fee) => (fee.state === 'HELD' || fee.state === 'SETTLEMENT_FAILED') && this.runner.get(fee.campaignId)?.state !== 'RECOVERY_REQUIRED')
       .sort((left, right) => left.campaignId.localeCompare(right.campaignId));
     let succeeded = 0; let failed = 0;
     for (const fee of candidates) {
@@ -99,9 +99,9 @@ export class EvaluationExecutionService {
 
   private async advanceSafely(campaign: SoloCampaignRecord, fee: EvaluationFeeRecord): Promise<SoloCampaignRecord> {
     let next = campaign;
-    if (!['FINALIZED', 'FAILED'].includes(next.state)) {
+    if (!['FINALIZED', 'FAILED', 'RECOVERY_REQUIRED'].includes(next.state)) {
       try { next = await this.runner.advance(next.campaignId); }
-      catch { next = this.runner.failInfrastructure(next.campaignId); }
+      catch { next = this.runner.failInfrastructure(next.campaignId, { stage: 'EXECUTION', code: 'UNEXPECTED_RUNTIME_ERROR' }); }
     }
     return this.settle(next, fee);
   }

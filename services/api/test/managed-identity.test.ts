@@ -167,3 +167,41 @@ test('legacy CCTP burn without a persisted burn key requires reconciliation and 
     assert.equal(calls, 0);
   } finally { runtime.close(); }
 });
+
+test('CCTP history restores only the owner operations without exposing replay keys', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const userId = `usr_${'c'.repeat(64)}`;
+    for (const [operationId, ownerId, updatedAt] of [
+      ['11111111-1111-4111-8111-111111111111', userId, 1],
+      ['22222222-2222-4222-8222-222222222222', userId, 2],
+      ['33333333-3333-4333-8333-333333333333', `usr_${'d'.repeat(64)}`, 3],
+    ] as const) runtime.put('circle-cctp-transfers', operationId, { operationId, state: 'APPROVING', userId: ownerId, walletId: 'wallet-id', address, sourceChain: 'BASE-SEPOLIA', amount: '1', approvalIdempotencyKey: 'private-approval', burnIdempotencyKey: 'private-burn', updatedAt });
+    const service = new ManagedIdentityService(options(runtime, async () => ({ walletId: 'wallet-id', address })));
+    const history = service.listCctpTransfers(userId);
+    assert.deepEqual(history.map((row) => row.operationId), ['22222222-2222-4222-8222-222222222222', '11111111-1111-4111-8111-111111111111']);
+    assert.equal(JSON.stringify(history).includes('private-approval'), false);
+    assert.equal(JSON.stringify(history).includes('private-burn'), false);
+  } finally { runtime.close(); }
+});
+
+test('CCTP failure returns a safe message without upstream request data', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address }),
+        listUsdcBalances: async () => [{ chain: 'BASE-SEPOLIA', label: 'Base Sepolia', amount: '2', isArc: false, available: true }],
+        bridgeUsdcToArc: async () => { throw new Error('upstream private request payload'); },
+      },
+    } as any);
+    const account = await service.loginWallet(address);
+    const started = await service.startBridgeUsdcToArc(account.userId, 'BASE-SEPOLIA', '1');
+    await service.resumeCctpTransfers();
+    const result = service.getCctpTransfer(account.userId, started.operationId);
+    assert.equal(result.state, 'RECOVERY_REQUIRED');
+    assert.equal(result.message, 'CCTP transfer failed. Check the source transaction and try again only after reconciliation.');
+    assert.equal(JSON.stringify(result).includes('upstream private request payload'), false);
+  } finally { runtime.close(); }
+});

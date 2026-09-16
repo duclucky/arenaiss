@@ -173,6 +173,7 @@ export interface ManagedIdentityAdapter {
   listUsdcBalances?(): Promise<ManagedUsdcBalance[]>;
   transferUsdc?(destinationAddress: string, amount: string): Promise<ManagedWalletTransaction>;
   bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedCctpTransfer>;
+  listCctpTransfers?(): Promise<ManagedCctpTransfer[]>;
   getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
   claimTournamentCredit?(tournamentId: string, idempotencyKey: string): Promise<ManagedWalletTransaction>;
   logout(): Promise<void>;
@@ -225,7 +226,7 @@ export interface EvaluationApiAdapter {
   createPack(input: { packId: string; version: string; name: string; scenarios: EvaluationScenario[] }): Promise<EvaluationPack>;
   createSoloCampaign(input: { campaignId: string; agentId: string; agentsVersion: string; packId: string; packVersion: string; runtimePolicy: { model: string; maxOutputTokens: number; temperature: number; maxProviderAttempts: number } }): Promise<EvaluationCampaign>;
   getExecutionConfig?(): Promise<{ enabled: boolean; feeUsdc?: string; feeAsset: 'USDC'; feeCustody?: 'ESCROW'; escrowAddress?: string; genLayerGasPayer: 'OWNER' }>;
-  getFee?(campaignId: string): Promise<{ state: string; amountUsdc: string; escrowAddress: string; refundAvailableAt?: number; deposit?: ManagedWalletTransaction; settlement?: ManagedWalletTransaction; error?: string }>;
+  getFee?(campaignId: string): Promise<{ state: string; amountUsdc: string; escrowAddress: string; refundAvailableAt?: number; deposit?: ManagedWalletTransaction; settlement?: ManagedWalletTransaction; error?: string } | null>;
   claimTimeoutRefund?(campaignId: string, idempotencyKey: string): Promise<{ state: string; amountUsdc: string; escrowAddress: string; refundAvailableAt?: number; settlement?: ManagedWalletTransaction }>;
   startEvo?(input: { agentId: string; agentsVersion: string }): Promise<EvaluationCampaign>;
   advanceCampaign?(campaignId: string): Promise<EvaluationCampaign>;

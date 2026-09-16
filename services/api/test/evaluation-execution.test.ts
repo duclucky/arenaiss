@@ -56,6 +56,28 @@ test('Evo refunds held USDC when the runner returns an infrastructure failure', 
   } finally { runtime.close(); }
 });
 
+test('Evo keeps escrow held while an uncertain GenLayer transaction needs reconciliation', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const uncertain: any = { campaignId, owner, state: 'RECOVERY_REQUIRED', items: [{ state: 'RECOVERY_REQUIRED', failureStage: 'GENLAYER_SUBMIT' }] };
+    let refunds = 0; let releases = 0; let advances = 0;
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { releases += 1; return tx('3'); }, async refund() { refunds += 1; return tx('4'); } },
+      runner: { get: () => uncertain, async advance() { advances += 1; return uncertain; }, failInfrastructure() { throw new Error('unexpected failure'); } } as any,
+    });
+    const result = await service.start('usr_owner', owner, campaignId);
+    assert.equal(result.state, 'RECOVERY_REQUIRED');
+    assert.equal(service.getFee(campaignId)?.state, 'HELD');
+    assert.equal(refunds, 0);
+    assert.equal(releases, 0);
+    await service.advance(owner, campaignId);
+    assert.equal(advances, 0);
+    assert.deepEqual(await service.resumePending(), { attempted: 0, succeeded: 0, failed: 0 });
+  } finally { runtime.close(); }
+});
+
 test('unexpected runner errors become terminal infrastructure failures and refund', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
@@ -65,7 +87,7 @@ test('unexpected runner errors become terminal infrastructure failures and refun
       runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol',
       fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
       settlement: { async release() { throw new Error('unexpected release'); }, async refund() { refunded += 1; return tx('4'); } },
-      runner: { get: () => ({ campaignId, owner, state: 'RUNNING' }), async advance() { throw new Error('canonical readback failed'); }, failInfrastructure() { marked += 1; return failed; } } as any,
+      runner: { get: () => ({ campaignId, owner, state: 'RUNNING' }), async advance() { throw new Error('canonical readback failed'); }, failInfrastructure(_id: string, failure: any) { marked += 1; assert.deepEqual(failure, { stage: 'EXECUTION', code: 'UNEXPECTED_RUNTIME_ERROR' }); return failed; } } as any,
     });
 
     const result = await service.start('usr_owner', owner, campaignId);

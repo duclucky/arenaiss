@@ -308,6 +308,36 @@ test("same Agent version and Test Pack can create multiple idempotent SOLO campa
   }
 });
 
+test("evaluation campaign reads use the durable runtime state after a worker transition", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const agent = api.createAgent(ALICE, "Runtime Agent", "Follow the durable evaluation state.");
+    const pack = {
+      packId: `sha256:${"3".repeat(64)}` as const,
+      version: "1.0.0",
+      name: "Runtime Pack",
+      scenarios: [{ schema: "arena-test-scenario-v1" as const, scenarioId: "runtime_01", version: "1.0.0", level: "RESPONSE" as const, objective: "Answer once.", context: "", constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }],
+    };
+    api.createEvaluationPack(ALICE, pack);
+    const campaignId = sha256Text("runtime-canonical-campaign");
+    api.createSoloCampaign(ALICE, { campaignId, agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy: { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 } });
+
+    const transitioned = runtime.get<any>("evaluation-campaigns", campaignId)!;
+    const runId = sha256Text("runtime-canonical-run");
+    transitioned.state = "FAILED";
+    transitioned.items[0] = { scenarioId: "runtime_01", state: "FAILED", attempt: 1, runIds: [runId], currentRunId: runId, failure: "INFRASTRUCTURE_ERROR" };
+    runtime.put("evaluation-campaigns", campaignId, transitioned);
+
+    assert.equal(api.getPublicEvaluationCampaign(campaignId)?.state, "FAILED");
+    assert.equal(api.getPublicEvaluationCampaign(campaignId)?.items[0].runIds[0], runId);
+    assert.equal(api.listOwnedEvaluationCampaigns(ALICE)[0].state, "FAILED");
+    assert.equal(api.getAgentDetail(ALICE, agent.agentId).evaluations[0].state, "FAILED");
+  } finally {
+    runtime.close();
+  }
+});
+
 test("EVAL-5 API compares only two versions of the same owned Agent and persists the redacted result", () => {
   const runtime = new SqliteRuntimeStore(":memory:");
   try {

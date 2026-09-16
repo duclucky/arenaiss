@@ -216,6 +216,14 @@ export class ManagedIdentityService {
     return this.publicCctpOperation(operation);
   }
 
+  listCctpTransfers(userId: string): CctpTransferOperation[] {
+    return this.runtime.list<CctpTransferRecord>('circle-cctp-transfers')
+      .filter((operation) => operation.userId === userId)
+      .sort((a, b) => b.updatedAt - a.updatedAt || b.operationId.localeCompare(a.operationId))
+      .slice(0, 20)
+      .map((operation) => this.publicCctpOperation(operation));
+  }
+
   async resumeCctpTransfers(): Promise<void> {
     const resumable = this.runtime.list<CctpTransferRecord>('circle-cctp-transfers')
       .filter((operation) => ['PENDING', 'APPROVING', 'BURNING'].includes(operation.state));
@@ -369,9 +377,11 @@ export class ManagedIdentityService {
         onProgress: (state) => this.updateCctpTransfer(operationId, { state }),
       });
       this.updateCctpTransfer(operationId, { ...result, state: 'SUBMITTED' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'CCTP transfer failed';
-      this.updateCctpTransfer(operationId, { state: 'FAILED', message });
+    } catch {
+      this.updateCctpTransfer(operationId, {
+        state: 'RECOVERY_REQUIRED',
+        message: 'CCTP transfer failed. Check the source transaction and try again only after reconciliation.',
+      });
     }
   }
 
