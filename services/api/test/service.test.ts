@@ -6,9 +6,31 @@ import { join } from "node:path";
 import { ArenaApiService } from "../src/service.ts";
 import { SqliteRuntimeStore } from "../../../packages/persistence/src/sqlite-runtime.ts";
 import { buildEvaluationInput, sha256Text } from "../../../packages/evaluation/src/protocol.ts";
+import { EVO_CORE_PACK_ID } from "../../../packages/evaluation/src/evo-core.ts";
 
 const ALICE = "0x1111111111111111111111111111111111111111";
 const BOB = "0x2222222222222222222222222222222222222222";
+
+test("Evo selects a stable diverse subset per Agent across campaigns, versions, and service restart", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const agent = api.createAgent(ALICE, "Evo cohort", "Explain assumptions clearly.");
+    const first = api.createEvoCampaign(ALICE, { agentId: agent.agentId, agentsVersion: agent.agentsVersion, model: "fixture" });
+    const second = api.createEvoCampaign(ALICE, { agentId: agent.agentId, agentsVersion: agent.agentsVersion, model: "fixture" });
+    const updated = api.updateAgent(ALICE, agent.agentId, "Explain assumptions and uncertainty clearly.");
+    const third = new ArenaApiService(ALICE, runtime).createEvoCampaign(ALICE, { agentId: agent.agentId, agentsVersion: updated.agentsVersion, model: "fixture" });
+    assert.equal(first.items.length, 6);
+    assert.equal(new Set(first.items.map((item) => item.scenarioId.split('_')[0])).size, 6);
+    assert.notEqual(first.packId, EVO_CORE_PACK_ID);
+    assert.deepEqual(second.items.map((item) => item.scenarioId), first.items.map((item) => item.scenarioId));
+    assert.deepEqual(third.items.map((item) => item.scenarioId), first.items.map((item) => item.scenarioId));
+    assert.equal(third.packId, first.packId);
+    const other = api.createAgent(BOB, "Other Evo cohort", "Explain assumptions clearly.");
+    const otherCampaign = api.createEvoCampaign(BOB, { agentId: other.agentId, agentsVersion: other.agentsVersion, model: "fixture" });
+    assert.notEqual(otherCampaign.packId, first.packId);
+  } finally { runtime.close(); }
+});
 
 test("agent owner stores AGENTS.md and public view exposes commitment only", () => {
   const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "You are concise.");

@@ -1,5 +1,16 @@
 # Implementation execution status
 
+## 2026-09-16 topic-pool expansion
+
+New Tournament operations freeze a 24-topic scenario deck at activation and use
+their persisted random bracket seed to shuffle topic order reproducibly. Older
+operations keep the six-topic selection rule. Evo Core V2 offers 18 scenarios
+across six capability categories and randomly selects one per category for an
+Agent. That six-scenario pack is persisted for the Agent across campaigns and
+versions so existing comparison and Marketplace eligibility checks retain exact
+pack comparability. Local checks passed; no paid provider, GenLayer, Arc, or
+live evaluation was performed as part of implementation.
+
 ## 2026-09-16 product-flow hardening
 
 This source revision reconciles submitted Marketplace listings, persists and reuses Circle

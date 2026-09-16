@@ -40,6 +40,24 @@ test("tie retries the whole pair with new attempt and next topic", async () => {
   assert.deepEqual(inference.calls.slice(0, 2).map((call) => call.topic), ["t1", "t2"]);
 });
 
+test("seeded topic selection is reproducible, seed-dependent, and avoids repeats within a deck", async () => {
+  const topics = Array.from({ length: 16 }, (_, index) => `topic-${index}`);
+  const run = async (seedDigest: `sha256:${string}`) => {
+    const inference = new FakeInference();
+    const result = await new TournamentOrchestrator(inference, new FakeJudge()).run({
+      tournamentId, seedDigest, entrants, topics, topicSelection: "seeded-shuffle-v1",
+      bracketRevision: 1, retryCap: 2, expiresAt: 1000, now: () => 100,
+    });
+    assert.equal(result.state, "RANKING_READY");
+    return inference.calls.map((call) => call.topic);
+  };
+  const first = await run(digest("topic-seed-a"));
+  assert.equal(first.length, 11);
+  assert.equal(new Set(first).size, first.length);
+  assert.deepEqual(await run(digest("topic-seed-a")), first);
+  assert.notDeepEqual(await run(digest("topic-seed-b")), first);
+});
+
 test("partial pair stops before judge submission and requests recovery", async () => {
   const inference = new FakeInference(); inference.partialAt = 1; const judge = new FakeJudge();
   const result = await new TournamentOrchestrator(inference, judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, expiresAt: 1000, now: () => 100 });
