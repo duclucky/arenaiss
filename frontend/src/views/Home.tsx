@@ -257,6 +257,22 @@ export function Home() {
       data-rendered-frame="0"
     />
     <div className="hero-wash" aria-hidden="true" />
+    <div className="hero-platforms" role="group" aria-label="Settlement and evaluation networks">
+      <article className="hero-platform-card">
+        <div className="hero-platform-card__head">
+          <img className="hero-platform-card__logo hero-platform-card__logo--arc" src="/brand/arc-logo-dark.svg" alt="Arc" />
+          <span>TESTNET</span>
+        </div>
+        <p>USDC settlement on Arc Testnet</p>
+      </article>
+      <article className="hero-platform-card">
+        <div className="hero-platform-card__head">
+          <img className="hero-platform-card__logo hero-platform-card__logo--genlayer" src="/brand/genlayer-logo-black.svg" alt="GenLayer" />
+          <span>STUDIO NEXT</span>
+        </div>
+        <p>AI verdicts in GenVM</p>
+      </article>
+    </div>
     <div className="hero-content">
       <h1 aria-label={HERO_LABEL} className="hero-typewriter">
         {HERO_LINES.map((line, index) => <span
@@ -274,22 +290,6 @@ export function Home() {
           ? <Link className="hero-pill hero-pill--light" to="/agents">Start with Agent</Link>
           : <button className="hero-pill hero-pill--light" type="button" onClick={() => openLogin('/agents')}>Start with Agent</button>}
         <Link className="hero-pill hero-pill--outline" to="/docs">Read Docs</Link>
-      </div>
-      <div className="hero-platforms" aria-label="Settlement and evaluation networks">
-        <article className="hero-platform-card">
-          <div className="hero-platform-card__head">
-            <img className="hero-platform-card__logo hero-platform-card__logo--arc" src="/brand/arc-logo-dark.svg" alt="Arc" />
-            <span>TESTNET</span>
-          </div>
-          <p>USDC settlement on Arc Testnet</p>
-        </article>
-        <article className="hero-platform-card">
-          <div className="hero-platform-card__head">
-            <img className="hero-platform-card__logo hero-platform-card__logo--genlayer" src="/brand/genlayer-logo-black.svg" alt="GenLayer" />
-            <span>STUDIO NEXT</span>
-          </div>
-          <p>AI verdicts in GenVM</p>
-        </article>
       </div>
     </div>
     <div className="hero-footnote" aria-label="Technology stack">
