@@ -50,9 +50,9 @@ it('shows a room read failure and retries the list without implying no rooms exi
   }));
   render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><PairMatches /></AppProvider></MemoryRouter>);
   expect(await screen.findByRole('alert')).toHaveTextContent('temporary room read failure');
-  expect(screen.queryByText('No rooms yet.')).not.toBeInTheDocument();
+  expect(screen.queryByText('No open rooms.')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Retry rooms' }));
-  await waitFor(() => expect(screen.getByText('No rooms yet.')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('No open rooms.')).toBeInTheDocument());
   expect(roomReads).toBeGreaterThan(1);
 });
 
@@ -69,7 +69,7 @@ it('shows an onchain refund credit after cancellation and hides the claim after 
         stake: '1000000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000, state: 'REFUNDABLE' }];
     },
   })));
-  render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches /></AppProvider></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
   fireEvent.click(await screen.findByRole('button', { name: 'Claim 1.0 USDC' }));
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Claim 1.0 USDC' })).not.toBeInTheDocument());
 });
@@ -82,8 +82,41 @@ it('links the two escrow deposits and settlement evidence from one room', async 
       creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '1000000', joinDeadline: 1_999_999_999,
       resolutionDeadline: 2_000_000_000, state: 'SETTLED', createTx: hashes[0], joinTx: hashes[1], settleTx: hashes[2] }];
   } })));
-  render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><PairMatches /></AppProvider></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
   expect(await screen.findByRole('link', { name: 'Creator deposit' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[0]}`);
   expect(screen.getByRole('link', { name: 'Challenger deposit' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[1]}`);
   expect(screen.getByRole('link', { name: 'Arc settlement' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[2]}`);
+});
+
+it.each([
+  { view: 'open', shown: ['a'], hidden: ['b', 'c', 'd'] },
+  { view: 'mine', shown: ['b', 'c'], hidden: ['a', 'd'] },
+  { view: 'completed', shown: ['c', 'd'], hidden: ['a', 'b'] },
+] as const)('shows the $view room subpage with its own room list', async ({ view, shown, hidden }) => {
+  const rooms = [
+    { roomId: `sha256:${'a'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, state: 'OPEN' },
+    { roomId: `sha256:${'b'.repeat(64)}`, creatorWallet: wallet, state: 'JOINED' },
+    { roomId: `sha256:${'c'.repeat(64)}`, creatorWallet: wallet, state: 'SETTLED' },
+    { roomId: `sha256:${'d'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, state: 'REFUNDABLE' },
+  ].map((item) => ({ ...item, stake: '10000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000 }));
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    if (url.endsWith('/credit')) return { amount: '0' };
+    return rooms;
+  } })));
+  render(<MemoryRouter initialEntries={[`/pairs/${view}`]}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view={view} /></AppProvider></MemoryRouter>);
+  for (const name of ['Open rooms', 'My rooms', 'Completed']) expect(screen.getByRole('link', { name })).toHaveAttribute('href', `/pairs/${name === 'Open rooms' ? 'open' : name === 'My rooms' ? 'mine' : 'completed'}`);
+  for (const digit of shown) expect(await screen.findByText(new RegExp(`Room sha256:${digit.repeat(64)}`))).toBeInTheDocument();
+  for (const digit of hidden) expect(screen.queryByText(new RegExp(`Room sha256:${digit.repeat(64)}`))).not.toBeInTheDocument();
+});
+
+it('shows that a joined room started automatically and exposes its current stage', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    return [{ roomId: `sha256:${'9'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
+      creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '10000', joinDeadline: 1_999_999_999,
+      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'RUNNING_AGENTS' }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText('Match started automatically. Both Agents are producing responses.')).toBeInTheDocument();
 });

@@ -14,6 +14,8 @@ export type PairRoom = {
   challenger?: string; challengerWallet?: string; challengerAgentId?: string; challengerVersion?: string;
   stake: string; joinDeadline: number; resolutionDeadline: number; state: PairRoomState;
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
+  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationAttempts?: number; retryAt?: number;
   createdAt: number;
 };
 export type ChainRoom = {
@@ -148,7 +150,7 @@ export class PairRoomCoordinator {
     if (onchain.state === 2 && row.joinTx && sameAddress(onchain.challenger, account.address)
       && onchain.challengerAgentVersion.toLowerCase() === bytes32(version)
       && sameAddress(onchain.creator, row.creatorWallet) && onchain.stake === BigInt(row.stake)) {
-      const joined: PairRoom = { ...row, state: 'JOINED' };
+      const joined: PairRoom = { ...row, state: 'JOINED', evaluationStage: 'QUEUED' };
       this.runtime.put(STORE, roomId, joined);
       return structuredClone(joined);
     }
@@ -171,7 +173,7 @@ export class PairRoomCoordinator {
     if (confirmed.state !== 2 || !sameAddress(confirmed.challenger, account.address)
       || confirmed.challengerAgentVersion.toLowerCase() !== bytes32(version)
       || !sameAddress(confirmed.creator, row.creatorWallet) || confirmed.stake !== BigInt(row.stake)) throw new Error('Arc room join requires reconciliation');
-    const joined: PairRoom = { ...pending, joinTx: submitted.txHash, state: 'JOINED' };
+    const joined: PairRoom = { ...pending, joinTx: submitted.txHash, state: 'JOINED', evaluationStage: 'QUEUED' };
     this.runtime.put(STORE, roomId, joined);
     return structuredClone(joined);
   }
