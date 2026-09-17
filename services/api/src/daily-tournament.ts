@@ -31,7 +31,8 @@ export async function runDailyTournamentTick(runtime: SqliteRuntimeStore, operat
     let current = await operations.get(latest.tournamentId) ?? await operations.create(latest);
     if (!TERMINAL.has(current.state)) {
       if (nowSeconds < latest.startsAt) return current;
-      const action = actionFor(current, nowSeconds >= latest.expiresAt);
+      const action = actionFor(current, nowSeconds >= latest.expiresAt)
+        ?? (current.state === 'RECOVERY_REQUIRED' && claimPartialProviderRetry(runtime, current, nowSeconds) ? 'PROGRESS' : null);
       if (action) current = await operations.execute({ tournamentId: latest.tournamentId, action });
       if (!TERMINAL.has(current.state)) return current;
     }
@@ -47,6 +48,17 @@ export async function runDailyTournamentTick(runtime: SqliteRuntimeStore, operat
   const input = runtime.get<CreateTournamentOperation>(INTENTS, tournamentId)!;
   if (input.startsAt !== startsAt || input.registrationClosesAt !== startsAt || input.tournamentId !== tournamentId) throw new Error('daily Tournament intent conflicts with UTC schedule');
   return await operations.get(tournamentId) ?? await operations.create(input);
+}
+
+function claimPartialProviderRetry(runtime: SqliteRuntimeStore, snapshot: TournamentOperationSnapshot, nowSeconds: number): boolean {
+  if (!snapshot.nextActions.includes('PROGRESS')) return false;
+  const recovery = summarizeTournamentRecovery(runtime, snapshot.message ?? '');
+  if (!recovery || recovery.comparisonState !== 'NONE' || recovery.providerA === recovery.providerB) return false;
+  const key = `${snapshot.tournamentId}:${recovery.attemptId}`;
+  const prior = runtime.get<{ count: number; nextAt: number }>('daily-tournament-provider-retries', key);
+  if (prior && (prior.count >= 3 || nowSeconds < prior.nextAt)) return false;
+  runtime.put('daily-tournament-provider-retries', key, { count: (prior?.count ?? 0) + 1, nextAt: nowSeconds + 300 });
+  return true;
 }
 
 function actionFor(snapshot: TournamentOperationSnapshot, expired: boolean): TournamentOperationAction | null {
