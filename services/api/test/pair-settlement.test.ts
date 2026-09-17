@@ -48,6 +48,7 @@ test('settles only a canonical finalized comparison, persists its intent, and re
   try {
     await f.worker.tick();
     assert.equal(f.settlements, 0);
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationStage, 'WAITING_VERDICT');
     f.setOutcome({ state: 'FINAL', result: 'B_WIN', transactionHash: `0x${'5'.repeat(64)}` });
     await f.worker.tick();
     const settled = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)!;
@@ -69,6 +70,8 @@ test('provider failures have a bounded retry budget while timeout refunds remain
     await f.worker.tick();
     await f.worker.tick();
     assert.equal(f.resolves, 1);
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationStage, 'RETRYING');
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationAttempts, 1);
     f.setNow(800);
     await f.worker.tick();
     f.setNow(2000);

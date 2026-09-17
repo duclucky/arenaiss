@@ -45,7 +45,10 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="tournaments" element={deferred(<Tournaments />)} />
-            <Route path="pairs" element={deferred(<PairMatches />)} />
+            <Route path="pairs" element={<Navigate to="/pairs/open" replace />} />
+            <Route path="pairs/open" element={deferred(<PairMatches view="open" />)} />
+            <Route path="pairs/mine" element={deferred(<PairMatches view="mine" />)} />
+            <Route path="pairs/completed" element={deferred(<PairMatches view="completed" />)} />
             <Route path="tournaments/:id" element={deferred(<TournamentDetail />)} />
             <Route path="tournaments/:id/submit" element={deferred(<SubmitEntry />)} />
             <Route path="matches/:id" element={deferred(<MatchDetail />)} />

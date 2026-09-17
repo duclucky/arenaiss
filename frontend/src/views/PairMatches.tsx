@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import type { AgentProfile } from '../adapters/interfaces';
 import { useAppContext } from '../context';
 
@@ -7,6 +8,8 @@ type Room = {
   creatorAgentId: string; challengerAgentId?: string; challengerVersion?: string; stake: string;
   joinDeadline: number; resolutionDeadline: number; state: 'OPEN' | 'JOINING' | 'JOINED' | 'REFUNDABLE' | 'SETTLED';
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
+  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationAttempts?: number; retryAt?: number;
 };
 
 function parseStake(value: string): string {
@@ -18,8 +21,19 @@ function parseStake(value: string): string {
 }
 
 function units(value: string): string { const number = BigInt(value); return `${number / 1_000_000n}.${(number % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '') || '0'}`; }
+function progress(room: Room): string {
+  if (room.state !== 'JOINED') return room.state === 'REFUNDABLE' ? 'Refund credits are available to the depositors.' : room.state === 'SETTLED' ? 'Arc settlement is final. The winner can claim any remaining payout credit.' : '';
+  if (room.evaluationStage === 'RUNNING_AGENTS') return 'Match started automatically. Both Agents are producing responses.';
+  if (room.evaluationStage === 'WAITING_VERDICT') return 'Agent responses are ready. Waiting for the finalized GenLayer verdict.';
+  if (room.evaluationStage === 'RETRYING') return `A match service call failed. Automatic retry ${room.evaluationAttempts ?? 1} is scheduled${room.retryAt ? ` for ${new Date(room.retryAt * 1_000).toLocaleString()}` : ''}.`;
+  if (room.evaluationStage === 'TIE_WAITING_REFUND') return 'GenLayer returned a tie. Both stakes become refundable at the resolution deadline.';
+  if (room.evaluationStage === 'SETTLING') return 'The verdict is final. Arc payout settlement is being confirmed.';
+  return 'Both deposits are held. The match is queued to start automatically.';
+}
 
-export function PairMatches() {
+export type PairRoomView = 'open' | 'mine' | 'completed';
+
+export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   const { account, managedAccount, agentApi, networkConfig } = useAppContext();
   const base = networkConfig?.apiUrl?.replace(/\/$/, '') || '';
   const [enabled, setEnabled] = useState(false);
@@ -85,13 +99,24 @@ export function PairMatches() {
       || room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase()));
   const myCreatedRoom = (room: Room) => Boolean(managedAccount && room.creatorWallet.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
   const myJoinedRoom = (room: Room) => Boolean(managedAccount && room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
+  const visibleRooms = rooms.filter((room) => view === 'open' ? room.state === 'OPEN'
+    : view === 'mine' ? myRoom(room)
+      : room.state === 'SETTLED' || room.state === 'REFUNDABLE');
+  const viewCopy = view === 'open'
+    ? { title: 'Open rooms', empty: 'No open rooms.' }
+    : view === 'mine' ? { title: 'My rooms', empty: managedAccount ? 'You have not joined a room yet.' : 'Log in to see rooms you created or joined.' }
+      : { title: 'Completed', empty: 'No completed rooms yet.' };
 
   return <section className="mx-auto max-w-5xl space-y-8">
     <header><p className="page-kicker">Independent competition</p><h1 className="page-title">Pair matches</h1><p className="page-lede">Create a room with a USDC stake on Arc Testnet. A challenger deposits the same amount. The winner can claim both stakes after a finalized comparison; refunds remain claimable if the room is canceled or expires.</p></header>
+    <nav className="flex flex-wrap gap-2" aria-label="Pair match views">
+      {([['open', 'Open rooms'], ['mine', 'My rooms'], ['completed', 'Completed']] as const).map(([key, label]) =>
+        <NavLink key={key} to={`/pairs/${key}`} className={({ isActive }) => `metal-button-ghost ${isActive ? 'is-active' : ''}`}>{label}</NavLink>)}
+    </nav>
     {!enabled && <div className="glass-panel p-6" role="status">Pair matches are being prepared. Deposits are disabled until the Arc escrow is deployed and verified.</div>}
     {error && <p className="retro-inset p-4 text-red-900" role="alert">{error}</p>}
     {notice && <p className="retro-inset p-4" role="status">{notice}</p>}
-    {enabled && managedAccount && <form className="glass-panel space-y-4 p-6" onSubmit={(event) => { event.preventDefault(); if (!selected) return; void perform(async () => {
+    {view === 'open' && enabled && managedAccount && <form className="glass-panel space-y-4 p-6" onSubmit={(event) => { event.preventDefault(); if (!selected) return; void perform(async () => {
       await request('/api/pair-rooms', { agentId: selected.agentId, version: selected.agentsVersion, stake: parseStake(stake), idempotencyKey: createKey.current });
       createKey.current = crypto.randomUUID();
     }, 'Room created. Your USDC stake is held by the Arc escrow.'); }}>
@@ -101,10 +126,10 @@ export function PairMatches() {
       <p className="text-sm text-neutral-700">The wallet approves the exact stake, then deposits it. If your Arc USDC balance is insufficient, the room will not open. You can cancel before someone joins and receive your stake back.</p>
       <button type="submit" className="metal-button-solid" disabled={pending || !selected}>Create and deposit</button>
     </form>}
-    <section aria-labelledby="pair-rooms-heading"><h2 id="pair-rooms-heading" className="mb-4 text-2xl font-semibold">Rooms</h2>
+    <section aria-labelledby="pair-rooms-heading"><h2 id="pair-rooms-heading" className="mb-4 text-2xl font-semibold">{viewCopy.title}</h2>
       {roomsError ? <div className="glass-panel p-6" role="alert"><p>{roomsError}</p><button type="button" className="metal-button-ghost mt-4" onClick={() => void refresh().catch(() => undefined)}>Retry rooms</button></div>
         : !roomsLoaded ? <p className="glass-panel p-6" role="status">Loading rooms…</p>
-        : rooms.length === 0 ? <p className="glass-panel p-6">No rooms yet.</p> : <ul className="space-y-3">{rooms.map((room) => <li className="glass-panel space-y-3 p-5" key={room.roomId}>
+        : visibleRooms.length === 0 ? <p className="glass-panel p-6">{viewCopy.empty}</p> : <ul className="space-y-3">{visibleRooms.map((room) => <li className="glass-panel space-y-3 p-5" key={room.roomId}>
         <div className="flex flex-wrap items-center justify-between gap-3"><strong>{units(room.stake)} USDC each</strong><span className="retro-chip px-3 py-1 text-xs">{room.state}</span></div>
         <p className="break-all font-mono text-xs">Room {room.roomId}</p>
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
@@ -113,7 +138,7 @@ export function PairMatches() {
           {room.verdictTx && <a className="underline" href={`https://explorer-studio-dev.genlayer.com/transactions/${room.verdictTx}`} target="_blank" rel="noreferrer">GenLayer verdict</a>}
           {room.settleTx && <a className="underline" href={`https://testnet.arcscan.app/tx/${room.settleTx}`} target="_blank" rel="noreferrer">Arc settlement</a>}
         </div>
-        <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : room.state === 'JOINED' ? 'Both deposits are held. Waiting for the match outcome.' : room.state === 'REFUNDABLE' ? 'Refund credit is available to each depositor.' : 'The winner can claim the payout.'}</p>
+        <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
         {enabled && managedAccount && <div className="flex flex-wrap gap-2">
           {(room.state === 'OPEN' || room.state === 'JOINING') && myCreatedRoom(room) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/CANCEL`, {}), 'Room canceled. Refund was sent to your wallet or remains claimable below.')}>Cancel and refund</button>}
           {room.state === 'OPEN' && !myRoom(room) && selected && <button className="metal-button-solid" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/join`, { agentId: selected.agentId, version: selected.agentsVersion }), 'Joined the room. Your matching stake is held by the escrow.')}>Join and deposit</button>}
