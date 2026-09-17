@@ -21,6 +21,7 @@ export function summarizeTournamentRecovery(runtime: SqliteRuntimeStore, message
     fallbackSelected,
     comparisonState: comparison?.state ?? 'NONE',
     comparisonHashRecorded: Boolean(comparison?.transactionHash),
+    ...(comparison?.transactionHash ? { comparisonTransactionHash: comparison.transactionHash } : {}),
   };
 }
 

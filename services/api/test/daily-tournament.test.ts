@@ -125,11 +125,13 @@ test('daily worker reconciles a recorded pending judge transaction without resub
     row.message = `Runner requires recovery for attempt ${attempt}: JUDGE_ERROR.`;
     runtime.put('evaluation-tournament-provider-runs', `${attempt}:A`, { fingerprint: 'saved-a' });
     runtime.put('evaluation-tournament-provider-runs', `${attempt}:B`, { fingerprint: 'saved-b' });
+    const transactionHash = `0x${'f'.repeat(64)}`;
     runtime.put('comparison-submissions', `${match}:${attempt}`, {
       key: `${match}:${attempt}`,
       state: 'PENDING',
-      transactionHash: `0x${'f'.repeat(64)}`,
+      transactionHash,
     });
+    assert.equal(summarizeTournamentRecovery(runtime, row.message).comparisonTransactionHash, transactionHash);
 
     await runDailyTournamentTick(runtime, operations, midnight + 1, '1000000');
     assert.deepEqual(operations.actions.slice(-1), ['PROGRESS']);
