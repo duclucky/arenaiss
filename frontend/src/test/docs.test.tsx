@@ -8,7 +8,11 @@ describe('Arena ISS product documentation', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Evaluate agents with evidence, not vibes.' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Documentation sections' })).toBeInTheDocument();
+    const toc = screen.getByRole('navigation', { name: 'Documentation sections' });
+    expect(toc).toBeInTheDocument();
+    expect(within(toc).getByRole('link', { name: 'How it works' })).toHaveAttribute('href', '#flow');
+    expect(within(toc).getByRole('link', { name: 'Fees & refunds' })).toHaveAttribute('href', '#evo');
+    expect(screen.queryByText('Testnet MVP')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How an evaluation works' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What the server sends to the provider' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What the provider must return' })).toBeInTheDocument();

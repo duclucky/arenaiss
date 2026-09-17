@@ -26,7 +26,7 @@ export type AgentDetail = PublicAgent & {
   evaluations: PublicEvaluationCampaign[];
 };
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed };
+export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed; operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
 export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number };
 export type PublicVerdictCriterion = { id: string; label: string; winner: "A" | "B" | "TIE"; reason: string };
@@ -230,6 +230,7 @@ export class ArenaApiService {
       || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(tournament.prizePool)
       || (tournament.stakeAmount !== undefined && !/^[1-9][0-9]*$/.test(tournament.stakeAmount))
       || (tournament.registrationClosesAt !== undefined && (!Number.isSafeInteger(tournament.registrationClosesAt) || tournament.registrationClosesAt < 1))
+      || (tournament.operationState !== undefined && !['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(tournament.operationState))
       || (tournament.bracketSeed !== undefined && (tournament.bracketSeed.schema !== "arena-bracket-seed-v2" || !isDigest(tournament.bracketSeed.seedDigest) || !isDigest(tournament.bracketSeed.rosterDigest) || !/^0x[0-9a-f]{64}$/.test(tournament.bracketSeed.entropyBlockHash) || !/^(0|[1-9][0-9]*)$/.test(tournament.bracketSeed.entropyBlockNumber)))) throw new Error("invalid tournament");
     if (tournament.bracketSeed) {
       const expected = derivePublicBracketSeed({ tournamentId: tournament.id as Digest, entrants: tournament.entrantIds as Digest[], entropyBlockHash: tournament.bracketSeed.entropyBlockHash, entropyBlockNumber: tournament.bracketSeed.entropyBlockNumber });

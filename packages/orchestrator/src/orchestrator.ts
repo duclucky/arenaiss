@@ -20,7 +20,7 @@ export type InferenceInput = {
   agentB: Entrant;
 };
 
-export type PairOutput = { state: "OUTPUTS_READY" | "PARTIAL_PAIR"; outputA?: string; outputB?: string; outputADigest?: Digest; outputBDigest?: Digest };
+export type PairOutput = { state: "OUTPUTS_READY" | "PARTIAL_PAIR"; outputA?: string; outputB?: string; outputADigest?: Digest; outputBDigest?: Digest; failureCode?: "EMPTY_OUTPUT" | "PROVIDER_TIMEOUT" | "PROVIDER_ERROR" | "INVALID_OUTPUT" };
 
 export interface OrchestratorInference { run(input: InferenceInput): Promise<PairOutput>; }
 export type OrchestratorJudgeOutcome =
@@ -44,8 +44,8 @@ export type OrchestratorInput = {
 
 export type OrchestratorResult =
   | { state: "RANKING_READY"; ranking: Digest[]; results: ReadonlyMap<Digest, MatchResult> }
-  | { state: "WAITING_FOR_JUDGE"; matchId: Digest; attemptId: Digest }
-  | { state: "RECOVERY_REQUIRED"; matchId: Digest; attemptId: Digest }
+  | { state: "WAITING_FOR_JUDGE"; matchId: Digest; attemptId: Digest; results: ReadonlyMap<Digest, MatchResult> }
+  | { state: "RECOVERY_REQUIRED"; matchId: Digest; attemptId: Digest; reason: "PROVIDER_INCOMPLETE" | "EMPTY_OUTPUT" | "PROVIDER_TIMEOUT" | "PROVIDER_ERROR" | "INVALID_OUTPUT" | "JUDGE_ERROR" | "JUDGE_FAILED"; results: ReadonlyMap<Digest, MatchResult> }
   | { state: "REFUND_REQUIRED"; reason: "TOURNAMENT_EXPIRED" | "RETRY_EXHAUSTED" };
 
 export class TournamentOrchestrator {
@@ -86,17 +86,17 @@ export class TournamentOrchestrator {
         const topicIndex = input.topicSelection === "seeded-shuffle-v1" ? matchOrdinal + number - 1 : match.matchIndex + number - 1;
         const context: InferenceInput = { tournamentId: input.tournamentId, matchId: match.matchId, attemptId: currentAttempt, topic: selectedTopics[topicIndex % selectedTopics.length], agentA, agentB };
         const pair = await this.inference.run(context);
-        if (pair.state !== "OUTPUTS_READY" || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt };
+        if (pair.state !== "OUTPUTS_READY" || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt, reason: pair.failureCode ?? "PROVIDER_INCOMPLETE", results };
         let outcome: OrchestratorJudgeOutcome;
         try {
           outcome = await this.judge.judge({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest });
         } catch {
-          return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt };
+          return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_ERROR", results };
         }
         if (outcome.state === "SUBMITTED" || outcome.state === "PENDING" || outcome.state === "ACCEPTED") {
-          return { state: "WAITING_FOR_JUDGE", matchId: match.matchId, attemptId: currentAttempt };
+          return { state: "WAITING_FOR_JUDGE", matchId: match.matchId, attemptId: currentAttempt, results };
         }
-        if (outcome.state === "FAILED") return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt };
+        if (outcome.state === "FAILED") return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_FAILED", results };
         const verdict = outcome.result;
         if (verdict === "A_WIN" || verdict === "B_WIN") { terminal = verdict; break; }
       }

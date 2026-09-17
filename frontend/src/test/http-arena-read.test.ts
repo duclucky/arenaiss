@@ -62,6 +62,12 @@ describe('arena live-read adapter', () => {
     expect((await adapter.listTournaments())[0]).toMatchObject({ registrationClosesAt: 1789603200, entrantCount: 1, bracketSeed });
   });
 
+  it('preserves the public recovery state for an active tournament', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ id: 'daily', name: 'Daily', status: 'ACTIVE', operationState: 'RECOVERY_REQUIRED', prizePool: '9' }), { status: 200 }));
+    const adapter = new HttpArenaReadAdapter('/', fetcher as typeof fetch);
+    expect((await adapter.getTournament('daily'))?.operationState).toBe('RECOVERY_REQUIRED');
+  });
+
   it('rejects a malformed public pairing proof', async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify([{ id: 'daily', name: 'Daily', status: 'ACTIVE', prizePool: '8', bracketSeed: { schema: 'arena-bracket-seed-v2', seedDigest: 'bad' } }]), { status: 200 }));
     await expect(new HttpArenaReadAdapter('/', fetcher as typeof fetch).listTournaments()).rejects.toThrow('INVALID_ARENA_RESPONSE');

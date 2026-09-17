@@ -3,7 +3,8 @@ import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, ty
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
 
-import { buildBracket, derivePublicBracketSeed, type PublicBracketSeed } from '../../../packages/domain/src/bracket.ts';
+import { buildBracket, derivePublicBracketSeed, type PublicBracketSeed, type SlotRef } from '../../../packages/domain/src/bracket.ts';
+import type { MatchResult } from '../../../packages/domain/src/progression.ts';
 import { TournamentEvaluationPairRunner, TournamentComparisonJudgeAdapter } from '../../../packages/evaluation/src/tournament-runner.ts';
 import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
 import { ComparisonRunRegistry } from '../../../packages/evaluation/src/tournament-comparison.ts';
@@ -174,7 +175,10 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
       this.runtime.put('tournament-operations', record.input.tournamentId, record);
     }
     const entrants = record.entrants;
+    this.publish(record, arc, entrants.map((item) => item.entrantId));
+    this.publishOpeningMatches(record);
     const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: 1, retryCap: 3, expiresAt: record.input.expiresAt, now: this.now });
+    this.publishMatchProgress(record, result);
     this.applyOrchestrator(record, result, entrants.length);
     this.publish(record, arc, entrants.map((item) => item.entrantId));
   }
@@ -192,12 +196,13 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   }
 
   private applyOrchestrator(record: OperationRecord, result: OrchestratorResult, entrantCount: number): void {
+    if ('results' in result) record.finalizedMatchCount = result.results.size;
     if (result.state === 'RANKING_READY') {
       record.ranking = [...result.ranking]; record.finalizedMatchCount = result.results.size; record.state = 'SETTLEMENT_PENDING'; record.message = 'Studio Next finalized every required verdict. Ranking is ready for Arc settlement.'; return;
     }
     if (result.state === 'WAITING_FOR_JUDGE') { record.state = 'WAITING_FOR_JUDGE'; record.message = `Studio Next is finalizing attempt ${result.attemptId}.`; return; }
     if (result.state === 'REFUND_REQUIRED') { record.state = this.now() >= record.input.expiresAt ? 'REFUND_PENDING' : 'RECOVERY_REQUIRED'; record.message = `Runner stopped: ${result.reason}.`; return; }
-    record.state = 'RECOVERY_REQUIRED'; record.message = `Runner requires recovery for attempt ${result.attemptId}.`;
+    record.state = 'RECOVERY_REQUIRED'; record.message = `Runner requires recovery for attempt ${result.attemptId}: ${result.reason}.`;
     record.finalizedMatchCount = Math.min(record.finalizedMatchCount, Math.max(0, bracketMatchCount(entrantCount) - 1));
   }
 
@@ -207,7 +212,48 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     const registered = record.entrants ?? await this.arc.registeredEntrants(record.input.tournamentId, this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`));
     this.runtime.put('tournament-operations', record.input.tournamentId, record);
     this.publish(record, arc, registered.map((item) => item.entrantId.startsWith('sha256:') ? item.entrantId : fromBytes32(item.entrantId)));
+    this.publishOpeningMatches(record);
     return this.toSnapshot(record, arc, registered);
+  }
+
+  private publishOpeningMatches(record: OperationRecord): void {
+    if (!record.seedDigest || !record.entrants) return;
+    const bracket = buildBracket({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest, entrants: record.entrants.map((item) => item.entrantId), bracketRevision: 1 });
+    const byEntrant = new Map(record.entrants.map((item) => [item.entrantId, item]));
+    for (const match of bracket.matches) {
+      if (match.slotA.kind !== 'entrant' || match.slotB.kind !== 'entrant' || this.service.getMatch(match.matchId)) continue;
+      const a = byEntrant.get(match.slotA.id)!;
+      const b = byEntrant.get(match.slotB.id)!;
+      const label = (entrant: Entrant) => `${this.service.getPublicAgent(entrant.agentId).name} · ${entrant.entrantId.slice(-12)}`;
+      this.service.publishMatch(this.operatorAddress, { id: match.matchId, tournamentId: record.input.tournamentId, state: 'SCHEDULED', agentA: label(a), agentB: label(b), agentIdA: a.agentId, agentIdB: b.agentId, round: match.roundNumber });
+    }
+  }
+
+  private publishMatchProgress(record: OperationRecord, result: OrchestratorResult): void {
+    if (!record.seedDigest || !record.entrants || !('results' in result)) return;
+    const bracket = buildBracket({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest, entrants: record.entrants.map((item) => item.entrantId), bracketRevision: 1 });
+    const matches = new Map(bracket.matches.map((match) => [match.matchId, match]));
+    const entrants = new Map(record.entrants.map((entrant) => [entrant.entrantId, entrant]));
+    const resolve = (slot: SlotRef): Entrant | null => {
+      if (slot.kind === 'entrant') return entrants.get(slot.id as `sha256:${string}`) ?? null;
+      const parent = matches.get(slot.id as `sha256:${string}`);
+      const outcome: MatchResult | undefined = result.results.get(slot.id as `sha256:${string}`);
+      if (!parent || (outcome !== 'A_WIN' && outcome !== 'B_WIN')) return null;
+      const selected = slot.kind === 'winner'
+        ? (outcome === 'A_WIN' ? parent.slotA : parent.slotB)
+        : (outcome === 'A_WIN' ? parent.slotB : parent.slotA);
+      return resolve(selected);
+    };
+    const label = (entrant: Entrant) => `${this.service.getPublicAgent(entrant.agentId).name} · ${entrant.entrantId.slice(-12)}`;
+    for (const match of bracket.matches) {
+      const a = resolve(match.slotA); const b = resolve(match.slotB);
+      if (!a || !b) continue;
+      const outcome = result.results.get(match.matchId);
+      const state = outcome === 'A_WIN' || outcome === 'B_WIN' ? 'FINALIZED'
+        : 'matchId' in result && result.matchId === match.matchId ? (result.state === 'RECOVERY_REQUIRED' ? 'RETRYABLE' : 'JUDGING')
+        : 'SCHEDULED';
+      this.service.publishMatch(this.operatorAddress, { id: match.matchId, tournamentId: record.input.tournamentId, state, agentA: label(a), agentB: label(b), agentIdA: a.agentId, agentIdB: b.agentId, ...(outcome === 'A_WIN' ? { winner: label(a) } : outcome === 'B_WIN' ? { winner: label(b) } : {}), round: match.roundNumber });
+    }
   }
 
   private applyArcTerminal(record: OperationRecord, arc: ArcSnapshot): void {
@@ -218,7 +264,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
 
   private publish(record: OperationRecord, arc: ArcSnapshot, entrants: readonly string[]): void {
     const status = record.state === 'COMPLETED' ? 'COMPLETED' : record.state === 'REFUNDED' ? 'CANCELLED' : ['RUNNING', 'WAITING_FOR_JUDGE', 'SETTLEMENT_PENDING', 'RECOVERY_REQUIRED', 'REFUND_PENDING'].includes(record.state) ? 'ACTIVE' : 'UPCOMING';
-    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt, ...(record.bracketSeed ? { bracketSeed: record.bracketSeed } : {}) });
+    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt, ...(record.bracketSeed ? { bracketSeed: record.bracketSeed } : {}), ...(['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(record.state) ? { operationState: record.state as 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' } : {}) });
   }
 
   private toSnapshot(record: OperationRecord, arc: ArcSnapshot, entrants: readonly unknown[]): TournamentOperationSnapshot {
