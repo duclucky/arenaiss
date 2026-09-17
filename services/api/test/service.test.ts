@@ -31,6 +31,37 @@ test("public match detail records bounded state transitions across restart witho
   } finally { runtime.close(); }
 });
 
+test("operator archives and removes one Tournament bracket while preserving its public audit log", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime, () => 1_789_603_200);
+    const tournamentId = `sha256:${"a".repeat(64)}`;
+    const matchId = `sha256:${"b".repeat(64)}`;
+    api.publishTournament(ALICE, { id: tournamentId, name: "Migration cup", status: "ACTIVE", entrantIds: [], prizePool: "0" });
+    api.publishMatch(ALICE, { id: matchId, tournamentId, agentA: "Alpha", agentB: "Beta", round: 1, state: "FINALIZED", winner: "Alpha" });
+    const archive = api.archiveTournamentMatches(ALICE, tournamentId, "bracket-revision-1", 1_789_603_200);
+    assert.equal(archive.matches.length, 1);
+    assert.equal(archive.matches[0].events[0].state, "FINALIZED");
+    assert.equal(api.listMatches(tournamentId).length, 0);
+    assert.equal(api.getMatch(matchId), null);
+    const restarted = new ArenaApiService(ALICE, runtime);
+    assert.equal(restarted.listMatches(tournamentId).length, 0);
+    assert.equal(runtime.get<any>('api-tournament-match-archives', `${tournamentId}:bracket-revision-1`)?.matches.length, 1);
+  } finally { runtime.close(); }
+});
+
+test("terminal public match permits stage metadata backfill without changing its verdict", () => {
+  const api = new ArenaApiService(ALICE);
+  const tournamentId = `sha256:${"c".repeat(64)}`;
+  const matchId = `sha256:${"d".repeat(64)}`;
+  api.publishTournament(ALICE, { id: tournamentId, name: "Backfill cup", status: "ACTIVE", entrantIds: [], prizePool: "0" });
+  const original = { id: matchId, tournamentId, agentA: "Alpha", agentB: "Beta", round: 1, state: "FINALIZED" as const, winner: "Alpha" };
+  api.publishMatch(ALICE, original);
+  api.publishMatch(ALICE, { ...original, stage: "main" });
+  assert.equal(api.getMatch(matchId)?.stage, "main");
+  assert.throws(() => api.publishMatch(ALICE, { ...original, winner: "Beta", stage: "main" }), /conflicting public match/i);
+});
+
 test("Evo selects a stable diverse subset per Agent across campaigns, versions, and service restart", () => {
   const runtime = new SqliteRuntimeStore(":memory:");
   try {

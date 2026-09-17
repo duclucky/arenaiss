@@ -47,14 +47,14 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByText('arena-evaluation-input-v1')).toBeInTheDocument();
     expect(screen.getByText('arena-evaluation-output-v1')).toBeInTheDocument();
     expect(screen.queryByText('arena-generation-input-v2')).not.toBeInTheDocument();
-    expect(screen.getByText(/single-Agent runs can use the fallback after a timeout, rate limit, or temporary upstream failure/i)).toBeInTheDocument();
-    expect(screen.getByText(/Tournament retries the whole pair on the fallback route only when a primary call times out/i)).toBeInTheDocument();
+    expect(screen.getByText(/single-Agent runs can use the fallback after a timeout, rate limit, network failure, or temporary upstream failure/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tournament retries the whole pair on the fallback route when a primary call times out or reports a temporary transport/i)).toBeInTheDocument();
     expect(screen.getByText(/A critical policy finding or a FAIL grade in safety or rule compliance sets the effective score to 0/i)).toBeInTheDocument();
     expect(screen.getByText(/Marketplace eligibility requires 12 finalized runs/i)).toBeInTheDocument();
     expect(screen.getByText(/registration closes at 00:00 UTC/i)).toBeInTheDocument();
     expect(screen.getByText(/8 to 32 registered Agents/i)).toBeInTheDocument();
-    expect(screen.getByText(/receive a bye into the main bracket/i)).toHaveTextContent('n - p');
-    expect(screen.getByText(/receive a bye into the main bracket/i)).toHaveTextContent('2p - n');
+    expect(screen.getByText(/If that round has an odd number of Agents, exactly one deterministically selected Agent receives a bye/i)).toBeInTheDocument();
+    expect(screen.getByText(/Independent matches in one round run concurrently/i)).toBeInTheDocument();
     expect(screen.getByText(/public Tournament record exposes the block number, block hash, roster digest, and final seed/i)).toBeInTheDocument();
     expect(screen.getByText(/It is not a VRF/i)).toBeInTheDocument();
     expect(screen.getByText(/10% platform fee/i)).toBeInTheDocument();

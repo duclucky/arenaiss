@@ -32,6 +32,14 @@ test("eight-player tournament completes Top 5 without players online", async () 
   assert.equal(inference.calls.length, judge.calls);
 });
 
+test("nine-player rolling-bye tournament completes with one bye per odd round", async () => {
+  const nineEntrants = [...entrants, { entrantId: digest("entrant-8"), agentId: digest("agent-8"), agentsVersion: digest("version-8"), agentsMd: "Agent 8", agentsCommitment: digest("Agent 8") }];
+  const result = await new TournamentOrchestrator(new FakeInference(), new FakeJudge()).run({ tournamentId, seedDigest: digest("rolling-seed"), entrants: nineEntrants, topics: ["t1", "t2"], bracketRevision: 2, retryCap: 2, maxConcurrentMatches: 3, expiresAt: 1000, now: () => 100 });
+  assert.equal(result.state, "RANKING_READY");
+  assert.equal(result.ranking?.length, 5);
+  assert.equal(new Set(result.ranking).size, 5);
+});
+
 test("tie retries the whole pair with new attempt and next topic", async () => {
   const inference = new FakeInference(); const judge = new FakeJudge(); judge.tieFirst = true;
   const result = await new TournamentOrchestrator(inference, judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1", "t2"], bracketRevision: 1, retryCap: 2, expiresAt: 1000, now: () => 100 });

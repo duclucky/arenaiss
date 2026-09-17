@@ -18,6 +18,7 @@ import type { CreateTournamentOperation, TournamentOperationAction, TournamentOp
 const ARC_CHAIN_ID = 5_042_002;
 const GENLAYER_CHAIN_ID = 61_997;
 const ZERO = `0x${'0'.repeat(64)}`;
+const ROLLING_BYE_MIGRATIONS = new Set(['sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd']);
 const PAYOUT_BPS = [4_000, 2_500, 1_500, 1_000, 1_000] as const;
 const LEGACY_TOPICS = [
   'Explain how an idempotency key prevents duplicate effects when a paid API call is retried.',
@@ -82,6 +83,7 @@ type OperationRecord = {
   input: CreateTournamentOperation;
   state: TournamentOperationState;
   topicPoolVersion?: 2;
+  bracketRevision?: number;
   topics?: string[];
   seedDigest?: `sha256:${string}`;
   bracketSeed?: PublicBracketSeed;
@@ -100,6 +102,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   private readonly orchestrator: TournamentOrchestrator;
   private readonly now: () => number;
   private readonly topics: readonly string[];
+  private readonly rollingByeMigrations: ReadonlySet<string>;
   constructor(
     runtime: SqliteRuntimeStore,
     service: ArenaApiService,
@@ -108,7 +111,8 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     orchestrator: TournamentOrchestrator,
     now: () => number = () => Math.floor(Date.now() / 1_000),
     topics: readonly string[] = DEFAULT_TOPICS,
-  ) { this.runtime = runtime; this.service = service; this.operatorAddress = operatorAddress; this.arc = arc; this.orchestrator = orchestrator; this.now = now; this.topics = topics; }
+    rollingByeMigrations: ReadonlySet<string> = ROLLING_BYE_MIGRATIONS,
+  ) { this.runtime = runtime; this.service = service; this.operatorAddress = operatorAddress; this.arc = arc; this.orchestrator = orchestrator; this.now = now; this.topics = topics; this.rollingByeMigrations = rollingByeMigrations; }
 
   async list(): Promise<TournamentOperationSnapshot[]> {
     const rows = this.runtime.list<OperationRecord>('tournament-operations');
@@ -123,7 +127,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   async create(input: CreateTournamentOperation): Promise<TournamentOperationSnapshot> {
     if (this.runtime.get('tournament-operations', input.tournamentId)) throw new Error('tournament operation already exists');
     const arc = await this.arc.create(input);
-    const record: OperationRecord = { input: structuredClone(input), state: 'REGISTRATION', topicPoolVersion: 2, finalizedMatchCount: 0, transactionHash: arc.transactionHash };
+    const record: OperationRecord = { input: structuredClone(input), state: 'REGISTRATION', topicPoolVersion: 2, bracketRevision: 2, finalizedMatchCount: 0, transactionHash: arc.transactionHash };
     this.runtime.put('tournament-operations', input.tournamentId, record);
     this.publish(record, arc, []);
     return this.toSnapshot(record, arc, []);
@@ -146,6 +150,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   }
 
   private async progress(record: OperationRecord): Promise<void> {
+    this.migrateRollingByeBracket(record);
     let arc = await this.arc.snapshot(record.input.tournamentId);
     if (arc.state === 'DRAFT' && this.now() >= record.input.registrationClosesAt) arc = await this.arc.closeRegistration(record.input.tournamentId);
     if (arc.state === 'REGISTRATION_CLOSED') {
@@ -177,7 +182,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     const entrants = record.entrants;
     this.publish(record, arc, entrants.map((item) => item.entrantId));
     this.publishOpeningMatches(record);
-    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: 1, retryCap: 3, maxConcurrentMatches: 3, expiresAt: record.input.expiresAt, now: this.now });
+    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: record.bracketRevision ?? 1, retryCap: 3, maxConcurrentMatches: 3, expiresAt: record.input.expiresAt, now: this.now });
     this.publishMatchProgress(record, result);
     this.applyOrchestrator(record, result, entrants.length);
     this.publish(record, arc, entrants.map((item) => item.entrantId));
@@ -203,10 +208,11 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     if (result.state === 'WAITING_FOR_JUDGE') { record.state = 'WAITING_FOR_JUDGE'; record.message = `Studio Next is finalizing attempt ${result.attemptId}.`; return; }
     if (result.state === 'REFUND_REQUIRED') { record.state = this.now() >= record.input.expiresAt ? 'REFUND_PENDING' : 'RECOVERY_REQUIRED'; record.message = `Runner stopped: ${result.reason}.`; return; }
     record.state = 'RECOVERY_REQUIRED'; record.message = `Runner requires recovery for attempt ${result.attemptId}: ${result.reason}.`;
-    record.finalizedMatchCount = Math.min(record.finalizedMatchCount, Math.max(0, bracketMatchCount(entrantCount) - 1));
+    record.finalizedMatchCount = Math.min(record.finalizedMatchCount, Math.max(0, bracketMatchCount(entrantCount, record.bracketRevision ?? 1) - 1));
   }
 
   private async refresh(record: OperationRecord): Promise<TournamentOperationSnapshot> {
+    this.migrateRollingByeBracket(record);
     const arc = await this.arc.snapshot(record.input.tournamentId);
     this.applyArcTerminal(record, arc);
     const registered = record.entrants ?? await this.arc.registeredEntrants(record.input.tournamentId, this.service.listTournamentOperatorEntrants(this.operatorAddress, record.input.tournamentId as `sha256:${string}`));
@@ -218,7 +224,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
 
   private publishOpeningMatches(record: OperationRecord): void {
     if (!record.seedDigest || !record.entrants) return;
-    const bracket = buildBracket({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest, entrants: record.entrants.map((item) => item.entrantId), bracketRevision: 1 });
+    const bracket = buildBracket({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest, entrants: record.entrants.map((item) => item.entrantId), bracketRevision: record.bracketRevision ?? 1 });
     const byEntrant = new Map(record.entrants.map((item) => [item.entrantId, item]));
     for (const match of bracket.matches) {
       if (match.slotA.kind !== 'entrant' || match.slotB.kind !== 'entrant' || this.service.getMatch(match.matchId)) continue;
@@ -231,7 +237,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
 
   private publishMatchProgress(record: OperationRecord, result: OrchestratorResult): void {
     if (!record.seedDigest || !record.entrants || !('results' in result)) return;
-    const bracket = buildBracket({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest, entrants: record.entrants.map((item) => item.entrantId), bracketRevision: 1 });
+    const bracket = buildBracket({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest, entrants: record.entrants.map((item) => item.entrantId), bracketRevision: record.bracketRevision ?? 1 });
     const matches = new Map(bracket.matches.map((match) => [match.matchId, match]));
     const entrants = new Map(record.entrants.map((entrant) => [entrant.entrantId, entrant]));
     const resolve = (slot: SlotRef): Entrant | null => {
@@ -264,13 +270,29 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     else if (arc.state === 'RUNNING' && !record.ranking && !['WAITING_FOR_JUDGE', 'RECOVERY_REQUIRED'].includes(record.state)) record.state = 'RUNNING';
   }
 
+  private migrateRollingByeBracket(record: OperationRecord): void {
+    if (!this.rollingByeMigrations.has(record.input.tournamentId) || (record.bracketRevision ?? 1) >= 2 || ['COMPLETED', 'REFUNDED'].includes(record.state)) return;
+    const archivedAt = this.now();
+    const archiveId = `bracket-revision-${record.bracketRevision ?? 1}`;
+    const matchArchive = this.service.archiveTournamentMatches(this.operatorAddress, record.input.tournamentId, archiveId, archivedAt);
+    this.runtime.putIfAbsent('tournament-operation-archives', `${record.input.tournamentId}:${archiveId}`, {
+      schema: 'arena-tournament-operation-archive-v1', tournamentId: record.input.tournamentId, archiveId, archivedAt,
+      operation: { state: record.state, finalizedMatchCount: record.finalizedMatchCount, message: record.message, seedDigest: record.seedDigest, bracketSeed: record.bracketSeed, transactionHash: record.transactionHash },
+      publicMatchCount: matchArchive.matches.length,
+    });
+    record.bracketRevision = 2;
+    record.state = 'RUNNING'; record.finalizedMatchCount = 0; record.ranking = undefined;
+    record.message = 'Bracket revision 2 restarted with one deterministic bye in each odd round. Revision 1 is archived.';
+    this.runtime.put('tournament-operations', record.input.tournamentId, record);
+  }
+
   private publish(record: OperationRecord, arc: ArcSnapshot, entrants: readonly string[]): void {
     const status = record.state === 'COMPLETED' ? 'COMPLETED' : record.state === 'REFUNDED' ? 'CANCELLED' : ['RUNNING', 'WAITING_FOR_JUDGE', 'SETTLEMENT_PENDING', 'RECOVERY_REQUIRED', 'REFUND_PENDING'].includes(record.state) ? 'ACTIVE' : 'UPCOMING';
-    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt, ...(record.bracketSeed ? { bracketSeed: record.bracketSeed } : {}), ...(['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(record.state) ? { operationState: record.state as 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' } : {}) });
+    this.service.publishTournament(this.operatorAddress, { id: record.input.tournamentId, name: record.input.name, status, entrantIds: [...entrants], stakeAmount: record.input.stakeAmount, prizePool: formatUnits(BigInt(record.input.stakeAmount) * BigInt(arc.entrantCount), 6), registrationClosesAt: record.input.registrationClosesAt, bracketRevision: record.bracketRevision ?? 1, ...(record.bracketSeed ? { bracketSeed: record.bracketSeed } : {}), ...(['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(record.state) ? { operationState: record.state as 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' } : {}) });
   }
 
   private toSnapshot(record: OperationRecord, arc: ArcSnapshot, entrants: readonly unknown[]): TournamentOperationSnapshot {
-    return { tournamentId: record.input.tournamentId, name: record.input.name, state: record.state, entrantCount: arc.entrantCount || entrants.length, matchCount: bracketMatchCount(Math.max(arc.entrantCount, entrants.length)), finalizedMatchCount: record.finalizedMatchCount, nextActions: nextActions(record.state), arc: { state: arc.state, ...(arc.transactionHash || record.transactionHash ? { transactionHash: arc.transactionHash || record.transactionHash } : {}), totalLiability: arc.totalLiability }, genLayer: { pendingCount: record.state === 'WAITING_FOR_JUDGE' ? 1 : 0, finalizedCount: record.finalizedMatchCount }, ...(record.message ? { message: record.message } : {}) };
+    return { tournamentId: record.input.tournamentId, name: record.input.name, state: record.state, entrantCount: arc.entrantCount || entrants.length, matchCount: bracketMatchCount(Math.max(arc.entrantCount, entrants.length), record.bracketRevision ?? 1), finalizedMatchCount: record.finalizedMatchCount, nextActions: nextActions(record.state), arc: { state: arc.state, ...(arc.transactionHash || record.transactionHash ? { transactionHash: arc.transactionHash || record.transactionHash } : {}), totalLiability: arc.totalLiability }, genLayer: { pendingCount: record.state === 'WAITING_FOR_JUDGE' ? 1 : 0, finalizedCount: record.finalizedMatchCount }, ...(record.message ? { message: record.message } : {}) };
   }
 }
 
@@ -336,7 +358,7 @@ export function tournamentOperationsFromEnvironment(environment: NodeJS.ProcessE
 }
 
 function nextActions(state: TournamentOperationState): readonly TournamentOperationAction[] { if (state === 'SETTLEMENT_PENDING') return ['SETTLE', 'EXPIRE']; if (state === 'REFUND_PENDING') return ['REFUND']; if (state === 'COMPLETED' || state === 'REFUNDED') return []; return ['PROGRESS', 'EXPIRE']; }
-function bracketMatchCount(entrantCount: number): number { if (entrantCount < 2) return 0; try { return buildBracket({ tournamentId: digest('count-tournament'), seedDigest: digest('count-seed'), entrants: Array.from({ length: entrantCount }, (_, index) => digest(`entrant-${index}`)), bracketRevision: 1 }).matches.length; } catch { return 0; } }
+function bracketMatchCount(entrantCount: number, bracketRevision: number): number { if (entrantCount < 2) return 0; try { return buildBracket({ tournamentId: digest('count-tournament'), seedDigest: digest('count-seed'), entrants: Array.from({ length: entrantCount }, (_, index) => digest(`entrant-${index}`)), bracketRevision }).matches.length; } catch { return 0; } }
 function digest(value: string): `sha256:${string}` { return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`; }
 function toBytes32(value: string): Hex { if (!/^sha256:[0-9a-f]{64}$/.test(value)) throw new Error('invalid Tournament digest'); return `0x${value.slice(7)}`; }
 function fromBytes32(value: string): `sha256:${string}` { if (!/^0x[0-9a-fA-F]{64}$/.test(value)) throw new Error('invalid Tournament bytes32'); return `sha256:${value.slice(2).toLowerCase()}`; }

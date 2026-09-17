@@ -26,10 +26,11 @@ export type AgentDetail = PublicAgent & {
   evaluations: PublicEvaluationCampaign[];
 };
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed; operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' };
+export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed; bracketRevision?: number; operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
 export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number; stage?: 'preliminary' | 'main' | 'third_place' | 'fifth_place' };
 export type PublicMatchEvent = { state: PublicMatchState; at?: number };
+export type TournamentMatchArchive = { schema: 'arena-tournament-match-archive-v1'; tournamentId: string; archiveId: string; archivedAt: number; matches: Array<PublicMatch & { events: PublicMatchEvent[]; verdict?: PublicVerdict }> };
 export type PublicVerdictCriterion = { id: string; label: string; winner: "A" | "B" | "TIE"; reason: string };
 export type PublicVerdict = {
   id: string; matchId: string; winner: "A" | "B" | "TIE"; reasons: readonly string[]; summary: string; transactionHash?: string;
@@ -233,6 +234,7 @@ export class ArenaApiService {
       || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(tournament.prizePool)
       || (tournament.stakeAmount !== undefined && !/^[1-9][0-9]*$/.test(tournament.stakeAmount))
       || (tournament.registrationClosesAt !== undefined && (!Number.isSafeInteger(tournament.registrationClosesAt) || tournament.registrationClosesAt < 1))
+      || (tournament.bracketRevision !== undefined && (!Number.isSafeInteger(tournament.bracketRevision) || tournament.bracketRevision < 1 || tournament.bracketRevision > 2))
       || (tournament.operationState !== undefined && !['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(tournament.operationState))
       || (tournament.bracketSeed !== undefined && (tournament.bracketSeed.schema !== "arena-bracket-seed-v2" || !isDigest(tournament.bracketSeed.seedDigest) || !isDigest(tournament.bracketSeed.rosterDigest) || !/^0x[0-9a-f]{64}$/.test(tournament.bracketSeed.entropyBlockHash) || !/^(0|[1-9][0-9]*)$/.test(tournament.bracketSeed.entropyBlockNumber)))) throw new Error("invalid tournament");
     if (tournament.bracketSeed) {
@@ -260,14 +262,22 @@ export class ArenaApiService {
       throw new Error("invalid public match");
     }
     const existing = this.matches.get(match.id);
+    const stored = structuredClone({ ...match, ...(match.stage ?? existing?.stage ? { stage: match.stage ?? existing?.stage } : {}) });
     if (existing) {
-      if (isDeepStrictEqual(existing, match)) return;
+      if (isDeepStrictEqual(existing, stored)) return;
+      if (TERMINAL_PUBLIC_MATCH_STATES.has(existing.state) && existing.stage === undefined && stored.stage !== undefined) {
+        const { stage: _stage, ...withoutStage } = stored;
+        if (isDeepStrictEqual(existing, withoutStage)) {
+          this.matches.set(match.id, stored);
+          this.runtime?.put("api-matches", match.id, stored);
+          return;
+        }
+      }
       if (TERMINAL_PUBLIC_MATCH_STATES.has(existing.state)) throw new Error("conflicting public match");
       if (existing.tournamentId !== match.tournamentId || existing.agentA !== match.agentA || existing.agentB !== match.agentB || existing.agentIdA !== match.agentIdA || existing.agentIdB !== match.agentIdB || existing.round !== match.round || (existing.stage && match.stage && existing.stage !== match.stage)) {
         throw new Error("conflicting public match identity");
       }
     }
-    const stored = structuredClone({ ...match, ...(match.stage ?? existing?.stage ? { stage: match.stage ?? existing?.stage } : {}) });
     this.matches.set(match.id, stored);
     this.runtime?.put("api-matches", match.id, stored);
     if (!existing || existing.state !== match.state) {
@@ -281,6 +291,27 @@ export class ArenaApiService {
     return [...this.matches.values()].filter((match) => match.tournamentId === tournamentId).map((match) => structuredClone(match));
   }
   getMatch(id: string): (PublicMatch & { events: PublicMatchEvent[] }) | null { const match = this.matches.get(id); return match ? { ...structuredClone(match), events: structuredClone(this.matchEvents.get(id) ?? [{ state: match.state }]) } : null; }
+  archiveTournamentMatches(caller: string, tournamentId: string, archiveId: string, archivedAt = this.nowSeconds()): TournamentMatchArchive {
+    this.requireOperator(caller);
+    if (!this.tournaments.has(tournamentId) || !archiveId || !Number.isSafeInteger(archivedAt) || archivedAt < 1) throw new Error('Tournament match archive is invalid');
+    const matches = this.listMatches(tournamentId).map((match) => ({
+      ...match,
+      events: structuredClone(this.matchEvents.get(match.id) ?? [{ state: match.state }]),
+      ...(this.verdicts.get(match.id) ? { verdict: structuredClone(this.verdicts.get(match.id)!) } : {}),
+    }));
+    const archive: TournamentMatchArchive = { schema: 'arena-tournament-match-archive-v1', tournamentId, archiveId, archivedAt, matches };
+    const key = `${tournamentId}:${archiveId}`;
+    const prior = this.runtime?.get<TournamentMatchArchive>('api-tournament-match-archives', key);
+    if (prior && !isDeepStrictEqual(prior, archive)) throw new Error('conflicting Tournament match archive');
+    this.runtime?.putIfAbsent('api-tournament-match-archives', key, archive);
+    for (const match of matches) {
+      this.matches.delete(match.id); this.matchEvents.delete(match.id); this.verdicts.delete(match.id);
+      this.runtime?.delete('api-matches', match.id);
+      this.runtime?.delete('api-match-events', match.id);
+      this.runtime?.delete('api-verdicts', match.id);
+    }
+    return structuredClone(prior ?? archive);
+  }
   publishVerdict(caller: string, verdict: PublicVerdict): void {
     this.requireOperator(caller);
     const unsafe = verdict as PublicVerdict & { agentsMd?: unknown; outputA?: unknown; outputB?: unknown };

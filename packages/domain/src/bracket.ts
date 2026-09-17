@@ -17,6 +17,7 @@ export type BracketBlueprint = {
   byeCount: number;
   matches: MatchBlueprint[];
   rankSources: SlotRef[];
+  byes?: Array<{ roundNumber: number; slot: SlotRef }>;
 };
 export type BracketInput = {
   tournamentId: Digest;
@@ -71,6 +72,7 @@ export function buildBracket(input: BracketInput): BracketBlueprint {
   if (n < 8 || n > 32) invalid("entrant count must be within 8..32");
   if (input.entrants.some((id) => !isDigest(id))) invalid("entrant digest is malformed");
   if (new Set(input.entrants).size !== n) invalid("duplicate entrant");
+  if (input.bracketRevision >= 2) return buildRollingByeBracket(input);
   const ordered = stableOrder(input.seedDigest, input.entrants);
   const power = 2 ** Math.floor(Math.log2(n));
   const preliminaryMatchCount = n - power;
@@ -119,5 +121,53 @@ export function buildBracket(input: BracketInput): BracketBlueprint {
     byeCount,
     matches,
     rankSources: [slot("winner", final.matchId), slot("loser", final.matchId), slot("winner", third.matchId), slot("loser", third.matchId), slot("winner", fifthFinal.matchId)],
+  };
+}
+
+function stableSlotOrder(seedDigest: Digest, label: string, sources: readonly SlotRef[]): SlotRef[] {
+  return [...sources].sort((a, b) => {
+    const left = createHash("sha256").update(Buffer.concat([Buffer.from(label), Buffer.from(seedDigest), Buffer.from(slotText(a))])).digest("hex");
+    const right = createHash("sha256").update(Buffer.concat([Buffer.from(label), Buffer.from(seedDigest), Buffer.from(slotText(b))])).digest("hex");
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}
+
+function buildRollingByeBracket(input: BracketInput): BracketBlueprint {
+  const matches: MatchBlueprint[] = [];
+  const mainRounds: MatchBlueprint[][] = [];
+  const byes: Array<{ roundNumber: number; slot: SlotRef }> = [];
+  let sources = stableOrder(input.seedDigest, input.entrants).map((id) => slot("entrant", id));
+  let roundNumber = 1;
+  while (sources.length > 1) {
+    const ordered = stableSlotOrder(input.seedDigest, `rolling-bye-round-${roundNumber}-v1`, sources);
+    const bye = ordered.length % 2 === 1 ? ordered.shift()! : undefined;
+    if (bye) byes.push({ roundNumber, slot: bye });
+    const round: MatchBlueprint[] = [];
+    for (let index = 0; index < ordered.length; index += 2) {
+      const match = makeMatch(input, "main", roundNumber, index / 2, ordered[index], ordered[index + 1]);
+      round.push(match); matches.push(match);
+    }
+    mainRounds.push(round);
+    sources = [...(bye ? [bye] : []), ...round.map((match) => slot("winner", match.matchId))];
+    roundNumber += 1;
+  }
+  const final = mainRounds.at(-1)?.[0];
+  if (!final || mainRounds.at(-1)?.length !== 1) invalid("rolling bracket did not produce a final");
+  const placementCandidates = mainRounds.slice(0, -1).reverse()
+    .flatMap((round, reverseRoundIndex) => stableSlotOrder(input.seedDigest, `rolling-placement-${reverseRoundIndex}-v1`, round.map((match) => slot("loser", match.matchId))))
+    .slice(0, 3);
+  if (placementCandidates.length !== 3) invalid("rolling bracket cannot produce top-five placement paths");
+  const fifth = makeMatch(input, "fifth_place", 1, 0, placementCandidates[1], placementCandidates[2]);
+  const third = makeMatch(input, "third_place", 1, 0, placementCandidates[0], slot("winner", fifth.matchId));
+  const detachedFinal = matches.pop();
+  if (detachedFinal?.matchId !== final.matchId) invalid("rolling final ordering is invalid");
+  matches.push(fifth, third, final);
+  return {
+    entrantCount: input.entrants.length,
+    preliminaryMatchCount: 0,
+    byeCount: byes.length,
+    byes,
+    matches,
+    rankSources: [slot("winner", final.matchId), slot("loser", final.matchId), slot("winner", third.matchId), slot("loser", third.matchId), slot("loser", fifth.matchId)],
   };
 }

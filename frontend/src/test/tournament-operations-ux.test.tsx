@@ -50,22 +50,23 @@ describe('Tournament operator console', () => {
   it('shows each round of a nine entrant bracket and marks the signed-in owner without entrant suffixes', async () => {
     const id = `sha256:${'e'.repeat(64)}`;
     const ownedId = `sha256:${'a'.repeat(64)}`;
-    const reads = { async getTournament() { return { id, name: 'Nine Agent Cup', status: 'ACTIVE', entrantIds: Array.from({ length: 9 }, (_, index) => `entrant-${index}`), prizePool: '9' }; }, async getMatches() { return [
-      { id: 'opening', tournamentId: id, agentA: 'My Agent · abcdef123456', agentB: 'Other Agent · 123456abcdef', agentIdA: ownedId, round: 0, state: 'SCHEDULED' },
-      { id: 'quarter', tournamentId: id, agentA: 'Third Agent', agentB: 'Fourth Agent', round: 1, state: 'SCHEDULED' },
+    const reads = { async getTournament() { return { id, name: 'Nine Agent Cup', status: 'ACTIVE', entrantIds: Array.from({ length: 9 }, (_, index) => `entrant-${index}`), prizePool: '9', bracketRevision: 2 }; }, async getMatches() { return [
+      { id: 'opening', tournamentId: id, agentA: 'My Agent · abcdef123456', agentB: 'Other Agent · 123456abcdef', agentIdA: ownedId, round: 1, state: 'SCHEDULED' },
+      { id: 'second', tournamentId: id, agentA: 'Third Agent', agentB: 'Fourth Agent', round: 2, state: 'SCHEDULED' },
     ]; } } as unknown as ArenaReadAdapter;
     const agentApi = { async listOwnedRegistrations() { return [{ tournamentId: id, entrantId: 'entrant-0', agentId: ownedId }]; }, async listOwnedAgents() { return []; } } as unknown as AgentApiAdapter;
     render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider identityAdapter={identity} arenaReadAdapter={reads} agentApiAdapter={agentApi}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
-    expect(await screen.findByRole('tab', { name: /Preliminary/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Quarterfinals/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Semifinals/ })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: /Round 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Round 2/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Round 3/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Final/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Third place/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Fifth place/ })).toBeInTheDocument();
     expect(await screen.findByText('My Agent')).toBeInTheDocument();
     expect(screen.queryByText(/abcdef123456/)).not.toBeInTheDocument();
     expect(await screen.findByText('(YOU)')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: /Quarterfinals/ }));
+    expect(screen.queryByRole('tab', { name: /Preliminary/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /Round 2/ }));
     expect(screen.getByText('Third Agent')).toBeInTheDocument();
     expect(screen.queryByText('My Agent')).not.toBeInTheDocument();
   });

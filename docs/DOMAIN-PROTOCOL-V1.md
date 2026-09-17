@@ -85,6 +85,23 @@ or bracket revision produces different match IDs. Progression and ancestry
 validation are a separate domain operation; a tie or retry never advances a
 slot.
 
+## Bracket formation v2 — rolling single bye
+
+Revision 2 removes the preliminary bracket. At the start of every competitive
+round, the currently available entrant/winner slots are ordered by
+`sha256(UTF8("rolling-bye-round-<round>-v1") || UTF8(seedDigest) ||
+UTF8(slotRef))`. When the count is odd, the first ordered slot receives the
+round's only bye. Every other slot is paired adjacently. Winners plus the bye
+slot form the next round, so nine entrants progress as `9 → 5 → 3 → 2 → 1`
+with exactly one bye in each of the first three rounds.
+
+After the main finalist pair is known, the three strongest non-finalists by
+elimination depth enter a two-match placement path. Its first match determines
+fifth place; its winner meets the highest placement candidate to determine
+third and fourth. The championship final remains last. The resulting rank
+sources are champion, runner-up, third, fourth, and fifth. Revision 1 remains
+readable for archived Tournaments; new operation records freeze revision 2.
+
 ## Progression boundary
 
 `advanceBracket` accepts only the persisted blueprint and a map of finalized
