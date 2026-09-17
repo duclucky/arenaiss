@@ -182,10 +182,9 @@ evaluation or evidence-authenticity phase gate.
 
 ## VPS deployment slice — 2026-09-14
 
-- Rootless Docker API/web deployment is live under the dedicated unprivileged
-  `arenaiss` account on the owner-managed Ubuntu host at the stable LAN endpoint
-  `http://192.168.1.24:8080`. The previous `ducky` Docker daemon has no Arena
-  containers; its two unrelated bot processes remain running.
+- Rootless Docker API/web deployment is live under a dedicated unprivileged
+  service account on the owner-managed Ubuntu host. Unrelated host workloads
+  remain isolated from the Arena Compose stack.
 - Caddy serves the built SPA, applies security headers, and proxies `/api` and
   `/healthz` same-origin to the internal-only API container.
 - Production API state was seeded idempotently from the sanitized live evidence:
@@ -197,7 +196,7 @@ evaluation or evidence-authenticity phase gate.
   rotation, graceful SIGTERM close, verified SQLite backup/restore, container
   restart policy, rootless Docker boot enablement and a daily backup timer are
   active.
-- Named Cloudflare Tunnel `arenaiss-vps` is connected with four QUIC connections
+- The named Cloudflare Tunnel is connected with four QUIC connections
   and routes `arenaiss.xyz` plus `www.arenaiss.xyz` to the web service without a
   stable public IP. The `.xyz` registry delegates to the assigned Cloudflare
   nameservers, Cloudflare and Google DNS-over-HTTPS return both proxy addresses,

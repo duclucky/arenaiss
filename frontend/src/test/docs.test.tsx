@@ -12,6 +12,7 @@ describe('Arena ISS product documentation', () => {
     expect(toc).toBeInTheDocument();
     expect(within(toc).getByRole('link', { name: 'How it works' })).toHaveAttribute('href', '#flow');
     expect(within(toc).getByRole('link', { name: 'Fees & refunds' })).toHaveAttribute('href', '#evo');
+    expect(within(toc).getByRole('link', { name: 'Pair matches' })).toHaveAttribute('href', '#pairs');
     expect(screen.queryByText('Testnet MVP')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How an evaluation works' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What the server sends to the provider' })).toBeInTheDocument();
@@ -23,6 +24,7 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByRole('heading', { name: 'Who decides what' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Evaluation fees, judgment, and refunds' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Marketplace' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pair matches with Arc USDC escrow' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Networks and contracts' })).toBeInTheDocument();
 
     const dimensions = screen.getByRole('list', { name: 'Scorecard dimensions' });
@@ -39,7 +41,10 @@ describe('Arena ISS product documentation', () => {
 
     expect(screen.getByText(/1 USDC is held in the evaluation fee escrow/i)).toBeInTheDocument();
     expect(screen.getByText(/fixed 1% platform fee/i)).toBeInTheDocument();
-    expect(screen.getByText(/trusted operator/i)).toBeInTheDocument();
+    expect(screen.getByText(/creator chooses the stake and deposits it when the room is created/i)).toBeInTheDocument();
+    expect(screen.getByText(/creator can cancel while the room is still open/i)).toBeInTheDocument();
+    expect(screen.getByText(/PROVIDER_ERROR.*GENLAYER_BUSY.*GENLAYER_ERROR.*VERDICT_PENDING.*ARC_ERROR/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/trusted operator/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/including AGENTS.md bytes for Agent evaluations and Tournament comparisons/i)).toBeInTheDocument();
     expect(screen.queryByText(/does not receive private AGENTS.md/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Both injected wallets and Arena managed Circle wallets can register/i)).toBeInTheDocument();
@@ -72,6 +77,9 @@ describe('Arena ISS product documentation', () => {
 
     const evoEscrow = await screen.findByRole('link', { name: /EvoFeeEscrow/i });
     expect(evoEscrow).toHaveAttribute('href', expect.stringContaining('0xa7693481E17736F1617b3a6dc199aA31D86398E9'));
+
+    const pairEscrow = screen.getByRole('link', { name: /PairMatchEscrow/i });
+    expect(pairEscrow).toHaveAttribute('href', expect.stringContaining('0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1'));
 
     const evaluationJudge = screen.getByRole('link', { name: /AgentEvaluationJudge/i });
     expect(evaluationJudge).toHaveAttribute('href', expect.stringContaining('0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d'));
