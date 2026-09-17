@@ -58,7 +58,8 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
 
   const refresh = useCallback(async () => {
     try {
-      const next = await request<Room[]>('/api/pair-rooms');
+      if (view !== 'open' && !managedAccount) { setRooms([]); setRoomsError(''); return; }
+      const next = await request<Room[]>(view === 'open' ? '/api/pair-rooms' : '/api/pair-rooms/mine');
       setRooms(next);
       setRoomsError('');
       const address = managedAccount?.managedWallet.address.toLowerCase();
@@ -74,7 +75,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
       setRoomsError(cause instanceof Error ? cause.message : 'Could not load rooms.');
       throw cause;
     } finally { setRoomsLoaded(true); }
-  }, [managedAccount?.managedWallet.address, request]);
+  }, [managedAccount, request, view]);
   useEffect(() => {
     request<{ enabled: boolean }>('/api/pair-rooms/config').then((config) => setEnabled(config.enabled)).catch(() => undefined);
     refresh().catch(() => undefined);
@@ -105,7 +106,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   const viewCopy = view === 'open'
     ? { title: 'Open rooms', empty: 'No open rooms.' }
     : view === 'mine' ? { title: 'My rooms', empty: managedAccount ? 'You have not joined a room yet.' : 'Log in to see rooms you created or joined.' }
-      : { title: 'Completed', empty: 'No completed rooms yet.' };
+      : { title: 'Completed', empty: managedAccount ? 'No completed rooms yet.' : 'Log in to see rooms you created or joined.' };
 
   return <section className="mx-auto max-w-5xl space-y-8">
     <header><p className="page-kicker">Independent competition</p><h1 className="page-title">Pair matches</h1><p className="page-lede">Create a room with a USDC stake on Arc Testnet. A challenger deposits the same amount. The winner can claim both stakes after a finalized comparison; refunds remain claimable if the room is canceled or expires.</p></header>

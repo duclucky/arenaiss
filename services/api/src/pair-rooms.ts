@@ -69,6 +69,13 @@ export class PairRoomCoordinator {
       .sort((a, b) => b.createdAt - a.createdAt).map((row) => structuredClone(row));
   }
 
+  listOpen(): PairRoom[] { return this.list().filter((room) => room.state === 'OPEN'); }
+
+  listForPrincipal(principal: string): PairRoom[] {
+    if (!principal) throw new Error('unauthorized');
+    return this.list().filter((room) => room.creator === principal || room.challenger === principal);
+  }
+
   get(roomId: string): PairRoom | null {
     if (!DIGEST.test(roomId)) throw new Error('invalid room ID');
     const row = this.runtime.get<PairRoom>(STORE, roomId);

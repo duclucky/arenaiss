@@ -136,3 +136,17 @@ test('backend durably links both Arc deposit transactions to one room across a f
     assert.equal(f.joins, 1);
   } finally { f.runtime.close(); }
 });
+
+test('public listing exposes only joinable rooms while private listing is participant-scoped', async () => {
+  const f = fixture();
+  try {
+    const created = await f.coordinator.create('creator', 'creator-principal', { agentId: AGENT, version: VERSION_A, stake: '1000000', idempotencyKey: '66666666-6666-4666-8666-666666666666' });
+    assert.deepEqual(f.coordinator.listOpen().map((item) => item.roomId), [created.roomId]);
+    assert.deepEqual(f.coordinator.listForPrincipal('creator-principal').map((item) => item.roomId), [created.roomId]);
+    assert.deepEqual(f.coordinator.listForPrincipal('stranger'), []);
+    await assert.rejects(f.coordinator.join('challenger', 'challenger-principal', created.roomId, AGENT, VERSION_B), /temporary Arc read failure/);
+    await f.coordinator.join('challenger', 'challenger-principal', created.roomId, AGENT, VERSION_B);
+    assert.deepEqual(f.coordinator.listOpen(), []);
+    assert.deepEqual(f.coordinator.listForPrincipal('challenger-principal').map((item) => item.roomId), [created.roomId]);
+  } finally { f.runtime.close(); }
+});

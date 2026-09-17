@@ -23,11 +23,11 @@ export class PairSettlementWorker {
     const rows = this.runtime.list<PairRoom>('pair-rooms-v1');
     await Promise.all(rows.filter((item) => item.state === 'OPEN' || item.state === 'JOINING' || item.state === 'JOINED').map(async (room) => {
       const owner = randomUUID();
-      if (this.runtime.claimLease('pair-room-worker-leases', room.roomId, room.roomId, owner, Date.now(), 10 * 60_000) === 'BUSY') return;
+      if (this.runtime.claimLease('pair-room-worker-leases-v2', room.roomId, room.roomId, owner, Date.now(), 6 * 60_000) === 'BUSY') return;
       try { await this.progress(room); }
       catch (error) {
         this.defer(room.roomId, error instanceof Error ? error.message : 'unknown error');
-      } finally { this.runtime.releaseLease('pair-room-worker-leases', room.roomId, owner); }
+      } finally { this.runtime.releaseLease('pair-room-worker-leases-v2', room.roomId, owner); }
     }));
   }
 
