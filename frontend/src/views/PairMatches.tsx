@@ -71,6 +71,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   const [credits, setCredits] = useState<Record<string, string>>({});
   const [expandedVerdict, setExpandedVerdict] = useState('');
   const [verdictDetails, setVerdictDetails] = useState<Record<string, VerdictDetail>>({});
+  const verdictDetailsRef = useRef<Record<string, VerdictDetail>>({});
   const [verdictLoading, setVerdictLoading] = useState('');
   const [verdictErrors, setVerdictErrors] = useState<Record<string, string>>({});
   const createKey = useRef(crypto.randomUUID());
@@ -90,13 +91,29 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
       setRoomsError('');
       const address = managedAccount?.managedWallet.address.toLowerCase();
       if (!address) { setCredits({}); return; }
-      const balances = await Promise.all(next.filter((room) => (room.state === 'REFUNDABLE' || room.state === 'SETTLED')
-        && (room.creatorWallet.toLowerCase() === address || room.challengerWallet?.toLowerCase() === address))
-        .map(async (room) => {
-          try { return [room.roomId, (await request<{ amount: string }>(`/api/pair-rooms/${room.roomId}/credit`)).amount] as const; }
-          catch { return [room.roomId, '0'] as const; }
-        }));
+      const [balances, loadedVerdicts] = await Promise.all([
+        Promise.all(next.filter((room) => (room.state === 'REFUNDABLE' || room.state === 'SETTLED')
+          && (room.creatorWallet.toLowerCase() === address || room.challengerWallet?.toLowerCase() === address))
+          .map(async (room) => {
+            try { return [room.roomId, (await request<{ amount: string }>(`/api/pair-rooms/${room.roomId}/credit`)).amount] as const; }
+            catch { return [room.roomId, '0'] as const; }
+          })),
+        view === 'completed' ? Promise.all(next.filter((room) => room.state === 'SETTLED' && room.verdictTx && !verdictDetailsRef.current[room.roomId])
+          .map(async (room) => {
+            try {
+              const detail = await request<VerdictDetail>(`/api/pair-rooms/${room.roomId}/verdict`);
+              return detail?.roomId === room.roomId && (detail.winner === 'CREATOR' || detail.winner === 'CHALLENGER')
+                ? [room.roomId, detail] as const : null;
+            } catch { return null; }
+          })) : Promise.resolve([]),
+      ]);
       setCredits(Object.fromEntries(balances));
+      const verdictEntries = loadedVerdicts.filter((entry): entry is readonly [string, VerdictDetail] => entry !== null);
+      if (verdictEntries.length > 0) {
+        const loaded = Object.fromEntries(verdictEntries);
+        verdictDetailsRef.current = { ...verdictDetailsRef.current, ...loaded };
+        setVerdictDetails((current) => ({ ...current, ...loaded }));
+      }
     } catch (cause) {
       setRoomsError(cause instanceof Error ? cause.message : 'Could not load rooms.');
       throw cause;
@@ -123,10 +140,11 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   async function toggleVerdict(roomId: string) {
     if (expandedVerdict === roomId) { setExpandedVerdict(''); return; }
     setExpandedVerdict(roomId);
-    if (verdictDetails[roomId]) return;
+    if (verdictDetailsRef.current[roomId]) return;
     setVerdictLoading(roomId); setVerdictErrors((current) => ({ ...current, [roomId]: '' }));
     try {
       const detail = await request<VerdictDetail>(`/api/pair-rooms/${roomId}/verdict`);
+      verdictDetailsRef.current = { ...verdictDetailsRef.current, [roomId]: detail };
       setVerdictDetails((current) => ({ ...current, [roomId]: detail }));
     } catch (cause) {
       setVerdictErrors((current) => ({ ...current, [roomId]: cause instanceof Error ? cause.message : 'Could not load the GenLayer judgment.' }));
@@ -139,6 +157,12 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
       || room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase()));
   const myCreatedRoom = (room: Room) => Boolean(managedAccount && room.creatorWallet.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
   const myJoinedRoom = (room: Room) => Boolean(managedAccount && room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
+  const settledOutcome = (room: Room): 'YOU WON' | 'YOU LOST' | null => {
+    const detail = verdictDetails[room.roomId];
+    if (room.state !== 'SETTLED' || !detail || !managedAccount) return null;
+    const mySide = myCreatedRoom(room) ? 'CREATOR' : myJoinedRoom(room) ? 'CHALLENGER' : null;
+    return mySide ? (detail.winner === mySide ? 'YOU WON' : 'YOU LOST') : null;
+  };
   const visibleRooms = rooms.filter((room) => view === 'open' ? room.state === 'OPEN'
     : view === 'mine' ? myRoom(room) && !['SETTLED', 'REFUNDABLE'].includes(room.state)
       : myRoom(room) && (room.state === 'SETTLED' || room.state === 'REFUNDABLE'));
@@ -169,8 +193,8 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
     <section aria-labelledby="pair-rooms-heading"><h2 id="pair-rooms-heading" className="mb-4 text-2xl font-semibold">{viewCopy.title}</h2>
       {roomsError ? <div className="glass-panel p-6" role="alert"><p>{roomsError}</p><button type="button" className="metal-button-ghost mt-4" onClick={() => void refresh().catch(() => undefined)}>Retry rooms</button></div>
         : !roomsLoaded ? <p className="glass-panel p-6" role="status">Loading rooms…</p>
-        : visibleRooms.length === 0 ? <p className="glass-panel p-6">{viewCopy.empty}</p> : <ul className="space-y-3">{visibleRooms.map((room) => <li className="glass-panel space-y-3 p-5" key={room.roomId}>
-        <div className="flex flex-wrap items-center justify-between gap-3"><strong>{units(room.stake)} USDC each</strong><span className="retro-chip px-3 py-1 text-xs">{room.state}</span></div>
+        : visibleRooms.length === 0 ? <p className="glass-panel p-6">{viewCopy.empty}</p> : <ul className="space-y-3">{visibleRooms.map((room) => { const outcome = settledOutcome(room); return <li className="glass-panel space-y-3 p-5" key={room.roomId}>
+        <div className="flex flex-wrap items-center justify-between gap-3"><strong>{units(room.stake)} USDC each</strong><div className="flex flex-wrap items-center gap-2">{outcome && <span className={`pair-outcome ${outcome === 'YOU WON' ? 'pair-outcome--won' : 'pair-outcome--lost'}`}>{outcome}</span>}<span className="retro-chip px-3 py-1 text-xs">{room.state}</span></div></div>
         <p className="break-all font-mono text-xs">Room {room.roomId}</p>
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           {room.createTx && <a className="underline" href={`https://testnet.arcscan.app/tx/${room.createTx}`} target="_blank" rel="noreferrer">Creator deposit</a>}
@@ -191,7 +215,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
           {(room.state === 'OPEN' || room.state === 'JOINING' || room.state === 'JOINED') && (myRoom(room) || room.state === 'OPEN') && Date.now() / 1_000 >= (room.state === 'JOINED' ? room.resolutionDeadline : room.joinDeadline) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/EXPIRE`, {}), 'Deadline passed. Refunds are claimable.')}>Open timeout refunds</button>}
           {(room.state === 'REFUNDABLE' || room.state === 'SETTLED') && myRoom(room) && BigInt(credits[room.roomId] || '0') > 0n && <button className="metal-button-solid" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/WITHDRAW`, {}), 'Available USDC credit was transferred to your wallet.')}>Claim {units(credits[room.roomId])} USDC</button>}
         </div>}
-      </li>)}</ul>}
+      </li>; })}</ul>}
     </section>
   </section>;
 }

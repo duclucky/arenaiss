@@ -441,6 +441,10 @@ button:disabled { cursor: not-allowed; }
 .docs-limits li { position: relative; padding: 17px 20px 17px 34px; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.55; }
 .docs-limits li::before { position: absolute; left: 5px; content: '→'; font-family: var(--retro-control-font); }
 
+.pair-outcome { border: 1px solid currentColor; padding: 4px 12px; font-family: var(--retro-control-font); font-size: 12px; font-weight: 700; line-height: 1; }
+.pair-outcome--won { background: #d7f0d2; color: #174915; }
+.pair-outcome--lost { background: #f2d4d0; color: #711e18; }
+
 @media (max-width: 1023px) {
   .site-header { grid-template-columns: 1fr auto; padding: 16px 20px; }
   .site-header .header-actions { grid-column: 2; grid-row: 1; }

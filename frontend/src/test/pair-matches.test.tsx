@@ -139,11 +139,27 @@ it('opens the finalized GenLayer scorecard from a completed room', async () => {
     return [{ roomId, creator: account.principal, creatorWallet: wallet, creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '1000000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000, state: 'SETTLED', verdictTx }];
   } })));
   render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText('YOU WON')).toBeInTheDocument();
   fireEvent.click(await screen.findByRole('button', { name: 'View GenLayer judgment' }));
   expect(await screen.findByRole('region', { name: 'GenLayer judgment details' })).toHaveTextContent('Creator followed the retry safety requirements more completely.');
   expect(screen.getByText('Creator covered every required step.')).toBeInTheDocument();
   expect(screen.getByText('MISSING_CONFIRMATION')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open transaction in GenLayer explorer' })).toHaveAttribute('href', `https://explorer-studio-dev.genlayer.com/transactions/${verdictTx}`);
+});
+
+it('labels a settled loss from the signed-in participant perspective', async () => {
+  const roomId = `sha256:${'4'.repeat(64)}`;
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    if (url.endsWith('/credit')) return { amount: '0' };
+    if (url.endsWith('/verdict')) return { roomId, winner: 'CHALLENGER' };
+    return [{ roomId, creator: account.principal, creatorWallet: wallet, challengerWallet: `0x${'8'.repeat(40)}`,
+      creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '1000000', joinDeadline: 1_999_999_999,
+      resolutionDeadline: 2_000_000_000, state: 'SETTLED', verdictTx: `0x${'3'.repeat(64)}` }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText('YOU LOST')).toBeInTheDocument();
+  expect(screen.queryByText('YOU WON')).not.toBeInTheDocument();
 });
 
 it('explains when the bounded evaluation retries are exhausted', async () => {
