@@ -59,7 +59,12 @@ export function TournamentDetail() {
   const bracketBase = entrantCount ? 2 ** Math.floor(Math.log2(entrantCount)) : 0;
   const preliminaryCount = entrantCount ? entrantCount - bracketBase : 0;
   const byeCount = entrantCount ? 2 * bracketBase - entrantCount : 0;
-  const rounds = bracketBase >= 2
+  const rollingRoundSizes: number[] = [];
+  for (let remaining = entrantCount; remaining > 1; remaining = Math.ceil(remaining / 2)) rollingRoundSizes.push(Math.floor(remaining / 2));
+  const rollingRoundKeys = rollingRoundSizes.map((_, index) => String(index + 1));
+  const rounds = tournament.bracketRevision && tournament.bracketRevision >= 2
+    ? [...rollingRoundKeys.slice(0, -1), 'fifth', 'third', ...rollingRoundKeys.slice(-1)]
+    : bracketBase >= 2
     ? [...(preliminaryCount > 0 ? ['0'] : []), ...Array.from({ length: Math.log2(bracketBase) }, (_, index) => String(index + 1)), 'third', 'fifth']
     : [...new Set(matches.map((match) => String(match.round)))].sort();
   const requestedRound = searchParams.get('round');
@@ -70,6 +75,7 @@ export function TournamentDetail() {
   const roundLabel = (round: string) => {
     if (round === 'third') return 'Third place';
     if (round === 'fifth') return 'Fifth place';
+    if (tournament.bracketRevision && tournament.bracketRevision >= 2) return round === rollingRoundKeys.at(-1) ? 'Final' : `Round ${round}`;
     if (round === '0') return 'Preliminary';
     const matchCount = bracketBase / 2 ** Number(round);
     return matchCount === 1 ? 'Final' : matchCount === 2 ? 'Semifinals' : matchCount === 4 ? 'Quarterfinals' : `Round of ${matchCount * 2}`;
@@ -77,6 +83,9 @@ export function TournamentDetail() {
   const matchesInRound = (round: string) => matches.filter((match) => round === 'third' ? match.stage === 'third_place'
     : round === 'fifth' ? match.stage === 'fifth_place'
     : match.round === Number(round) && match.stage !== 'third_place' && match.stage !== 'fifth_place');
+  const expectedMatches = (round: string) => round === 'third' || round === 'fifth' ? 1
+    : tournament.bracketRevision && tournament.bracketRevision >= 2 ? (rollingRoundSizes[Number(round) - 1] ?? 0)
+    : round === '0' ? preliminaryCount : bracketBase / 2 ** Number(round);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -122,10 +131,12 @@ export function TournamentDetail() {
           Match bracket <Info size={16} className="text-muted-foreground" aria-hidden="true" />
         </h2>
         <p className="mb-4 text-sm leading-relaxed text-neutral-700">This is the knockout match schedule. Arena locks the entrant list and pairs Agents deterministically from a fixed seed; winners advance through later rounds. For new Tournaments, the public pairing proof above identifies the Arc block used for that seed.</p>
-        {tournament.bracketSeed && preliminaryCount > 0 && <p className="mb-4 text-sm text-neutral-700">Opening round: {preliminaryCount} preliminary {preliminaryCount === 1 ? 'match' : 'matches'}; {byeCount} Agents advance past that round by bye. Pairings that depend on an earlier winner appear once that result is final.</p>}
+        {tournament.bracketRevision && tournament.bracketRevision >= 2
+          ? <p className="mb-4 text-sm text-neutral-700">Every round pairs all available Agents. When a round has an odd count, exactly one Agent receives a deterministic bye and advances; the remaining Agents compete in that round.</p>
+          : tournament.bracketSeed && preliminaryCount > 0 && <p className="mb-4 text-sm text-neutral-700">Opening round: {preliminaryCount} preliminary {preliminaryCount === 1 ? 'match' : 'matches'}; {byeCount} Agents advance past that round by bye. Pairings that depend on an earlier winner appear once that result is final.</p>}
         {rounds.length > 0 && <div role="tablist" aria-label="Tournament rounds" className="mb-5 flex flex-wrap gap-2">
           {rounds.map((round) => <button key={round} type="button" role="tab" aria-selected={activeRound === round} aria-controls="round-matches" className={activeRound === round ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ round })}>
-            {roundLabel(round)} <span className="ml-1 text-xs">{matchesInRound(round).filter((match) => match.state === 'FINALIZED').length}/{round === 'third' ? 1 : round === 'fifth' ? 3 : round === '0' ? preliminaryCount : bracketBase / 2 ** Number(round)}</span>
+            {roundLabel(round)} <span className="ml-1 text-xs">{matchesInRound(round).filter((match) => match.state === 'FINALIZED').length}/{expectedMatches(round)}</span>
           </button>)}
         </div>}
         {matches.length === 0 ? (

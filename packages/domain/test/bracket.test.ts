@@ -41,6 +41,34 @@ test("covers each entrant once and creates top-five ancestry paths", () => {
   assert.equal(result.matches.filter((m) => m.stage === "fifth_place").length, 3);
 });
 
+test("revision 2 gives exactly one deterministic bye in every odd round and has no preliminary round", () => {
+  const input = { tournamentId: ("sha256:" + "a".repeat(64)) as `sha256:${string}`, seedDigest: ("sha256:" + "b".repeat(64)) as `sha256:${string}`, entrants: entrants(9) as `sha256:${string}`[], bracketRevision: 2 };
+  const result = buildBracket(input);
+  assert.equal(result.preliminaryMatchCount, 0);
+  assert.deepEqual(result.byes?.map((bye) => bye.roundNumber), [1, 2, 3]);
+  assert.deepEqual(result.matches.filter((match) => match.stage === "main").map((match) => match.roundNumber), [1, 1, 1, 1, 2, 2, 3, 4]);
+  assert.equal(result.matches.filter((match) => match.stage === "third_place").length, 1);
+  assert.equal(result.matches.filter((match) => match.stage === "fifth_place").length, 1);
+  assert.equal(result.rankSources.length, 5);
+  assert.deepEqual(result, buildBracket(input));
+});
+
+test("revision 2 always uses one bye at most per competitive round", () => {
+  for (let count = 8; count <= 32; count += 1) {
+    const result = buildBracket({ tournamentId: ("sha256:" + "a".repeat(64)) as `sha256:${string}`, seedDigest: ("sha256:" + "b".repeat(64)) as `sha256:${string}`, entrants: entrants(count) as `sha256:${string}`[], bracketRevision: 2 });
+    const expectedByeRounds: number[] = [];
+    let remaining = count;
+    let roundNumber = 1;
+    while (remaining > 1) {
+      if (remaining % 2 === 1) expectedByeRounds.push(roundNumber);
+      remaining = Math.ceil(remaining / 2);
+      roundNumber += 1;
+    }
+    assert.deepEqual(result.byes?.map((bye) => bye.roundNumber), expectedByeRounds);
+    assert.equal(result.matches.some((match) => match.stage === "preliminary"), false);
+  }
+});
+
 test("rejects duplicate, missing, out-of-range entrants and changes domain", () => {
   const base = { tournamentId: "sha256:" + "a".repeat(64), seedDigest: "sha256:" + "b".repeat(64), bracketRevision: 1 };
   assert.throws(() => buildBracket({ ...base, entrants: entrants(7) }), /8|entrant/i);

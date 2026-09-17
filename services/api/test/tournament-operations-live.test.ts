@@ -106,7 +106,7 @@ test('Tournament derives a public bracket seed from the locked roster and schedu
   } finally { runtime.close(); }
 });
 
-test('locked nine entrant roster publishes the playable opening match and survives a paused runner', async () => {
+test('locked nine entrant roster publishes four first-round matches and one bye', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const arc = new FakeArc(); arc.entrantCount = 9;
@@ -119,7 +119,7 @@ test('locked nine entrant roster publishes the playable opening match and surviv
     await operations.create(input);
     assert.equal((await operations.execute({ tournamentId, action: 'PROGRESS' })).state, 'RECOVERY_REQUIRED');
     assert.equal(tournaments.at(-1).operationState, 'RECOVERY_REQUIRED');
-    assert.equal([...matches.values()].filter((match) => match.round === 0 && match.state === 'SCHEDULED').length, 1);
+    assert.equal([...matches.values()].filter((match) => match.round === 1 && match.state === 'SCHEDULED').length, 4);
     const first = [...matches.values()][0];
     assert.match(first.agentA, /^Agent /);
     await operations.get(tournamentId);
@@ -127,7 +127,7 @@ test('locked nine entrant roster publishes the playable opening match and surviv
   } finally { runtime.close(); }
 });
 
-test('finalized opening result publishes the winner and newly playable next pairing', async () => {
+test('finalized first round publishes all winners and the newly playable second round', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const arc = new FakeArc(); arc.entrantCount = 9;
@@ -135,17 +135,42 @@ test('finalized opening result publishes the winner and newly playable next pair
     const matches = new Map<string, any>();
     const service = { listTournamentOperatorEntrants: () => roster, publishTournament() {}, publishMatch: (_caller: string, match: any) => matches.set(match.id, match), getMatch: (id: string) => matches.get(id) ?? null, getPublicAgent: (id: string) => ({ name: `Agent ${id.slice(-4)}` }) } as any;
     const orchestrator = { async run(input: any) {
-      const bracket = buildBracket({ tournamentId, seedDigest: input.seedDigest, entrants: input.entrants.map((item: any) => item.entrantId), bracketRevision: 1 });
-      const opening = bracket.matches[0];
-      return { state: 'WAITING_FOR_JUDGE', matchId: bracket.matches[1].matchId, attemptId: tournamentId, results: new Map([[opening.matchId, 'A_WIN']]) };
+      const bracket = buildBracket({ tournamentId, seedDigest: input.seedDigest, entrants: input.entrants.map((item: any) => item.entrantId), bracketRevision: 2 });
+      const firstRound = bracket.matches.filter((match) => match.stage === 'main' && match.roundNumber === 1);
+      const secondRound = bracket.matches.find((match) => match.stage === 'main' && match.roundNumber === 2)!;
+      return { state: 'WAITING_FOR_JUDGE', matchId: secondRound.matchId, attemptId: tournamentId, results: new Map(firstRound.map((match) => [match.matchId, 'A_WIN'])) };
     } } as any;
     const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
     await operations.create({ tournamentId, name: 'Daily', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 32, stakeAmount: '1000000' });
     await operations.execute({ tournamentId, action: 'PROGRESS' });
-    const finalized = [...matches.values()].find((item) => item.round === 0);
-    assert.equal(finalized.state, 'FINALIZED');
-    assert.equal(finalized.winner, finalized.agentA);
-    assert.ok([...matches.values()].some((item) => item.round === 1 && item.state === 'SCHEDULED'));
+    const finalized = [...matches.values()].filter((item) => item.round === 1 && item.state === 'FINALIZED');
+    assert.equal(finalized.length, 4);
+    assert.equal(finalized.every((item) => item.winner === item.agentA), true);
+    assert.ok([...matches.values()].some((item) => item.round === 2 && item.state === 'SCHEDULED'));
+  } finally { runtime.close(); }
+});
+
+test('authorized legacy Tour migration archives revision 1 and restarts the same roster on rolling-bye revision 2', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const arc = new FakeArc(); arc.state = 'RUNNING'; arc.entrantCount = 9;
+    const roster = [...entrants, { ...entrants[0], entrantId: `0x${'9'.padStart(64, '0')}`, agentId: `0x${'19'.padStart(64, '0')}` }];
+    const canonical = roster.map((item) => ({ entrantId: `sha256:${item.entrantId.slice(2)}`, agentId: `sha256:${item.agentId.slice(2)}`, agentsVersion: `sha256:${item.agentsVersion.slice(2)}`, agentsCommitment: `sha256:${item.agentsCommitment.slice(2)}`, agentsMd: item.agentsMd }));
+    runtime.put('tournament-operations', tournamentId, { input: { tournamentId, name: 'Migrated test Tour', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 32, stakeAmount: '1000000' }, state: 'RECOVERY_REQUIRED', topicPoolVersion: 2, topics: ['topic'], seedDigest: sha('legacy-seed'), entrants: canonical, finalizedMatchCount: 2, message: 'Legacy recovery.' });
+    const publishedMatches = new Map<string, any>(); let archiveCalls = 0;
+    const service = {
+      archiveTournamentMatches: (_caller: string, id: string, archiveId: string) => { archiveCalls += 1; assert.equal(id, tournamentId); assert.equal(archiveId, 'bracket-revision-1'); return { matches: [{ id: 'legacy' }] }; },
+      listTournamentOperatorEntrants: () => roster, publishTournament() {}, publishMatch: (_caller: string, match: any) => publishedMatches.set(match.id, match), getMatch: (id: string) => publishedMatches.get(id) ?? null, getPublicAgent: (id: string) => ({ name: id }),
+    } as any;
+    const operations = new LiveTournamentOperations(runtime, service, operator, arc, { async run() { throw new Error('get must not execute'); } } as any, () => 50, ['topic'], new Set([tournamentId]));
+    const snapshot = await operations.get(tournamentId);
+    assert.equal(archiveCalls, 1);
+    assert.equal(snapshot?.state, 'RUNNING');
+    assert.equal(snapshot?.finalizedMatchCount, 0);
+    assert.equal(snapshot?.matchCount, 10);
+    assert.equal(runtime.get<any>('tournament-operations', tournamentId)?.bracketRevision, 2);
+    assert.equal(runtime.get<any>('tournament-operation-archives', `${tournamentId}:bracket-revision-1`)?.publicMatchCount, 1);
+    assert.equal([...publishedMatches.values()].filter((match) => match.round === 1).length, 4);
   } finally { runtime.close(); }
 });
 
