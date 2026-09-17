@@ -50,6 +50,23 @@ test("a primary timeout reruns both Tournament sides on the same fallback model"
   ]);
 });
 
+test("a temporary primary provider failure reruns the full pair on fallback", async () => {
+  const calls: string[] = [];
+  const provider = {
+    getFallbackModel: () => "fallback-model",
+    async generate(value: any) {
+      calls.push(`${value.route}:${value.input.agent.content}`);
+      if (value.route === "PRIMARY" && value.input.agent.content === "Agent B") throw Object.assign(new Error("PROVIDER_ERROR"), { transient: true });
+      return { rawOutput: `${value.route}:${value.input.agent.content}`, output: {}, model: value.route === "FALLBACK" ? "fallback-model" : "primary-model", route: value.route };
+    },
+  };
+  const result = await new TournamentEvaluationPairRunner(provider, { model: "primary-model", maxOutputTokens: 1000, temperature: 0 }).run(context);
+  assert.equal(result.state, "OUTPUTS_READY");
+  assert.equal(result.outputA, "FALLBACK:Agent A");
+  assert.equal(result.outputB, "FALLBACK:Agent B");
+  assert.deepEqual(calls, ["PRIMARY:Agent A", "PRIMARY:Agent B", "FALLBACK:Agent A", "FALLBACK:Agent B"]);
+});
+
 test("Tournament restart keeps the fallback route and reuses its completed side", async () => {
   const runtime = new SqliteRuntimeStore(":memory:");
   try {

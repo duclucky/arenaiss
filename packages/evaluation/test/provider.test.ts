@@ -5,6 +5,7 @@ import {
   EVALUATION_PLATFORM_WRAPPER_V1,
   buildEvaluationProviderBody,
   classifyEvaluationProviderError,
+  isTransientEvaluationProviderError,
   OpenAICompatibleEvaluationProvider,
 } from "../src/provider.ts";
 import { buildEvaluationInput, sha256Text } from "../src/protocol.ts";
@@ -202,6 +203,26 @@ test("provider uses fallback for a temporary upstream HTTP failure", async () =>
   const result = await provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "eval-upstream-503" });
   assert.equal(result.route, "FALLBACK");
   assert.deepEqual(calls, ["https://primary.example/v1/chat/completions", "https://api.openai.com/v1/chat/completions"]);
+});
+
+test("explicit primary route retains a safe transient marker for upstream HTTP 503", async () => {
+  const provider = new OpenAICompatibleEvaluationProvider({
+    endpoint: "https://primary.example/v1", apiKey: "server-secret",
+    fetchImpl: async () => new Response("{}", { status: 503 }),
+  });
+  await assert.rejects(
+    () => provider.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "transient-503", route: "PRIMARY" }),
+    (error) => { assert.equal(classifyEvaluationProviderError(error), "PROVIDER_ERROR"); assert.equal(isTransientEvaluationProviderError(error), true); return true; },
+  );
+});
+
+test("network failure is transient but invalid model output is not", async () => {
+  const network = new OpenAICompatibleEvaluationProvider({ endpoint: "https://primary.example/v1", apiKey: "server-secret", fetchImpl: async () => { throw new TypeError("fetch failed"); } });
+  await assert.rejects(() => network.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "network", route: "PRIMARY" }),
+    (error) => { assert.equal(isTransientEvaluationProviderError(error), true); return true; });
+  const invalid = new OpenAICompatibleEvaluationProvider({ endpoint: "https://primary.example/v1", apiKey: "server-secret", fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] }), { status: 200 }) });
+  await assert.rejects(() => invalid.generate({ model: "model-1", input, maxOutputTokens: 1200, temperature: 0.1, operationKey: "invalid", route: "PRIMARY" }),
+    (error) => { assert.equal(isTransientEvaluationProviderError(error), false); return true; });
 });
 
 test("provider falls back when the primary response body stalls after HTTP headers", async () => {

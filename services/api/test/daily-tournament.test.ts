@@ -113,7 +113,7 @@ test('daily worker retries one-sided provider output with a cooldown but never r
   } finally { runtime.close(); }
 });
 
-test('partial provider replay stops after three claims for one attempt', async () => {
+test('partial provider replay allows one recovery after the fallback upgrade and remains bounded', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const operations = new FakeOperations();
@@ -122,10 +122,10 @@ test('partial provider replay stops after three claims for one attempt', async (
     const row = operations.records.get(first!.tournamentId)!;
     row.message = `Runner requires recovery for attempt ${attempt}.`;
     runtime.put('evaluation-tournament-provider-runs', `${attempt}:A`, { fingerprint: 'saved' });
-    for (let number = 0; number < 4; number += 1) {
+    for (let number = 0; number < 5; number += 1) {
       row.state = 'RECOVERY_REQUIRED';
       await runDailyTournamentTick(runtime, operations, midnight + 1 + number * 300, '1000000');
     }
-    assert.equal(operations.actions.filter((action) => action === 'PROGRESS').length, 3);
+    assert.equal(operations.actions.filter((action) => action === 'PROGRESS').length, 4);
   } finally { runtime.close(); }
 });
