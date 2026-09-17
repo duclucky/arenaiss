@@ -33,7 +33,10 @@ export async function runDailyTournamentTick(runtime: SqliteRuntimeStore, operat
     if (!TERMINAL.has(current.state)) {
       if (nowSeconds < latest.startsAt) return current;
       const action = actionFor(current, nowSeconds >= latest.expiresAt)
-        ?? (current.state === 'RECOVERY_REQUIRED' && claimPartialProviderRetry(runtime, current, nowSeconds) ? 'PROGRESS' : null);
+        ?? (current.state === 'RECOVERY_REQUIRED' && (
+          claimJudgeReconciliation(runtime, current, nowSeconds)
+          || claimPartialProviderRetry(runtime, current, nowSeconds)
+        ) ? 'PROGRESS' : null);
       if (action) current = await operations.execute({ tournamentId: latest.tournamentId, action });
       if (!TERMINAL.has(current.state)) return current;
     }
@@ -49,6 +52,17 @@ export async function runDailyTournamentTick(runtime: SqliteRuntimeStore, operat
   const input = runtime.get<CreateTournamentOperation>(INTENTS, tournamentId)!;
   if (input.startsAt !== startsAt || input.registrationClosesAt !== startsAt || input.tournamentId !== tournamentId) throw new Error('daily Tournament intent conflicts with UTC schedule');
   return await operations.get(tournamentId) ?? await operations.create(input);
+}
+
+function claimJudgeReconciliation(runtime: SqliteRuntimeStore, snapshot: TournamentOperationSnapshot, nowSeconds: number): boolean {
+  if (!snapshot.nextActions.includes('PROGRESS')) return false;
+  const recovery = summarizeTournamentRecovery(runtime, snapshot.message ?? '');
+  if (!recovery?.comparisonHashRecorded || !['SUBMITTED', 'PENDING', 'ACCEPTED', 'FINALIZED'].includes(recovery.comparisonState)) return false;
+  const key = `${snapshot.tournamentId}:${recovery.attemptId}`;
+  const prior = runtime.get<{ nextAt: number }>('daily-tournament-judge-reconciliations', key);
+  if (prior && nowSeconds < prior.nextAt) return false;
+  runtime.put('daily-tournament-judge-reconciliations', key, { nextAt: nowSeconds + 30 });
+  return true;
 }
 
 function claimPartialProviderRetry(runtime: SqliteRuntimeStore, snapshot: TournamentOperationSnapshot, nowSeconds: number): boolean {

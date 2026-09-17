@@ -113,6 +113,37 @@ test('daily worker retries one-sided provider output with a cooldown but never r
   } finally { runtime.close(); }
 });
 
+test('daily worker reconciles a recorded pending judge transaction without resubmitting it', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const operations = new FakeOperations();
+    const first = await runDailyTournamentTick(runtime, operations, midnight - 60, '1000000');
+    const attempt = `sha256:${'d'.repeat(64)}`;
+    const match = `sha256:${'e'.repeat(64)}`;
+    const row = operations.records.get(first!.tournamentId)!;
+    row.state = 'RECOVERY_REQUIRED';
+    row.message = `Runner requires recovery for attempt ${attempt}: JUDGE_ERROR.`;
+    runtime.put('evaluation-tournament-provider-runs', `${attempt}:A`, { fingerprint: 'saved-a' });
+    runtime.put('evaluation-tournament-provider-runs', `${attempt}:B`, { fingerprint: 'saved-b' });
+    runtime.put('comparison-submissions', `${match}:${attempt}`, {
+      key: `${match}:${attempt}`,
+      state: 'PENDING',
+      transactionHash: `0x${'f'.repeat(64)}`,
+    });
+
+    await runDailyTournamentTick(runtime, operations, midnight + 1, '1000000');
+    assert.deepEqual(operations.actions.slice(-1), ['PROGRESS']);
+
+    const previousCount = operations.actions.length;
+    row.state = 'RECOVERY_REQUIRED';
+    await runDailyTournamentTick(runtime, operations, midnight + 2, '1000000');
+    assert.equal(operations.actions.length, previousCount);
+
+    await runDailyTournamentTick(runtime, operations, midnight + 31, '1000000');
+    assert.equal(operations.actions.length, previousCount + 1);
+  } finally { runtime.close(); }
+});
+
 test('partial provider replay allows one recovery after the fallback upgrade and remains bounded', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
