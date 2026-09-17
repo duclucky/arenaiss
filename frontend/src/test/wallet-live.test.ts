@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BrowserArcWalletAdapter } from '../adapters/wallet';
 import type { ArcNetworkConfig } from '../adapters/interfaces';
@@ -14,6 +14,8 @@ const config: ArcNetworkConfig = {
 const bytes32 = (suffix: string) => `0x${suffix.padStart(64, '0')}`;
 
 describe('live Arc wallet adapter', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
   it('adds Arc Testnet with native USDC details and switches a MetaMask wallet without the network', async () => {
     const requests: Array<{ method: string; params?: unknown[] }> = [];
     let chainId = '0x1';
@@ -99,13 +101,11 @@ describe('live Arc wallet adapter', () => {
       agentsCommitment: bytes32('5'),
     }, config);
     const withdrawal = await adapter.withdrawCredit(bytes32('1'), config);
-    const credit = await adapter.getCredit(bytes32('1'), account, config);
     const signature = await adapter.signMessage('Arena challenge');
 
     expect(approval.state).toBe('SUBMITTED');
     expect(registration.state).toBe('SUBMITTED');
     expect(withdrawal.state).toBe('SUBMITTED');
-    expect(credit).toBe('1000');
     expect(signature).toBe(`0x${'cd'.repeat(65)}`);
     const writes = requests.filter((request) => request.method === 'eth_sendTransaction');
     expect(writes).toHaveLength(3);
@@ -133,5 +133,31 @@ describe('live Arc wallet adapter', () => {
     await expect(adapter.approveEscrow('-1', config)).rejects.toThrow('INVALID_AMOUNT');
     await expect(adapter.withdrawCredit('not-bytes32', config)).rejects.toThrow('INVALID_BYTES32');
     expect(requests).toHaveLength(before);
+  });
+
+  it('reads Tournament registration and credit from the public Arc RPC without a browser wallet', async () => {
+    const entrantId = bytes32('2');
+    const agentId = bytes32('3');
+    const agentsVersion = bytes32('4');
+    const agentsCommitment = bytes32('5');
+    let rpcReads = 0;
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const request = JSON.parse(String(init?.body)) as { id: number };
+      rpcReads += 1;
+      const result = rpcReads === 1
+        ? `0x${(2_500_000n).toString(16).padStart(64, '0')}`
+        : `0x${account.slice(2).padStart(64, '0')}${agentId.slice(2)}${agentsVersion.slice(2)}${agentsCommitment.slice(2)}${'1'.padStart(64, '0')}${'0'.repeat(64)}`;
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('Request', class { constructor(_input: RequestInfo | URL, _init?: RequestInit) {} } as unknown as typeof Request);
+    vi.stubGlobal('fetch', fetcher);
+    const adapter = new BrowserArcWalletAdapter();
+
+    expect(await adapter.getCredit(bytes32('1'), account, config)).toBe('2500000');
+    await expect(adapter.getEntrant(bytes32('1'), entrantId, config)).resolves.toMatchObject({
+      wallet: account, agentId, agentsVersion, agentsCommitment, registered: true, ranked: false,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    await adapter.disconnect();
   });
 });

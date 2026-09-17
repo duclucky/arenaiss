@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, custom, defineChain, getAddress } from 'viem';
+import { createPublicClient, createWalletClient, custom, defineChain, getAddress, http } from 'viem';
 import { ArcWalletAdapter, WalletProvider, ArcNetworkConfig, EntrantRegistration, WalletTransaction, CanonicalEntrant } from './interfaces';
 
 const usdcAbi = [{
@@ -291,8 +291,7 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
     if (!isBytes32(tournamentId)) throw new Error('INVALID_BYTES32');
     if (!isAddress(address)) throw new Error('INVALID_ADDRESS');
     if (!config.escrowAddress || !isConfiguredAddress(config.escrowAddress)) throw new Error('NOT_CONFIGURED');
-    const { provider, chain } = this.requireProviderAndChain(config);
-    const client = createPublicClient({ chain, transport: custom(provider) });
+    const client = createPublicClient({ chain: arcChain(config), transport: http(config.rpcUrl) });
     const result = await client.readContract({
       address: getAddress(config.escrowAddress), abi: escrowAbi, functionName: 'creditOf',
       args: [tournamentId as `0x${string}`, getAddress(address)],
@@ -303,8 +302,7 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
   async getEntrant(tournamentId: string, entrantId: string, config: ArcNetworkConfig): Promise<CanonicalEntrant> {
     if (!isBytes32(tournamentId) || !isBytes32(entrantId)) throw new Error('INVALID_BYTES32');
     if (!config.escrowAddress || !isConfiguredAddress(config.escrowAddress)) throw new Error('NOT_CONFIGURED');
-    const { provider, chain } = this.requireProviderAndChain(config);
-    const result = await createPublicClient({ chain, transport: custom(provider) }).readContract({
+    const result = await createPublicClient({ chain: arcChain(config), transport: http(config.rpcUrl) }).readContract({
       address: getAddress(config.escrowAddress), abi: escrowAbi, functionName: 'getEntrant',
       args: [tournamentId as `0x${string}`, entrantId as `0x${string}`],
     });
@@ -336,13 +334,7 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
     if (!this.connectedProviderUuid || !this.connectedAccount) throw new Error('NOT_CONFIGURED');
     const provider = this.providers.get(this.connectedProviderUuid);
     if (!provider) throw new Error('NOT_CONFIGURED');
-    const chain = defineChain({
-      id: config.chainId,
-      name: config.name,
-      nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-      rpcUrls: { default: { http: [config.rpcUrl] } },
-    });
-    return { provider, chain };
+    return { provider, chain: arcChain(config) };
   }
 
   async disconnect(): Promise<void> {
@@ -391,6 +383,15 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
       this.announcementHandler = undefined;
     }
   }
+}
+
+function arcChain(config: ArcNetworkConfig) {
+  return defineChain({
+    id: config.chainId,
+    name: config.name,
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+    rpcUrls: { default: { http: [config.rpcUrl] } },
+  });
 }
 
 function isAddress(value: string): boolean {

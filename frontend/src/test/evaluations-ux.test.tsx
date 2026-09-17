@@ -101,9 +101,13 @@ describe('evaluation product UX', () => {
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Result' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Provider' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Agent runtime' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Judge' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Provider' })).not.toBeInTheDocument();
     expect(screen.getByText('cheap-model')).toBeInTheDocument();
     expect(screen.getByText('Fallback')).toBeInTheDocument();
+    expect(screen.getByText('GenLayer GenVM')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.tagName === 'P' && element.textContent?.includes('Agent runtime generates each response') === true && element.textContent.includes('GenLayer GenVM validators independently judge'))).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', '/evaluation-runs/run_1?evaluation=campaign_1');
   });
 
@@ -241,6 +245,8 @@ describe('evaluation product UX', () => {
   it('links a finalized run to its Studio Next transaction receipt', async () => {
     render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} evaluationApiAdapter={evaluationApi}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Score dimensions' })).toBeInTheDocument();
+    expect(screen.getByText('Agent runtime state')).toBeInTheDocument();
+    expect(screen.getByText('GenLayer GenVM')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View Studio Next transaction/i })).toHaveAttribute('href', `${config.genLayer.explorerUrl}/transactions/${run.judge.transactionHash}`);
     expect(screen.queryByText(run.runId)).not.toBeInTheDocument();
   });

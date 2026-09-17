@@ -155,7 +155,7 @@ export function Account() {
       })
       .catch((reason) => {
         if (cancelled) return;
-        setCreditsError(reason instanceof Error ? reason.message : 'Could not load tournament credits.');
+        setCreditsError(tournamentCreditsError(reason));
         setCreditsState('error');
       });
     return () => { cancelled = true; };
@@ -447,6 +447,12 @@ function formatUsdc(baseUnits: string): string {
   const whole = value / 1_000_000n;
   const fraction = (value % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
   return fraction ? `${whole}.${fraction}` : `${whole}.00`;
+}
+
+function tournamentCreditsError(reason: unknown): string {
+  const code = reason instanceof Error ? reason.message : '';
+  if (code === 'NOT_CONFIGURED') return 'Tournament rewards could not be loaded because the Arc Testnet escrow configuration is unavailable. Your funds are unchanged. Please try again later or contact support.';
+  return 'Arena could not read your Tournament rewards from Arc Testnet. Your funds remain in escrow. Select Try again to refresh the onchain balance.';
 }
 
 function formatDisplayAmount(value: string): string {

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
-import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, CanonicalEntrant, EntrantRegistration, MarketplaceApiAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
+import type { AgentApiAdapter, AgentProfile, ArcNetworkConfig, ArcWalletAdapter, CanonicalEntrant, EntrantRegistration, ManagedIdentityAdapter, MarketplaceApiAdapter, WalletProvider, WalletTransaction } from '../adapters/interfaces';
 
 const account = '0x1111111111111111111111111111111111111111';
 const tournamentA = `0x${'a'.repeat(64)}`;
@@ -89,5 +89,32 @@ describe('Account tournament credits', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Claim Marketplace proceeds' }));
     await waitFor(() => expect(withdrawCredit).toHaveBeenCalledWith(expect.any(String)));
     expect(await screen.findByText('Marketplace claim submitted.')).toBeInTheDocument();
+  });
+
+  it('loads Tournament credit for a restored managed wallet without connecting a browser provider', async () => {
+    const managedIdentity: ManagedIdentityAdapter = {
+      async capabilities() { return { wallet: true, email: true, managedWallet: true }; },
+      async restore() { return { userId: 'managed-user', principal: 'owner@example.com', identity: { kind: 'EMAIL' }, managedWallet: { state: 'READY', userId: 'managed-user', walletId: 'wallet-managed', address: account, blockchain: 'ARC-TESTNET', accountType: 'EOA' } }; },
+      async signInWithWallet() { throw new Error('unused'); }, async requestEmailCode() {}, async verifyEmail() { throw new Error('unused'); }, async logout() {},
+    };
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} walletAdapter={new CreditsWallet()} agentApiAdapter={new CreditsAgentApi()} identityAdapter={managedIdentity} />);
+
+    expect(await screen.findByText('2.5 USDC claimable')).toBeInTheDocument();
+    expect(screen.queryByText('NOT_CONFIGURED')).not.toBeInTheDocument();
+  });
+
+  it('explains an unavailable Arc credit read without exposing NOT_CONFIGURED', async () => {
+    class UnavailableReadsWallet extends CreditsWallet {
+      async getEntrant(): Promise<CanonicalEntrant> { throw new Error('NOT_CONFIGURED'); }
+    }
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} walletAdapter={new UnavailableReadsWallet()} agentApiAdapter={new CreditsAgentApi()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Test Wallet' }));
+
+    expect(await screen.findByText(/Tournament rewards could not be loaded because the Arc Testnet escrow configuration is unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText('NOT_CONFIGURED')).not.toBeInTheDocument();
   });
 });

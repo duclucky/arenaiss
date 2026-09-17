@@ -44,6 +44,21 @@ describe('Marketplace website UX', () => {
     await waitFor(() => expect(createEligibility).toHaveBeenCalledWith(expect.objectContaining({ agentId, agentsVersion: version, campaignIds: campaigns.map((row) => row.campaignId), judgeAddress: config.genLayer.evaluationJudgeAddress })));
   });
 
+  it('explains every failed Marketplace eligibility rule and the next step', async () => {
+    const rejectedEligibility = vi.fn().mockRejectedValue(new Error('Agent version is not marketplace eligible: CRITICAL_POLICY_FINDING,SCORE_SPREAD_ABOVE_THRESHOLD'));
+    mount({ ...marketplaceApi, createEligibility: rejectedEligibility });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
+    fireEvent.change(await screen.findByLabelText('Agent to certify'), { target: { value: agentId } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check eligibility' }));
+
+    expect(await screen.findByRole('heading', { name: 'This Agent version is not eligible yet' })).toBeInTheDocument();
+    expect(screen.getByText(/at least one evaluation run contains a blocking policy finding/i)).toBeInTheDocument();
+    expect(screen.getByText(/highest and lowest evaluation scores is greater than the allowed 20 points/i)).toBeInTheDocument();
+    expect(screen.getByText(/review the failed runs, update this Agent version, then complete two new evaluations/i)).toBeInTheDocument();
+    expect(screen.getByText('CRITICAL_POLICY_FINDING')).toBeInTheDocument();
+    expect(screen.getByText('SCORE_SPREAD_ABOVE_THRESHOLD')).toBeInTheDocument();
+  });
+
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
     expect(await screen.findByText('1.000000 USDC')).toBeInTheDocument();

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ShoppingBag, Tag } from 'lucide-react';
+import { AlertTriangle, ShoppingBag, Tag } from 'lucide-react';
 import { formatUnits, parseUnits } from 'viem';
 import { useAppContext } from '../context';
 import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, MarketplaceListing } from '../adapters/interfaces';
@@ -8,6 +8,42 @@ import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, Marketpl
 const uuid = () => crypto.randomUUID();
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const usdc = (amount: string) => `${Number(formatUnits(BigInt(amount), 6)).toFixed(6)} USDC`;
+
+const eligibilityExplanations: Record<string, string> = {
+  CRITICAL_POLICY_FINDING: 'At least one evaluation run contains a blocking policy finding, such as a forbidden, unknown, duplicate, or unconfirmed action.',
+  SCORE_SPREAD_ABOVE_THRESHOLD: 'The gap between the highest and lowest evaluation scores is greater than the allowed 20 points, so this version is not consistent enough for Marketplace certification.',
+  OVERALL_SCORE_BELOW_THRESHOLD: 'The average evaluation score is below the required 80 points.',
+  INCOMPLETE_COVERAGE: 'One or more required scenarios do not have two finalized evaluation runs.',
+  REQUIRED_RUN_COUNT_MISMATCH: 'The selected evaluations do not contain the exact required set of runs.',
+  RUN_BINDING_MISMATCH: 'At least one run belongs to a different Agent version, Test Pack, rubric, network, or GenLayer judge.',
+  UNEXPECTED_SCENARIO: 'At least one run uses a scenario outside the required Marketplace Test Pack.',
+  INVALID_SCORE: 'At least one evaluation score is missing or outside the accepted range.',
+  INVALID_FINDING_COUNT: 'At least one evaluation contains invalid policy-finding metadata.',
+  INVALID_EXECUTION_MODEL: 'At least one run is missing its model provenance.',
+  INVALID_DIMENSION_SCORE: 'At least one scorecard dimension is missing or invalid.',
+};
+
+function eligibilityReasons(message: string): Array<{ code: string; explanation: string }> | null {
+  const prefix = 'Agent version is not marketplace eligible:';
+  if (!message.startsWith(prefix)) return null;
+  return message.slice(prefix.length).split(',').map((code) => code.trim()).filter(Boolean).map((code) => ({
+    code,
+    explanation: code.startsWith('DIMENSION_BELOW_THRESHOLD:')
+      ? `The average ${code.slice('DIMENSION_BELOW_THRESHOLD:'.length).replace(/_/g, ' ')} score is below the Marketplace minimum.`
+      : eligibilityExplanations[code] ?? 'This evaluation evidence does not satisfy one of the locked Marketplace certification rules.',
+  }));
+}
+
+function MarketplaceError({ message, onRefresh }: { message: string; onRefresh: () => void }) {
+  const reasons = eligibilityReasons(message);
+  if (!reasons) return <div role="alert" className="mt-8 border border-red-700 bg-red-50 p-4 text-sm">{message} <button type="button" className="ml-3 underline" onClick={onRefresh}>Refresh state</button></div>;
+  return <section role="alert" aria-labelledby="marketplace-eligibility-error" className="mt-8 border border-red-700 bg-red-50 p-5 text-sm">
+    <div className="flex items-start gap-3"><AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-red-800" size={20}/><div className="min-w-0"><h2 id="marketplace-eligibility-error" className="text-lg font-bold text-red-950">This Agent version is not eligible yet</h2><p className="mt-2 leading-relaxed text-red-950">Marketplace certification stopped because the selected evaluations failed these requirements:</p></div></div>
+    <ul className="mt-4 space-y-3">{reasons.map((reason) => <li key={reason.code} className="retro-inset p-4"><p className="font-mono text-xs font-bold text-red-950">{reason.code}</p><p className="mt-2 leading-relaxed text-neutral-800">{reason.explanation}</p></li>)}</ul>
+    <p className="mt-4 leading-relaxed text-red-950"><strong>How to qualify:</strong> Review the failed runs, update this Agent version, then complete two new evaluations. All required runs must have no blocking policy findings, an average score of at least 80, and a score spread of 20 points or less.</p>
+    <div className="mt-4 flex flex-wrap gap-3"><Link className="metal-button-ghost" to="/evaluations">Open evaluations</Link><button type="button" className="metal-button-ghost" onClick={onRefresh}>Refresh after new evaluations</button></div>
+  </section>;
+}
 
 export function Marketplace() {
   const { account, marketplaceApi, agentApi, evaluationApi, networkConfig } = useAppContext();
@@ -159,7 +195,7 @@ export function Marketplace() {
     <p className="page-kicker">Agent Exchange · Arc Testnet</p>
     <div className="flex flex-wrap items-end justify-between gap-6"><div><h1 id="marketplace-heading" className="page-title">Marketplace</h1><p className="page-lede">Buy exact Agent versions that passed Arena ISS evaluation. Every sale settles in USDC with a fixed 1% platform fee.</p></div><span className="retro-chip px-3 py-2 text-xs">Platform fee · 1%</span></div>
     <div role="tablist" aria-label="Marketplace sections" className="mt-8 grid gap-2 sm:grid-cols-2"><button role="tab" aria-selected={activeView === 'browse'} className={activeView === 'browse' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({}, { replace: true })}><ShoppingBag size={17} aria-hidden="true" /> Agents for sale</button><button role="tab" aria-selected={activeView === 'sell'} className={activeView === 'sell' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ view: 'sell' }, { replace: true })}><Tag size={17} aria-hidden="true" /> Sell my Agent</button></div>
-    {error && <div role="alert" className="mt-8 border border-red-700 bg-red-50 p-4 text-sm">{error} <button type="button" className="ml-3 underline" onClick={() => refresh().catch((cause) => setError(cause instanceof Error ? cause.message : 'Refresh failed.'))}>Refresh state</button></div>}
+    {error && <MarketplaceError message={error} onRefresh={() => refresh().catch((cause) => setError(cause instanceof Error ? cause.message : 'Refresh failed.'))}/>}
     {activeView === 'browse' && <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{listings.map((row) => <article className="glass-panel flex min-h-64 flex-col p-5" key={row.listingId}>
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">Agent listing</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip px-2 py-1 text-xs">{row.state}</span></div>
       <dl className="mt-8 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
