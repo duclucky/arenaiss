@@ -181,7 +181,7 @@ button:disabled { cursor: not-allowed; }
 .hero-line { display: block; min-height: 1.15em; white-space: nowrap; line-height: 1.15; }
 .hero-line--brand { margin-bottom: 8px; font-size: clamp(34px, 4.8vw, 68px); }
 .hero-line--standard { font-size: clamp(14px, 2.35vw, 34px); }
-.hero-line--promise, .hero-line--detail { max-width: 720px; white-space: normal; font-size: clamp(14px, 1.75vw, 24px); }
+.hero-line--promise, .hero-line--detail, .hero-line--marketplace { max-width: 720px; white-space: normal; font-size: clamp(14px, 1.75vw, 24px); }
 .type-cursor { display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -.08em; background: #000; animation: blink 1s step-end infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: clamp(24px, 3vw, 36px); opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
@@ -482,7 +482,7 @@ button:disabled { cursor: not-allowed; }
   .hero-typewriter { min-height: 150px; }
   .hero-line--brand { margin-bottom: 6px; font-size: clamp(30px, 9vw, 40px); }
   .hero-line--standard { white-space: normal; font-size: clamp(14px, 3.8vw, 17px); }
-  .hero-line--promise, .hero-line--detail { font-size: clamp(15px, 4vw, 17px); line-height: 1.25; }
+  .hero-line--promise, .hero-line--detail, .hero-line--marketplace { font-size: clamp(15px, 4vw, 17px); line-height: 1.25; }
   .hero-pill { min-height: 44px; }
   .hero-platforms { top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-platform-card { padding: 11px 12px 12px; }

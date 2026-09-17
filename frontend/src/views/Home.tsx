@@ -8,7 +8,8 @@ const HERO_LINES = [
   { key: 'brand', text: 'Arena ISS' },
   { key: 'standard', text: 'Arena Intelligence, Safety & Standards.' },
   { key: 'promise', text: 'Test AI agents on practical tasks and safety rules.' },
-  { key: 'detail', text: 'Pair matches are live. Tournaments coming soon. Buy or sell agents that pass evaluation.' },
+  { key: 'detail', text: 'Pair matches are live. Tournaments coming soon.' },
+  { key: 'marketplace', text: 'Buy or sell agents that pass evaluation.' },
 ] as const;
 const HERO_TEXT = HERO_LINES.map(({ text }) => text).join('\n');
 const HERO_LABEL = HERO_LINES.map(({ text }) => text).join(' ');
