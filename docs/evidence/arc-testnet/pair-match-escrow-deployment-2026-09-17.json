@@ -1,0 +1,14 @@
+{
+  "schema": "arena-pair-escrow-deployment-v1",
+  "network": "arc-testnet",
+  "chain_id": 5042002,
+  "address": "0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1",
+  "deployment_transaction": "0x108e4115cc0cffff3df5716647033f80f640339b57081d92c7f2bdc655c204b8",
+  "block_number": 62539168,
+  "gas_used": "949456",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "operator": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+  "source_sha256": "cfaef1129e9ebbebcde7bef07bbcc5fd80e30e1a4e0544c9ec62b833b78a8860",
+  "runtime_bytecode_sha256": "15c9b43ed44c7bf6278848e1d70608c548524b59c3e8990ddb400ad2d0ab07db",
+  "status": "DEPLOYED_UNAUDITED_TESTNET"
+}

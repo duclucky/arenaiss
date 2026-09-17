@@ -22,6 +22,9 @@ import type { TournamentOperationsPort } from './tournament-operations.ts';
 import { tournamentOperationsFromEnvironment } from './tournament-operations-live.ts';
 import { launchReferenceTournament, runReferenceTournamentTick } from './reference-tournament-launch.ts';
 import { DailyTournamentWorker } from './daily-tournament.ts';
+import { PairRoomCoordinator } from './pair-rooms.ts';
+import { ArcPairChainPort } from './pair-arc.ts';
+import { pairSettlementFromEnvironment } from './pair-settlement-live.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -42,12 +45,29 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const evaluationWorker = evaluationExecution ? new EvaluationExecutionWorker(evaluationExecution, envPositiveInteger('EVALUATION_WORKER_INTERVAL_MS', 5_000)) : undefined;
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
   const agentRegistry = agentRegistryFromEnvironment(process.env);
+  const pairAddress = process.env.ARC_PAIR_ESCROW_ADDRESS?.trim();
+  const pairsEnabled = process.env.ARENA_PAIR_ROOMS_ENABLED === '1';
+  const pairChain = pairsEnabled && pairAddress ? new ArcPairChainPort({ escrowAddress: pairAddress, expectedOperator: operator, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() }) : undefined;
+  const pairWorker = pairsEnabled && runtime && pairChain && managedIdentityService ? pairSettlementFromEnvironment(process.env, runtime, service, pairChain, operator) : undefined;
+  const pairRooms = pairWorker && pairAddress && runtime && managedIdentityService && pairChain ? new PairRoomCoordinator(runtime, service, {
+    account: async (userId) => managedIdentityService.pairAccount(userId),
+    create: (userId, input) => managedIdentityService.pairCreate(userId, input),
+    join: (userId, input) => managedIdentityService.pairJoin(userId, input),
+    action: (userId, input) => managedIdentityService.pairAction(userId, input),
+  }, pairChain) : undefined;
+  let pairWorkerBusy = false;
+  let pairWorkerTimer: ReturnType<typeof setInterval> | undefined;
+  const pairTick = async () => {
+    if (!pairWorker || pairWorkerBusy) return;
+    pairWorkerBusy = true;
+    try { await pairWorker.tick(); } finally { pairWorkerBusy = false; }
+  };
   const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
   const dailyStake = process.env.ARENA_DAILY_TOURNAMENT_STAKE_UNITS?.trim();
   if (dailyStake && (!runtime || !tournamentOperations)) throw new Error('daily Tournament requires persistent runtime and Tournament operations');
   const dailyWorker = dailyStake ? new DailyTournamentWorker(runtime!, tournamentOperations!, dailyStake) : undefined;
   options.onTournamentOperationsReady?.(tournamentOperations);
-  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry);
+  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms);
   const now = options.now ?? Date.now;
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
@@ -94,8 +114,8 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
-  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); });
-  server.once('close', () => { evaluationWorker?.stop(); dailyWorker?.stop(); });
+  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); if (pairWorker) { void pairTick().catch(() => undefined); pairWorkerTimer = setInterval(() => void pairTick().catch(() => undefined), 10_000); } });
+  server.once('close', () => { evaluationWorker?.stop(); dailyWorker?.stop(); if (pairWorkerTimer) clearInterval(pairWorkerTimer); });
   return server;
 }
 
@@ -133,6 +153,7 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
     marketplaceAddress: environment.ARC_MARKETPLACE_ADDRESS?.trim(),
     evaluationEscrowAddress: environment.ARC_EVO_FEE_ESCROW_ADDRESS?.trim(),
     tournamentEscrowAddress: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim(),
+    pairEscrowAddress: environment.ARC_PAIR_ESCROW_ADDRESS?.trim(),
     circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
     emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
   };

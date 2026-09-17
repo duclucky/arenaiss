@@ -56,6 +56,7 @@ describe('managed Arena ISS wallet account', () => {
     expect(within(primaryNavigation).getAllByRole('link').map((link) => link.textContent)).toEqual([
       'Agents',
       'Evaluations',
+      'Pair matches',
       'Tournaments',
       'Marketplace',
       'Docs',

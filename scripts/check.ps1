@@ -50,6 +50,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\services\api\test\http.test.ts" `
   "$PSScriptRoot\..\services\api\test\managed-identity.test.ts" `
   "$PSScriptRoot\..\services\api\test\circle-managed-wallet.test.ts" `
+  "$PSScriptRoot\..\services\api\test\pair-rooms.test.ts" `
+  "$PSScriptRoot\..\services\api\test\pair-settlement.test.ts" `
   "$PSScriptRoot\..\services\api\test\evaluation-execution.test.ts" `
   "$PSScriptRoot\..\services\api\test\tournament-operations-http.test.ts" `
   "$PSScriptRoot\..\services\api\test\tournament-operations-live.test.ts" `

@@ -109,6 +109,15 @@ The Account page includes a Tournament credits tab. It lists the connected
 wallet's confirmed Arc tournament registrations and exposes a Claim button only
 for a positive pull credit left behind by automatic payout.
 
+An independent two-Agent room escrow is implemented locally for Arc Testnet:
+the creator chooses a USDC stake and deposits when creating the room, a
+challenger deposits the same amount, and the contract supports full refunds
+and a two-stake winner credit. The backend retains both deposit transaction
+hashes under one room ID. The contract is deployed on Arc Testnet and a local
+pair judgment/settlement worker is implemented. A live two-wallet value lifecycle
+has not yet been verified. See
+[`docs/PAIR-MATCH-ESCROW.md`](docs/PAIR-MATCH-ESCROW.md).
+
 A local, opt-in server integration now accepts wallet-signature or email-OTP
 login and provisions one Circle developer-controlled `ARC-TESTNET` EOA for the
 resulting Arena user. It is disabled until all server-only Circle and SMTP
