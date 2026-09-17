@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { ComparisonRunTracker } from "../../genlayer/src/comparison-tracker.ts";
 import type { InferenceInput, OrchestratorInference, OrchestratorJudge, PairOutput } from "../../orchestrator/src/orchestrator.ts";
 import type { SqliteRuntimeStore } from "../../persistence/src/sqlite-runtime.ts";
-import { classifyEvaluationProviderError, type EvaluationProviderResult } from "./provider.ts";
+import { classifyEvaluationProviderError, isTransientEvaluationProviderError, type EvaluationProviderResult } from "./provider.ts";
 import { buildEvaluationInput, sha256Text, type EvaluationProviderInput, type EvaluationScenario } from "./protocol.ts";
 import { resultForTournamentProgression } from "./tournament-comparison.ts";
 
@@ -53,14 +53,14 @@ export class TournamentEvaluationPairRunner implements OrchestratorInference {
     if (decision) return (await this.runRoute(input, fingerprint, scenario, "FALLBACK", decision.model)).output;
 
     const primary = await this.runRoute(input, fingerprint, scenario, "PRIMARY", this.policy.model);
-    if (!fallbackModel || !primary.timedOut || primary.otherFailure) return primary.output;
+    if (!fallbackModel || (!primary.timedOut && !primary.transientFailure) || primary.otherFailure) return primary.output;
     const selected = { fingerprint, model: fallbackModel };
     this.routeMemory.set(input.attemptId, selected);
     this.runtime?.put("evaluation-tournament-provider-route", input.attemptId, selected);
     return (await this.runRoute(input, fingerprint, scenario, "FALLBACK", fallbackModel)).output;
   }
 
-  private async runRoute(input: InferenceInput, fingerprint: string, scenario: EvaluationScenario, route: "PRIMARY" | "FALLBACK", model: string): Promise<{ output: PairOutput; timedOut: boolean; otherFailure: boolean }> {
+  private async runRoute(input: InferenceInput, fingerprint: string, scenario: EvaluationScenario, route: "PRIMARY" | "FALLBACK", model: string): Promise<{ output: PairOutput; timedOut: boolean; transientFailure: boolean; otherFailure: boolean }> {
     const routeFingerprint = route === "PRIMARY" ? fingerprint : sha256(`${fingerprint}|FALLBACK|${model}`);
     const rows = await Promise.allSettled((["A", "B"] as const).map(async (side) => {
       const key = route === "PRIMARY" ? `${input.attemptId}:${side}` : `${input.attemptId}:fallback:${side}`;
@@ -81,13 +81,14 @@ export class TournamentEvaluationPairRunner implements OrchestratorInference {
     }));
     const failures = rows.filter((row): row is PromiseRejectedResult => row.status === "rejected");
     const timedOut = failures.some((row) => classifyEvaluationProviderError(row.reason) === "PROVIDER_TIMEOUT");
-    const otherFailure = failures.some((row) => classifyEvaluationProviderError(row.reason) !== "PROVIDER_TIMEOUT");
+    const transientFailure = failures.some((row) => isTransientEvaluationProviderError(row.reason));
+    const otherFailure = failures.some((row) => classifyEvaluationProviderError(row.reason) !== "PROVIDER_TIMEOUT" && !isTransientEvaluationProviderError(row.reason));
     const successes = rows.filter((row): row is PromiseFulfilledResult<{ side: "A" | "B" } & ProviderRecord> => row.status === "fulfilled").map((row) => row.value);
     const a = successes.find((row) => row.side === "A"); const b = successes.find((row) => row.side === "B");
     const output: PairOutput = !a || !b
       ? { state: "PARTIAL_PAIR", ...(failures.length ? { failureCode: classifyEvaluationProviderError(failures[0].reason) } : {}), ...(a ? { outputA: a.rawOutput, outputADigest: a.responseDigest as `sha256:${string}` } : {}), ...(b ? { outputB: b.rawOutput, outputBDigest: b.responseDigest as `sha256:${string}` } : {}) }
       : { state: "OUTPUTS_READY", outputA: a.rawOutput, outputB: b.rawOutput, outputADigest: a.responseDigest as `sha256:${string}`, outputBDigest: b.responseDigest as `sha256:${string}` };
-    return { output, timedOut, otherFailure };
+    return { output, timedOut, transientFailure, otherFailure };
   }
 }
 

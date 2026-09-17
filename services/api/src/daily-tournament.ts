@@ -57,7 +57,7 @@ function claimPartialProviderRetry(runtime: SqliteRuntimeStore, snapshot: Tourna
   if (!recovery || recovery.comparisonState !== 'NONE' || recovery.providerA === recovery.providerB) return false;
   const key = `${snapshot.tournamentId}:${recovery.attemptId}`;
   const prior = runtime.get<{ count: number; nextAt: number }>('daily-tournament-provider-retries', key);
-  if (prior && (prior.count >= 3 || nowSeconds < prior.nextAt)) return false;
+  if (prior && (prior.count >= 4 || nowSeconds < prior.nextAt)) return false;
   runtime.put('daily-tournament-provider-retries', key, { count: (prior?.count ?? 0) + 1, nextAt: nowSeconds + 300 });
   return true;
 }

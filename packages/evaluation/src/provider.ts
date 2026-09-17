@@ -57,6 +57,9 @@ export function classifyEvaluationProviderError(error: unknown): EvaluationProvi
   if (message.startsWith("INVALID_OUTPUT") || message.startsWith("OUTPUT_") || message.includes("unsupported output field")) return "INVALID_OUTPUT";
   return "PROVIDER_ERROR";
 }
+export function isTransientEvaluationProviderError(error: unknown): boolean {
+  return error instanceof Error && (error as Error & { transient?: boolean }).transient === true;
+}
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -136,7 +139,9 @@ export class OpenAICompatibleEvaluationProvider {
         route,
       };
     } catch (error) {
-      throw new Error(classifyEvaluationProviderError(error));
+      const failure = new Error(classifyEvaluationProviderError(error));
+      if (this.isTemporaryFailure(error)) Object.assign(failure, { transient: true });
+      throw failure;
     }
   }
 
@@ -144,12 +149,18 @@ export class OpenAICompatibleEvaluationProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await this.fetchImpl(endpoint, {
-        method: "POST",
-        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "idempotency-key": operationKey },
-        body,
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await this.fetchImpl(endpoint, {
+          method: "POST",
+          headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "idempotency-key": operationKey },
+          body,
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (error instanceof TypeError) throw new Error("NETWORK_ERROR");
+        throw error;
+      }
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
       return await response.json();
     } finally {
@@ -159,6 +170,7 @@ export class OpenAICompatibleEvaluationProvider {
 
   private isTemporaryFailure(error: unknown): boolean {
     return (error instanceof DOMException && error.name === "AbortError")
+      || (error instanceof Error && error.message === "NETWORK_ERROR")
       || (error instanceof Error && /^HTTP_(429|5\d\d)$/.test(error.message));
   }
 
