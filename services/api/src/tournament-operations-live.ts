@@ -103,6 +103,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   private readonly now: () => number;
   private readonly topics: readonly string[];
   private readonly rollingByeMigrations: ReadonlySet<string>;
+  private readonly leaseOwner = `api:${process.pid}`;
   constructor(
     runtime: SqliteRuntimeStore,
     service: ArenaApiService,
@@ -112,7 +113,12 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     now: () => number = () => Math.floor(Date.now() / 1_000),
     topics: readonly string[] = DEFAULT_TOPICS,
     rollingByeMigrations: ReadonlySet<string> = ROLLING_BYE_MIGRATIONS,
-  ) { this.runtime = runtime; this.service = service; this.operatorAddress = operatorAddress; this.arc = arc; this.orchestrator = orchestrator; this.now = now; this.topics = topics; this.rollingByeMigrations = rollingByeMigrations; }
+  ) {
+    this.runtime = runtime; this.service = service; this.operatorAddress = operatorAddress; this.arc = arc; this.orchestrator = orchestrator; this.now = now; this.topics = topics; this.rollingByeMigrations = rollingByeMigrations;
+    for (const row of runtime.list<OperationRecord>('tournament-operations')) {
+      runtime.releaseLease('tournament-operation-leases', row.input.tournamentId, this.leaseOwner);
+    }
+  }
 
   async list(): Promise<TournamentOperationSnapshot[]> {
     const rows = this.runtime.list<OperationRecord>('tournament-operations');
@@ -136,8 +142,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   async execute({ tournamentId, action }: { tournamentId: string; action: TournamentOperationAction }): Promise<TournamentOperationSnapshot> {
     const record = this.runtime.get<OperationRecord>('tournament-operations', tournamentId);
     if (!record) throw new Error('tournament operation not found');
-    const leaseOwner = `api:${process.pid}`;
-    if (this.runtime.claimLease('tournament-operation-leases', tournamentId, tournamentId, leaseOwner, Date.now(), 10 * 60_000) === 'BUSY') throw new Error('tournament operation is already running');
+    if (this.runtime.claimLease('tournament-operation-leases', tournamentId, tournamentId, this.leaseOwner, Date.now(), 10 * 60_000) === 'BUSY') throw new Error('tournament operation is already running');
     try {
       if (action === 'PROGRESS') await this.progress(record);
       else if (action === 'SETTLE') await this.settle(record);
@@ -145,7 +150,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
       this.runtime.put('tournament-operations', tournamentId, record);
       return this.refresh(record);
     } finally {
-      this.runtime.releaseLease('tournament-operation-leases', tournamentId, leaseOwner);
+      this.runtime.releaseLease('tournament-operation-leases', tournamentId, this.leaseOwner);
     }
   }
 

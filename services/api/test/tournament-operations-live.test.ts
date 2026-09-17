@@ -44,6 +44,7 @@ test('production Tournament runner derives ranking, persists it, then settles on
     assert.equal(runs, 1);
     assert.deepEqual(arc.transactionNames, ['create', 'close', 'run']);
 
+    assert.equal(runtime.claimLease('tournament-operation-leases', tournamentId, tournamentId, `api:${process.pid}`, Date.now(), 10 * 60_000), 'CLAIMED');
     const restored = new LiveTournamentOperations(runtime, service, operator, arc, { async run() { throw new Error('ranking must be restored'); } } as any, () => 40);
     const settled = await restored.execute({ tournamentId, action: 'SETTLE' });
     assert.equal(settled.state, 'COMPLETED');
