@@ -74,6 +74,10 @@ export class ArenaHttpApi {
       const pairRoom = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})$/);
       if (request.method === 'GET' && pairRoom) {
         const room = this.pairRooms?.get(pairRoom[1].toLowerCase());
+        if (room && room.state !== 'OPEN') {
+          const session = this.requireSessionRecord(request.headers);
+          if (session.principal !== room.creator && session.principal !== room.challenger) return this.json(404, { error: 'not found' });
+        }
         return room ? this.json(200, room) : this.json(404, { error: 'not found' });
       }
       const pairCredit = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})\/credit$/);

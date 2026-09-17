@@ -95,17 +95,23 @@ test('anonymous pair listing is open-only and participant rooms require a sessio
   const pairs = {
     listOpen() { return [{ roomId: `sha256:${'a'.repeat(64)}`, state: 'OPEN' }]; },
     listForPrincipal(principal: string) { calls.push(principal); return [{ roomId: `sha256:${'b'.repeat(64)}`, state: 'JOINED' }]; },
+    get(roomId: string) { return roomId.endsWith('a'.repeat(64))
+      ? { roomId, state: 'OPEN', creator: bob }
+      : { roomId, state: 'JOINED', creator: alice, challenger: bob }; },
   } as unknown as PairRoomCoordinator;
   const api = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, undefined, undefined, pairs);
   const publicRooms = await api.handle({ method: 'GET', path: '/api/pair-rooms' });
   assert.equal(publicRooms.status, 200);
   assert.equal(publicRooms.body[0].state, 'OPEN');
   assert.equal((await api.handle({ method: 'GET', path: '/api/pair-rooms/mine' })).status, 401);
+  assert.equal((await api.handle({ method: 'GET', path: `/api/pair-rooms/sha256:${'a'.repeat(64)}` })).status, 200);
+  assert.equal((await api.handle({ method: 'GET', path: `/api/pair-rooms/sha256:${'b'.repeat(64)}` })).status, 401);
   await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
   const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
   const mine = await api.handle({ method: 'GET', path: '/api/pair-rooms/mine', headers: { cookie: auth.headers['set-cookie'].split(';')[0] } });
   assert.equal(mine.status, 200);
   assert.equal(mine.body[0].state, 'JOINED');
+  assert.equal((await api.handle({ method: 'GET', path: `/api/pair-rooms/sha256:${'b'.repeat(64)}`, headers: { cookie: auth.headers['set-cookie'].split(';')[0] } })).status, 200);
   assert.deepEqual(calls, [alice]);
 });
 
