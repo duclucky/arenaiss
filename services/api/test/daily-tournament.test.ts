@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
-import { runDailyTournamentTick } from '../src/daily-tournament.ts';
+import { runDailyTournamentTick, summarizeTournamentRecovery } from '../src/daily-tournament.ts';
 import type { CreateTournamentOperation, TournamentOperationSnapshot, TournamentOperationsPort } from '../src/tournament-operations.ts';
 
 const midnight = Date.UTC(2026, 8, 17) / 1_000;
@@ -69,5 +69,22 @@ test('daily tournament recovers a persisted create intent and never opens anothe
     await runDailyTournamentTick(runtime, operations, midnight + 1, '1000000');
     assert.equal(operations.records.get(first!.tournamentId)!.state, 'REFUNDED');
     assert.equal(operations.records.size, 2);
+  } finally { runtime.close(); }
+});
+
+test('recovery diagnostic reports persisted side and submission states without provider output', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const attempt = `sha256:${'a'.repeat(64)}`;
+    runtime.put('evaluation-tournament-provider-runs', `${attempt}:A`, { rawOutput: 'PRIVATE', fingerprint: 'fingerprint' });
+    runtime.put('comparison-submissions', `sha256:${'b'.repeat(64)}:${attempt}`, { key: `sha256:${'b'.repeat(64)}:${attempt}`, state: 'SUBMISSION_PERSISTED', submission: { responseJsonA: 'PRIVATE' } });
+    assert.deepEqual(summarizeTournamentRecovery(runtime, `Runner requires recovery for attempt ${attempt}.`), {
+      attemptId: attempt,
+      providerA: true,
+      providerB: false,
+      fallbackSelected: false,
+      comparisonState: 'SUBMISSION_PERSISTED',
+      comparisonHashRecorded: false,
+    });
   } finally { runtime.close(); }
 });
