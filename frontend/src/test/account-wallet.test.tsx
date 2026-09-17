@@ -127,6 +127,8 @@ describe('managed Arena ISS wallet account', () => {
   it('closes the account menu when clicking elsewhere', async () => {
     render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={identity()} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
     const trigger = await screen.findByRole('button', { name: 'Account' });
+    expect(trigger).toHaveTextContent('Account');
+    expect(trigger).not.toHaveTextContent('Signed in');
     fireEvent.click(trigger);
     expect(screen.getByRole('menu')).toBeInTheDocument();
     fireEvent.pointerDown(document.body);

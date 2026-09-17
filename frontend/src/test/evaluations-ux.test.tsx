@@ -104,7 +104,7 @@ describe('evaluation product UX', () => {
     expect(screen.getByRole('columnheader', { name: 'Provider' })).toBeInTheDocument();
     expect(screen.getByText('cheap-model')).toBeInTheDocument();
     expect(screen.getByText('Fallback')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', '/evaluation-runs/run_1');
+    expect(screen.getByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', '/evaluation-runs/run_1?evaluation=campaign_1');
   });
 
   it('refreshes a running result page until the campaign and fee finish without a reload', async () => {
@@ -172,7 +172,7 @@ describe('evaluation product UX', () => {
     const detailRun = { ...run, runId };
     const api = { ...evaluationApi, async getCampaign(id: string) { return id === campaignId ? detailCampaign : null; }, async listRuns() { return [detailRun]; } };
     render(<MemoryRouter initialEntries={[`/evaluations/${campaignId}`]}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
-    expect(await screen.findByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', `/evaluation-runs/${runId}`);
+    expect(await screen.findByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', `/evaluation-runs/${runId}?evaluation=${encodeURIComponent(campaignId)}`);
     expect(screen.queryByText(campaignId)).not.toBeInTheDocument();
     expect(screen.queryByText(runId)).not.toBeInTheDocument();
   });
@@ -243,6 +243,14 @@ describe('evaluation product UX', () => {
     expect(await screen.findByRole('table', { name: 'Score dimensions' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View Studio Next transaction/i })).toHaveAttribute('href', `${config.genLayer.explorerUrl}/transactions/${run.judge.transactionHash}`);
     expect(screen.queryByText(run.runId)).not.toBeInTheDocument();
+  });
+
+  it('returns from a run to the results of its evaluation after a direct page load', async () => {
+    render(<MemoryRouter initialEntries={['/evaluation-runs/run_1?evaluation=campaign_1']}><AppProvider config={config} evaluationApiAdapter={evaluationApi}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    const back = await screen.findByRole('link', { name: '← Results' });
+    expect(back).toHaveAttribute('href', '/evaluations/campaign_1');
+    fireEvent.click(back);
+    expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
   });
 
   it('shows the actual fallback route and model on a finalized run', async () => {
