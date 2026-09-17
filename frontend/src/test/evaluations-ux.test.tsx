@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -96,10 +96,33 @@ describe('evaluation product UX', () => {
   });
 
   it('renders campaign outcomes as a table with a run evidence link', async () => {
-    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={evaluationApi}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    const routed = { ...campaign, items: [{ ...campaign.items[0], providerModel: 'cheap-model', providerRoute: 'FALLBACK' as const }] };
+    const api = { ...evaluationApi, async getCampaign() { return routed; } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Result' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Provider' })).toBeInTheDocument();
+    expect(screen.getByText('cheap-model')).toBeInTheDocument();
+    expect(screen.getByText('Fallback')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open attempt 1' })).toHaveAttribute('href', '/evaluation-runs/run_1');
+  });
+
+  it('refreshes a running result page until the campaign and fee finish without a reload', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = { ...campaign, state: 'RUNNING', items: [{ ...campaign.items[0], state: 'RETRYABLE', attempt: 1, score: undefined, overallScore: undefined, failureStage: 'PROVIDER', failureCode: 'PROVIDER_TIMEOUT' }] };
+      const getCampaign = vi.fn().mockResolvedValueOnce(pending).mockResolvedValue(campaign);
+      const getFee = vi.fn().mockResolvedValueOnce({ state: 'HELD', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' })
+        .mockResolvedValue({ state: 'RELEASED', amountUsdc: '1', escrowAddress: '0x3333333333333333333333333333333333333333' });
+      const api = { ...evaluationApi, getCampaign, getFee };
+      render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
+      expect(screen.getByText('Retrying after timeout')).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+      expect(getCampaign).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('88/100')).toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
   });
 
   it('renders a legacy campaign and its runs when the evaluation fee does not exist', async () => {
@@ -220,6 +243,29 @@ describe('evaluation product UX', () => {
     expect(await screen.findByRole('table', { name: 'Score dimensions' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View Studio Next transaction/i })).toHaveAttribute('href', `${config.genLayer.explorerUrl}/transactions/${run.judge.transactionHash}`);
     expect(screen.queryByText(run.runId)).not.toBeInTheDocument();
+  });
+
+  it('shows the actual fallback route and model on a finalized run', async () => {
+    const fallback = { ...run, provider: { state: 'SUCCESS', route: 'FALLBACK' as const, model: 'fallback-model' } };
+    const api = { ...evaluationApi, async getRun() { return fallback; } };
+    render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('Fallback')).toBeInTheDocument();
+    expect(screen.getByText('fallback-model')).toBeInTheDocument();
+  });
+
+  it('refreshes a pending run through GenLayer finality without a reload', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = { ...run, provider: { state: 'PENDING' }, judge: { state: 'NOT_SUBMITTED' }, scorecard: undefined };
+      const getRun = vi.fn().mockResolvedValueOnce(pending).mockResolvedValue(run);
+      const api = { ...evaluationApi, getRun };
+      render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByText('Scorecard is not final yet.')).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+      expect(getRun).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('table', { name: 'Score dimensions' })).toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
   });
 
   it('names the public topic without revealing the hidden scenario prompt', async () => {

@@ -173,6 +173,18 @@ it('explains when the bounded evaluation retries are exhausted', async () => {
   expect(await screen.findByText(/Evaluation paused after 3 failed attempts/)).toHaveTextContent(/Both players can approve an early refund/);
 });
 
+it('shows when a joined room is using the fallback provider model', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    return [{ roomId: `sha256:${'8'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
+      creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '10000', joinDeadline: 1_999_999_999,
+      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'WAITING_VERDICT',
+      providerRoute: 'FALLBACK', providerModel: 'fallback-model' }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText(/Fallback provider/i)).toHaveTextContent('fallback-model');
+});
+
 it('shows the safe evaluation failure code and its specific explanation', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };

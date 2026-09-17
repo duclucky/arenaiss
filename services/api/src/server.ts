@@ -14,7 +14,7 @@ import { ViemMarketplaceChainPort } from './marketplace-arc.ts';
 import { ViemAgentRegistryPort } from './agent-registry-arc.ts';
 import { EvaluationExecutionService, EvaluationExecutionWorker } from './evaluation-execution.ts';
 import { ViemEvoFeeSettlement } from './evo-fee-arc.ts';
-import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
+import { OpenAICompatibleEvaluationProvider, providerConfigurationFromEnvironment } from '../../../packages/evaluation/src/provider.ts';
 import { EvaluationRunTracker, PersistentEvaluationRunStore } from '../../../packages/evaluation/src/run-tracker.ts';
 import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../packages/evaluation/src/solo-runner.ts';
 import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/src/evaluation-sdk-port.ts';
@@ -122,21 +122,16 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
 function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: ManagedIdentityService, operator: string): EvaluationExecutionService | undefined {
   const privateKey = process.env.GENLAYER_OWNER_PRIVATE_KEY?.trim() || process.env.STUDIONET_PRIVATE_KEY?.trim();
   const judgeAddress = process.env.GENLAYER_EVALUATION_JUDGE_ADDRESS?.trim();
-  const providerEndpoint = process.env.END_POINT?.trim();
-  const fallbackProviderEndpoint = process.env.FALLBACK_END_POINT?.trim();
-  const providerKey = process.env.API_KEY?.trim();
-  const fallbackProviderKey = process.env.FALLBACK_API_KEY?.trim();
-  const fallbackProviderModel = process.env.FALLBACK_MODEL?.trim();
+  const routing = providerConfigurationFromEnvironment(process.env);
   const feeUsdc = process.env.EVALUATION_FEE_USDC?.trim();
   const escrowAddress = process.env.ARC_EVO_FEE_ESCROW_ADDRESS?.trim();
-  const model = process.env.MODEL?.trim();
-  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc, escrowAddress].some(Boolean)) return undefined;
-  if (![privateKey, judgeAddress, providerEndpoint, providerKey, feeUsdc, escrowAddress, model].every(Boolean)) return undefined;
-  const provider = new OpenAICompatibleEvaluationProvider({ endpoint: providerEndpoint!, fallbackEndpoint: fallbackProviderEndpoint, apiKey: providerKey!, fallbackApiKey: fallbackProviderKey, fallbackModel: fallbackProviderModel });
+  if (![privateKey, judgeAddress, feeUsdc, escrowAddress, routing].some(Boolean)) return undefined;
+  if (!privateKey || !judgeAddress || !feeUsdc || !escrowAddress || !routing) return undefined;
+  const provider = new OpenAICompatibleEvaluationProvider(routing.provider);
   const judge = createStudioNextAgentEvaluationPort(privateKey!);
   const runner = new SoloEvaluationRunner(provider, new EvaluationRunTracker(judge, new PersistentEvaluationRunStore(runtime), judgeAddress!), new PersistentSoloCampaignStore(runtime));
   const settlement = new ViemEvoFeeSettlement({ privateKey: privateKey!, escrowAddress: escrowAddress!, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() });
-  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model });
+  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model: routing.model });
 }
 
 export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
@@ -272,7 +267,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
   server.listen(port, host, () => {
-    process.stdout.write(`${JSON.stringify({ event: 'server_listening', host, port, fallbackConfigured: Boolean(process.env.FALLBACK_API_KEY?.trim() && process.env.FALLBACK_MODEL?.trim()) })}\n`);
+    process.stdout.write(`${JSON.stringify({ event: 'server_listening', host, port, fallbackConfigured: Boolean(providerConfigurationFromEnvironment(process.env)) })}\n`);
     if (process.env.ARENA_ONE_SHOT_TOURNAMENT === 'reference-8x1-30m-v1') {
       if (!tournamentOperations) process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_launch_failed', error: 'Tournament operations unavailable' })}\n`);
       else void launchReferenceTournament(runtime, tournamentOperations, Math.floor(Date.now() / 1_000))

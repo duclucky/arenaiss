@@ -111,6 +111,7 @@ export class ArenaHttpApi {
         if (!this.tournamentOperations) throw new Error('tournament operations unavailable');
         if (request.method === 'GET') return this.json(200, await this.tournamentOperations.list());
         if (request.method === 'POST') {
+          if (process.env.ARENA_TOURNAMENTS_PAUSED === '1') throw new Error('Tournament creation is paused');
           const body = request.body || {};
           requireExactKeys(body, ['tournamentId', 'name', 'registrationOpensAt', 'registrationClosesAt', 'startsAt', 'expiresAt', 'minEntrants', 'maxEntrants', 'stakeAmount']);
           const input = {
@@ -252,8 +253,8 @@ export class ArenaHttpApi {
         if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
         const body = request.body || {};
         const created = this.service.createEvoCampaign(session.principal, { agentId: requireDigest(body.agentId), agentsVersion: requireDigest(body.agentsVersion), model: this.evaluationExecution.model });
-        const campaign = await this.evaluationExecution.start(session.userId!, session.principal, created.campaignId);
-        return this.json(202, campaign);
+        await this.evaluationExecution.start(session.userId!, session.principal, created.campaignId, { queueOnly: true });
+        return this.json(202, this.service.getPublicEvaluationCampaign(created.campaignId));
       }
       if (request.method === 'POST' && request.path === '/api/evaluation-packs') {
         const owner = this.requireSession(request.headers);
@@ -281,8 +282,8 @@ export class ArenaHttpApi {
       if (request.method === 'POST' && evaluationStart) {
         const session = this.requireManagedSession(request.headers);
         if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
-        const campaign = await this.evaluationExecution.start(session.userId!, session.principal, evaluationStart[1]);
-        return this.json(202, campaign);
+        await this.evaluationExecution.start(session.userId!, session.principal, evaluationStart[1], { queueOnly: true });
+        return this.json(202, this.service.getPublicEvaluationCampaign(evaluationStart[1] as `sha256:${string}`));
       }
       const evaluationAdvance = request.path.match(/^\/api\/evaluation-campaigns\/(sha256:[0-9a-fA-F]{64})\/advance$/);
       if (request.method === 'POST' && evaluationAdvance) {
@@ -390,12 +391,14 @@ export class ArenaHttpApi {
       }
       const registrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/registrations$/);
       if (request.method === 'POST' && registrationMatch) {
+        if (process.env.ARENA_TOURNAMENTS_PAUSED === '1') throw new Error('Tournament registration is paused');
         const owner = this.requireSession(request.headers);
         const agentId = requireString(request.body?.agentId);
         return this.json(200, this.service.prepareRegistration(owner, registrationMatch[1] as `sha256:${string}`, agentId as `sha256:${string}`));
       }
       const managedRegistrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/managed-registration$/);
       if (request.method === 'POST' && managedRegistrationMatch) {
+        if (process.env.ARENA_TOURNAMENTS_PAUSED === '1') throw new Error('Tournament registration is paused');
         const session = this.requireManagedSession(request.headers);
         if (!this.managedIdentity) throw new Error('managed Tournament registration unavailable');
         const agentId = requireString(request.body?.agentId);

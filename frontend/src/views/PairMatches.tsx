@@ -11,6 +11,7 @@ type Room = {
   evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
   evaluationFailureCode?: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'VERDICT_PENDING' | 'ARC_ERROR';
   evaluationAttempts?: number; retryAt?: number;
+  providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
 };
 type VerdictDetail = {
   schema: 'arena-pair-verdict-v1'; roomId: string; result: 'A_WIN' | 'B_WIN'; winner: 'CREATOR' | 'CHALLENGER'; summary: string;
@@ -203,6 +204,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
           {room.settleTx && <a className="underline" href={`https://testnet.arcscan.app/tx/${room.settleTx}`} target="_blank" rel="noreferrer">Arc settlement</a>}
         </div>
         <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
+        {room.providerRoute && room.providerModel && <p className="break-all text-xs text-neutral-700">{room.providerRoute === 'FALLBACK' ? 'Fallback provider' : 'Primary provider'} · {room.providerModel}</p>}
         {room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{room.evaluationFailureCode}</code></p>}
         {view === 'completed' && room.state === 'SETTLED' && room.verdictTx && <button type="button" className="metal-button-ghost" disabled={verdictLoading === room.roomId} onClick={() => void toggleVerdict(room.roomId)}>{expandedVerdict === room.roomId ? 'Hide GenLayer judgment' : verdictLoading === room.roomId ? 'Loading GenLayer judgment…' : 'View GenLayer judgment'}</button>}
         {expandedVerdict === room.roomId && verdictErrors[room.roomId] && <p role="alert" className="retro-inset p-4 text-sm text-red-900">{verdictErrors[room.roomId]}</p>}

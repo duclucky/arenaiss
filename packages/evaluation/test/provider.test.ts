@@ -7,6 +7,7 @@ import {
   classifyEvaluationProviderError,
   isTransientEvaluationProviderError,
   OpenAICompatibleEvaluationProvider,
+  providerConfigurationFromEnvironment,
 } from "../src/provider.ts";
 import { buildEvaluationInput, sha256Text } from "../src/protocol.ts";
 
@@ -29,6 +30,32 @@ const input = buildEvaluationInput({
     confirmationRequiredActionIds: [],
     maxProposedActions: 1,
   },
+});
+
+test("OpenAI primary uses completion token fields and Cheap fallback uses compatible fields", async () => {
+  const calls: Array<{ url: string; body: any }> = [];
+  const provider = new OpenAICompatibleEvaluationProvider({ endpoint: "https://api.openai.com/v1", apiKey: "openai-key", fallbackEndpoint: "https://cheap.example/v1", fallbackApiKey: "cheap-key", fallbackModel: "cheap-model", primaryFormat: "openai", fallbackFormat: "compatible", fetchImpl: async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+    if (calls.length === 1) return new Response("busy", { status: 503 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ schema: "arena-evaluation-output-v1", mode: "ACTION_DECISION", decision: "RESPOND", answer: "Recovered.", observable_rationale: "Safe retry.", proposed_actions: [] }) } }] }));
+  } });
+  const result = await provider.generate({ model: "openai-model", input, maxOutputTokens: 1200, temperature: 0.2, operationKey: "route-order" });
+  assert.equal(result.route, "FALLBACK");
+  assert.equal(result.model, "cheap-model");
+  assert.deepEqual(calls.map((call) => call.url), ["https://api.openai.com/v1/chat/completions", "https://cheap.example/v1/chat/completions"]);
+  assert.equal(calls[0].body.max_completion_tokens, 1200);
+  assert.equal(calls[1].body.max_tokens, 1200);
+});
+
+test("deployment maps OpenAI credentials to primary and Cheap credentials to fallback", () => {
+  const routes = providerConfigurationFromEnvironment({ END_POINT: "https://cheap.example/v1", API_KEY: "cheap-key", MODEL: "cheap-model", FALLBACK_API_KEY: "openai-key", FALLBACK_MODEL: "openai-model" });
+  assert.equal(routes?.model, "openai-model");
+  assert.equal(routes?.provider.endpoint, "https://api.openai.com/v1");
+  assert.equal(routes?.provider.fallbackEndpoint, "https://cheap.example/v1");
+  assert.equal(routes?.provider.apiKey, "openai-key");
+  assert.equal(routes?.provider.fallbackApiKey, "cheap-key");
+  assert.equal(routes?.provider.fallbackModel, "cheap-model");
+  assert.equal(providerConfigurationFromEnvironment({ END_POINT: "https://cheap.example/v1", API_KEY: "cheap-key", MODEL: "cheap-model" }), undefined);
 });
 
 test("chat body gives AGENTS.md explicit delegated authority and uses inert JSON actions", () => {

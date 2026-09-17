@@ -48,19 +48,19 @@ export type PublicEvaluationRun = {
   mode: string;
   rubricVersion: string;
   scenario: { scenarioId: string; version: string; mode: string; digest: string };
-  provider: { state: string };
+  provider: { state: string; model?: string; route?: 'PRIMARY' | 'FALLBACK' };
   judge: { state: string; transactionHash?: string };
   scorecard?: { resultClass: string; overallScore: number; dimensions: Array<{ dimensionId: string; grade: string }>; actionsExecuted: false };
 };
 export type PrivateEvaluationRun = Omit<PublicEvaluationRun, "schema" | "scenario" | "provider" | "scorecard"> & {
   schema: "arena-private-evaluation-run-v1";
   scenario: Record<string, unknown> & { digest: string };
-  provider: { state: string; requestId?: string; usageTokens?: number; output?: unknown };
+  provider: { state: string; model?: string; route?: 'PRIMARY' | 'FALLBACK'; requestId?: string; usageTokens?: number; output?: unknown };
   scorecard?: Record<string, unknown>;
 };
 export type EvaluationPackRecord = { schema: "arena-evaluation-pack-v1"; packId: Digest; version: string; owner: string; name: string; scenarios: EvaluationScenario[] };
 export type PublicEvaluationPack = { schema: "arena-public-evaluation-pack-v1"; packId: string; version: string; name: string; scenarioIds: string[]; scenarioCount: number };
-export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; createdAt?: number; startedAt?: number; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; failureStage?: string; failureCode?: string }> };
+export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; createdAt?: number; startedAt?: number; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; providerModel?: string; providerRoute?: 'PRIMARY' | 'FALLBACK'; failureStage?: string; failureCode?: string }> };
 export type MarketplaceTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
 export type MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1"; certificateDigest: Digest; evidenceDigest: string; owner: string; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; packId: Digest; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: "ELIGIBLE" | "APPROVED"; authorization?: MarketplaceTransaction };
 export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "CANCEL_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; purchaseApprovalIdempotencyKey?: string; purchaseIdempotencyKey?: string; cancellationIdempotencyKey?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
@@ -657,7 +657,7 @@ export class ArenaApiService {
     const heldAt = fee?.heldAt;
     const startedAt = fee?.campaignId === campaign.campaignId && fee.owner === campaign.owner && typeof heldAt === "number" && Number.isSafeInteger(heldAt) && heldAt > 0 && Number.isSafeInteger(heldAt * 1_000)
       ? heldAt * 1_000 : undefined;
-    return { schema: "arena-public-evaluation-campaign-v1", campaignId: campaign.campaignId, agentVersionId: campaign.agent.versionId, packId: campaign.testPack.packId, packVersion: campaign.testPack.version, rubricVersion: campaign.rubricVersion, state: campaign.state, ...(campaign.createdAt !== undefined ? { createdAt: campaign.createdAt } : {}), ...(startedAt !== undefined ? { startedAt } : {}), items: campaign.items.map((item) => ({ scenarioId: item.scenarioId, state: item.state, attempt: item.attempt, runIds: [...item.runIds], ...(item.scorecard ? { score: String(item.scorecard.result_class), overallScore: effectiveEvaluationScore(item.scorecard) } : {}), ...(item.failureStage && /^(PROVIDER|PERSISTENCE|GENLAYER_SUBMIT|GENLAYER_FINALITY|EXECUTION)$/.test(item.failureStage) ? { failureStage: item.failureStage } : {}), ...(item.failureCode && /^[A-Z_]{1,64}$/.test(item.failureCode) ? { failureCode: item.failureCode } : {}) })) };
+    return { schema: "arena-public-evaluation-campaign-v1", campaignId: campaign.campaignId, agentVersionId: campaign.agent.versionId, packId: campaign.testPack.packId, packVersion: campaign.testPack.version, rubricVersion: campaign.rubricVersion, state: campaign.state, ...(campaign.createdAt !== undefined ? { createdAt: campaign.createdAt } : {}), ...(startedAt !== undefined ? { startedAt } : {}), items: campaign.items.map((item) => ({ scenarioId: item.scenarioId, state: item.state, attempt: item.attempt, runIds: [...item.runIds], ...(item.scorecard ? { score: String(item.scorecard.result_class), overallScore: effectiveEvaluationScore(item.scorecard) } : {}), ...(item.providerModel && /^[^\s]{1,160}$/.test(item.providerModel) ? { providerModel: item.providerModel } : {}), ...(item.providerRoute && ['PRIMARY', 'FALLBACK'].includes(item.providerRoute) ? { providerRoute: item.providerRoute } : {}), ...(item.failureStage && /^(PROVIDER|PERSISTENCE|GENLAYER_SUBMIT|GENLAYER_FINALITY|EXECUTION)$/.test(item.failureStage) ? { failureStage: item.failureStage } : {}), ...(item.failureCode && /^[A-Z_]{1,64}$/.test(item.failureCode) ? { failureCode: item.failureCode } : {}) })) };
   }
   private requireSameSoloCampaign(existing: SoloCampaignRecord, owner: string, version: AgentVersion, pack: EvaluationPackRecord, runtimePolicy: SoloCampaignRecord["runtimePolicy"]): void {
     if (existing.owner !== owner
@@ -683,7 +683,9 @@ export class ArenaApiService {
       mode: record.input.mode,
       rubricVersion: record.rubricVersion,
       scenario: { scenarioId: record.input.scenario.scenario_id, version: record.input.scenario.version, mode: record.input.scenario.mode, digest: record.scenarioDigest },
-      provider: { state: record.provider.state },
+      provider: { state: record.provider.state,
+        ...(record.provider.state === 'SUCCESS' && typeof record.provider.model === 'string' && /^[^\s]{1,160}$/.test(record.provider.model) ? { model: record.provider.model } : {}),
+        ...(record.provider.state === 'SUCCESS' && (record.provider.route === 'PRIMARY' || record.provider.route === 'FALLBACK') ? { route: record.provider.route } : {}) },
       judge,
       ...(scorecard ? { scorecard } : {}),
     };
@@ -691,7 +693,7 @@ export class ArenaApiService {
   private privateEvaluationView(record: EvaluationRunRecord): PrivateEvaluationRun {
     const publicView = this.publicEvaluationView(record);
     const provider = record.provider.state === "SUCCESS"
-      ? { state: record.provider.state, ...(record.provider.requestId ? { requestId: record.provider.requestId } : {}), ...(record.provider.usageTokens !== undefined ? { usageTokens: record.provider.usageTokens } : {}), output: structuredClone(record.provider.output) }
+      ? { ...publicView.provider, ...(record.provider.requestId ? { requestId: record.provider.requestId } : {}), ...(record.provider.usageTokens !== undefined ? { usageTokens: record.provider.usageTokens } : {}), output: structuredClone(record.provider.output) }
       : { state: record.provider.state };
     return {
       ...publicView,

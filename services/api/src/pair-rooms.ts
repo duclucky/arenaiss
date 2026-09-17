@@ -17,6 +17,7 @@ export type PairRoom = {
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
   evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
   evaluationFailureCode?: PairEvaluationFailureCode; evaluationAttempts?: number; retryAt?: number;
+  providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
   createdAt: number;
 };
 export type PairVerdictDetail = {
@@ -75,7 +76,7 @@ export class PairRoomCoordinator {
 
   list(): PairRoom[] {
     return this.runtime.list<PairRoom>(STORE).filter((row) => row.state !== 'PENDING')
-      .sort((a, b) => b.createdAt - a.createdAt).map((row) => structuredClone(row));
+      .sort((a, b) => b.createdAt - a.createdAt).map((row) => this.withProviderRoute(row));
   }
 
   listOpen(): PairRoom[] { return this.list().filter((room) => room.state === 'OPEN'); }
@@ -88,7 +89,24 @@ export class PairRoomCoordinator {
   get(roomId: string): PairRoom | null {
     if (!DIGEST.test(roomId)) throw new Error('invalid room ID');
     const row = this.runtime.get<PairRoom>(STORE, roomId);
-    return row && row.state !== 'PENDING' ? structuredClone(row) : null;
+    return row && row.state !== 'PENDING' ? this.withProviderRoute(row) : null;
+  }
+
+  private withProviderRoute(row: PairRoom): PairRoom {
+    const room = structuredClone(row);
+    if (room.state !== 'JOINED' && room.state !== 'SETTLED' && room.state !== 'REFUNDABLE') return room;
+    const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|1`);
+    const a = this.runtime.get<{ model?: string; route?: 'PRIMARY' | 'FALLBACK' }>('evaluation-tournament-provider-runs', `${attemptId}:A`);
+    const b = this.runtime.get<{ model?: string; route?: 'PRIMARY' | 'FALLBACK' }>('evaluation-tournament-provider-runs', `${attemptId}:B`);
+    if (a?.model && a.model === b?.model && a.route === 'PRIMARY' && b?.route === 'PRIMARY' && /^[^\s]{1,160}$/.test(a.model)) {
+      room.providerRoute = 'PRIMARY'; room.providerModel = a.model;
+    }
+    const decision = this.runtime.get<{ model?: string }>('evaluation-tournament-provider-route', attemptId);
+    if (typeof decision?.model === 'string' && /^[^\s]{1,160}$/.test(decision.model)) {
+      room.providerRoute = 'FALLBACK';
+      room.providerModel = decision.model;
+    }
+    return room;
   }
 
   verdict(principal: string, roomId: string): PairVerdictDetail {

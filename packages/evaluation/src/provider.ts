@@ -72,6 +72,22 @@ export interface EvaluationProviderResult {
   route?: "PRIMARY" | "FALLBACK";
 }
 
+type ChatRequestFormat = "compatible" | "openai";
+
+export function providerConfigurationFromEnvironment(environment: Record<string, string | undefined>): { model: string; provider: { endpoint: string; apiKey: string; fallbackEndpoint: string; fallbackApiKey: string; fallbackModel: string; primaryFormat: ChatRequestFormat; fallbackFormat: ChatRequestFormat } } | undefined {
+  const endpoint = environment.END_POINT?.trim();
+  const apiKey = environment.API_KEY?.trim();
+  const model = environment.MODEL?.trim();
+  const openaiKey = environment.FALLBACK_API_KEY?.trim();
+  const openaiModel = environment.FALLBACK_MODEL?.trim();
+  if (!endpoint || !apiKey || !model || !openaiKey || !openaiModel) return undefined;
+  return { model: openaiModel, provider: {
+    endpoint: environment.FALLBACK_END_POINT?.trim() || "https://api.openai.com/v1",
+    apiKey: openaiKey, fallbackEndpoint: endpoint, fallbackApiKey: apiKey, fallbackModel: model,
+    primaryFormat: "openai", fallbackFormat: "compatible",
+  } };
+}
+
 export class OpenAICompatibleEvaluationProvider {
   private static readonly OPENAI_ENDPOINT = "https://api.openai.com/v1";
   private endpoint: string;
@@ -80,8 +96,10 @@ export class OpenAICompatibleEvaluationProvider {
   private style: EvaluationProviderStyle;
   private fetchImpl: FetchLike;
   private timeoutMs: number;
+  private primaryFormat: ChatRequestFormat;
+  private fallbackFormat: ChatRequestFormat;
 
-  constructor(config: { endpoint: string; fallbackEndpoint?: string; apiKey: string; fallbackApiKey?: string; fallbackModel?: string; style?: EvaluationProviderStyle; fetchImpl?: FetchLike; timeoutMs?: number }) {
+  constructor(config: { endpoint: string; fallbackEndpoint?: string; apiKey: string; fallbackApiKey?: string; fallbackModel?: string; style?: EvaluationProviderStyle; primaryFormat?: ChatRequestFormat; fallbackFormat?: ChatRequestFormat; fetchImpl?: FetchLike; timeoutMs?: number }) {
     if (!config.apiKey) throw new TypeError("provider API key is required server-side");
     this.style = config.style ?? "chat-completions";
     this.endpoint = this.normalizeEndpoint(config.endpoint, "provider");
@@ -95,6 +113,8 @@ export class OpenAICompatibleEvaluationProvider {
       model: fallbackModel,
     };
     this.apiKey = config.apiKey;
+    this.primaryFormat = config.primaryFormat ?? "compatible";
+    this.fallbackFormat = config.fallbackFormat ?? "openai";
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.timeoutMs = config.timeoutMs ?? 120_000;
   }
@@ -103,20 +123,18 @@ export class OpenAICompatibleEvaluationProvider {
 
   async generate(value: { model: string; input: EvaluationProviderInput; maxOutputTokens: number; temperature: number; operationKey: string; route?: "PRIMARY" | "FALLBACK" }): Promise<EvaluationProviderResult> {
     try {
-      const body = JSON.stringify(buildEvaluationProviderBody({ style: this.style, model: value.model, input: value.input, maxOutputTokens: value.maxOutputTokens, temperature: value.temperature }));
+      const body = JSON.stringify(this.requestBody(this.style, this.primaryFormat, value.model, value.input, value.maxOutputTokens, value.temperature));
       let payload: any;
       let responseStyle = this.style;
       let route: "PRIMARY" | "FALLBACK" = "PRIMARY";
       const useFallback = async () => {
         if (!this.fallback) throw new Error("fallback provider is unavailable");
-        const openaiBody = buildEvaluationProviderBody({ style: "chat-completions", model: this.fallback.model, input: value.input, maxOutputTokens: value.maxOutputTokens, temperature: value.temperature });
-        const { max_tokens: maxCompletionTokens, temperature: _temperature, ...fallbackParameters } = openaiBody;
-        const fallbackBody = JSON.stringify({ ...fallbackParameters, max_completion_tokens: maxCompletionTokens });
+        const fallbackBody = JSON.stringify(this.requestBody("chat-completions", this.fallbackFormat, this.fallback.model, value.input, value.maxOutputTokens, value.temperature));
         payload = await this.request(this.fallback.endpoint, this.fallback.apiKey, fallbackBody, value.operationKey);
         responseStyle = "chat-completions";
         route = "FALLBACK";
       };
-      if (value.route === "FALLBACK") {
+      if (value.route === "FALLBACK" || (!value.route && this.fallback && value.model === this.fallback.model)) {
         await useFallback();
       } else {
         try {
@@ -143,6 +161,13 @@ export class OpenAICompatibleEvaluationProvider {
       if (this.isTemporaryFailure(error)) Object.assign(failure, { transient: true });
       throw failure;
     }
+  }
+
+  private requestBody(style: EvaluationProviderStyle, format: ChatRequestFormat, model: string, input: EvaluationProviderInput, maxOutputTokens: number, temperature: number): Record<string, unknown> {
+    const body = buildEvaluationProviderBody({ style, model, input, maxOutputTokens, temperature });
+    if (style !== "chat-completions" || format !== "openai") return body;
+    const { max_tokens: maxCompletionTokens, temperature: _temperature, ...parameters } = body;
+    return { ...parameters, max_completion_tokens: maxCompletionTokens };
   }
 
   private async request(endpoint: string, apiKey: string, body: string, operationKey: string): Promise<unknown> {

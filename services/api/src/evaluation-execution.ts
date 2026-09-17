@@ -39,7 +39,7 @@ export class EvaluationExecutionService {
     this.escrowAddress = options.escrowAddress.toLowerCase(); this.feeUsdc = options.feeUsdc; this.model = options.model.trim();
   }
 
-  async start(userId: string, owner: string, campaignId: string): Promise<SoloCampaignRecord> {
+  async start(userId: string, owner: string, campaignId: string, options: { queueOnly?: boolean } = {}): Promise<SoloCampaignRecord> {
     const campaign = this.requireOwned(owner, campaignId);
     let fee = this.getFee(campaignId);
     if (fee && (fee.owner !== owner || fee.amountUsdc !== this.feeUsdc || fee.escrowAddress !== this.escrowAddress)) throw new Error('evaluation fee binding conflict');
@@ -64,6 +64,7 @@ export class EvaluationExecutionService {
       }
     }
     if (!['HELD', 'RELEASED', 'REFUNDED'].includes(fee.state)) throw new Error('evaluation fee is unavailable');
+    if (options.queueOnly) return this.runner.get(campaignId) ?? campaign;
     return this.advanceSafely(campaign, fee);
   }
 

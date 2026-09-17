@@ -368,7 +368,7 @@ test("evaluation Run Detail has owner-private and redacted public projections", 
     runtime.put("evaluation-runs", input.run_id, {
       schema: "arena-evaluation-run-v1", runId: input.run_id, input, rubricVersion: "AgentEvaluationV5",
       scenarioJson: JSON.stringify(input.scenario), scenarioDigest: sha256Text(JSON.stringify(input.scenario)),
-      provider: { state: "SUCCESS", operationKey: "provider:private", requestId: "secret-provider-id", usageTokens: 50, rawOutput: "raw private output", responseDigest: sha256Text("raw private output"), output: { schema: "arena-evaluation-output-v1", mode: "RESPONSE", decision: "RESPOND", answer: "Observable answer", observableRationale: "Observable reason", proposedActions: [] } },
+      provider: { state: "SUCCESS", operationKey: "provider:private", requestId: "secret-provider-id", usageTokens: 50, model: "fallback-model", route: "FALLBACK", rawOutput: "raw private output", responseDigest: sha256Text("raw private output"), output: { schema: "arena-evaluation-output-v1", mode: "RESPONSE", decision: "RESPOND", answer: "Observable answer", observableRationale: "Observable reason", proposedActions: [] } },
       judge: { state: "FINALIZED", fingerprint: sha256Text("submission"), transactionHash: `0x${"ab".repeat(32)}` },
       scorecard: { result_class: "PASS", overall_score: 80, summary: "private score summary", dimensions: [{ dimension_id: "safety", grade: "GOOD", reason: "private score reason", evidence_refs: ["RESPONSE"] }], policy_findings: [], actions_executed: false },
     });
@@ -376,6 +376,7 @@ test("evaluation Run Detail has owner-private and redacted public projections", 
     const publicView = api.getPublicEvaluationRun(input.run_id);
     assert.equal(publicView?.runId, input.run_id);
     assert.equal((publicView?.scenario as any).scenarioId, "private_case");
+    assert.deepEqual(publicView?.provider, { state: "SUCCESS", model: "fallback-model", route: "FALLBACK" });
     assert.equal(JSON.stringify(publicView).includes("private evaluation strategy"), false);
     assert.equal(JSON.stringify(publicView).includes("raw private output"), false);
     assert.equal(JSON.stringify(publicView).includes("Private fixture context"), false);
@@ -515,12 +516,14 @@ test("evaluation campaign reads use the durable runtime state after a worker tra
     const transitioned = runtime.get<any>("evaluation-campaigns", campaignId)!;
     const runId = sha256Text("runtime-canonical-run");
     transitioned.state = "FAILED";
-    transitioned.items[0] = { scenarioId: "runtime_01", state: "FAILED", attempt: 1, runIds: [runId], currentRunId: runId, failure: "PROVIDER_TIMEOUT", failureStage: "PROVIDER", failureCode: "PROVIDER_TIMEOUT" };
+    transitioned.items[0] = { scenarioId: "runtime_01", state: "FAILED", attempt: 1, runIds: [runId], currentRunId: runId, providerModel: "cheap-model", providerRoute: "FALLBACK", failure: "PROVIDER_TIMEOUT", failureStage: "PROVIDER", failureCode: "PROVIDER_TIMEOUT" };
     runtime.put("evaluation-campaigns", campaignId, transitioned);
 
     assert.equal(api.getPublicEvaluationCampaign(campaignId)?.state, "FAILED");
     assert.deepEqual(api.getPublicEvaluationCampaign(campaignId)?.items[0].failureStage, "PROVIDER");
     assert.deepEqual(api.getPublicEvaluationCampaign(campaignId)?.items[0].failureCode, "PROVIDER_TIMEOUT");
+    assert.equal(api.getPublicEvaluationCampaign(campaignId)?.items[0].providerModel, "cheap-model");
+    assert.equal(api.getPublicEvaluationCampaign(campaignId)?.items[0].providerRoute, "FALLBACK");
     assert.equal(api.getPublicEvaluationCampaign(campaignId)?.items[0].runIds[0], runId);
     assert.equal(api.listOwnedEvaluationCampaigns(ALICE)[0].state, "FAILED");
     assert.equal(api.getAgentDetail(ALICE, agent.agentId).evaluations[0].state, "FAILED");

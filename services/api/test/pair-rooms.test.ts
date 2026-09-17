@@ -70,6 +70,39 @@ function fixture() {
   return { runtime, coordinator, get creates() { return creates; }, get joins() { return joins; }, setCreatorBalance(value: bigint) { creatorBalance = value; }, setChallengerBalance(value: bigint) { challengerBalance = value; }, rejectWithdrawal() { rejectWithdrawal = true; }, rejectJoin() { rejectJoin = true; } };
 }
 
+test('participant room history exposes the selected fallback route without provider credentials', () => {
+  const f = fixture();
+  try {
+    const roomId = `sha256:${'d'.repeat(64)}`;
+    const attemptId = `sha256:${createHash('sha256').update(`arena-pair-attempt-v1|${roomId}|1`).digest('hex')}`;
+    f.runtime.put('pair-rooms-v1', roomId, { roomId, creator: 'creator-principal', creatorWallet: CREATOR,
+      creatorAgentId: AGENT, creatorVersion: VERSION_A, challenger: 'challenger-principal', challengerWallet: CHALLENGER,
+      challengerAgentId: AGENT, challengerVersion: VERSION_B, stake: '1000000', joinDeadline: 1000,
+      resolutionDeadline: 2000, state: 'JOINED', createdAt: 100 });
+    f.runtime.put('evaluation-tournament-provider-route', attemptId, { fingerprint: 'bound-run', model: 'fallback-model' });
+    const room = f.coordinator.listForPrincipal('creator-principal')[0] as any;
+    assert.equal(room.providerRoute, 'FALLBACK');
+    assert.equal(room.providerModel, 'fallback-model');
+    assert.equal(JSON.stringify(room).includes('apiKey'), false);
+  } finally { f.runtime.close(); }
+});
+
+test('participant room history identifies a completed primary provider pair', () => {
+  const f = fixture();
+  try {
+    const roomId = `sha256:${'e'.repeat(64)}`;
+    const attemptId = `sha256:${createHash('sha256').update(`arena-pair-attempt-v1|${roomId}|1`).digest('hex')}`;
+    f.runtime.put('pair-rooms-v1', roomId, { roomId, creator: 'creator-principal', creatorWallet: CREATOR,
+      creatorAgentId: AGENT, creatorVersion: VERSION_A, challenger: 'challenger-principal', challengerWallet: CHALLENGER,
+      challengerAgentId: AGENT, challengerVersion: VERSION_B, stake: '1000000', joinDeadline: 1000,
+      resolutionDeadline: 2000, state: 'JOINED', createdAt: 100 });
+    for (const side of ['A', 'B']) f.runtime.put('evaluation-tournament-provider-runs', `${attemptId}:${side}`, { model: 'openai-model', route: 'PRIMARY' });
+    const room = f.coordinator.listForPrincipal('creator-principal')[0];
+    assert.equal(room.providerRoute, 'PRIMARY');
+    assert.equal(room.providerModel, 'openai-model');
+  } finally { f.runtime.close(); }
+});
+
 test('insufficient Arc USDC leaves no visible room and never submits a wallet transaction', async () => {
   const f = fixture();
   try {

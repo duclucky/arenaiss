@@ -10,22 +10,42 @@ export function EvaluationRunDetail() {
   const [run, setRun] = useState<EvaluationRun | null>(null);
   const [privateEvidence, setPrivateEvidence] = useState<{ runId: string; account: string; run: PrivateEvaluationRun } | null>(null);
   const [error, setError] = useState('');
+  const observedRunId = run?.runId;
+  const providerState = run?.provider.state;
+  const judgeState = run?.judge.state;
 
   useEffect(() => {
     let active = true;
+    let timer: number | undefined;
     setRun(null); setError('');
-    if (id && evaluationApi) evaluationApi.getRun(id).then((value) => { if (active) setRun(value as EvaluationRun); }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Could not load run.'); });
-    return () => { active = false; };
+    if (id && evaluationApi) {
+      const refresh = async () => {
+        let pollAgain = true;
+        try {
+          const value = await evaluationApi.getRun(id) as EvaluationRun;
+          if (!active) return;
+          setRun(value); setError('');
+          pollAgain = !['FINALIZED', 'FAILED', 'RECOVERY_REQUIRED'].includes(value.judge.state)
+            && !['EMPTY_OUTPUT', 'PROVIDER_TIMEOUT', 'PROVIDER_ERROR', 'INVALID_OUTPUT'].includes(value.provider.state);
+        } catch (cause) {
+          if (active) setError(cause instanceof Error ? cause.message : 'Could not load run.');
+        } finally {
+          if (active && pollAgain) timer = window.setTimeout(refresh, 5_000);
+        }
+      };
+      void refresh();
+    }
+    return () => { active = false; if (timer !== undefined) window.clearTimeout(timer); };
   }, [id, evaluationApi]);
 
   useEffect(() => {
     let active = true;
     setPrivateEvidence(null);
-    if (id && account && evaluationApi) evaluationApi.getRun(id, true).then((value) => {
+    if (id && account && evaluationApi && observedRunId === id) evaluationApi.getRun(id, true).then((value) => {
       if (active && value.schema === 'arena-private-evaluation-run-v1') setPrivateEvidence({ runId: id, account, run: value });
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [id, account, evaluationApi]);
+  }, [id, account, evaluationApi, observedRunId, providerState, judgeState]);
 
   if (error) return <div role="alert" className="glass-panel mx-auto max-w-4xl p-8">{error}</div>;
   if (!run) return <div role="status" className="glass-panel mx-auto max-w-4xl p-8">Loading run…</div>;
@@ -33,7 +53,7 @@ export function EvaluationRunDetail() {
   return <section className="mx-auto max-w-4xl space-y-8">
     <Link to="/evaluations" className="inline-flex min-h-11 items-center text-sm underline">← Evaluations</Link>
     <header><p className="page-kicker">Evaluation run</p><h1 className="page-title">Test result</h1></header>
-    <div className="glass-panel p-6"><div className="grid gap-3 sm:grid-cols-2"><Fact label="Topic" value={topicName(run.scenario.scenarioId)}/><Fact label="Mode" value={run.mode}/><Fact label="Provider" value={run.provider.state}/><Fact label="GenLayer finality" value={run.judge.state}/><Fact label="Rubric" value={run.rubricVersion}/></div><p className="mt-4 text-xs text-neutral-600">Topic labels describe the test area. The exact prompt and hidden context remain private.</p>{receiptUrl && <a className="metal-button-ghost mt-5 w-full gap-2 sm:w-auto" href={receiptUrl} target="_blank" rel="noreferrer">View Studio Next transaction <ExternalLink size={15} aria-hidden="true" /></a>}</div>
+    <div className="glass-panel p-6"><div className="grid gap-3 sm:grid-cols-2"><Fact label="Topic" value={topicName(run.scenario.scenarioId)}/><Fact label="Mode" value={run.mode}/><Fact label="Provider" value={run.provider.state}/>{run.provider.route && <Fact label="Provider route" value={run.provider.route === 'FALLBACK' ? 'Fallback' : 'Primary'}/>}{run.provider.model && <Fact label="Provider model" value={run.provider.model}/>}<Fact label="GenLayer finality" value={run.judge.state}/><Fact label="Rubric" value={run.rubricVersion}/></div><p className="mt-4 text-xs text-neutral-600">Topic labels describe the test area. The exact prompt and hidden context remain private.</p>{receiptUrl && <a className="metal-button-ghost mt-5 w-full gap-2 sm:w-auto" href={receiptUrl} target="_blank" rel="noreferrer">View Studio Next transaction <ExternalLink size={15} aria-hidden="true" /></a>}</div>
     {run.scorecard ? <section className="glass-panel p-6" aria-labelledby="scorecard-heading"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="page-kicker">Verdict</p><h2 id="scorecard-heading" className="text-2xl font-bold">{run.scorecard.resultClass}</h2></div><p className="font-mono text-4xl">{run.scorecard.overallScore}<span className="text-lg text-neutral-600">/100</span></p></div>{run.scorecard.resultClass === 'FAIL' && run.scorecard.overallScore === 0 && <p role="status" className="mt-4 border-l-2 border-black pl-4 text-sm leading-relaxed"><strong>A policy finding or failing safety/rule grade sets the effective score to 0.</strong> The dimension grades below remain available for audit.</p>}<div className="mt-6 overflow-x-auto"><table aria-label="Score dimensions" className="w-full min-w-[420px] border-collapse text-left text-sm"><thead className="border-y border-black bg-black/5 text-xs uppercase tracking-wider"><tr><th className="p-3">Dimension</th><th className="p-3 text-right">Grade</th></tr></thead><tbody>{run.scorecard.dimensions.map((dimension) => <tr className="border-b border-black/15" key={dimension.dimensionId}><td className="p-3">{dimension.dimensionId}</td><td className="p-3 text-right font-bold">{dimension.grade}</td></tr>)}</tbody></table></div></section> : <div className="glass-panel p-6">Scorecard is not final yet.</div>}
     {privateEvidence && privateEvidence.runId === id && privateEvidence.account === account && <OwnerEvidence run={privateEvidence.run} effectiveScore={run.scorecard?.overallScore} />}
     <div className="border-l-2 border-black pl-4 text-xs leading-relaxed text-neutral-600"><strong className="text-black">Privacy boundary.</strong> Only the Agent owner can view the output and detailed findings. Public records exclude prompts, hidden context, provider output and private reasons.</div>

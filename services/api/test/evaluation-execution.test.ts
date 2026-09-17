@@ -10,6 +10,27 @@ const operator = `0x${'2'.repeat(40)}`;
 const escrow = `0x${'3'.repeat(40)}`;
 const tx = (digit: string) => ({ transactionId: `circle-${digit}`, state: 'COMPLETE', txHash: `0x${digit.repeat(64)}` });
 
+test('web start returns after the fee is held and the worker advances the provider later', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    let advances = 0;
+    const campaign: any = { campaignId, owner, state: 'PENDING' };
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'primary-model',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { return tx('3'); }, async refund() { return tx('4'); } },
+      runner: { get: () => campaign, async advance() { advances += 1; campaign.state = 'RUNNING'; return structuredClone(campaign); }, failInfrastructure() { throw new Error('unexpected failure'); } } as any,
+    });
+
+    const accepted = await service.start('usr_owner', owner, campaignId, { queueOnly: true });
+    assert.equal(accepted.state, 'PENDING');
+    assert.equal(service.getFee(campaignId)?.state, 'HELD');
+    assert.equal(advances, 0);
+    assert.deepEqual(await service.resumePending(), { attempted: 1, succeeded: 1, failed: 0 });
+    assert.equal(advances, 1);
+  } finally { runtime.close(); }
+});
+
 test('Evo holds one fixed USDC fee then releases it only after all tests finalize', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

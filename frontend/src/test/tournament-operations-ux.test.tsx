@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import type { AgentApiAdapter, ArenaReadAdapter, ManagedIdentityAdapter, TournamentOperationsApiAdapter } from '../adapters/interfaces';
+import type { AgentApiAdapter, ArenaReadAdapter, ManagedIdentityAdapter } from '../adapters/interfaces';
 import { AppProvider } from '../context';
 import { Tournaments } from '../views/Tournaments';
 import { TournamentDetail } from '../views/TournamentDetail';
@@ -10,13 +10,11 @@ import { MatchDetail } from '../views/MatchDetail';
 
 const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, identity: { kind: 'WALLET' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: `0x${'9'.repeat(40)}`, blockchain: 'ARC-TESTNET' as const, accountType: 'EOA' as const } };
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
-const arenaRead = { async listTournaments() { return []; } } as unknown as ArenaReadAdapter;
-const snapshot = { tournamentId: `sha256:${'a'.repeat(64)}`, name: 'Safety Cup', state: 'REGISTRATION' as const, entrantCount: 3, matchCount: 0, finalizedMatchCount: 0, nextActions: ['PROGRESS', 'EXPIRE'] as const, arc: { state: 'REGISTRATION' } };
 
 describe('Tournament operator console', () => {
-  it('marks Tournaments as coming soon and disables the build Agent action', async () => {
-    render(<MemoryRouter><AppProvider arenaReadAdapter={arenaRead}><Tournaments /></AppProvider></MemoryRouter>);
-    expect(await screen.findByText('Coming soon')).toBeInTheDocument();
+  it('marks Tournaments as coming soon and disables the build Agent action', () => {
+    render(<MemoryRouter><AppProvider><Tournaments /></AppProvider></MemoryRouter>);
+    expect(screen.getAllByText('Coming soon').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Build an agent' })).toBeDisabled();
     expect(screen.queryByRole('link', { name: /Build an agent/ })).not.toBeInTheDocument();
   });
@@ -89,62 +87,17 @@ describe('Tournament operator console', () => {
     expect(screen.queryByText(/abcdef123456/)).not.toBeInTheDocument();
   });
 
-  it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {
-    const archived = `sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
-    const hiddenDaily = 'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd';
-    const live = `sha256:${'b'.repeat(64)}`;
-    const joined = `sha256:${'c'.repeat(64)}`;
-    const reads = { async listTournaments() { return [
-      { id: archived, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', entrantIds: [], prizePool: '0.008' },
-      { id: hiddenDaily, name: 'Arena ISS Daily 2026-09-17 UTC', status: 'ACTIVE', entrantCount: 9, prizePool: '9' },
-      { id: live, name: 'Open Safety Cup', status: 'UPCOMING', entrantCount: 3, registrationClosesAt: Math.floor(Date.now() / 1_000) + 3_600, prizePool: '3' },
-      { id: joined, name: 'Joined Cup', status: 'COMPLETED', entrantIds: [], prizePool: '8' },
-    ]; } } as unknown as ArenaReadAdapter;
-    const agentApi = { async listOwnedRegistrations() { return [{ tournamentId: `0x${'c'.repeat(64)}`, entrantId: `0x${'d'.repeat(64)}` }]; }, async listOwnedAgents() { return []; }, async createAgent() { throw new Error('unused'); }, async prepareRegistration() { throw new Error('unused'); } } as AgentApiAdapter;
-    render(<MemoryRouter><AppProvider identityAdapter={identity} arenaReadAdapter={reads} agentApiAdapter={agentApi}><Tournaments /></AppProvider></MemoryRouter>);
-    expect(await screen.findByRole('heading', { name: 'From registration to results' })).toBeInTheDocument();
-    expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
-    expect(await screen.findByText('Open Safety Cup')).toBeInTheDocument();
-    expect(screen.queryByText('Arena ISS Daily 2026-09-17 UTC')).not.toBeInTheDocument();
-    expect(screen.getByText(/Registered Agents:/).parentElement).toHaveTextContent('3');
-    expect(screen.getByText(/Starts in:/).parentElement).toHaveTextContent('00:');
-    expect(screen.queryByText('Joined Cup')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Tournaments joined' }));
-    expect(await screen.findByText('Joined Cup')).toBeInTheDocument();
-    expect(screen.queryByText('Open Safety Cup')).not.toBeInTheDocument();
+  it('directs players from the paused Tournament page to pair matches and existing claims', () => {
+    render(<MemoryRouter><AppProvider><Tournaments /></AppProvider></MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Tournament play is paused' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Explore pair matches' })).toHaveAttribute('href', '/pairs');
+    expect(screen.getByRole('link', { name: 'View claims' })).toHaveAttribute('href', '/account?tab=claim');
   });
 
-  it('creates and progresses a tournament without exposing ranking or payout inputs', async () => {
-    const create = vi.fn().mockResolvedValue(snapshot);
-    const execute = vi.fn().mockResolvedValue({ ...snapshot, state: 'RUNNING' });
-    const operations: TournamentOperationsApiAdapter = { async list() { return [snapshot]; }, async get() { return snapshot; }, create, execute };
-    render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '/api' }} identityAdapter={identity} arenaReadAdapter={arenaRead} tournamentOperationsApiAdapter={operations}><Tournaments /></AppProvider></MemoryRouter>);
-
-    expect(await screen.findByRole('heading', { name: 'Operator lifecycle' })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/ranking/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/payout/i)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Tournament name'), { target: { value: 'New Safety Cup' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create tournament' }));
-    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ name: 'New Safety Cup', minEntrants: 8, maxEntrants: 8 })));
-    fireEvent.click(screen.getByRole('button', { name: 'Progress Safety Cup' }));
-    await waitFor(() => expect(execute).toHaveBeenCalledWith(snapshot.tournamentId, 'PROGRESS'));
-  });
-
-  it('lets the operator schedule a one USDC tournament to start in 30 minutes', async () => {
-    const create = vi.fn().mockResolvedValue(snapshot);
-    const operations: TournamentOperationsApiAdapter = { async list() { return []; }, async get() { return snapshot; }, create, async execute() { return snapshot; } };
-    render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '/api' }} identityAdapter={identity} arenaReadAdapter={arenaRead} tournamentOperationsApiAdapter={operations}><Tournaments /></AppProvider></MemoryRouter>);
-
-    expect(await screen.findByRole('heading', { name: 'Operator lifecycle' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Starts in'), { target: { value: '1800' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create tournament' }));
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    const input = create.mock.calls[0][0];
-    expect(input.registrationClosesAt - input.registrationOpensAt).toBe(1_800);
-    expect(input.startsAt).toBe(input.registrationClosesAt);
-    expect(input.minEntrants).toBe(8);
-    expect(input.maxEntrants).toBe(8);
-    expect(input.stakeAmount).toBe('1000000');
+  it('does not offer new Tournament registration or operator creation while paused', () => {
+    render(<MemoryRouter><AppProvider><Tournaments /></AppProvider></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: 'Create tournament' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Register Agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Tournament live' })).not.toBeInTheDocument();
   });
 });

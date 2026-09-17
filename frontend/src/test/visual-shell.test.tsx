@@ -200,9 +200,9 @@ describe('Arena ISS visual shell', () => {
     expect(container.querySelector('.app-shell')).toHaveAttribute('data-surface', 'editorial');
     expect(container.querySelector('.brand-mark')).toHaveAttribute('src', '/brand/arena-iss-mark.png');
     expect(container.querySelector('.brand-star')).not.toBeInTheDocument();
-    expect(container.querySelector('.page-kicker')).toHaveTextContent('Open competition');
-    expect(screen.getByRole('button', { name: 'Build an agent' })).toHaveClass('pill-button-dark');
+    expect(container.querySelector('.page-kicker')).toHaveTextContent('Future competition mode');
     expect(screen.getByRole('button', { name: 'Build an agent' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Explore pair matches' })).toHaveAttribute('href', '/pairs');
   });
 
   it('does not expose product navigation before login', async () => {
@@ -213,15 +213,11 @@ describe('Arena ISS visual shell', () => {
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
   });
 
-  it('shows an actionable read error and retries without leaving the editorial page', async () => {
+  it('shows the paused Tournament page without loading an obsolete live list', async () => {
     window.history.pushState({}, '', '/tournaments');
     const arenaRead = new RecoveringArenaRead();
     render(<App walletAdapter={new VisualWallet()} arenaReadAdapter={arenaRead} />);
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('temporary read failure');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('heading', { name: 'Recovered Arena' })).toBeInTheDocument();
-    expect(arenaRead.calls).toBe(2);
+    expect(await screen.findByRole('heading', { name: 'Tournament play is paused' })).toBeInTheDocument();
+    expect(arenaRead.calls).toBe(0);
   });
 });

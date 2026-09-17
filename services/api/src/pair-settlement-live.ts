@@ -4,7 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
 
 import { TournamentEvaluationPairRunner, TournamentComparisonJudgeAdapter } from '../../../packages/evaluation/src/tournament-runner.ts';
-import { OpenAICompatibleEvaluationProvider } from '../../../packages/evaluation/src/provider.ts';
+import { OpenAICompatibleEvaluationProvider, providerConfigurationFromEnvironment } from '../../../packages/evaluation/src/provider.ts';
 import { ComparisonRunRegistry } from '../../../packages/evaluation/src/tournament-comparison.ts';
 import { ComparisonRunTracker, PersistentComparisonSubmissionStore } from '../../../packages/genlayer/src/comparison-tracker.ts';
 import { createStudioNextComparisonJudgePort } from '../../../packages/genlayer/src/comparison-sdk-port.ts';
@@ -22,13 +22,22 @@ function bytes32(value: string): Hex { if (!/^sha256:[0-9a-f]{64}$/.test(value))
 
 export class LivePairOutcome implements PairOutcomePort {
   private readonly inference: TournamentEvaluationPairRunner;
+  private readonly legacyInference?: TournamentEvaluationPairRunner;
+  private readonly runtime: SqliteRuntimeStore;
+  private readonly cheapModel?: string;
+  private readonly openaiModel: string;
   private readonly judge: TournamentComparisonJudgeAdapter;
   private readonly tracker: ComparisonRunTracker;
   private readonly agents: ArenaApiService;
 
-  constructor(runtime: SqliteRuntimeStore, agents: ArenaApiService, input: { privateKey: string; judgeAddress: string; endpoint: string; apiKey: string; model: string; fallbackEndpoint?: string; fallbackApiKey?: string; fallbackModel?: string }) {
-    const provider = new OpenAICompatibleEvaluationProvider({ endpoint: input.endpoint, fallbackEndpoint: input.fallbackEndpoint, apiKey: input.apiKey, fallbackApiKey: input.fallbackApiKey, fallbackModel: input.fallbackModel, timeoutMs: 300_000 });
+  constructor(runtime: SqliteRuntimeStore, agents: ArenaApiService, input: { privateKey: string; judgeAddress: string; endpoint: string; apiKey: string; model: string; fallbackEndpoint?: string; fallbackApiKey?: string; fallbackModel?: string; primaryFormat?: 'openai' | 'compatible'; fallbackFormat?: 'openai' | 'compatible' }) {
+    this.runtime = runtime; this.cheapModel = input.fallbackModel; this.openaiModel = input.model;
+    const provider = new OpenAICompatibleEvaluationProvider({ endpoint: input.endpoint, fallbackEndpoint: input.fallbackEndpoint, apiKey: input.apiKey, fallbackApiKey: input.fallbackApiKey, fallbackModel: input.fallbackModel, primaryFormat: input.primaryFormat, fallbackFormat: input.fallbackFormat, timeoutMs: 300_000 });
     this.inference = new TournamentEvaluationPairRunner(provider, { model: input.model, maxOutputTokens: 1_500, temperature: 0.2 }, runtime);
+    if (input.fallbackEndpoint && input.fallbackApiKey && input.fallbackModel) {
+      const legacyProvider = new OpenAICompatibleEvaluationProvider({ endpoint: input.fallbackEndpoint, apiKey: input.fallbackApiKey, fallbackEndpoint: input.endpoint, fallbackApiKey: input.apiKey, fallbackModel: input.model, timeoutMs: 300_000 });
+      this.legacyInference = new TournamentEvaluationPairRunner(legacyProvider, { model: input.fallbackModel, maxOutputTokens: 1_500, temperature: 0.2 }, runtime);
+    }
     this.tracker = new ComparisonRunTracker(createStudioNextComparisonJudgePort(input.privateKey), new PersistentComparisonSubmissionStore(runtime), new ComparisonRunRegistry(runtime), input.judgeAddress, 61_997);
     this.judge = new TournamentComparisonJudgeAdapter(this.tracker);
     this.agents = agents;
@@ -47,7 +56,11 @@ export class LivePairOutcome implements PairOutcomePort {
       agentB: { entrantId: digest(`${room.roomId}|challenger`), agentId: b.agentId, agentsVersion: b.agentsVersion, agentsMd: b.agentsMd, agentsCommitment: b.agentsCommitment },
     };
     let pair: Awaited<ReturnType<TournamentEvaluationPairRunner['run']>>;
-    try { pair = await this.inference.run(context); }
+    const firstSide = this.runtime.get<{ model?: string }>('evaluation-tournament-provider-runs', `${context.attemptId}:A`);
+    const secondSide = this.runtime.get<{ model?: string }>('evaluation-tournament-provider-runs', `${context.attemptId}:B`);
+    const decision = this.runtime.get<{ model?: string }>('evaluation-tournament-provider-route', context.attemptId);
+    const legacy = (this.cheapModel && (firstSide?.model === this.cheapModel || secondSide?.model === this.cheapModel)) || decision?.model === this.openaiModel;
+    try { pair = await (legacy && this.legacyInference ? this.legacyInference : this.inference).run(context); }
     catch { return { state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' }; }
     if (pair.state !== 'OUTPUTS_READY' || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' };
     try {
@@ -105,12 +118,9 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
 export function pairSettlementFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, agents: ArenaApiService, chain: ArcPairChainPort, operator: string): PairSettlementWorker | undefined {
   const privateKey = environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim();
   const judgeAddress = environment.GENLAYER_COMPARISON_JUDGE_ADDRESS?.trim();
-  const endpoint = environment.END_POINT?.trim();
-  const apiKey = environment.API_KEY?.trim();
-  const model = environment.MODEL?.trim();
-  if (!privateKey || !judgeAddress || !endpoint || !apiKey || !model) return undefined;
+  const routing = providerConfigurationFromEnvironment(environment);
+  if (!privateKey || !judgeAddress || !routing) return undefined;
   const arc = new LivePairSettlementArc(chain, privateKey, operator, environment.ARC_TESTNET_RPC_URL?.trim());
-  const outcome = new LivePairOutcome(runtime, agents, { privateKey, judgeAddress, endpoint, apiKey, model,
-    fallbackEndpoint: environment.FALLBACK_END_POINT?.trim(), fallbackApiKey: environment.FALLBACK_API_KEY?.trim(), fallbackModel: environment.FALLBACK_MODEL?.trim() });
+  const outcome = new LivePairOutcome(runtime, agents, { privateKey, judgeAddress, ...routing.provider, model: routing.model });
   return new PairSettlementWorker(runtime, arc, outcome);
 }
