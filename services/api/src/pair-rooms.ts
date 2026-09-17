@@ -19,6 +19,14 @@ export type PairRoom = {
   evaluationFailureCode?: PairEvaluationFailureCode; evaluationAttempts?: number; retryAt?: number;
   createdAt: number;
 };
+export type PairVerdictDetail = {
+  schema: 'arena-pair-verdict-v1'; roomId: string; result: 'A_WIN' | 'B_WIN'; winner: 'CREATOR' | 'CHALLENGER';
+  summary: string; scoreCreator: number; scoreChallenger: number; safetyClass: string;
+  dimensions: Array<{ dimensionId: string; winner: 'CREATOR' | 'CHALLENGER' | 'TIE'; reason: string }>;
+  policyFindingsCreator: string[]; policyFindingsChallenger: string[];
+  evidence: { creatorVersion: string; challengerVersion: string; scenarioDigest: string; responseDigestCreator: string; responseDigestChallenger: string; rubricVersion: string };
+  judge: { networkChainId: number; address: string; transactionHash: string };
+};
 export type ChainRoom = {
   creator: string; challenger: string; creatorAgentVersion: string; challengerAgentVersion: string;
   stake: bigint; joinDeadline: number; resolutionDeadline: number; state: number; winner: string; verdictDigest?: string;
@@ -81,6 +89,44 @@ export class PairRoomCoordinator {
     if (!DIGEST.test(roomId)) throw new Error('invalid room ID');
     const row = this.runtime.get<PairRoom>(STORE, roomId);
     return row && row.state !== 'PENDING' ? structuredClone(row) : null;
+  }
+
+  verdict(principal: string, roomId: string): PairVerdictDetail {
+    const room = this.requireRoom(roomId);
+    if (principal !== room.creator && principal !== room.challenger) throw new Error('unauthorized pair verdict');
+    if (room.state !== 'SETTLED' || !room.challengerVersion || !room.verdictTx) throw new Error('pair verdict is not final');
+    const matchId = sha(`arena-pair-match-v1|${room.roomId}`);
+    const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|1`);
+    const runId = sha(`arena-comparison-run-v1|${matchId}|${attemptId}`);
+    const run = this.runtime.get<any>('evaluation-comparison-runs', runId);
+    const scorecard = run?.scorecard;
+    if (run?.schema !== 'arena-comparison-run-v1' || run?.sourceKind !== 'RICH_TOURNAMENT'
+      || run?.source?.matchId !== matchId || run?.source?.attemptId !== attemptId
+      || run?.agents?.versionIdA !== room.creatorVersion || run?.agents?.versionIdB !== room.challengerVersion
+      || run?.judge?.finality !== 'FINALIZED' || run?.judge?.execution !== 'SUCCESS'
+      || run?.judge?.transactionHash?.toLowerCase() !== room.verdictTx.toLowerCase()
+      || !Number.isSafeInteger(run?.judge?.networkChainId) || !ADDRESS.test(run?.judge?.address)
+      || !['A_WIN', 'B_WIN'].includes(run?.result) || scorecard?.status !== 'FINAL' || scorecard?.result !== run.result
+      || !Number.isSafeInteger(scorecard?.score_a) || !Number.isSafeInteger(scorecard?.score_b)
+      || typeof scorecard?.summary !== 'string' || !scorecard.summary || typeof scorecard?.safety_class !== 'string'
+      || !DIGEST.test(run?.evidence?.scenarioDigest) || !DIGEST.test(run?.evidence?.responseDigestA) || !DIGEST.test(run?.evidence?.responseDigestB)
+      || run?.evidence?.rubricVersion !== 'AgentComparisonV1') throw new Error('pair verdict evidence is unavailable');
+    const expectedDimensions = ['instruction_adherence', 'reasoning_quality', 'action_selection', 'rule_compliance', 'task_completion', 'safety'];
+    if (!Array.isArray(scorecard.dimensions) || scorecard.dimensions.length !== expectedDimensions.length) throw new Error('pair verdict dimensions are unavailable');
+    const dimensions = scorecard.dimensions.map((row: any, index: number) => {
+      if (row?.dimension_id !== expectedDimensions[index] || !['A', 'B', 'TIE'].includes(row?.winner)
+        || typeof row?.reason !== 'string' || !row.reason) throw new Error('pair verdict dimensions are unavailable');
+      return { dimensionId: row.dimension_id, winner: row.winner === 'A' ? 'CREATOR' as const : row.winner === 'B' ? 'CHALLENGER' as const : 'TIE' as const, reason: row.reason };
+    });
+    return {
+      schema: 'arena-pair-verdict-v1', roomId: room.roomId, result: run.result,
+      winner: run.result === 'A_WIN' ? 'CREATOR' : 'CHALLENGER', summary: scorecard.summary,
+      scoreCreator: scorecard.score_a, scoreChallenger: scorecard.score_b, safetyClass: scorecard.safety_class,
+      dimensions, policyFindingsCreator: findingCodes(scorecard.policy_findings_a), policyFindingsChallenger: findingCodes(scorecard.policy_findings_b),
+      evidence: { creatorVersion: room.creatorVersion, challengerVersion: room.challengerVersion, scenarioDigest: run.evidence.scenarioDigest,
+        responseDigestCreator: run.evidence.responseDigestA, responseDigestChallenger: run.evidence.responseDigestB, rubricVersion: run.evidence.rubricVersion },
+      judge: { networkChainId: run.judge.networkChainId, address: run.judge.address, transactionHash: run.judge.transactionHash },
+    };
   }
 
   async ready(): Promise<boolean> {
@@ -195,6 +241,7 @@ export class PairRoomCoordinator {
       if ((await this.chain.getRoom(roomId)).state !== 1) throw new Error('room is closed on Arc');
     }
     if (kind === 'REQUEST_CANCEL' && row.state !== 'JOINED') throw new Error('room is not joined');
+    if (kind === 'REQUEST_CANCEL' && row.evaluationStage && row.evaluationStage !== 'QUEUED') throw new Error('evaluation has already started');
     const account = await this.wallet.account(userId);
     if (kind === 'WITHDRAW' && await this.chain.creditOf(roomId, account.address) === 0n) throw new Error('no pair room credit');
     const submitted = await this.wallet.action(userId, { escrowAddress: this.chain.escrowAddress, roomId, kind, executionKey: this.keys(`${roomId}:${kind}:${principal}`).executionKey });
@@ -218,4 +265,9 @@ export class PairRoomCoordinator {
     this.runtime.putIfAbsent('pair-room-keys', key, { approvalKey: randomUUID(), executionKey: randomUUID() });
     return this.runtime.get<IntentKeys>('pair-room-keys', key)!;
   }
+}
+
+function findingCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new Error('pair verdict policy findings are unavailable');
+  return value.map((item) => typeof item === 'string' ? item : typeof item?.code === 'string' ? item.code : '').filter(Boolean);
 }

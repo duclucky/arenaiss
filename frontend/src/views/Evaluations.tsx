@@ -5,6 +5,11 @@ import type { AgentProfile, EvaluationCampaign } from '../adapters/interfaces';
 import { useAppContext } from '../context';
 
 const coverage = ['Instruction following', 'Reasoning', 'Safety', 'Tool discipline', 'Robustness'];
+function mergeCampaigns(current: EvaluationCampaign[], incoming: EvaluationCampaign[]): EvaluationCampaign[] {
+  const merged = new Map(current.map((campaign) => [campaign.campaignId, campaign]));
+  for (const campaign of incoming) merged.set(campaign.campaignId, campaign);
+  return [...merged.values()];
+}
 
 export function Evaluations() {
   const { account, agentApi, evaluationApi } = useAppContext();
@@ -28,7 +33,7 @@ export function Evaluations() {
   useEffect(() => {
     if (!account || !evaluationApi || !campaigns.some((campaign) => !['FINALIZED', 'FAILED'].includes(campaign.state))) return;
     const timer = window.setInterval(() => {
-      evaluationApi.listCampaigns().then(setCampaigns).catch(() => undefined);
+      evaluationApi.listCampaigns().then((next) => setCampaigns((current) => mergeCampaigns(current, next))).catch(() => undefined);
     }, 5_000);
     return () => window.clearInterval(timer);
   }, [account, evaluationApi, campaigns]);
@@ -39,7 +44,11 @@ export function Evaluations() {
     setRunning(true); setError(''); setWorkerNotice('');
     try {
       const campaign = await evaluationApi.startEvo({ agentId: agent.agentId, agentsVersion: agent.agentsVersion });
-      setCampaigns((current) => [campaign, ...current.filter((row) => row.campaignId !== campaign.campaignId)]);
+      setCampaigns((current) => mergeCampaigns(current, [campaign]));
+      try {
+        const refreshed = await evaluationApi.listCampaigns();
+        setCampaigns((current) => mergeCampaigns(current, refreshed));
+      } catch { /* Keep the accepted campaign visible while the next background refresh retries. */ }
       if (!['FINALIZED', 'FAILED'].includes(campaign.state)) setWorkerNotice('Evaluation accepted. Processing continues on the server, so you may close this page.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not start evaluation.'); }
     finally { setRunning(false); }

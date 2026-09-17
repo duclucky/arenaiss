@@ -90,14 +90,14 @@ it('links the two escrow deposits and settlement evidence from one room', async 
 
 it.each([
   { view: 'open', shown: ['a'], hidden: ['b', 'c', 'd'] },
-  { view: 'mine', shown: ['b', 'c'], hidden: ['a', 'd'] },
+  { view: 'mine', shown: ['b'], hidden: ['a', 'c', 'd'] },
   { view: 'completed', shown: ['c', 'd'], hidden: ['a', 'b'] },
 ] as const)('shows the $view room subpage with its own room list', async ({ view, shown, hidden }) => {
   const rooms = [
     { roomId: `sha256:${'a'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, state: 'OPEN' },
     { roomId: `sha256:${'b'.repeat(64)}`, creatorWallet: wallet, state: 'JOINED' },
     { roomId: `sha256:${'c'.repeat(64)}`, creatorWallet: wallet, state: 'SETTLED' },
-    { roomId: `sha256:${'d'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, state: 'REFUNDABLE' },
+    { roomId: `sha256:${'d'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, challengerWallet: wallet, state: 'REFUNDABLE' },
   ].map((item) => ({ ...item, stake: '10000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000 }));
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };
@@ -119,6 +119,31 @@ it('shows that a joined room started automatically and exposes its current stage
   } })));
   render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
   expect(await screen.findByText('Match started automatically. Both Agents are producing responses.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Request mutual cancellation' })).not.toBeInTheDocument();
+});
+
+it('opens the finalized GenLayer scorecard from a completed room', async () => {
+  const roomId = `sha256:${'5'.repeat(64)}`;
+  const verdictTx = `0x${'6'.repeat(64)}`;
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    if (url.endsWith('/credit')) return { amount: '0' };
+    if (url.endsWith('/verdict')) return {
+      schema: 'arena-pair-verdict-v1', roomId, result: 'A_WIN', winner: 'CREATOR', summary: 'Creator followed the retry safety requirements more completely.',
+      scoreCreator: 75, scoreChallenger: 25, safetyClass: 'NEITHER_UNSAFE',
+      dimensions: [{ dimensionId: 'instruction_adherence', winner: 'CREATOR', reason: 'Creator covered every required step.' }],
+      policyFindingsCreator: [], policyFindingsChallenger: ['MISSING_CONFIRMATION'],
+      evidence: { creatorVersion: `sha256:${'a'.repeat(64)}`, challengerVersion: `sha256:${'b'.repeat(64)}`, scenarioDigest: `sha256:${'c'.repeat(64)}`, responseDigestCreator: `sha256:${'d'.repeat(64)}`, responseDigestChallenger: `sha256:${'e'.repeat(64)}`, rubricVersion: 'AgentComparisonV1' },
+      judge: { networkChainId: 61997, address: `0x${'7'.repeat(40)}`, transactionHash: verdictTx },
+    };
+    return [{ roomId, creator: account.principal, creatorWallet: wallet, creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '1000000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000, state: 'SETTLED', verdictTx }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: 'View GenLayer judgment' }));
+  expect(await screen.findByRole('region', { name: 'GenLayer judgment details' })).toHaveTextContent('Creator followed the retry safety requirements more completely.');
+  expect(screen.getByText('Creator covered every required step.')).toBeInTheDocument();
+  expect(screen.getByText('MISSING_CONFIRMATION')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open transaction in GenLayer explorer' })).toHaveAttribute('href', `https://explorer-studio-dev.genlayer.com/transactions/${verdictTx}`);
 });
 
 it('explains when the bounded evaluation retries are exhausted', async () => {

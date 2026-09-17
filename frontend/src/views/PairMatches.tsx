@@ -12,6 +12,14 @@ type Room = {
   evaluationFailureCode?: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'VERDICT_PENDING' | 'ARC_ERROR';
   evaluationAttempts?: number; retryAt?: number;
 };
+type VerdictDetail = {
+  schema: 'arena-pair-verdict-v1'; roomId: string; result: 'A_WIN' | 'B_WIN'; winner: 'CREATOR' | 'CHALLENGER'; summary: string;
+  scoreCreator: number; scoreChallenger: number; safetyClass: string;
+  dimensions: Array<{ dimensionId: string; winner: 'CREATOR' | 'CHALLENGER' | 'TIE'; reason: string }>;
+  policyFindingsCreator: string[]; policyFindingsChallenger: string[];
+  evidence: { creatorVersion: string; challengerVersion: string; scenarioDigest: string; responseDigestCreator: string; responseDigestChallenger: string; rubricVersion: string };
+  judge: { networkChainId: number; address: string; transactionHash: string };
+};
 
 function failureExplanation(code?: Room['evaluationFailureCode']): string {
   if (code === 'PROVIDER_ERROR') return 'The Agent response provider did not produce both valid outputs.';
@@ -61,6 +69,10 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [credits, setCredits] = useState<Record<string, string>>({});
+  const [expandedVerdict, setExpandedVerdict] = useState('');
+  const [verdictDetails, setVerdictDetails] = useState<Record<string, VerdictDetail>>({});
+  const [verdictLoading, setVerdictLoading] = useState('');
+  const [verdictErrors, setVerdictErrors] = useState<Record<string, string>>({});
   const createKey = useRef(crypto.randomUUID());
 
   const request = useCallback(async <T,>(path: string, body?: object): Promise<T> => {
@@ -108,6 +120,19 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
     finally { setPending(false); }
   }
 
+  async function toggleVerdict(roomId: string) {
+    if (expandedVerdict === roomId) { setExpandedVerdict(''); return; }
+    setExpandedVerdict(roomId);
+    if (verdictDetails[roomId]) return;
+    setVerdictLoading(roomId); setVerdictErrors((current) => ({ ...current, [roomId]: '' }));
+    try {
+      const detail = await request<VerdictDetail>(`/api/pair-rooms/${roomId}/verdict`);
+      setVerdictDetails((current) => ({ ...current, [roomId]: detail }));
+    } catch (cause) {
+      setVerdictErrors((current) => ({ ...current, [roomId]: cause instanceof Error ? cause.message : 'Could not load the GenLayer judgment.' }));
+    } finally { setVerdictLoading(''); }
+  }
+
   const selected = agents.find((agent) => agent.agentId === agentId);
   const myRoom = (room: Room) => Boolean(managedAccount &&
     (room.creatorWallet.toLowerCase() === managedAccount.managedWallet.address.toLowerCase()
@@ -115,8 +140,8 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   const myCreatedRoom = (room: Room) => Boolean(managedAccount && room.creatorWallet.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
   const myJoinedRoom = (room: Room) => Boolean(managedAccount && room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
   const visibleRooms = rooms.filter((room) => view === 'open' ? room.state === 'OPEN'
-    : view === 'mine' ? myRoom(room)
-      : room.state === 'SETTLED' || room.state === 'REFUNDABLE');
+    : view === 'mine' ? myRoom(room) && !['SETTLED', 'REFUNDABLE'].includes(room.state)
+      : myRoom(room) && (room.state === 'SETTLED' || room.state === 'REFUNDABLE'));
   const viewCopy = view === 'open'
     ? { title: 'Open rooms', empty: 'No open rooms.' }
     : view === 'mine' ? { title: 'My rooms', empty: managedAccount ? 'You have not joined a room yet.' : 'Log in to see rooms you created or joined.' }
@@ -155,15 +180,32 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
         </div>
         <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
         {room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{room.evaluationFailureCode}</code></p>}
+        {view === 'completed' && room.state === 'SETTLED' && room.verdictTx && <button type="button" className="metal-button-ghost" disabled={verdictLoading === room.roomId} onClick={() => void toggleVerdict(room.roomId)}>{expandedVerdict === room.roomId ? 'Hide GenLayer judgment' : verdictLoading === room.roomId ? 'Loading GenLayer judgment…' : 'View GenLayer judgment'}</button>}
+        {expandedVerdict === room.roomId && verdictErrors[room.roomId] && <p role="alert" className="retro-inset p-4 text-sm text-red-900">{verdictErrors[room.roomId]}</p>}
+        {expandedVerdict === room.roomId && verdictDetails[room.roomId] && <VerdictPanel detail={verdictDetails[room.roomId]} />}
         {enabled && managedAccount && <div className="flex flex-wrap gap-2">
           {(room.state === 'OPEN' || room.state === 'JOINING') && myCreatedRoom(room) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/CANCEL`, {}), 'Room canceled. Refund was sent to your wallet or remains claimable below.')}>Cancel and refund</button>}
           {room.state === 'OPEN' && !myRoom(room) && selected && <button className="metal-button-solid" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/join`, { agentId: selected.agentId, version: selected.agentsVersion }), 'Joined the room. Your matching stake is held by the escrow.')}>Join and deposit</button>}
           {room.state === 'JOINING' && myJoinedRoom(room) && room.challengerAgentId && room.challengerVersion && <button className="metal-button-solid" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/join`, { agentId: room.challengerAgentId, version: room.challengerVersion }), 'Arc join status refreshed.')}>Retry join confirmation</button>}
-          {room.state === 'JOINED' && myRoom(room) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/REQUEST_CANCEL`, {}), 'Cancellation requested. Both players must agree for an early refund.')}>Request mutual cancellation</button>}
+          {room.state === 'JOINED' && (!room.evaluationStage || room.evaluationStage === 'QUEUED') && myRoom(room) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/REQUEST_CANCEL`, {}), 'Cancellation requested. Both players must agree for an early refund.')}>Request mutual cancellation</button>}
           {(room.state === 'OPEN' || room.state === 'JOINING' || room.state === 'JOINED') && (myRoom(room) || room.state === 'OPEN') && Date.now() / 1_000 >= (room.state === 'JOINED' ? room.resolutionDeadline : room.joinDeadline) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/EXPIRE`, {}), 'Deadline passed. Refunds are claimable.')}>Open timeout refunds</button>}
           {(room.state === 'REFUNDABLE' || room.state === 'SETTLED') && myRoom(room) && BigInt(credits[room.roomId] || '0') > 0n && <button className="metal-button-solid" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/WITHDRAW`, {}), 'Available USDC credit was transferred to your wallet.')}>Claim {units(credits[room.roomId])} USDC</button>}
         </div>}
       </li>)}</ul>}
     </section>
+  </section>;
+}
+
+const dimensionLabels: Record<string, string> = { instruction_adherence: 'Instruction adherence', reasoning_quality: 'Reasoning quality', action_selection: 'Action selection', rule_compliance: 'Rule compliance', task_completion: 'Task completion', safety: 'Safety' };
+function sideLabel(value: 'CREATOR' | 'CHALLENGER' | 'TIE'): string { return value === 'CREATOR' ? 'Creator' : value === 'CHALLENGER' ? 'Challenger' : 'Tie'; }
+function VerdictPanel({ detail }: { detail: VerdictDetail }) {
+  return <section role="region" aria-label="GenLayer judgment details" className="retro-inset space-y-4 p-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="page-kicker">Final GenLayer judgment</p><h3 className="text-xl font-semibold">{sideLabel(detail.winner)} wins</h3></div><span className="retro-chip px-3 py-1 text-xs">{detail.evidence.rubricVersion}</span></div>
+    <p className="text-sm leading-relaxed">{detail.summary}</p>
+    <dl className="grid gap-3 text-sm sm:grid-cols-3"><div><dt className="font-semibold">Creator score</dt><dd>{detail.scoreCreator}</dd></div><div><dt className="font-semibold">Challenger score</dt><dd>{detail.scoreChallenger}</dd></div><div><dt className="font-semibold">Safety class</dt><dd>{detail.safetyClass}</dd></div></dl>
+    <div><h4 className="font-semibold">Dimension decisions</h4><ul className="mt-2 space-y-2">{detail.dimensions.map((row) => <li key={row.dimensionId} className="border-t border-black/20 pt-2 text-sm"><strong>{dimensionLabels[row.dimensionId] ?? row.dimensionId}: {sideLabel(row.winner)}</strong><p className="mt-1 text-neutral-700">{row.reason}</p></li>)}</ul></div>
+    {(detail.policyFindingsCreator.length > 0 || detail.policyFindingsChallenger.length > 0) && <div><h4 className="font-semibold">Policy findings</h4><div className="mt-2 flex flex-wrap gap-2">{detail.policyFindingsCreator.map((code) => <code key={`creator-${code}`} className="retro-chip px-2 py-1">Creator · {code}</code>)}{detail.policyFindingsChallenger.map((code) => <code key={`challenger-${code}`} className="retro-chip px-2 py-1">{code}</code>)}</div></div>}
+    <details><summary className="cursor-pointer font-semibold">Evidence bindings</summary><dl className="mt-3 space-y-2 break-all font-mono text-xs"><div><dt>Scenario</dt><dd>{detail.evidence.scenarioDigest}</dd></div><div><dt>Creator response</dt><dd>{detail.evidence.responseDigestCreator}</dd></div><div><dt>Challenger response</dt><dd>{detail.evidence.responseDigestChallenger}</dd></div></dl></details>
+    <a className="underline" href={`https://explorer-studio-dev.genlayer.com/transactions/${detail.judge.transactionHash}`} target="_blank" rel="noreferrer">Open transaction in GenLayer explorer</a>
   </section>;
 }

@@ -80,6 +80,12 @@ export class ArenaHttpApi {
         }
         return room ? this.json(200, room) : this.json(404, { error: 'not found' });
       }
+      const pairVerdict = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})\/verdict$/);
+      if (request.method === 'GET' && pairVerdict) {
+        const session = this.requireSessionRecord(request.headers);
+        if (!this.pairRooms) throw new Error('pair matches unavailable');
+        return this.json(200, this.pairRooms.verdict(session.principal, pairVerdict[1].toLowerCase()));
+      }
       const pairCredit = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})\/credit$/);
       if (request.method === 'GET' && pairCredit) {
         const session = this.requireManagedSession(request.headers);

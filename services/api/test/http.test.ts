@@ -98,6 +98,7 @@ test('anonymous pair listing is open-only and participant rooms require a sessio
     get(roomId: string) { return roomId.endsWith('a'.repeat(64))
       ? { roomId, state: 'OPEN', creator: bob }
       : { roomId, state: 'JOINED', creator: alice, challenger: bob }; },
+    verdict(principal: string, roomId: string) { calls.push(`${principal}:${roomId}`); return { schema: 'arena-pair-verdict-v1', result: 'A_WIN' }; },
   } as unknown as PairRoomCoordinator;
   const api = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, undefined, undefined, pairs);
   const publicRooms = await api.handle({ method: 'GET', path: '/api/pair-rooms' });
@@ -112,7 +113,10 @@ test('anonymous pair listing is open-only and participant rooms require a sessio
   assert.equal(mine.status, 200);
   assert.equal(mine.body[0].state, 'JOINED');
   assert.equal((await api.handle({ method: 'GET', path: `/api/pair-rooms/sha256:${'b'.repeat(64)}`, headers: { cookie: auth.headers['set-cookie'].split(';')[0] } })).status, 200);
-  assert.deepEqual(calls, [alice]);
+  const verdict = await api.handle({ method: 'GET', path: `/api/pair-rooms/sha256:${'b'.repeat(64)}/verdict`, headers: { cookie: auth.headers['set-cookie'].split(';')[0] } });
+  assert.equal(verdict.status, 200);
+  assert.equal(verdict.body.result, 'A_WIN');
+  assert.deepEqual(calls, [alice, `${alice}:sha256:${'b'.repeat(64)}`]);
 });
 
 test('wallet login provisions one persisted Circle wallet and exposes it through the session', async () => {

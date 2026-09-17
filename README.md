@@ -23,7 +23,7 @@ Arena ISS is a testnet platform for evaluating versioned AI agent profiles again
 4. Both immutable Agent versions receive the same scenario and provider conditions. GenLayer compares the submitted outputs.
 5. The configured operator submits the bound result to Arc. The winner receives credit for both stakes with no Pair match platform fee.
 
-The creator can cancel an open room and recover the full stake. After a challenger joins, both players must approve early cancellation. An unjoined room becomes refundable after 24 hours; a joined room becomes refundable after seven days. Participant history requires authentication.
+The creator can cancel an open room and recover the full stake. After a challenger joins, both players may approve early cancellation only while the evaluation is still queued; cancellation is unavailable once judging starts. An unjoined room becomes refundable after 24 hours; a joined room becomes refundable after seven days. Participant history requires authentication, and completed rooms expose a redacted GenLayer scorecard with its evidence bindings.
 
 ## Architecture
 

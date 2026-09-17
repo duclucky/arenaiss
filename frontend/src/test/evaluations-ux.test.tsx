@@ -83,6 +83,18 @@ describe('evaluation product UX', () => {
     expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();
   });
 
+  it('refreshes My evaluations immediately after a successful submission', async () => {
+    const submitted = { ...campaign, campaignId: 'campaign_new', state: 'RUNNING', createdAt: Date.UTC(2026, 8, 17, 13, 0) };
+    const listCampaigns = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([submitted]);
+    const api = { ...evaluationApi, listCampaigns, startEvo: vi.fn().mockResolvedValue(submitted) };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    const button = await screen.findByRole('button', { name: 'Start evaluation' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() => expect(listCampaigns).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('link', { name: 'Open evaluation results' })).toHaveAttribute('href', '/evaluations/campaign_new');
+  });
+
   it('renders campaign outcomes as a table with a run evidence link', async () => {
     render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={evaluationApi}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
