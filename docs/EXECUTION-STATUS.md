@@ -530,8 +530,8 @@ response body reaches its local timeout. The fallback remains disabled until
 the API key and model are both configured.
 On 2026-09-17, the local routing order changed: the existing OpenAI credentials
 (`FALLBACK_*`) are primary, and the Cheap credentials (`API_KEY`, `END_POINT`,
-`MODEL`) are fallback. Both routes must be configured for execution. No live
-fallback request was made while validating this routing change.
+`MODEL`) are fallback. Both routes must be configured for execution. This is a
+local source change; no provider request or production release is implied.
 Tournament switches both sides of a pair to the fallback model after a primary
 timeout and persists that decision for restart. Evo records the actual model on
 each scenario. Comparison and Marketplace eligibility accept mixed-model

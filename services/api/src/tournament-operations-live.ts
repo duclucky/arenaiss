@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, type Address, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, formatUnits, parseAbi, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
 
@@ -14,6 +14,7 @@ import { TournamentOrchestrator, type Entrant, type OrchestratorResult } from '.
 import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import type { ArenaApiService, TournamentOperatorEntrant } from './service.ts';
 import type { CreateTournamentOperation, TournamentOperationAction, TournamentOperationSnapshot, TournamentOperationState, TournamentOperationsPort } from './tournament-operations.ts';
+import { ARC_TESTNET_RPC_URL, arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
 
 const ARC_CHAIN_ID = 5_042_002;
 const GENLAYER_CHAIN_ID = 61_997;
@@ -306,7 +307,7 @@ export class ViemTournamentArcOperations implements TournamentArcOperations {
   constructor(input: { rpcUrl: string; escrowAddress: string; privateKey: string }) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(input.escrowAddress) || !/^0x[0-9a-fA-F]{64}$/.test(input.privateKey) || new URL(input.rpcUrl).protocol !== 'https:') throw new Error('invalid Tournament Arc configuration');
     this.escrow = input.escrowAddress as Address; this.account = privateKeyToAccount(input.privateKey as Hex);
-    this.client = createPublicClient({ chain: arcTestnet, transport: http(input.rpcUrl) }); this.wallet = createWalletClient({ account: this.account, chain: arcTestnet, transport: http(input.rpcUrl) });
+    this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(input.rpcUrl) }); this.wallet = createWalletClient({ account: this.account, chain: arcTestnet, transport: arcWriteTransport(input.rpcUrl) });
   }
   async create(input: CreateTournamentOperation): Promise<ArcSnapshot> {
     await this.requireChain(); const existing = await this.snapshot(input.tournamentId); const raw = await this.raw(input.tournamentId);
@@ -351,7 +352,7 @@ export class ViemTournamentArcOperations implements TournamentArcOperations {
 }
 
 export function tournamentOperationsFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, service: ArenaApiService, operatorAddress: string): TournamentOperationsPort | undefined {
-  const values = { privateKey: environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim(), judgeAddress: environment.GENLAYER_COMPARISON_JUDGE_ADDRESS?.trim(), routing: providerConfigurationFromEnvironment(environment), escrow: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim() || environment.VITE_ARC_ESCROW_ADDRESS?.trim(), rpc: environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network' };
+  const values = { privateKey: environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim(), judgeAddress: environment.GENLAYER_COMPARISON_JUDGE_ADDRESS?.trim(), routing: providerConfigurationFromEnvironment(environment), escrow: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim() || environment.VITE_ARC_ESCROW_ADDRESS?.trim(), rpc: environment.ARC_TESTNET_RPC_URL?.trim() || ARC_TESTNET_RPC_URL };
   if (!Object.values(values).some(Boolean)) return undefined;
   if (!values.privateKey || !values.judgeAddress || !values.routing || !values.escrow) return undefined;
   if (privateKeyToAccount(values.privateKey as Hex).address.toLowerCase() !== operatorAddress.toLowerCase()) throw new Error('Tournament operator signer does not match ARENA_OPERATOR_ADDRESS');

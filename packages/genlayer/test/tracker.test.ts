@@ -31,6 +31,9 @@ test("raw and normalized receipt shapes map to one lifecycle", () => {
   assert.deepEqual(normalizeReceipt({ status: "finalized", execution_status: "success" }), { finality: "FINALIZED", execution: "SUCCESS" });
   assert.deepEqual(normalizeReceipt({ data: { transaction: { status: "ACCEPTED", result: { status: "PENDING" } } } }), { finality: "ACCEPTED", execution: "PENDING" });
   assert.deepEqual(normalizeReceipt({ statusName: "FINALIZED", txExecutionResultName: "FINISHED_WITH_RETURN" }), { finality: "FINALIZED", execution: "SUCCESS" });
+  assert.deepEqual(normalizeReceipt({ statusName: "FINALIZED", resultName: "MAJORITY_AGREE", txExecutionResultName: "FINISHED_WITH_RETURN" }), { finality: "FINALIZED", execution: "SUCCESS" });
+  assert.deepEqual(normalizeReceipt({ statusName: "FINALIZED", resultName: "MAJORITY_DISAGREE", txExecutionResultName: "FINISHED_WITH_RETURN" }), { finality: "FINALIZED", execution: "FAILED" });
+  assert.deepEqual(normalizeReceipt({ status: "FINALIZED", result_name: "MAJORITY_DISAGREE", execution_status: "SUCCESS" }), { finality: "FINALIZED", execution: "FAILED" });
   assert.deepEqual(normalizeReceipt({ statusName: "FINALIZED", txExecutionResultName: "FINISHED_WITH_ERROR" }), { finality: "FINALIZED", execution: "FAILED" });
   assert.deepEqual(normalizeReceipt({ statusName: "PROPOSING", txExecutionResultName: "NOT_VOTED" }), { finality: "PENDING", execution: "PENDING" });
   assert.deepEqual(normalizeReceipt({ statusName: "PENDING" }), { finality: "PENDING", execution: "PENDING" });

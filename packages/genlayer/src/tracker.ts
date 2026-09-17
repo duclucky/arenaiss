@@ -38,6 +38,7 @@ const MAX_SUMMARY_BYTES = 640;
 export function normalizeReceipt(value: any): NormalizedReceipt {
   const raw = value?.data?.transaction ?? value;
   const status = String(raw?.statusName ?? raw?.status ?? "").toUpperCase();
+  const consensus = String(raw?.resultName ?? raw?.result_name ?? "").toUpperCase();
   const receiptContainer = raw?.consensus_data?.leader_receipt;
   const receiptRows = Array.isArray(receiptContainer)
     ? receiptContainer
@@ -58,6 +59,7 @@ export function normalizeReceipt(value: any): NormalizedReceipt {
   else if (["FAILED", "REVERTED", "FINISHED_WITH_ERROR", "TIMEOUT", "NONDET_DISAGREE"].includes(execution)) executionState = "FAILED";
   else throw new Error("malformed GenLayer receipt execution");
   if (failedTerminal.includes(status)) executionState = "FAILED";
+  if (finality === "FINALIZED" && consensus && consensus !== "MAJORITY_AGREE") executionState = "FAILED";
   return { finality, execution: executionState };
 }
 

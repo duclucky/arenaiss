@@ -1,5 +1,6 @@
-import { createPublicClient, http, parseAbi, type Address } from 'viem';
+import { createPublicClient, parseAbi, type Address } from 'viem';
 import { arcTestnet } from 'viem/chains';
+import { arcReadTransport } from './arc-rpc.ts';
 
 const ABI = parseAbi(['function agents(bytes32) view returns (address owner, bytes32 version, bytes32 commitment, bool active)']);
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -15,7 +16,7 @@ export class ViemAgentRegistryPort implements AgentRegistryPort {
   constructor(input: { rpcUrl: string; address: string }) {
     if (!ADDRESS.test(input.address) || new URL(input.rpcUrl).protocol !== 'https:') throw new Error('invalid Arc Agent registry configuration');
     this.address = input.address as Address;
-    this.client = createPublicClient({ chain: arcTestnet, transport: http(input.rpcUrl) });
+    this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(input.rpcUrl) });
   }
 
   async readAgent(agentId: string): Promise<AgentRegistryRecord> {

@@ -1,8 +1,9 @@
-import { createPublicClient, createWalletClient, http, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
 import type { EvaluationSettlementPort } from './evaluation-execution.ts';
 import type { WalletTransactionResult } from './managed-identity.ts';
+import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
 
 const ABI = [
   { type: 'function', name: 'payments', stateMutability: 'view', inputs: [{ name: 'campaignId', type: 'bytes32' }], outputs: [{ name: 'payer', type: 'address' }, { name: 'depositedAt', type: 'uint64' }, { name: 'state', type: 'uint8' }] },
@@ -21,9 +22,8 @@ export class ViemEvoFeeSettlement implements EvaluationSettlementPort {
     if (!/^0x[0-9a-fA-F]{40}$/.test(input.escrowAddress)) throw new TypeError('evaluation escrow address is invalid');
     this.address = input.escrowAddress as `0x${string}`;
     this.account = privateKeyToAccount(input.privateKey as Hex);
-    const transport = http(input.rpcUrl || 'https://rpc.testnet.arc.network');
-    this.publicClient = createPublicClient({ chain: arcTestnet, transport });
-    this.walletClient = createWalletClient({ account: this.account, chain: arcTestnet, transport });
+    this.publicClient = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(input.rpcUrl) });
+    this.walletClient = createWalletClient({ account: this.account, chain: arcTestnet, transport: arcWriteTransport(input.rpcUrl) });
   }
 
   release(campaignId: string): Promise<WalletTransactionResult> { return this.settle(campaignId, 'release', 2); }

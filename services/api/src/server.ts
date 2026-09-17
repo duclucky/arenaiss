@@ -25,6 +25,7 @@ import { DailyTournamentWorker } from './daily-tournament.ts';
 import { PairRoomCoordinator } from './pair-rooms.ts';
 import { ArcPairChainPort } from './pair-arc.ts';
 import { pairSettlementFromEnvironment } from './pair-settlement-live.ts';
+import { ARC_TESTNET_RPC_URL } from './arc-rpc.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -157,11 +158,11 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
 function agentRegistryFromEnvironment(environment: NodeJS.ProcessEnv): ViemAgentRegistryPort | undefined {
   const address = environment.ARC_AGENT_REGISTRY_ADDRESS?.trim();
   if (!address) return undefined;
-  return new ViemAgentRegistryPort({ rpcUrl: environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network', address });
+  return new ViemAgentRegistryPort({ rpcUrl: environment.ARC_TESTNET_RPC_URL?.trim() || ARC_TESTNET_RPC_URL, address });
 }
 
 function marketplaceChainFromEnvironment(environment: NodeJS.ProcessEnv): ViemMarketplaceChainPort | undefined {
-  const rpcUrl = environment.ARC_TESTNET_RPC_URL?.trim() || 'https://rpc.testnet.arc.network';
+  const rpcUrl = environment.ARC_TESTNET_RPC_URL?.trim() || ARC_TESTNET_RPC_URL;
   const registry = environment.ARC_AGENT_REGISTRY_V2_ADDRESS?.trim();
   const marketplace = environment.ARC_MARKETPLACE_ADDRESS?.trim();
   if (!registry && !marketplace) return undefined;

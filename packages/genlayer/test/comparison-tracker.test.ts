@@ -42,6 +42,16 @@ test("E6 pending, failed and mismatched canonical comparisons never become eligi
   await assert.rejects(() => tracker.poll(submission.matchId, submission.attemptId), /binding/i);
 });
 
+test("a finalized validator disagreement cannot produce a match result", async () => {
+  const port = new Port();
+  const registry = new ComparisonRunRegistry();
+  const tracker = new ComparisonRunTracker(port, new MemoryComparisonSubmissionStore(), registry, judge, 61997);
+  await tracker.submit(submission);
+  port.receipt = { statusName: "FINALIZED", resultName: "MAJORITY_DISAGREE", txExecutionResultName: "FINISHED_WITH_RETURN" };
+  port.getComparison = async () => { throw new Error("canonical read must not run"); };
+  assert.deepEqual(await tracker.poll(submission.matchId, submission.attemptId), { state: "FAILED" });
+});
+
 test("E6 SDK adapter estimates v0.6 fees and submits the exact comparison ABI", async () => {
   const calls: any[] = []; const fees = { distribution: {}, messageAllocations: [], feeValue: 1n };
   const client = { async estimateTransactionFeesForWrite(input: any) { calls.push(["estimate", input]); return fees; }, async writeContract(input: any) { calls.push(["write", input]); return tx; }, async getTransaction() {}, async readContract() {} };

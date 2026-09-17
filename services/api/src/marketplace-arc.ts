@@ -1,8 +1,9 @@
-import { createPublicClient, createWalletClient, http, parseAbi, parseEventLogs, type Address, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, parseAbi, parseEventLogs, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { WalletTransactionResult } from './managed-identity.ts';
 import { arcTestnet } from 'viem/chains';
 import type { MarketplaceArcSnapshot } from './service.ts';
+import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
 
 const REGISTRY_ABI = parseAbi(['function agents(bytes32) view returns (address owner, bytes32 version, bytes32 commitment, bool active)']);
 const MARKETPLACE_ABI = parseAbi(['function operator() view returns (address)', 'function platformRecipient() view returns (address)', 'function listings(uint256) view returns (bytes32 agentId, bytes32 version, bytes32 commitment, bytes32 eligibilityDigest, address seller, uint128 price, uint64 expiresAt, uint8 state)', 'function eligibility(bytes32) view returns (bytes32 agentId, bytes32 version, bytes32 commitment, uint64 validUntil, bool consumed)', 'function creditOf(address) view returns (uint256)', 'function approveEligibility(bytes32 digest,bytes32 agentId,bytes32 version,bytes32 commitment,uint64 validUntil)', 'function withdraw()', 'event ListingCreated(uint256 indexed listingId, bytes32 indexed agentId, address indexed seller, uint256 price, uint64 expiresAt, bytes32 eligibilityDigest)']);
@@ -23,9 +24,9 @@ export class ViemMarketplaceChainPort implements MarketplaceChainPort {
     if (!ADDRESS.test(input.registryAddress) || !ADDRESS.test(input.marketplaceAddress) || new URL(input.rpcUrl).protocol !== 'https:') throw new Error('invalid Arc marketplace configuration');
     this.registry = input.registryAddress as Address;
     this.marketplace = input.marketplaceAddress as Address;
-    this.client = createPublicClient({ chain: arcTestnet, transport: http(input.rpcUrl) });
+    this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(input.rpcUrl) });
     this.account = input.privateKey ? privateKeyToAccount(input.privateKey as Hex) : undefined;
-    this.walletClient = this.account ? createWalletClient({ account: this.account, chain: arcTestnet, transport: http(input.rpcUrl) }) : undefined;
+    this.walletClient = this.account ? createWalletClient({ account: this.account, chain: arcTestnet, transport: arcWriteTransport(input.rpcUrl) }) : undefined;
   }
 
   async snapshot(listingId: string): Promise<MarketplaceArcSnapshot> {

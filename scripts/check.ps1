@@ -60,6 +60,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\services\api\test\reference-tournament-launch.test.ts" `
   "$PSScriptRoot\..\services\api\test\server.test.ts" `
   "$PSScriptRoot\..\tests\ops\backup.test.ts" `
+  "$PSScriptRoot\..\tests\ops\arc-rpc-config.test.ts" `
   "$PSScriptRoot\..\tests\ops\seed-live-demo.test.ts" `
   "$PSScriptRoot\..\tests\system\trusted-operator-lifecycle.test.ts" `
   "$PSScriptRoot\..\tests\system\evaluation-tournament-convergence.test.ts" `

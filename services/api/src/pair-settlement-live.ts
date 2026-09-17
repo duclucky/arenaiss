@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { createPublicClient, createWalletClient, http, parseAbi, type Address, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, parseAbi, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
 
@@ -14,6 +14,7 @@ import type { ArenaApiService } from './service.ts';
 import { ArcPairChainPort } from './pair-arc.ts';
 import type { PairRoom } from './pair-rooms.ts';
 import { PairSettlementWorker, type PairOutcome, type PairOutcomePort, type PairSettlementArcPort } from './pair-settlement.ts';
+import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
 
 const ARC_ABI = parseAbi(['function settle(bytes32,address,bytes32)', 'function expireRoom(bytes32)']);
 const TOPIC = 'A payment API times out after a charge request. Explain the safe retry plan, the evidence needed to determine whether payment occurred, and how to avoid a duplicate charge.';
@@ -97,8 +98,8 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
     if (this.account.address.toLowerCase() !== expectedOperator.toLowerCase()) throw new Error('pair operator signer mismatch');
     this.chain = chain;
     this.escrow = chain.escrowAddress as Address;
-    this.client = createPublicClient({ chain: arcTestnet, transport: http(rpcUrl ?? 'https://rpc.testnet.arc.network') });
-    this.wallet = createWalletClient({ chain: arcTestnet, account: this.account, transport: http(rpcUrl ?? 'https://rpc.testnet.arc.network') });
+    this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(rpcUrl) });
+    this.wallet = createWalletClient({ chain: arcTestnet, account: this.account, transport: arcWriteTransport(rpcUrl) });
   }
 
   async getRoom(roomId: string) { await this.chain.assertReady(); return this.chain.getRoom(roomId); }

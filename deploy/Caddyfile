@@ -6,7 +6,7 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://db.onlinewebfonts.com; font-src 'self' https://db.onlinewebfonts.com; script-src 'self'; connect-src 'self' https://rpc.testnet.arc.network https://studio-next.genlayer.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://db.onlinewebfonts.com; font-src 'self' https://db.onlinewebfonts.com; script-src 'self'; connect-src 'self' https://rpc.testnet.arc.io https://studio-next.genlayer.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 	}
 
 	handle /api/* {

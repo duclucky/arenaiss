@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { createPublicClient, http, parseAbi, type Address } from 'viem';
+import { createPublicClient, parseAbi, type Address } from 'viem';
 import { arcTestnet } from 'viem/chains';
 import type { ChainRoom, PairChainPort } from './pair-rooms.ts';
+import { arcReadTransport, arcRpcUrl } from './arc-rpc.ts';
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
@@ -21,13 +22,13 @@ export class ArcPairChainPort implements PairChainPort {
   private readonly client;
 
   constructor(input: { escrowAddress: string; expectedOperator: string; rpcUrl?: string }) {
-    const rpcUrl = input.rpcUrl ?? 'https://rpc.testnet.arc.network';
+    const rpcUrl = arcRpcUrl(input.rpcUrl);
     if (!ADDRESS.test(input.escrowAddress) || /^0x0{40}$/i.test(input.escrowAddress)
       || !ADDRESS.test(input.expectedOperator) || /^0x0{40}$/i.test(input.expectedOperator)
       || new URL(rpcUrl).protocol !== 'https:') throw new Error('invalid pair escrow configuration');
     this.escrowAddress = input.escrowAddress;
     this.expectedOperator = input.expectedOperator;
-    this.client = createPublicClient({ chain: arcTestnet, transport: http(rpcUrl) });
+    this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(rpcUrl) });
   }
 
   async assertReady(): Promise<void> {
