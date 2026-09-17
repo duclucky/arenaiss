@@ -19,6 +19,7 @@ const EvaluationDetail = lazy(() => import('./views/EvaluationDetail').then((mod
 const EvaluationRunDetail = lazy(() => import('./views/EvaluationRunDetail').then((module) => ({ default: module.EvaluationRunDetail })));
 const Marketplace = lazy(() => import('./views/Marketplace').then((module) => ({ default: module.Marketplace })));
 const Docs = lazy(() => import('./views/Docs').then((module) => ({ default: module.Docs })));
+const PairMatches = lazy(() => import('./views/PairMatches').then((module) => ({ default: module.PairMatches })));
 
 function deferred(element: ReactNode) {
   return <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>{element}</Suspense>;
@@ -44,6 +45,7 @@ export default function App({ config, env, walletAdapter, agentApiAdapter, evalu
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="tournaments" element={deferred(<Tournaments />)} />
+            <Route path="pairs" element={deferred(<PairMatches />)} />
             <Route path="tournaments/:id" element={deferred(<TournamentDetail />)} />
             <Route path="tournaments/:id/submit" element={deferred(<SubmitEntry />)} />
             <Route path="matches/:id" element={deferred(<MatchDetail />)} />

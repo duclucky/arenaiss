@@ -984,6 +984,12 @@ regression và new shared EvaluationRun conformance cùng pass.
 
 **Prerequisite:** `EVAL-6 PASS`.
 
+**Current bounded slice:** `PairMatchEscrow` is deployed on Arc Testnet; room
+deposit/refund API/UI and the pair comparison/settlement worker have local tests.
+The live two-wallet deposit, GenLayer verdict, Arc settlement and withdrawal
+lifecycle remains open; EVAL-7 has not passed. See `PAIR-MATCH-ESCROW.md` for
+the room-specific safety cards and value matrix.
+
 1. Leaderboard luôn scope theo TestPack version, runtime/scoring policy và run
    count; không có universal score.
 2. Shared report khóa AgentVersion/evidence references và trạng thái finality.

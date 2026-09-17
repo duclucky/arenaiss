@@ -6,6 +6,7 @@ import type { MarketplaceChainPort } from './marketplace-arc.ts';
 import type { EvaluationExecutionService } from './evaluation-execution.ts';
 import type { TournamentOperationAction, TournamentOperationsPort } from './tournament-operations.ts';
 import type { AgentRegistryPort } from './agent-registry-arc.ts';
+import type { PairRoomCoordinator } from './pair-rooms.ts';
 
 type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
@@ -27,14 +28,16 @@ export class ArenaHttpApi {
   private evaluationExecution?: EvaluationExecutionService;
   private tournamentOperations?: TournamentOperationsPort;
   private agentRegistry?: AgentRegistryPort;
+  private pairRooms?: PairRoomCoordinator;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator) {
     this.service = service;
     this.verifySignature = verifySignature;
     this.marketplaceChain = marketplaceChain;
     this.evaluationExecution = evaluationExecution;
     this.tournamentOperations = tournamentOperations;
     this.agentRegistry = agentRegistry;
+    this.pairRooms = pairRooms;
     this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
     void this.managedIdentity?.resumeUsdcTransfers().catch(() => undefined);
@@ -52,6 +55,42 @@ export class ArenaHttpApi {
       }
       if (request.method === 'POST' && request.path === '/api/auth/email/verify') return await this.verifyEmail(request.body);
       if (request.method === 'POST' && request.path === '/api/auth/logout') return this.logout(request.headers);
+      if (request.method === 'GET' && request.path === '/api/pair-rooms/config') return this.json(200, { enabled: this.pairRooms ? await this.pairRooms.ready() : false, network: 'Arc Testnet', usdcDecimals: 6 });
+      if (request.method === 'GET' && request.path === '/api/pair-rooms') return this.json(200, this.pairRooms?.list() ?? []);
+      if (request.method === 'POST' && request.path === '/api/pair-rooms') {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.pairRooms) throw new Error('pair matches unavailable');
+        const body = request.body || {};
+        requireExactKeys(body, ['agentId', 'version', 'stake', 'idempotencyKey']);
+        return this.json(201, await this.pairRooms.create(session.userId!, session.principal, {
+          agentId: requireDigest(body.agentId), version: requireDigest(body.version), stake: requireUint(body.stake), idempotencyKey: requireString(body.idempotencyKey),
+        }));
+      }
+      const pairRoom = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})$/);
+      if (request.method === 'GET' && pairRoom) {
+        const room = this.pairRooms?.get(pairRoom[1].toLowerCase());
+        return room ? this.json(200, room) : this.json(404, { error: 'not found' });
+      }
+      const pairCredit = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})\/credit$/);
+      if (request.method === 'GET' && pairCredit) {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.pairRooms) throw new Error('pair matches unavailable');
+        return this.json(200, { amount: await this.pairRooms.credit(session.userId!, session.principal, pairCredit[1].toLowerCase()) });
+      }
+      const pairJoin = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})\/join$/);
+      if (request.method === 'POST' && pairJoin) {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.pairRooms) throw new Error('pair matches unavailable');
+        requireExactKeys(request.body || {}, ['agentId', 'version']);
+        return this.json(202, await this.pairRooms.join(session.userId!, session.principal, pairJoin[1].toLowerCase(), requireDigest(request.body?.agentId), requireDigest(request.body?.version)));
+      }
+      const pairAction = request.path.match(/^\/api\/pair-rooms\/(sha256:[0-9a-fA-F]{64})\/actions\/(CANCEL|REQUEST_CANCEL|EXPIRE|WITHDRAW)$/);
+      if (request.method === 'POST' && pairAction) {
+        const session = this.requireManagedSession(request.headers);
+        if (!this.pairRooms) throw new Error('pair matches unavailable');
+        requireExactKeys(request.body || {}, []);
+        return this.json(202, await this.pairRooms.action(session.userId!, session.principal, pairAction[1].toLowerCase(), pairAction[2] as 'CANCEL' | 'REQUEST_CANCEL' | 'EXPIRE' | 'WITHDRAW'));
+      }
       if (request.path === '/api/tournament-operations') {
         this.requireOperator(request.headers);
         if (!this.tournamentOperations) throw new Error('tournament operations unavailable');

@@ -118,6 +118,25 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeComplete(input.walletId, input.escrowAddress, 'withdrawCredit(bytes32)', [digestBytes32(input.tournamentId)], input.idempotencyKey, 'arena-iss-tournament-credit-withdraw');
   }
 
+  async pairCreate(input: { walletId: string; escrowAddress: string; roomId: string; version: string; stake: string; joinDeadline: number; resolutionDeadline: number; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult> {
+    const stake = requirePairStake(input.stake);
+    await this.executeComplete(input.walletId, ARC_USDC, 'approve(address,uint256)', [input.escrowAddress, stake], input.approvalKey, 'arena-iss-pair-approve');
+    return this.executeComplete(input.walletId, input.escrowAddress, 'createRoom(bytes32,bytes32,uint128,uint64,uint64)',
+      [digestBytes32(input.roomId), digestBytes32(input.version), stake, String(input.joinDeadline), String(input.resolutionDeadline)], input.executionKey, 'arena-iss-pair-create');
+  }
+
+  async pairJoin(input: { walletId: string; escrowAddress: string; roomId: string; version: string; stake: string; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult> {
+    await this.executeComplete(input.walletId, ARC_USDC, 'approve(address,uint256)', [input.escrowAddress, requirePairStake(input.stake)], input.approvalKey, 'arena-iss-pair-approve');
+    return this.executeComplete(input.walletId, input.escrowAddress, 'joinRoom(bytes32,bytes32)',
+      [digestBytes32(input.roomId), digestBytes32(input.version)], input.executionKey, 'arena-iss-pair-join');
+  }
+
+  async pairAction(input: { walletId: string; escrowAddress: string; roomId: string; kind: 'CANCEL' | 'REQUEST_CANCEL' | 'EXPIRE' | 'WITHDRAW'; executionKey: string }): Promise<WalletTransactionResult> {
+    const signature = { CANCEL: 'cancelRoom(bytes32)', REQUEST_CANCEL: 'requestCancel(bytes32)', EXPIRE: 'expireRoom(bytes32)', WITHDRAW: 'withdraw(bytes32)' }[input.kind];
+    return this.executeComplete(input.walletId, input.escrowAddress, signature,
+      [digestBytes32(input.roomId)], input.executionKey, `arena-iss-pair-${input.kind.toLowerCase()}`);
+  }
+
   async registerTournamentEntrant(input: { walletId: string; escrowAddress: string; stakeAmount: string; tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string; approvalIdempotencyKey: string; registrationIdempotencyKey: string }): Promise<WalletTransactionResult> {
     if (!/^[1-9][0-9]*$/.test(input.stakeAmount)) throw new Error('invalid Tournament stake');
     await this.executeComplete(input.walletId, ARC_USDC, 'approve(address,uint256)', [input.escrowAddress, input.stakeAmount], input.approvalIdempotencyKey, 'arena-iss-tournament-approve');
@@ -231,6 +250,11 @@ function decimalToBaseUnits(value: string): string {
 function digestBytes32(value: string): string {
   if (!/^sha256:[0-9a-fA-F]{64}$/.test(value)) throw new Error('invalid agent digest');
   return `0x${value.slice(7).toLowerCase()}`;
+}
+
+function requirePairStake(value: string): string {
+  if (!/^[1-9][0-9]{0,11}$/.test(value)) throw new Error('invalid pair stake');
+  return value;
 }
 
 function requireBytes32(value: string): string {

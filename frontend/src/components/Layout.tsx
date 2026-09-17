@@ -7,6 +7,7 @@ import { LoginModal } from './LoginModal';
 const navItems = [
   ['/agents', 'Agents'],
   ['/evaluations', 'Evaluations'],
+  ['/pairs', 'Pair matches'],
   ['/tournaments', 'Tournaments'],
   ['/marketplace', 'Marketplace'],
   ['/docs', 'Docs'],

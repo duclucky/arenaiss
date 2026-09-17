@@ -1,5 +1,23 @@
 # Implementation execution status
 
+## 2026-09-17 pair-room escrow — deployed contract, local flow
+
+An independent two-Agent `PairMatchEscrow` now has local create, equal-stake
+join, winner credit, creator pre-join cancellation, mutual joined cancellation,
+timeout refunds and pull withdrawals. The API pairs creator/challenger Arc
+transaction hashes under one durable room ID, verifies canonical Arc room
+readback, and retries a pending join after a transient read failure. The new
+room page uses the managed Circle wallet and exposes cancellation, timeout and
+claim actions. Pair deposits require the feature flag and a verified Arc Testnet
+escrow configuration; the release Compose file enables that flag. The contract is deployed at
+`0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1` (transaction
+`0x108e4115cc0cffff3df5716647033f80f640339b57081d92c7f2bdc655c204b8`),
+with USDC/operator/runtime readback. The pair worker now derives the winner from
+a finalized canonical GenLayer comparison and submits a durable operator intent;
+its local tests pass. No two-wallet live deposit/verdict/settlement/withdrawal
+flow has been exercised. Details and safety boundaries are in
+`PAIR-MATCH-ESCROW.md`.
+
 ## 2026-09-16 topic-pool expansion
 
 New Tournament operations freeze a 24-topic scenario deck at activation and use

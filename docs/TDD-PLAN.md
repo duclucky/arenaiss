@@ -989,6 +989,17 @@ Additional tests prove:
 
 ### Wave E7 — Benchmark/report/economics (`EVAL-7`)
 
+#### PAIR-1 optional Arc room escrow (local slice)
+
+For a new two-Agent room, cover insufficient creator/challenger USDC and
+allowance without accepting a room, exact equal deposits, one challenger,
+creator-only unjoined cancellation, mutual joined cancellation, both timeout
+refunds, operator-only one-time winner credit, no settlement after the
+resolution deadline, failed withdrawal preserving credit/liability, and zero
+liability after every credit is withdrawn. The backend cone must prove durable
+`createTx`/`joinTx` binding across an Arc read failure and UI recovery of a
+claimable refund. This local slice does not replace BEN-3 or count as its exit.
+
 #### BEN-1 scoped benchmark
 
 Leaderboard rows require identical TestPack/runtime/scoring versions and declared

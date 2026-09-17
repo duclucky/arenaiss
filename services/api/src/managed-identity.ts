@@ -52,6 +52,9 @@ export type CircleWalletPort = {
   marketplaceCancel(input: { walletId: string; marketplaceAddress: string; listingId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceWithdraw(input: { walletId: string; marketplaceAddress: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  pairCreate(input: { walletId: string; escrowAddress: string; roomId: string; version: string; stake: string; joinDeadline: number; resolutionDeadline: number; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult>;
+  pairJoin(input: { walletId: string; escrowAddress: string; roomId: string; version: string; stake: string; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult>;
+  pairAction(input: { walletId: string; escrowAddress: string; roomId: string; kind: 'CANCEL' | 'REQUEST_CANCEL' | 'EXPIRE' | 'WITHDRAW'; executionKey: string }): Promise<WalletTransactionResult>;
 };
 export type UsdcBalance = { chain: string; label: string; amount: string; isArc: boolean; available: boolean };
 export type WalletTransactionResult = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
@@ -84,6 +87,7 @@ export type ManagedIdentityOptions = {
   marketplaceAddress?: string;
   evaluationEscrowAddress?: string;
   tournamentEscrowAddress?: string;
+  pairEscrowAddress?: string;
 };
 
 export class ManagedIdentityService {
@@ -97,6 +101,7 @@ export class ManagedIdentityService {
   private readonly marketplaceAddress?: string;
   private readonly evaluationEscrowAddress?: string;
   private readonly tournamentEscrowAddress?: string;
+  private readonly pairEscrowAddress?: string;
   private readonly emailChallenges = new Map<string, EmailChallenge>();
   private readonly provisioning = new Map<string, Promise<ManagedWallet>>();
   private readonly cctpTransfers = new Map<string, Promise<void>>();
@@ -114,6 +119,7 @@ export class ManagedIdentityService {
     this.marketplaceAddress = options.marketplaceAddress ? requireAddress(options.marketplaceAddress) : undefined;
     this.evaluationEscrowAddress = options.evaluationEscrowAddress ? requireAddress(options.evaluationEscrowAddress) : undefined;
     this.tournamentEscrowAddress = options.tournamentEscrowAddress ? requireAddress(options.tournamentEscrowAddress) : undefined;
+    this.pairEscrowAddress = options.pairEscrowAddress ? requireAddress(options.pairEscrowAddress) : undefined;
   }
 
   async loginWallet(address: string): Promise<ManagedAccount> {
@@ -361,6 +367,28 @@ export class ManagedIdentityService {
   async marketplaceWithdraw(userId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
     const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
     return this.circleWallets.marketplaceWithdraw({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, idempotencyKey });
+  }
+
+  pairAccount(userId: string): { address: string } {
+    return { address: this.requireReadyWallet(userId).address };
+  }
+
+  async pairCreate(userId: string, input: { escrowAddress: string; roomId: string; version: string; stake: string; joinDeadline: number; resolutionDeadline: number; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.pairEscrowAddress || input.escrowAddress.toLowerCase() !== this.pairEscrowAddress) throw new Error('pair escrow unavailable');
+    return this.circleWallets.pairCreate({ walletId: wallet.walletId, ...input });
+  }
+
+  async pairJoin(userId: string, input: { escrowAddress: string; roomId: string; version: string; stake: string; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.pairEscrowAddress || input.escrowAddress.toLowerCase() !== this.pairEscrowAddress) throw new Error('pair escrow unavailable');
+    return this.circleWallets.pairJoin({ walletId: wallet.walletId, ...input });
+  }
+
+  async pairAction(userId: string, input: { escrowAddress: string; roomId: string; kind: 'CANCEL' | 'REQUEST_CANCEL' | 'EXPIRE' | 'WITHDRAW'; executionKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.pairEscrowAddress || input.escrowAddress.toLowerCase() !== this.pairEscrowAddress) throw new Error('pair escrow unavailable');
+    return this.circleWallets.pairAction({ walletId: wallet.walletId, ...input });
   }
 
   private async login(identityKey: string, kind: LoginIdentityKind, principal: string): Promise<ManagedAccount> {
