@@ -25,7 +25,11 @@ function progress(room: Room): string {
   if (room.state !== 'JOINED') return room.state === 'REFUNDABLE' ? 'Refund credits are available to the depositors.' : room.state === 'SETTLED' ? 'Arc settlement is final. The winner can claim any remaining payout credit.' : '';
   if (room.evaluationStage === 'RUNNING_AGENTS') return 'Match started automatically. Both Agents are producing responses.';
   if (room.evaluationStage === 'WAITING_VERDICT') return 'Agent responses are ready. Waiting for the finalized GenLayer verdict.';
-  if (room.evaluationStage === 'RETRYING') return `A match service call failed. Automatic retry ${room.evaluationAttempts ?? 1} is scheduled${room.retryAt ? ` for ${new Date(room.retryAt * 1_000).toLocaleString()}` : ''}.`;
+  if (room.evaluationStage === 'RETRYING') {
+    const attempts = room.evaluationAttempts ?? 1;
+    if (attempts >= 3) return `Evaluation paused after ${attempts} failed attempts. No winner was selected. Both players can approve an early refund, or refunds open after ${new Date(room.resolutionDeadline * 1_000).toLocaleString()}.`;
+    return `The Agent evaluation or GenLayer verdict step failed. Automatic retry ${attempts} is scheduled${room.retryAt ? ` for ${new Date(room.retryAt * 1_000).toLocaleString()}` : ''}.`;
+  }
   if (room.evaluationStage === 'TIE_WAITING_REFUND') return 'GenLayer returned a tie. Both stakes become refundable at the resolution deadline.';
   if (room.evaluationStage === 'SETTLING') return 'The verdict is final. Arc payout settlement is being confirmed.';
   return 'Both deposits are held. The match is queued to start automatically.';
