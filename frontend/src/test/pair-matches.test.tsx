@@ -121,6 +121,17 @@ it('shows that a joined room started automatically and exposes its current stage
   expect(await screen.findByText('Match started automatically. Both Agents are producing responses.')).toBeInTheDocument();
 });
 
+it('explains when the bounded evaluation retries are exhausted', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    return [{ roomId: `sha256:${'8'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
+      creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '10000', joinDeadline: 1_999_999_999,
+      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'RETRYING', evaluationAttempts: 3, retryAt: 1_999_999_000 }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText(/Evaluation paused after 3 failed attempts/)).toHaveTextContent(/Both players can approve an early refund/);
+});
+
 it('does not request or render participant room history before login', async () => {
   const fetcher = vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };

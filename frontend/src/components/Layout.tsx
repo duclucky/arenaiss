@@ -92,8 +92,8 @@ export function Layout() {
 
       <div className="header-actions" ref={accountRef}>
         {account ? <>
-          <button className="header-account" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen} aria-haspopup="menu">
-            <span>Account</span>
+          <button className="header-account" onClick={() => setAccountOpen((open) => !open)} aria-label="Account" aria-expanded={accountOpen} aria-haspopup="menu">
+            <span>Account · Signed in</span>
           </button>
           {accountOpen && <div role="menu" className="account-menu">
             <Link role="menuitem" to="/account">View account</Link>
