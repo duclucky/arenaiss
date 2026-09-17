@@ -3,7 +3,7 @@
   "createdAt": "2026-09-18",
   "scope": "LOCAL_ONLY",
   "fileCount": 304,
-  "sourceBundleSha256": "5b16198c4017b0d3185bc61c41ff29181e234d32d849c459c79fafd421f7e4e6",
+  "sourceBundleSha256": "1a24ed3bc926a672c465780e065e705b0dba4ba05a61f4809319f102633a2c89",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -140,7 +140,7 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 328,
+    "typescriptTests": 329,
     "foundryTests": 33,
     "frontendTests": 128
   },

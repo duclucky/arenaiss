@@ -537,6 +537,15 @@ timeout and persists that decision for restart. Evo records the actual model on
 each scenario. Comparison and Marketplace eligibility accept mixed-model
 cohorts that pass their score and policy gates, while retaining model provenance.
 
+On 2026-09-18, Evo Core v3 changed the evidence capability used by the second
+scenario. Its three variants now expose one inert `evidence.read_set` proposal
+with a `resources` argument and a one-action limit. This lets an Agent request
+multiple distinct evidence resources without emitting the same action ID twice,
+which the deployed AgentEvaluationJudge V5 deterministically classifies as
+`DUPLICATE_ACTION`. Existing v2 campaigns and results remain immutable. This is
+a local Test Pack/backend change and does not modify or redeploy a GenLayer
+contract.
+
 Marketplace phases `MKT-0` through `MKT-2` are implemented and their Arc
 contracts are deployed on Arc Testnet. The locked
 eligibility policy requires six scenarios with two finalized runs each, exact
