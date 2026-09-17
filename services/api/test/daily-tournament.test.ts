@@ -8,12 +8,12 @@ import type { CreateTournamentOperation, TournamentOperationSnapshot, Tournament
 const midnight = Date.UTC(2026, 8, 17) / 1_000;
 
 class FakeOperations implements TournamentOperationsPort {
-  records = new Map<string, { input: CreateTournamentOperation; state: TournamentOperationSnapshot['state'] }>();
+  records = new Map<string, { input: CreateTournamentOperation; state: TournamentOperationSnapshot['state']; message?: string }>();
   actions: string[] = [];
   async list() { return Promise.all([...this.records].map(([id]) => this.get(id) as Promise<TournamentOperationSnapshot>)); }
   async get(id: string) {
     const row = this.records.get(id);
-    return row ? { tournamentId: id, name: row.input.name, state: row.state, entrantCount: 8, matchCount: 12, finalizedMatchCount: 0, nextActions: row.state === 'SETTLEMENT_PENDING' ? ['SETTLE'] as const : row.state === 'COMPLETED' || row.state === 'REFUNDED' ? [] as const : ['PROGRESS', 'REFUND', 'EXPIRE'] as const } : null;
+    return row ? { tournamentId: id, name: row.input.name, state: row.state, entrantCount: 8, matchCount: 12, finalizedMatchCount: 0, ...(row.message ? { message: row.message } : {}), nextActions: row.state === 'SETTLEMENT_PENDING' ? ['SETTLE'] as const : row.state === 'COMPLETED' || row.state === 'REFUNDED' ? [] as const : ['PROGRESS', 'REFUND', 'EXPIRE'] as const } : null;
   }
   async create(input: CreateTournamentOperation) {
     this.actions.push(`CREATE:${input.startsAt}`);
@@ -86,5 +86,45 @@ test('recovery diagnostic reports persisted side and submission states without p
       comparisonState: 'SUBMISSION_PERSISTED',
       comparisonHashRecorded: false,
     });
+  } finally { runtime.close(); }
+});
+
+test('daily worker retries one-sided provider output with a cooldown but never replays a judge submission', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const operations = new FakeOperations();
+    const first = await runDailyTournamentTick(runtime, operations, midnight - 60, '1000000');
+    const attempt = `sha256:${'a'.repeat(64)}`;
+    const match = `sha256:${'b'.repeat(64)}`;
+    const row = operations.records.get(first!.tournamentId)!;
+    row.state = 'RECOVERY_REQUIRED';
+    row.message = `Runner requires recovery for attempt ${attempt}.`;
+    runtime.put('evaluation-tournament-provider-runs', `${attempt}:A`, { fingerprint: 'saved', rawOutput: 'PRIVATE' });
+    await runDailyTournamentTick(runtime, operations, midnight + 1, '1000000');
+    assert.deepEqual(operations.actions.slice(-1), ['PROGRESS']);
+    const previousCount = operations.actions.length;
+    row.state = 'RECOVERY_REQUIRED';
+    await runDailyTournamentTick(runtime, operations, midnight + 2, '1000000');
+    assert.equal(operations.actions.length, previousCount);
+    runtime.put('comparison-submissions', `${match}:${attempt}`, { key: `${match}:${attempt}`, state: 'SUBMISSION_PERSISTED' });
+    await runDailyTournamentTick(runtime, operations, midnight + 301, '1000000');
+    assert.equal(operations.actions.length, previousCount);
+  } finally { runtime.close(); }
+});
+
+test('partial provider replay stops after three claims for one attempt', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const operations = new FakeOperations();
+    const first = await runDailyTournamentTick(runtime, operations, midnight - 60, '1000000');
+    const attempt = `sha256:${'c'.repeat(64)}`;
+    const row = operations.records.get(first!.tournamentId)!;
+    row.message = `Runner requires recovery for attempt ${attempt}.`;
+    runtime.put('evaluation-tournament-provider-runs', `${attempt}:A`, { fingerprint: 'saved' });
+    for (let number = 0; number < 4; number += 1) {
+      row.state = 'RECOVERY_REQUIRED';
+      await runDailyTournamentTick(runtime, operations, midnight + 1 + number * 300, '1000000');
+    }
+    assert.equal(operations.actions.filter((action) => action === 'PROGRESS').length, 3);
   } finally { runtime.close(); }
 });
