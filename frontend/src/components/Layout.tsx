@@ -38,7 +38,7 @@ export function Layout() {
         setAccountOpen(false);
       }
     };
-    const resize = () => { if (window.innerWidth >= 768) setMenuOpen(false); };
+    const resize = () => { if (window.innerWidth >= 1024) setMenuOpen(false); };
     document.addEventListener('keydown', close);
     window.addEventListener('resize', resize);
     return () => {
