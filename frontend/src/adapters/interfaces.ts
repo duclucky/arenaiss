@@ -13,6 +13,7 @@ export type Tournament = {
     entropyBlockHash: string;
     entropyBlockNumber: string;
   };
+  operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING';
   demo?: TournamentDemoDetail;
 };
 

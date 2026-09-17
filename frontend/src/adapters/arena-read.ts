@@ -144,6 +144,7 @@ function normalizeTournament(value: unknown): Tournament {
   if (!TOURNAMENT_STATES.has(status)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.registrationClosesAt !== undefined && (!Number.isSafeInteger(item.registrationClosesAt) || (item.registrationClosesAt as number) < 1)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.entrantIds !== undefined && (!Array.isArray(item.entrantIds) || item.entrantIds.some((id) => typeof id !== 'string'))) throw new Error('INVALID_ARENA_RESPONSE');
+  if (item.operationState !== undefined && !['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(String(item.operationState))) throw new Error('INVALID_ARENA_RESPONSE');
   let bracketSeed: Tournament['bracketSeed'];
   if (item.bracketSeed !== undefined) {
     const proof = record(item.bracketSeed);
@@ -155,7 +156,7 @@ function normalizeTournament(value: unknown): Tournament {
   return { id: text(item.id), name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
     ...(item.registrationClosesAt !== undefined ? { registrationClosesAt: item.registrationClosesAt as number } : {}),
     ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}),
-    ...(bracketSeed ? { bracketSeed } : {}) };
+    ...(bracketSeed ? { bracketSeed } : {}), ...(item.operationState ? { operationState: item.operationState as Tournament['operationState'] } : {}) };
 }
 function normalizeMatch(value: unknown): Match {
   const item = record(value);

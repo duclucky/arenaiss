@@ -25,7 +25,7 @@ test("E6 partial rich provider pair stops before comparison submission", async (
   let calls = 0;
   const provider = { async generate(value: any) { calls += 1; if (value.input.agent.content === "Agent B") throw new Error("PROVIDER_TIMEOUT"); const rawOutput = JSON.stringify({ schema: "arena-evaluation-output-v1", mode: "RESPONSE", decision: "RESPOND", answer: "A", observable_rationale: "Support", proposed_actions: [] }); return { rawOutput, output: {} }; } };
   const result = await new TournamentEvaluationPairRunner(provider, { model: "fixture", maxOutputTokens: 1000, temperature: 0 }).run(context);
-  assert.equal(calls, 2); assert.equal(result.state, "PARTIAL_PAIR"); assert.ok(result.outputA); assert.equal(result.outputB, undefined);
+  assert.equal(calls, 2); assert.equal(result.state, "PARTIAL_PAIR"); assert.ok(result.outputA); assert.equal(result.outputB, undefined); assert.equal(result.failureCode, "PROVIDER_TIMEOUT");
 });
 
 test("a primary timeout reruns both Tournament sides on the same fallback model", async () => {

@@ -43,6 +43,10 @@ export function TournamentDetail() {
     );
   }
 
+  const bracketBase = tournament.entrantCount ? 2 ** Math.floor(Math.log2(tournament.entrantCount)) : 0;
+  const preliminaryCount = tournament.entrantCount ? tournament.entrantCount - bracketBase : 0;
+  const byeCount = tournament.entrantCount ? 2 * bracketBase - tournament.entrantCount : 0;
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -69,6 +73,8 @@ export function TournamentDetail() {
 
       {tournament.registrationClosesAt && <p className="text-sm text-neutral-700">Registration closes at <time dateTime={new Date(tournament.registrationClosesAt * 1_000).toISOString()}>{new Date(tournament.registrationClosesAt * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time>. The roster is locked when the Tournament starts.</p>}
 
+      {tournament.operationState === 'RECOVERY_REQUIRED' && <div role="status" className="glass-panel border-amber-700 p-4 text-sm">Tournament processing is paused while the operator reviews an evaluation attempt. Published pairings remain visible below; results will update after recovery.</div>}
+
       {tournament.bracketSeed && <section className="glass-panel rounded-[28px] p-5 md:p-6" aria-label="Public pairing proof">
         <p className="page-kicker">Public pairing proof</p>
         <h2 className="text-xl font-bold">Arc anchored bracket seed</h2>
@@ -85,8 +91,9 @@ export function TournamentDetail() {
           Match bracket <Info size={16} className="text-muted-foreground" aria-hidden="true" />
         </h2>
         <p className="mb-4 text-sm leading-relaxed text-neutral-700">This is the knockout match schedule. Arena locks the entrant list and pairs Agents deterministically from a fixed seed; winners advance through later rounds. For new Tournaments, the public pairing proof above identifies the Arc block used for that seed.</p>
+        {tournament.bracketSeed && preliminaryCount > 0 && <p className="mb-4 text-sm text-neutral-700">Opening round: {preliminaryCount} preliminary {preliminaryCount === 1 ? 'match' : 'matches'}; {byeCount} Agents advance past that round by bye. Pairings that depend on an earlier winner appear once that result is final.</p>}
         {matches.length === 0 ? (
-          <p className="text-muted-foreground">{tournament.status === 'UPCOMING' ? 'Pairings will appear here after registration closes and the Tournament starts.' : 'No matches scheduled yet.'}</p>
+          <p className="text-muted-foreground">{tournament.status === 'UPCOMING' ? 'Pairings will appear here after registration closes and the Tournament starts.' : tournament.operationState === 'RECOVERY_REQUIRED' ? 'Tournament processing is paused. Pairings are being reconciled.' : 'Pairings are being prepared.'}</p>
         ) : (
           <div className="space-y-4">
             {matches.map((m) => (

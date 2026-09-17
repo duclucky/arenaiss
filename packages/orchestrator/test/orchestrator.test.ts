@@ -62,6 +62,7 @@ test("partial pair stops before judge submission and requests recovery", async (
   const inference = new FakeInference(); inference.partialAt = 1; const judge = new FakeJudge();
   const result = await new TournamentOrchestrator(inference, judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, expiresAt: 1000, now: () => 100 });
   assert.equal(result.state, "RECOVERY_REQUIRED"); assert.equal(judge.calls, 0);
+  if (result.state === "RECOVERY_REQUIRED") assert.equal(result.reason, "PROVIDER_INCOMPLETE");
 });
 
 test("operator-approved recovery abandons the incomplete attempt and retries the whole pair", async () => {
@@ -97,6 +98,7 @@ test("finalized execution failure requires recovery without creating a new attem
   assert.equal(result.state, "RECOVERY_REQUIRED");
   assert.equal(inference.calls.length, 1);
   assert.equal(judge.calls, 1);
+  if (result.state === "RECOVERY_REQUIRED") assert.equal(result.reason, "JUDGE_FAILED");
 });
 
 test("expiry requests refund instead of inventing a winner", async () => {
@@ -111,6 +113,7 @@ test("judge adapter exception becomes controlled recovery for the same attempt",
   assert.equal(result.state, "RECOVERY_REQUIRED");
   assert.equal(inference.calls.length, 1);
   if (result.state === "RECOVERY_REQUIRED") assert.equal(result.attemptId, inference.calls[0].attemptId);
+  if (result.state === "RECOVERY_REQUIRED") assert.equal(result.reason, "JUDGE_ERROR");
 });
 
 for (const retryResult of ["TIE", "RETRYABLE"] as const) {

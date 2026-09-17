@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
+import { buildBracket } from '../../../packages/domain/src/bracket.ts';
 import { LiveTournamentOperations, ViemTournamentArcOperations, type TournamentArcOperations } from '../src/tournament-operations-live.ts';
 
 const tournamentId = `sha256:${'1'.repeat(64)}`;
@@ -29,7 +30,7 @@ test('production Tournament runner derives ranking, persists it, then settles on
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const arc = new FakeArc(); const published: any[] = []; let runs = 0;
-    const service = { listTournamentOperatorEntrants: () => entrants, publishTournament: (_caller: string, value: any) => published.push(value) } as any;
+    const service = { listTournamentOperatorEntrants: () => entrants, publishTournament: (_caller: string, value: any) => published.push(value), publishMatch() {}, getMatch: () => null, getPublicAgent: (id: string) => ({ name: id }) } as any;
     const ranking = entrants.slice(0, 5).map((row) => `sha256:${row.entrantId.slice(2)}`);
     const orchestrator = { async run(input: any) { runs += 1; assert.equal(input.entrants.length, 8); return { state: 'RANKING_READY', ranking, results: new Map(Array.from({ length: 12 }, (_, index) => [`sha256:${String(index + 101).padStart(64, '0')}`, 'A_WIN'])) }; } } as any;
     const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
@@ -77,7 +78,7 @@ test('Tournament derives a public bracket seed from the locked roster and schedu
     arc.startBlockEntropy = async (startsAt) => { assert.equal(startsAt, 20); return { blockHash: entropyBlockHash, blockNumber: entropyBlockNumber }; };
     let currentEntrants = entrants;
     const published: any[] = [];
-    const service = { listTournamentOperatorEntrants: () => currentEntrants, publishTournament: (_caller: string, value: any) => published.push(value) } as any;
+    const service = { listTournamentOperatorEntrants: () => currentEntrants, publishTournament: (_caller: string, value: any) => published.push(value), publishMatch() {}, getMatch: () => null, getPublicAgent: (id: string) => ({ name: id }) } as any;
     const seeds: string[] = [];
     const rosterSizes: number[] = [];
     const topicSnapshots: string[][] = [];
@@ -105,6 +106,49 @@ test('Tournament derives a public bracket seed from the locked roster and schedu
   } finally { runtime.close(); }
 });
 
+test('locked nine entrant roster publishes the playable opening match and survives a paused runner', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const arc = new FakeArc(); arc.entrantCount = 9;
+    const roster = [...entrants, { ...entrants[0], entrantId: `0x${'9'.padStart(64, '0')}`, agentId: `0x${'19'.padStart(64, '0')}` }];
+    const matches = new Map<string, any>(); const tournaments: any[] = [];
+    const service = { listTournamentOperatorEntrants: () => roster, publishTournament: (_caller: string, row: any) => tournaments.push(row), publishMatch: (_caller: string, match: any) => matches.set(match.id, match), getMatch: (id: string) => matches.get(id) ?? null, getPublicAgent: (id: string) => ({ name: `Agent ${id.slice(-4)}` }) } as any;
+    const orchestrator = { async run() { return { state: 'RECOVERY_REQUIRED', attemptId: tournamentId, matchId: tournamentId, reason: 'PROVIDER_ERROR', results: new Map() }; } } as any;
+    const input = { tournamentId, name: 'Daily', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 32, stakeAmount: '1000000' };
+    const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
+    await operations.create(input);
+    assert.equal((await operations.execute({ tournamentId, action: 'PROGRESS' })).state, 'RECOVERY_REQUIRED');
+    assert.equal(tournaments.at(-1).operationState, 'RECOVERY_REQUIRED');
+    assert.equal([...matches.values()].filter((match) => match.round === 0 && match.state === 'SCHEDULED').length, 1);
+    const first = [...matches.values()][0];
+    assert.match(first.agentA, /^Agent /);
+    await operations.get(tournamentId);
+    assert.deepEqual(matches.get(first.id), first);
+  } finally { runtime.close(); }
+});
+
+test('finalized opening result publishes the winner and newly playable next pairing', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const arc = new FakeArc(); arc.entrantCount = 9;
+    const roster = [...entrants, { ...entrants[0], entrantId: `0x${'9'.padStart(64, '0')}`, agentId: `0x${'19'.padStart(64, '0')}` }];
+    const matches = new Map<string, any>();
+    const service = { listTournamentOperatorEntrants: () => roster, publishTournament() {}, publishMatch: (_caller: string, match: any) => matches.set(match.id, match), getMatch: (id: string) => matches.get(id) ?? null, getPublicAgent: (id: string) => ({ name: `Agent ${id.slice(-4)}` }) } as any;
+    const orchestrator = { async run(input: any) {
+      const bracket = buildBracket({ tournamentId, seedDigest: input.seedDigest, entrants: input.entrants.map((item: any) => item.entrantId), bracketRevision: 1 });
+      const opening = bracket.matches[0];
+      return { state: 'WAITING_FOR_JUDGE', matchId: bracket.matches[1].matchId, attemptId: tournamentId, results: new Map([[opening.matchId, 'A_WIN']]) };
+    } } as any;
+    const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
+    await operations.create({ tournamentId, name: 'Daily', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 20, expiresAt: 1000, minEntrants: 8, maxEntrants: 32, stakeAmount: '1000000' });
+    await operations.execute({ tournamentId, action: 'PROGRESS' });
+    const finalized = [...matches.values()].find((item) => item.round === 0);
+    assert.equal(finalized.state, 'FINALIZED');
+    assert.equal(finalized.winner, finalized.agentA);
+    assert.ok([...matches.values()].some((item) => item.round === 1 && item.state === 'SCHEDULED'));
+  } finally { runtime.close(); }
+});
+
 test('Arc entropy lookup selects the first block at or after the locked start time', async () => {
   const port = Object.create(ViemTournamentArcOperations.prototype) as ViemTournamentArcOperations;
   const calls: bigint[] = [];
@@ -123,7 +167,7 @@ test('Tournament operation created before topic pool v2 keeps the legacy selecti
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const arc = new FakeArc();
-    const service = { listTournamentOperatorEntrants: () => entrants, publishTournament() {} } as any;
+    const service = { listTournamentOperatorEntrants: () => entrants, publishTournament() {}, publishMatch() {}, getMatch: () => null, getPublicAgent: (id: string) => ({ name: id }) } as any;
     const seen: any[] = [];
     const orchestrator = { async run(input: any) { seen.push(input); return { state: 'WAITING_FOR_JUDGE', attemptId: tournamentId, results: new Map() }; } } as any;
     const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40, ['new-topic']);

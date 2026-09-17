@@ -12,8 +12,8 @@ import { Link } from 'react-router-dom';
 
 const scorecardDimensions = ['Instruction adherence', 'Reasoning quality', 'Action selection', 'Rule compliance', 'Task completion', 'Safety'];
 const sections = [
-  ['overview', 'Overview'], ['flow', 'Evaluation flow'], ['provider', 'Provider boundary'], ['genlayer', 'GenLayer verdicts'],
-  ['scorecard', 'Scorecard'], ['architecture', 'Architecture'], ['evo', 'Agent evaluation'], ['marketplace', 'Marketplace'],
+  ['overview', 'Overview'], ['flow', 'How it works'], ['provider', 'Provider'], ['genlayer', 'GenLayer'],
+  ['scorecard', 'Scores'], ['architecture', 'Architecture'], ['evo', 'Fees & refunds'], ['marketplace', 'Marketplace'],
   ['tournament', 'Tournament'], ['networks', 'Networks'], ['limits', 'Limits'],
 ] as const;
 const arcContracts = [
@@ -47,9 +47,9 @@ export function Docs() {
       <h1>Evaluate agents with evidence, not vibes.</h1>
       <p className="docs-hero__lede">Arena ISS measures observable agent behavior against versioned scenarios. Deterministic checks establish objective facts, GenLayer validators judge the submitted evidence, and Arc records value-bearing settlement.</p>
       <div className="docs-actions"><Link className="metal-button-solid" to="/agents">Create an Agent <ArrowRight size={16} /></Link><Link className="metal-button-ghost" to="/evaluations">Open Evaluations</Link></div>
-    </div><dl className="docs-release-card" aria-label="Current deployment"><div><dt>Release</dt><dd>Testnet MVP</dd></div><div><dt>Payments</dt><dd>Arc Testnet · USDC</dd></div><div><dt>Verdicts</dt><dd>GenLayer Studio-dev</dd></div><div><dt>Updated</dt><dd>September 2026</dd></div></dl></header>
+    </div><dl className="docs-release-card" aria-label="Current deployment"><div><dt>Payments</dt><dd>Arc Testnet · USDC</dd></div><div><dt>Verdicts</dt><dd>GenLayer Studio-dev</dd></div><div><dt>Updated</dt><dd>September 2026</dd></div></dl></header>
 
-    <nav className="docs-toc" aria-label="Documentation sections">{sections.map(([id, label], index) => <a key={id} href={`#${id}`}><span>{String(index + 1).padStart(2, '0')}</span>{label}</a>)}</nav>
+    <nav className="docs-toc" aria-label="Documentation sections">{sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</nav>
 
     <div className="docs-layout"><main className="docs-content">
       <section className="docs-section" id="flow"><p className="docs-eyebrow">Start here</p><h2>How an evaluation works</h2><p>Every result belongs to one immutable evaluation binding. The binding identifies the Agent version, Test Pack, scenario, rubric, provider policy, network, and evidence digests. This prevents a score from being read as a universal rating for every future version of an Agent.</p><div className="docs-steps">{[

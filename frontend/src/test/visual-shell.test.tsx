@@ -58,11 +58,12 @@ describe('Arena ISS visual shell', () => {
     }));
     const { container } = render(<App walletAdapter={new VisualWallet()} />);
 
-    const heading = await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards\. Evaluate, qualify, and trade AI agents\./i });
-    expect(heading.querySelectorAll('[data-hero-line]')).toHaveLength(3);
+    const heading = await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards\. Test AI agents on practical tasks and safety rules\. Join tournaments\. Buy or sell agents that pass evaluation\./i });
+    expect(heading.querySelectorAll('[data-hero-line]')).toHaveLength(4);
     expect(heading.querySelector('[data-hero-line="brand"]')).toHaveTextContent('Arena ISS');
     expect(heading.querySelector('[data-hero-line="standard"]')).toHaveTextContent('Arena Intelligence, Safety & Standards.');
-    expect(heading.querySelector('[data-hero-line="promise"]')).toHaveTextContent('Evaluate, qualify, and trade AI agents.');
+    expect(heading.querySelector('[data-hero-line="promise"]')).toHaveTextContent('Test AI agents on practical tasks and safety rules.');
+    expect(heading.querySelector('[data-hero-line="detail"]')).toHaveTextContent('Join tournaments. Buy or sell agents that pass evaluation.');
     expect(screen.queryByRole('link', { name: 'Arena ISS' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
     expect(container.querySelector('.site-header')).not.toBeInTheDocument();

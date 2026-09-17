@@ -85,7 +85,7 @@ export class TournamentEvaluationPairRunner implements OrchestratorInference {
     const successes = rows.filter((row): row is PromiseFulfilledResult<{ side: "A" | "B" } & ProviderRecord> => row.status === "fulfilled").map((row) => row.value);
     const a = successes.find((row) => row.side === "A"); const b = successes.find((row) => row.side === "B");
     const output: PairOutput = !a || !b
-      ? { state: "PARTIAL_PAIR", ...(a ? { outputA: a.rawOutput, outputADigest: a.responseDigest as `sha256:${string}` } : {}), ...(b ? { outputB: b.rawOutput, outputBDigest: b.responseDigest as `sha256:${string}` } : {}) }
+      ? { state: "PARTIAL_PAIR", ...(failures.length ? { failureCode: classifyEvaluationProviderError(failures[0].reason) } : {}), ...(a ? { outputA: a.rawOutput, outputADigest: a.responseDigest as `sha256:${string}` } : {}), ...(b ? { outputB: b.rawOutput, outputBDigest: b.responseDigest as `sha256:${string}` } : {}) }
       : { state: "OUTPUTS_READY", outputA: a.rawOutput, outputB: b.rawOutput, outputADigest: a.responseDigest as `sha256:${string}`, outputBDigest: b.responseDigest as `sha256:${string}` };
     return { output, timedOut, otherFailure };
   }

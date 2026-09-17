@@ -26,7 +26,7 @@ describe('Tournament operator console', () => {
   it('shows the reproducible Arc pairing proof and verification links when available', async () => {
     const id = `sha256:${'e'.repeat(64)}`;
     const bracketSeed = { schema: 'arena-bracket-seed-v2' as const, seedDigest: `sha256:${'a'.repeat(64)}`, rosterDigest: `sha256:${'b'.repeat(64)}`, entropyBlockHash: `0x${'c'.repeat(64)}`, entropyBlockNumber: '123' };
-    const reads = { async getTournament() { return { id, name: 'Proof Cup', status: 'ACTIVE', entrantIds: [], prizePool: '8', bracketSeed }; }, async getMatches() { return []; } } as unknown as ArenaReadAdapter;
+    const reads = { async getTournament() { return { id, name: 'Proof Cup', status: 'ACTIVE', entrantIds: Array.from({ length: 9 }, (_, index) => `entrant-${index}`), entrantCount: 9, prizePool: '9', bracketSeed }; }, async getMatches() { return []; } } as unknown as ArenaReadAdapter;
     render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider arenaReadAdapter={reads}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
     const proof = await screen.findByRole('region', { name: 'Public pairing proof' });
     expect(proof).toHaveTextContent(bracketSeed.seedDigest);
@@ -34,6 +34,16 @@ describe('Tournament operator console', () => {
     expect(proof).toHaveTextContent(bracketSeed.entropyBlockHash);
     expect(screen.getByRole('link', { name: 'How to verify pairing' })).toHaveAttribute('href', '/docs#tournament');
     expect(screen.getByRole('link', { name: 'View block' })).toHaveAttribute('href', 'https://testnet.arcscan.app/block/123');
+    expect(screen.getByText(/1 preliminary match; 7 Agents advance/)).toBeInTheDocument();
+  });
+
+  it('explains a paused tournament while preserving published pairings', async () => {
+    const id = `sha256:${'e'.repeat(64)}`;
+    const reads = { async getTournament() { return { id, name: 'Paused Cup', status: 'ACTIVE', operationState: 'RECOVERY_REQUIRED', entrantIds: Array(9).fill('entrant'), prizePool: '9' }; }, async getMatches() { return [{ id: 'match-1', tournamentId: id, agentA: 'Agent A', agentB: 'Agent B', round: 0, state: 'SCHEDULED' }]; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider arenaReadAdapter={reads}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('status')).toHaveTextContent('processing is paused');
+    expect(screen.getByText('Agent A')).toBeInTheDocument();
+    expect(screen.queryByText('No matches scheduled yet.')).not.toBeInTheDocument();
   });
 
   it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {

@@ -87,7 +87,7 @@ export function Layout() {
 
       {account ? <nav id="site-nav" aria-label="Primary" data-open={menuOpen} className="primary-nav">
         {navItems.map(([to, label]) => <NavLink key={to} to={to} className={({ isActive }) => clsx('nav-link', isActive && 'is-active')}>{label}</NavLink>)}
-      </nav> : <div />}
+      </nav> : null}
 
       <div className="header-actions" ref={accountRef}>
         {account ? <>
