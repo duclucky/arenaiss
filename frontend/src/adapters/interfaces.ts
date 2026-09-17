@@ -65,8 +65,12 @@ export type Match = {
   state: MatchState;
   agentA: string;
   agentB: string;
+  agentIdA?: string;
+  agentIdB?: string;
   winner?: string;
   round: number;
+  stage?: 'preliminary' | 'main' | 'third_place' | 'fifth_place';
+  events?: Array<{ state: MatchState; at?: number }>;
 };
 
 export type MatchVerdict = {

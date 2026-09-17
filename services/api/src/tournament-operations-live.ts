@@ -177,7 +177,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     const entrants = record.entrants;
     this.publish(record, arc, entrants.map((item) => item.entrantId));
     this.publishOpeningMatches(record);
-    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: 1, retryCap: 3, expiresAt: record.input.expiresAt, now: this.now });
+    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: 1, retryCap: 3, maxConcurrentMatches: 3, expiresAt: record.input.expiresAt, now: this.now });
     this.publishMatchProgress(record, result);
     this.applyOrchestrator(record, result, entrants.length);
     this.publish(record, arc, entrants.map((item) => item.entrantId));
@@ -225,7 +225,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
       const a = byEntrant.get(match.slotA.id)!;
       const b = byEntrant.get(match.slotB.id)!;
       const label = (entrant: Entrant) => `${this.service.getPublicAgent(entrant.agentId).name} · ${entrant.entrantId.slice(-12)}`;
-      this.service.publishMatch(this.operatorAddress, { id: match.matchId, tournamentId: record.input.tournamentId, state: 'SCHEDULED', agentA: label(a), agentB: label(b), agentIdA: a.agentId, agentIdB: b.agentId, round: match.roundNumber });
+      this.service.publishMatch(this.operatorAddress, { id: match.matchId, tournamentId: record.input.tournamentId, state: 'SCHEDULED', agentA: label(a), agentB: label(b), agentIdA: a.agentId, agentIdB: b.agentId, round: match.roundNumber, stage: match.stage });
     }
   }
 
@@ -249,10 +249,12 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
       const a = resolve(match.slotA); const b = resolve(match.slotB);
       if (!a || !b) continue;
       const outcome = result.results.get(match.matchId);
+      const activeState = 'activeMatches' in result ? result.activeMatches?.get(match.matchId) : undefined;
       const state = outcome === 'A_WIN' || outcome === 'B_WIN' ? 'FINALIZED'
+        : activeState ? (activeState === 'RECOVERY_REQUIRED' ? 'RETRYABLE' : 'JUDGING')
         : 'matchId' in result && result.matchId === match.matchId ? (result.state === 'RECOVERY_REQUIRED' ? 'RETRYABLE' : 'JUDGING')
         : 'SCHEDULED';
-      this.service.publishMatch(this.operatorAddress, { id: match.matchId, tournamentId: record.input.tournamentId, state, agentA: label(a), agentB: label(b), agentIdA: a.agentId, agentIdB: b.agentId, ...(outcome === 'A_WIN' ? { winner: label(a) } : outcome === 'B_WIN' ? { winner: label(b) } : {}), round: match.roundNumber });
+      this.service.publishMatch(this.operatorAddress, { id: match.matchId, tournamentId: record.input.tournamentId, state, agentA: label(a), agentB: label(b), agentIdA: a.agentId, agentIdB: b.agentId, ...(outcome === 'A_WIN' ? { winner: label(a) } : outcome === 'B_WIN' ? { winner: label(b) } : {}), round: match.roundNumber, stage: match.stage });
     }
   }
 

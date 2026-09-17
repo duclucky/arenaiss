@@ -15,6 +15,7 @@ export function summarizeTournamentRecovery(runtime: SqliteRuntimeStore, message
     .find((row) => row.key.endsWith(`:${attemptId}`));
   return {
     attemptId,
+    reasonCode: /:\s*([A-Z_]+)\.$/.exec(message)?.[1] ?? 'UNKNOWN',
     providerA: Boolean(runtime.get('evaluation-tournament-provider-runs', `${attemptId}${suffix}:A`)),
     providerB: Boolean(runtime.get('evaluation-tournament-provider-runs', `${attemptId}${suffix}:B`)),
     fallbackSelected,

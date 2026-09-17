@@ -12,6 +12,25 @@ import { EVO_CORE_PACK_ID } from "../../../packages/evaluation/src/evo-core.ts";
 const ALICE = "0x1111111111111111111111111111111111111111";
 const BOB = "0x2222222222222222222222222222222222222222";
 
+test("public match detail records bounded state transitions across restart without private evidence", () => {
+  const runtime = new SqliteRuntimeStore(":memory:");
+  try {
+    const api = new ArenaApiService(ALICE, runtime, () => 1_789_603_200);
+    const tournamentId = `sha256:${"a".repeat(64)}`;
+    const matchId = `sha256:${"b".repeat(64)}`;
+    api.publishTournament(ALICE, { id: tournamentId, name: "Match log", status: "ACTIVE", entrantIds: [], prizePool: "0" });
+    const base = { id: matchId, tournamentId, agentA: "Alpha", agentB: "Beta", round: 1 };
+    api.publishMatch(ALICE, { ...base, state: "SCHEDULED" });
+    api.publishMatch(ALICE, { ...base, state: "JUDGING" });
+    api.publishMatch(ALICE, { ...base, state: "JUDGING" });
+    assert.deepEqual(new ArenaApiService(ALICE, runtime).getMatch(matchId)?.events, [
+      { state: "SCHEDULED", at: 1_789_603_200 },
+      { state: "JUDGING", at: 1_789_603_200 },
+    ]);
+    assert.equal(JSON.stringify(api.getMatch(matchId)).includes("rawOutput"), false);
+  } finally { runtime.close(); }
+});
+
 test("Evo selects a stable diverse subset per Agent across campaigns, versions, and service restart", () => {
   const runtime = new SqliteRuntimeStore(":memory:");
   try {

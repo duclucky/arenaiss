@@ -80,6 +80,7 @@ test('recovery diagnostic reports persisted side and submission states without p
     runtime.put('comparison-submissions', `sha256:${'b'.repeat(64)}:${attempt}`, { key: `sha256:${'b'.repeat(64)}:${attempt}`, state: 'SUBMISSION_PERSISTED', submission: { responseJsonA: 'PRIVATE' } });
     assert.deepEqual(summarizeTournamentRecovery(runtime, `Runner requires recovery for attempt ${attempt}.`), {
       attemptId: attempt,
+      reasonCode: 'UNKNOWN',
       providerA: true,
       providerB: false,
       fallbackSelected: false,

@@ -28,7 +28,8 @@ export type AgentDetail = PublicAgent & {
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed; operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
-export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number };
+export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number; stage?: 'preliminary' | 'main' | 'third_place' | 'fifth_place' };
+export type PublicMatchEvent = { state: PublicMatchState; at?: number };
 export type PublicVerdictCriterion = { id: string; label: string; winner: "A" | "B" | "TIE"; reason: string };
 export type PublicVerdict = {
   id: string; matchId: string; winner: "A" | "B" | "TIE"; reasons: readonly string[]; summary: string; transactionHash?: string;
@@ -78,6 +79,7 @@ export class ArenaApiService {
   private agents = new Map<Digest, Agent>();
   private tournaments = new Map<string, PublicTournament>();
   private matches = new Map<string, PublicMatch>();
+  private matchEvents = new Map<string, PublicMatchEvent[]>();
   private verdicts = new Map<string, PublicVerdict>();
   private registrations = new Map<string, PreparedRegistration>();
   private evaluationPacks = new Map<string, EvaluationPackRecord>();
@@ -100,6 +102,7 @@ export class ArenaApiService {
       for (const agent of runtime.list<Agent>("api-agents")) this.agents.set(agent.agentId, agent);
       for (const tournament of runtime.list<PublicTournament>("api-tournaments")) this.tournaments.set(tournament.id, tournament);
       for (const match of runtime.list<PublicMatch>("api-matches")) this.matches.set(match.id, match);
+      for (const row of runtime.list<{ matchId: string; events: PublicMatchEvent[] }>("api-match-events")) this.matchEvents.set(row.matchId, row.events);
       for (const verdict of runtime.list<PublicVerdict>("api-verdicts")) this.verdicts.set(verdict.matchId, verdict);
       for (const registration of runtime.list<PreparedRegistration>("api-registrations")) {
         const owner = this.agents.get(`sha256:${registration.agentId.slice(2)}` as Digest)?.owner;
@@ -249,6 +252,7 @@ export class ArenaApiService {
     const winnerRequired = match.state === "FINALIZED" || match.state === "WINNER_ADVANCED";
     if (!match.id || !match.tournamentId || !this.tournaments.has(match.tournamentId) || !PUBLIC_MATCH_STATES.has(match.state)
       || !match.agentA || !match.agentB || match.agentA === match.agentB || !Number.isSafeInteger(match.round) || match.round < 0
+      || (match.stage !== undefined && !['preliminary', 'main', 'third_place', 'fifth_place'].includes(match.stage))
       || ((match.agentIdA === undefined) !== (match.agentIdB === undefined))
       || (match.agentIdA !== undefined && (!isDigest(match.agentIdA) || !isDigest(match.agentIdB!)))
       || (match.winner !== undefined && match.winner !== match.agentA && match.winner !== match.agentB)
@@ -259,18 +263,24 @@ export class ArenaApiService {
     if (existing) {
       if (isDeepStrictEqual(existing, match)) return;
       if (TERMINAL_PUBLIC_MATCH_STATES.has(existing.state)) throw new Error("conflicting public match");
-      if (existing.tournamentId !== match.tournamentId || existing.agentA !== match.agentA || existing.agentB !== match.agentB || existing.agentIdA !== match.agentIdA || existing.agentIdB !== match.agentIdB || existing.round !== match.round) {
+      if (existing.tournamentId !== match.tournamentId || existing.agentA !== match.agentA || existing.agentB !== match.agentB || existing.agentIdA !== match.agentIdA || existing.agentIdB !== match.agentIdB || existing.round !== match.round || (existing.stage && match.stage && existing.stage !== match.stage)) {
         throw new Error("conflicting public match identity");
       }
     }
-    const stored = structuredClone(match);
+    const stored = structuredClone({ ...match, ...(match.stage ?? existing?.stage ? { stage: match.stage ?? existing?.stage } : {}) });
     this.matches.set(match.id, stored);
     this.runtime?.put("api-matches", match.id, stored);
+    if (!existing || existing.state !== match.state) {
+      const events = this.matchEvents.get(match.id) ?? (existing ? [{ state: existing.state }] : []);
+      const next = [...events, { state: match.state, at: this.nowSeconds() }].slice(-24);
+      this.matchEvents.set(match.id, next);
+      this.runtime?.put("api-match-events", match.id, { matchId: match.id, events: next });
+    }
   }
   listMatches(tournamentId: string): PublicMatch[] {
     return [...this.matches.values()].filter((match) => match.tournamentId === tournamentId).map((match) => structuredClone(match));
   }
-  getMatch(id: string): PublicMatch | null { const match = this.matches.get(id); return match ? structuredClone(match) : null; }
+  getMatch(id: string): (PublicMatch & { events: PublicMatchEvent[] }) | null { const match = this.matches.get(id); return match ? { ...structuredClone(match), events: structuredClone(this.matchEvents.get(id) ?? [{ state: match.state }]) } : null; }
   publishVerdict(caller: string, verdict: PublicVerdict): void {
     this.requireOperator(caller);
     const unsafe = verdict as PublicVerdict & { agentsMd?: unknown; outputA?: unknown; outputB?: unknown };

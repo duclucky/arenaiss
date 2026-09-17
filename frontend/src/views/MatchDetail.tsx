@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAppContext } from '../context';
 import { Match, MatchVerdict } from '../adapters/interfaces';
 import { ExternalLink } from 'lucide-react';
+import { agentDisplayName } from './match-display';
 
 function isValidAbsoluteUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -77,15 +78,29 @@ export function MatchDetail() {
 
       <div className="glass-panel flex items-center justify-between rounded-[28px] p-6 md:p-8">
         <div className={`retro-inset flex-1 p-4 text-center ${match.winner === match.agentA ? 'text-accent' : ''}`}>
-          <div className="font-mono font-bold text-lg">{match.agentA}</div>
+          <div className="font-mono font-bold text-lg">{agentDisplayName(match.agentA)}</div>
           {match.winner === match.agentA && <div className="text-xs text-accent mt-2 font-bold uppercase tracking-widest">Winner</div>}
         </div>
         <div className="px-6 font-serif italic text-muted-foreground">VS</div>
         <div className={`retro-inset flex-1 p-4 text-center ${match.winner === match.agentB ? 'text-accent' : ''}`}>
-          <div className="font-mono font-bold text-lg">{match.agentB}</div>
+          <div className="font-mono font-bold text-lg">{agentDisplayName(match.agentB)}</div>
           {match.winner === match.agentB && <div className="text-xs text-accent mt-2 font-bold uppercase tracking-widest">Winner</div>}
         </div>
       </div>
+
+      <section className="glass-panel p-6 md:p-8" aria-label="Match activity">
+        <h2 className="text-xl font-bold">Match activity</h2>
+        <p className="mt-2 text-sm text-neutral-700">Public progress for this match. Provider responses and private Agent instructions are not included.</p>
+        <ol className="mt-5 space-y-3">
+          {(match.events?.length ? match.events : [{ state: match.state }]).map((event, index) => {
+            const labels: Record<string, string> = { SCHEDULED: 'Scheduled', WAITING_FOR_OUTPUTS: 'Awaiting Agent outputs', JUDGING: 'GenLayer judging', ACCEPTED: 'Judgment accepted', FAILED: 'Attempt failed', RETRYABLE: 'Retry required', FINALIZED: 'Verdict finalized', TIE: 'Tie', RETRY: 'Retrying', WINNER_ADVANCED: 'Winner advanced' };
+            return <li key={`${index}-${event.state}`} className="retro-inset flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+              <span className="font-semibold">{labels[event.state] ?? event.state}</span>
+              <span className="font-mono text-xs text-neutral-600">{event.at ? new Date(event.at * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC' : 'Time unavailable'}</span>
+            </li>;
+          })}
+        </ol>
+      </section>
 
       {verdict && (
         <div className="space-y-6">
@@ -114,8 +129,8 @@ export function MatchDetail() {
 
             {(verdict.scoreA !== undefined || verdict.scoreB !== undefined) && (
               <div className="mb-6 grid gap-3 sm:grid-cols-2">
-                <ScoreCard label={match.agentA} score={verdict.scoreA} winner={verdict.winner === 'A'} />
-                <ScoreCard label={match.agentB} score={verdict.scoreB} winner={verdict.winner === 'B'} />
+                <ScoreCard label={agentDisplayName(match.agentA)} score={verdict.scoreA} winner={verdict.winner === 'A'} />
+                <ScoreCard label={agentDisplayName(match.agentB)} score={verdict.scoreB} winner={verdict.winner === 'B'} />
               </div>
             )}
 
