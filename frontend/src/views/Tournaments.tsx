@@ -5,6 +5,11 @@ import { useAppContext } from '../context';
 import type { Tournament } from '../adapters/interfaces';
 import type { TournamentOperationAction, TournamentOperationSnapshot } from '../adapters/interfaces';
 
+const HIDDEN_TOURNAMENT_IDS = new Set([
+  'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
+  'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
+]);
+
 export function Tournaments() {
   const { arenaRead, account, agentApi, tournamentOperationsApi } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,7 +35,7 @@ export function Tournaments() {
     setLoading(true);
     setError('');
     arenaRead.listTournaments()
-      .then((data) => { if (active) setTournaments(data.filter((row) => row.id !== 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61')); })
+      .then((data) => { if (active) setTournaments(data.filter((row) => !HIDDEN_TOURNAMENT_IDS.has(row.id))); })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Could not load tournaments.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -71,8 +76,8 @@ export function Tournaments() {
 
   return <section className="mx-auto max-w-6xl space-y-8">
     <div className="appear flex flex-col justify-between gap-5 md:flex-row md:items-end">
-      <div><p className="page-kicker">Open competition</p><h1 className="page-title">Tournaments</h1></div>
-      <Link to="/agents/new" className="pill-button-dark">Build an agent <ArrowUpRight className="ml-2" size={16} aria-hidden="true" /></Link>
+      <div><p className="page-kicker">Open competition</p><div className="flex flex-wrap items-center gap-4"><h1 className="page-title">Tournaments</h1><span className="retro-chip px-3 py-1 text-xs font-semibold uppercase tracking-[.16em]">Coming soon</span></div></div>
+      <button type="button" className="pill-button-dark cursor-not-allowed opacity-40 grayscale" disabled title="Coming soon">Build an agent <ArrowUpRight className="ml-2" size={16} aria-hidden="true" /></button>
     </div>
     <div role="tablist" aria-label="Tournament sections" className="grid gap-2 sm:grid-cols-3">
       <button role="tab" aria-selected={activeView === 'overview'} className={activeView === 'overview' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({}, { replace: true })}><CircleHelp size={17} aria-hidden="true" /> Overview</button>

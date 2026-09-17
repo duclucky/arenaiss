@@ -14,6 +14,13 @@ const arenaRead = { async listTournaments() { return []; } } as unknown as Arena
 const snapshot = { tournamentId: `sha256:${'a'.repeat(64)}`, name: 'Safety Cup', state: 'REGISTRATION' as const, entrantCount: 3, matchCount: 0, finalizedMatchCount: 0, nextActions: ['PROGRESS', 'EXPIRE'] as const, arc: { state: 'REGISTRATION' } };
 
 describe('Tournament operator console', () => {
+  it('marks Tournaments as coming soon and disables the build Agent action', async () => {
+    render(<MemoryRouter><AppProvider arenaReadAdapter={arenaRead}><Tournaments /></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('Coming soon')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Build an agent' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: /Build an agent/ })).not.toBeInTheDocument();
+  });
+
   it('shows UTC registration deadline and hides registration after the roster closes', async () => {
     const id = `sha256:${'e'.repeat(64)}`;
     const reads = { async getTournament() { return { id, name: 'Arena ISS Daily', status: 'ACTIVE', entrantIds: [], prizePool: '8', registrationClosesAt: Date.UTC(2026, 8, 17) / 1_000 }; }, async getMatches() { return []; } } as unknown as ArenaReadAdapter;
@@ -84,10 +91,12 @@ describe('Tournament operator console', () => {
 
   it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {
     const archived = `sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
+    const hiddenDaily = 'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd';
     const live = `sha256:${'b'.repeat(64)}`;
     const joined = `sha256:${'c'.repeat(64)}`;
     const reads = { async listTournaments() { return [
       { id: archived, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', entrantIds: [], prizePool: '0.008' },
+      { id: hiddenDaily, name: 'Arena ISS Daily 2026-09-17 UTC', status: 'ACTIVE', entrantCount: 9, prizePool: '9' },
       { id: live, name: 'Open Safety Cup', status: 'UPCOMING', entrantCount: 3, registrationClosesAt: Math.floor(Date.now() / 1_000) + 3_600, prizePool: '3' },
       { id: joined, name: 'Joined Cup', status: 'COMPLETED', entrantIds: [], prizePool: '8' },
     ]; } } as unknown as ArenaReadAdapter;
@@ -97,6 +106,7 @@ describe('Tournament operator console', () => {
     expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Tournament live' }));
     expect(await screen.findByText('Open Safety Cup')).toBeInTheDocument();
+    expect(screen.queryByText('Arena ISS Daily 2026-09-17 UTC')).not.toBeInTheDocument();
     expect(screen.getByText(/Registered Agents:/).parentElement).toHaveTextContent('3');
     expect(screen.getByText(/Starts in:/).parentElement).toHaveTextContent('00:');
     expect(screen.queryByText('Joined Cup')).not.toBeInTheDocument();
