@@ -23,13 +23,14 @@ function fixture() {
   const runtime = new SqliteRuntimeStore(':memory:');
   runtime.put('pair-rooms-v1', room.roomId, room);
   let arcRoom = { ...chainRoom };
-  let outcome: Awaited<ReturnType<PairOutcomePort['resolve']>> = { state: 'WAITING' };
+  let outcome: Awaited<ReturnType<PairOutcomePort['resolve']>> = { state: 'WAITING', failureCode: 'VERDICT_PENDING' };
   let now = 200;
   let settlements = 0;
   let expirations = 0;
   let resolves = 0;
+  let arcFailure: Error | undefined;
   const arc: PairSettlementArcPort = {
-    async getRoom() { return structuredClone(arcRoom); },
+    async getRoom() { if (arcFailure) throw arcFailure; return structuredClone(arcRoom); },
     async settle(_roomId, winner, verdictDigest) {
       settlements++;
       arcRoom = { ...arcRoom, state: 3, winner, verdictDigest: `0x${verdictDigest.slice(7)}` } as ChainRoom;
@@ -40,7 +41,7 @@ function fixture() {
   const judge: PairOutcomePort = { async resolve() { resolves++; return outcome; } };
   const worker = new PairSettlementWorker(runtime, arc, judge, () => now);
   return { runtime, worker, get settlements() { return settlements; }, get expirations() { return expirations; }, get resolves() { return resolves; },
-    setOutcome(value: typeof outcome) { outcome = value; }, setArc(value: ChainRoom) { arcRoom = value; }, setNow(value: number) { now = value; } };
+    setOutcome(value: typeof outcome) { outcome = value; }, setArc(value: ChainRoom) { arcRoom = value; }, setArcFailure(value?: Error) { arcFailure = value; }, setNow(value: number) { now = value; } };
 }
 
 test('settles only a canonical finalized comparison, persists its intent, and reconciles retry', async () => {
@@ -66,7 +67,7 @@ test('provider failures have a bounded retry budget while timeout refunds remain
   try {
     f.runtime.put('pair-rooms-v1', room.roomId, { ...room, resolutionDeadline: 5000 });
     f.setArc({ ...chainRoom, resolutionDeadline: 5000 });
-    f.setOutcome({ state: 'RETRY_LATER' });
+    f.setOutcome({ state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' });
     await f.worker.tick();
     await f.worker.tick();
     assert.equal(f.resolves, 1);
@@ -84,6 +85,52 @@ test('provider failures have a bounded retry budget while timeout refunds remain
     await f.worker.tick();
     assert.equal(f.expirations, 1);
     assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'REFUNDABLE');
+  } finally { f.runtime.close(); }
+});
+
+test('persists a safe evaluation failure code for participant diagnostics', async () => {
+  const f = fixture();
+  try {
+    f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_BUSY' });
+    await f.worker.tick();
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(stored?.evaluationStage, 'RETRYING');
+    assert.equal((stored as PairRoom & { evaluationFailureCode?: string })?.evaluationFailureCode, 'GENLAYER_BUSY');
+  } finally { f.runtime.close(); }
+});
+
+test('marks a submitted comparison as verdict pending without treating it as a provider error', async () => {
+  const f = fixture();
+  try {
+    f.setOutcome({ state: 'WAITING', failureCode: 'VERDICT_PENDING' });
+    await f.worker.tick();
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(stored?.evaluationStage, 'WAITING_VERDICT');
+    assert.equal((stored as PairRoom & { evaluationFailureCode?: string })?.evaluationFailureCode, 'VERDICT_PENDING');
+  } finally { f.runtime.close(); }
+});
+
+test('backfills a legacy exhausted retry from its private error without another external call', async () => {
+  const f = fixture();
+  try {
+    f.runtime.put('pair-room-worker-retries', room.roomId, { failures: 3, nextAt: 9000 });
+    f.runtime.put('pair-room-worker-errors', room.roomId, { at: 100, message: 'GenLayer RPC error: Server busy: all 8 execution slots occupied, retry later' });
+    await f.worker.tick();
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal((stored as PairRoom & { evaluationFailureCode?: string })?.evaluationFailureCode, 'GENLAYER_BUSY');
+    assert.equal(f.resolves, 0);
+  } finally { f.runtime.close(); }
+});
+
+test('reports an Arc infrastructure failure without exposing its raw message', async () => {
+  const f = fixture();
+  try {
+    f.setArcFailure(new Error('Arc RPC unavailable at a private upstream URL'));
+    await f.worker.tick();
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(stored?.evaluationFailureCode, 'ARC_ERROR');
+    assert.equal(stored?.evaluationStage, 'RETRYING');
+    assert.equal(JSON.stringify(stored).includes('private upstream URL'), false);
   } finally { f.runtime.close(); }
 });
 

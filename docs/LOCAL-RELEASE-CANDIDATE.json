@@ -3,7 +3,7 @@
   "createdAt": "2026-09-17",
   "scope": "LOCAL_ONLY",
   "fileCount": 306,
-  "sourceBundleSha256": "20313f041b13b1ad90b2ddf4efdfbd3ed2a0caf5213c527cc94f14d62cd2429d",
+  "sourceBundleSha256": "db778f1b22ad5ecceb0ccaf5178d7545087a7c9a21b2aaf239a40d5896cf021a",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -52,8 +52,8 @@
     "package.json": "470baa0e564de1064f686d2df1f353ee38b682cb1c48fec1261bc11b257c00e4",
     "scripts/check.ps1": "e3202e97a00ae9faf45ca4bf294b9b60933ac43728151a174f43f643886f6dc8",
     "services/api/src/pair-arc.ts": "a04f10b9ac9ec6767dd1af43a92b3e3d30af0d2cdc1c8c91db3d1ca00d9dd815",
-    "services/api/src/pair-rooms.ts": "8fcfc8fd9a956bad9035c863b9bf7cb21abdf456765ec5d7d2fec06589bd8729",
-    "frontend/src/views/PairMatches.tsx": "70575e7c28b04ec0c5fbdb3dac2557d7601758ce28b99230070770cf4392e6cb",
+    "services/api/src/pair-rooms.ts": "d524e8794b86827e93cbde1ec224556f7d15e5f124b88721f5efa378568b79af",
+    "frontend/src/views/PairMatches.tsx": "7983752c7ec5fa08d705b911ec9784e1f33e7d2d5727cfd896c47af6a99c5e12",
     "scripts/deploy-agent-marketplace.mjs": "814bf91319e0f1089fe9e3a3232d6f9349c313ee11244b21652da825fec93d3c",
     "packages/marketplace/src/eligibility.ts": "1898cf5aa23455c60c62d0c0946e0e497e3b43e628e00bd0dbc966446b618f28",
     "packages/marketplace/test/eligibility.test.ts": "6f3eba0ff09dc4bdcdc43321859621a5eaeaec66040e2859e9ce6b3c8053f9b3",
@@ -88,7 +88,7 @@
     "frontend/src/views/Home.tsx": "7ca752b226b41b50e197a71695f6349fa282d0121e26a44f4265bd6f876b1ec4",
     "frontend/src/views/Docs.tsx": "f661bab695751eb290a129cc8add3dff0b76768f761576e382f362acac8d653b",
     "frontend/src/views/NewAgent.tsx": "f334b2acd22df72e09d0e0ed7f005aa1f2bee341e726c92c87dd20c67f5e789d",
-    "frontend/src/test/visual-shell.test.tsx": "01efd88aa5da6af4b2c09adf2312f2ed95f4fa15f71ff0472cf3dcc7bb882e80",
+    "frontend/src/test/visual-shell.test.tsx": "71c0972db354afaa922bcd9983768b82edcbf2c533040e93b3ffd2db45df11d0",
     "frontend/src/test/docs.test.tsx": "e20cc9aec74e84ab07a4d66539dbe33cadb18285e7422698f07b5a3140e2e59e",
     "frontend/src/test/language-policy.test.ts": "850adf3c24ee288b655baed526a0ffa914e0ba48d2d33e9efe061a674f441395",
     "frontend/src/test/phase10-routes.test.tsx": "f687d610d3a0e6311fe85a2de32249930e5afa2067e8dd8eccdc99ac1665539e",
@@ -111,10 +111,10 @@
     "frontend/src/test/http-evaluation.test.ts": "19c68f361f54971ac9f8daea4372b534901cec0f2f1732273ade06c6f37ab48b",
     "frontend/src/adapters/agent-api.ts": "77245d4fa9e4ca70221874bec0c41e33e6efd5ba7268f0bf5d51c57ef2772561",
     "frontend/src/views/Agents.tsx": "193e95ec5bbbc5d45f9abd30c065114a682c1e4c0076b711f0ca84e2b526437b",
-    "frontend/src/views/Tournaments.tsx": "d120f50d7b4843f6a69a8ec50b482549823e10b9bdc6ada184bef8ec26b131a0",
+    "frontend/src/views/Tournaments.tsx": "572189b7a1d0415ee8207255000bec3bee1e914a0a6f7d53b471bfdc04abfe12",
     "frontend/src/views/Marketplace.tsx": "4fd54284c98b34c9c8723695ae3724012ce1bad0fdc2696c2bc6e2841c31bdab",
     "frontend/src/test/account-credits.test.tsx": "a3e1633fc8a37f53914767c0ecfaa2f312b7e5e3166e316d80cb8a704cb10b61",
-    "frontend/src/test/tournament-operations-ux.test.tsx": "5a2904236a2f93b97ebf3b08f94d20063260495a5639aaa7ed84bf0c7dc8cd1c",
+    "frontend/src/test/tournament-operations-ux.test.tsx": "0c0111d87ad4c1419c42ca1ca55b7998da0a6e29bd5cdf7a0a12478d6831db0c",
     "frontend/src/test/marketplace-ux.test.tsx": "2c822227592ffdc5137c64b25f757b8aa25c9551c9a8a05acd381261182f5fde",
     "frontend/src/test/http-agent.test.ts": "e49db2dbea8f21eba15adb4f1e3c1749e31568158e4fc9ae810baf3dcc2c9243",
     "frontend/src/test/agents-management.test.tsx": "7f714123ee1152b5a57573ef352b5012e9903c7ae2dec4f673bac02ef4e769d9",
@@ -139,9 +139,9 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 283,
+    "typescriptTests": 318,
     "foundryTests": 24,
-    "frontendTests": 105
+    "frontendTests": 121
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

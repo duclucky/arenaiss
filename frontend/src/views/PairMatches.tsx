@@ -9,8 +9,18 @@ type Room = {
   joinDeadline: number; resolutionDeadline: number; state: 'OPEN' | 'JOINING' | 'JOINED' | 'REFUNDABLE' | 'SETTLED';
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
   evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationFailureCode?: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'VERDICT_PENDING' | 'ARC_ERROR';
   evaluationAttempts?: number; retryAt?: number;
 };
+
+function failureExplanation(code?: Room['evaluationFailureCode']): string {
+  if (code === 'PROVIDER_ERROR') return 'The Agent response provider did not produce both valid outputs.';
+  if (code === 'GENLAYER_BUSY') return 'GenLayer has no free execution slot for this comparison.';
+  if (code === 'GENLAYER_ERROR') return 'GenLayer did not accept or finalize a valid comparison.';
+  if (code === 'VERDICT_PENDING') return 'The comparison was submitted and its finalized GenLayer verdict is still pending.';
+  if (code === 'ARC_ERROR') return 'Arc escrow state could not be read or updated safely.';
+  return 'The evaluation pipeline could not complete.';
+}
 
 function parseStake(value: string): string {
   if (!/^(?:0|[1-9]\d{0,5})(?:\.\d{1,6})?$/.test(value)) throw new Error('Enter a positive USDC amount with up to 6 decimal places.');
@@ -24,11 +34,11 @@ function units(value: string): string { const number = BigInt(value); return `${
 function progress(room: Room): string {
   if (room.state !== 'JOINED') return room.state === 'REFUNDABLE' ? 'Refund credits are available to the depositors.' : room.state === 'SETTLED' ? 'Arc settlement is final. The winner can claim any remaining payout credit.' : '';
   if (room.evaluationStage === 'RUNNING_AGENTS') return 'Match started automatically. Both Agents are producing responses.';
-  if (room.evaluationStage === 'WAITING_VERDICT') return 'Agent responses are ready. Waiting for the finalized GenLayer verdict.';
+  if (room.evaluationStage === 'WAITING_VERDICT') return failureExplanation(room.evaluationFailureCode);
   if (room.evaluationStage === 'RETRYING') {
     const attempts = room.evaluationAttempts ?? 1;
-    if (attempts >= 3) return `Evaluation paused after ${attempts} failed attempts. No winner was selected. Both players can approve an early refund, or refunds open after ${new Date(room.resolutionDeadline * 1_000).toLocaleString()}.`;
-    return `The Agent evaluation or GenLayer verdict step failed. Automatic retry ${attempts} is scheduled${room.retryAt ? ` for ${new Date(room.retryAt * 1_000).toLocaleString()}` : ''}.`;
+    if (attempts >= 3) return `${failureExplanation(room.evaluationFailureCode)} Evaluation paused after ${attempts} failed attempts. No winner was selected. Both players can approve an early refund, or refunds open after ${new Date(room.resolutionDeadline * 1_000).toLocaleString()}.`;
+    return `${failureExplanation(room.evaluationFailureCode)} Automatic retry ${attempts} is scheduled${room.retryAt ? ` for ${new Date(room.retryAt * 1_000).toLocaleString()}` : ''}.`;
   }
   if (room.evaluationStage === 'TIE_WAITING_REFUND') return 'GenLayer returned a tie. Both stakes become refundable at the resolution deadline.';
   if (room.evaluationStage === 'SETTLING') return 'The verdict is final. Arc payout settlement is being confirmed.';
@@ -144,6 +154,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
           {room.settleTx && <a className="underline" href={`https://testnet.arcscan.app/tx/${room.settleTx}`} target="_blank" rel="noreferrer">Arc settlement</a>}
         </div>
         <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
+        {room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{room.evaluationFailureCode}</code></p>}
         {enabled && managedAccount && <div className="flex flex-wrap gap-2">
           {(room.state === 'OPEN' || room.state === 'JOINING') && myCreatedRoom(room) && <button className="metal-button-ghost" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/actions/CANCEL`, {}), 'Room canceled. Refund was sent to your wallet or remains claimable below.')}>Cancel and refund</button>}
           {room.state === 'OPEN' && !myRoom(room) && selected && <button className="metal-button-solid" disabled={pending} onClick={() => void perform(() => request(`/api/pair-rooms/${room.roomId}/join`, { agentId: selected.agentId, version: selected.agentsVersion }), 'Joined the room. Your matching stake is held by the escrow.')}>Join and deposit</button>}

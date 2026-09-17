@@ -46,17 +46,29 @@ export class LivePairOutcome implements PairOutcomePort {
       agentA: { entrantId: digest(`${room.roomId}|creator`), agentId: a.agentId, agentsVersion: a.agentsVersion, agentsMd: a.agentsMd, agentsCommitment: a.agentsCommitment },
       agentB: { entrantId: digest(`${room.roomId}|challenger`), agentId: b.agentId, agentsVersion: b.agentsVersion, agentsMd: b.agentsMd, agentsCommitment: b.agentsCommitment },
     };
-    const pair = await this.inference.run(context);
-    if (pair.state !== 'OUTPUTS_READY' || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: 'RETRY_LATER' };
-    const judgment = await this.judge.judge({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest, failureCode: pair.failureCode! });
-    if (judgment.state !== 'FINALIZED') return { state: 'WAITING' };
-    const canonical = await this.tracker.poll(context.matchId, context.attemptId);
-    if (canonical.state !== 'FINALIZED' || !canonical.run || canonical.run.judge.finality !== 'FINALIZED' || canonical.run.judge.execution !== 'SUCCESS'
-      || canonical.run.source.matchId !== context.matchId || canonical.run.source.attemptId !== context.attemptId
-      || canonical.run.agents.versionIdA !== a.agentsVersion || canonical.run.agents.versionIdB !== b.agentsVersion
-      || canonical.run.result !== judgment.result || !['A_WIN', 'B_WIN', 'TIE'].includes(canonical.run.result)) throw new Error('pair comparison canonical readback mismatch');
-    return { state: 'FINAL', result: canonical.run.result as 'A_WIN' | 'B_WIN' | 'TIE', transactionHash: canonical.run.judge.transactionHash };
+    let pair: Awaited<ReturnType<TournamentEvaluationPairRunner['run']>>;
+    try { pair = await this.inference.run(context); }
+    catch { return { state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' }; }
+    if (pair.state !== 'OUTPUTS_READY' || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' };
+    try {
+      const judgment = await this.judge.judge({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest, failureCode: pair.failureCode! });
+      if (judgment.state === 'FAILED') return { state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR' };
+      if (judgment.state !== 'FINALIZED') return { state: 'WAITING', failureCode: 'VERDICT_PENDING' };
+      const canonical = await this.tracker.poll(context.matchId, context.attemptId);
+      if (canonical.state !== 'FINALIZED' || !canonical.run || canonical.run.judge.finality !== 'FINALIZED' || canonical.run.judge.execution !== 'SUCCESS'
+        || canonical.run.source.matchId !== context.matchId || canonical.run.source.attemptId !== context.attemptId
+        || canonical.run.agents.versionIdA !== a.agentsVersion || canonical.run.agents.versionIdB !== b.agentsVersion
+        || canonical.run.result !== judgment.result || !['A_WIN', 'B_WIN', 'TIE'].includes(canonical.run.result)) return { state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR' };
+      return { state: 'FINAL', result: canonical.run.result as 'A_WIN' | 'B_WIN' | 'TIE', transactionHash: canonical.run.judge.transactionHash };
+    } catch (error) {
+      return { state: 'RETRY_LATER', failureCode: isGenLayerBusy(error) ? 'GENLAYER_BUSY' : 'GENLAYER_ERROR' };
+    }
   }
+}
+
+function isGenLayerBusy(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /server busy|execution slots? occupied|too many requests|\b429\b|capacity/i.test(message);
 }
 
 export class LivePairSettlementArc implements PairSettlementArcPort {

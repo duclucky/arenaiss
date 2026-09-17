@@ -201,7 +201,8 @@ describe('Arena ISS visual shell', () => {
     expect(container.querySelector('.brand-mark')).toHaveAttribute('src', '/brand/arena-iss-mark.png');
     expect(container.querySelector('.brand-star')).not.toBeInTheDocument();
     expect(container.querySelector('.page-kicker')).toHaveTextContent('Open competition');
-    expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveClass('pill-button-dark');
+    expect(screen.getByRole('button', { name: 'Build an agent' })).toHaveClass('pill-button-dark');
+    expect(screen.getByRole('button', { name: 'Build an agent' })).toBeDisabled();
   });
 
   it('does not expose product navigation before login', async () => {
