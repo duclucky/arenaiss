@@ -1,80 +1,74 @@
-# VPS deployment runbook
+# Deployment
 
-## Current boundary
+Arena ISS runs as a rootless Docker Compose stack with three services:
 
-The deployed service is the trusted-operator MVP web/API projection on the
-owner-managed Ubuntu host. It exposes canonical public tournament/match/verdict
-records and the browser wallet registration/withdrawal client. The current
-deployment does **not** run the bounded live-lifecycle script as a daemon and
-does not claim an unattended production scheduler until the durable worker
-input/job model is implemented.
+- `api`: Node.js API and durable SQLite workers on the internal network;
+- `web`: Caddy serving the React build and proxying `/api` plus `/healthz`; and
+- `tunnel`: an optional Cloudflare Tunnel with credentials mounted read-only.
 
-The public Evaluations page verifies the two active judge deployments
-directly against the canonical Studio Next RPC (`https://studio-next.genlayer.com/api`,
-chain `61997`). Its build-time public settings include both active judge addresses and
-the Studio Next explorer. These values are public chain identifiers, not secrets.
-The active bindings are `AgentEvaluationJudge` at
-`0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d` and
-`ArenaComparisonJudge` at `0xe5210eCCC4182090A1416f515Dc7001B27274BcB`.
-`ArenaMatchJudge` is archived and absent from the active image configuration;
-historical verdicts retain their original address and explorer links.
+The production deployment is the trusted-operator testnet MVP at
+[`https://arenaiss.xyz`](https://arenaiss.xyz). It uses Arc Testnet for value
+accounting and GenLayer Studio development preview for current judgments.
 
-The stable LAN endpoint is `http://192.168.1.24:8080`. The named Cloudflare
-Tunnel exposes the stable HTTPS hostnames `arenaiss.xyz` and
-`www.arenaiss.xyz` without depending on the host's public IP address.
+## Runtime configuration
 
-## Layout and process model
+Copy `.env.example` to a local ignored environment file. Production server
+values belong in the ignored `deploy/runtime.env` or an equivalent secret
+manager. Keep these values server-side:
 
-- Service account: dedicated unprivileged user `arenaiss`
-- Project: `/home/arenaiss/projects/async-agent-arena`
-- Runtime DB: `data/arena-runtime.sqlite`
-- Verified backups: `backups/arena-runtime-*.sqlite`
-- API: Node 24, internal port 8787, no host port
-- Web: Caddy, host port 8080, SPA fallback and same-origin `/api` proxy
-- Containers: rootless Docker under `arenaiss`, `restart: unless-stopped`
-- Tunnel: named Cloudflare Tunnel `arenaiss-vps`; credential file is ignored,
-  read-only in the container, and must be mode 0600 on the host
-- Logs: Docker JSON logs, 10 MB × 5 for API/web and 10 MB × 3 for tunnel
-- Daily backup: user timer at 02:15 UTC with a randomized delay
+- Circle API key, entity secret, and wallet set ID;
+- provider API keys;
+- GenLayer and Arc signer keys;
+- SMTP credentials;
+- identity pepper; and
+- Cloudflare tunnel credentials.
 
-`deploy/runtime.env` is ignored, mode 0600 on the host, and must contain only
-server-side values. Private provider/wallet values must never be Vite variables
-or Docker build arguments. Current API/web deployment does not need the model
-API key or an operator private key.
+Never use a `VITE_` variable for a secret. Those values are compiled into the
+public browser bundle.
 
-## Operations
-
-From the project directory, point Docker CLI to the rootless socket:
+## Start and verify
 
 ```sh
-export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
-docker compose up -d
+docker compose up -d --build --remove-orphans
 docker compose ps
 curl -fsS http://127.0.0.1:8080/healthz
 ```
 
-Create and verify a consistent SQLite backup:
+Expected health response:
+
+```json
+{"status":"ok"}
+```
+
+The stack stores runtime state under the ignored `data/` directory. Create and
+verify a transactionally consistent SQLite backup with:
 
 ```sh
 ./deploy/backup-now.sh
 ./deploy/restore-test.sh arena-runtime-YYYYMMDDTHHMMSSZ.sqlite
 ```
 
-Provision the tunnel credential once at
-`deploy/cloudflared-credentials.json`, set mode 0600, then start the stack:
+Backups, databases, logs, runtime environment files, tunnel credentials, wallet
+exports, and recovery material must never be committed.
+
+## Cloudflare Tunnel
+
+The checked-in tunnel config contains public routing only. The credential JSON
+is ignored and must be provisioned separately with restrictive file
+permissions before starting the tunnel service.
 
 ```sh
 chmod 600 deploy/cloudflared-credentials.json
-docker compose up -d
+docker compose up -d tunnel
 docker compose logs tunnel
 ```
 
-## Remaining host work
+## Release checks
 
-- Disable host suspend/lid sleep with an administrator-authorized system policy.
-  A user-level inhibitor was tested and rejected by host policy, then disabled.
-- Prefer wired Ethernet or otherwise provide redundant connectivity/power.
-- Add firewall/fail2ban policy through an administrator account if the host is
-  exposed directly instead of only through Cloudflare Tunnel.
-- Complete the real browser-wallet transaction lane in a browser that exposes
-  an EIP-6963/injected wallet. The Codex in-app browser exposes no provider.
+Before a release:
+
+1. run `npm run check`;
+2. inspect the staged diff and tracked files for credentials or runtime data;
+3. build and start the Compose stack;
+4. verify that both `api` and `web` report healthy; and
+5. verify the public `/healthz` endpoint and affected browser route.

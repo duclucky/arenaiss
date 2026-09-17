@@ -1,226 +1,162 @@
-# Arena ISS — Agent Evaluation Platform
+# Arena ISS
 
-**ISS means Intelligence, Safety & Standards.** Arena ISS is becoming a
-controlled platform for testing how versioned Agents reason through tasks,
-choose actions, and follow rules. The existing asynchronous elimination
-tournament remains the first implemented evaluation mode: GenLayer judges the
-submitted output pairs and Arc holds the optional USDC prize pool.
+**Intelligence, Safety & Standards for AI agents.**
 
-The direction lock and the boundary between implemented behavior and planned
-evaluation capabilities are defined in
-[`docs/ADR-002-AGENT-EVALUATION-PLATFORM.md`](docs/ADR-002-AGENT-EVALUATION-PLATFORM.md).
+Arena ISS is a testnet platform for evaluating versioned AI agent profiles against repeatable scenarios. It combines deterministic policy checks, GenLayer semantic judgments, and Arc USDC escrow for value-bearing evaluations.
+
+[Live demo](https://arenaiss.xyz) · [Product docs](https://arenaiss.xyz/docs) · [Arc Testnet explorer](https://testnet.arcscan.app)
+
+## What it does
+
+- **Agent registry:** stores private `AGENTS.md` profiles in the backend while publishing immutable SHA-256 commitments and owner bindings on Arc.
+- **Evaluations:** runs a fixed scenario pack, records observable output, applies deterministic safety and policy checks, and reads a six-dimension scorecard from GenLayer.
+- **Pair matches:** lets one user create a room with a chosen USDC stake and another user join with the same stake. Arc holds both deposits until a winner or refund path is finalized.
+- **Version comparison:** compares two versions of the same Agent only when their scenario, rubric, provider, and execution bindings are compatible.
+- **Marketplace:** limits listings to Agent versions that satisfy the locked evaluation policy and settles purchases in Arc Testnet USDC.
+- **Tournament engine:** includes deterministic bracket progression, GenLayer comparisons, Arc payouts, and refund recovery. Its public UI is currently marked **Coming soon** while operational recovery is refined.
+
+## Pair match flow
+
+1. The creator selects an Agent and stake. Their managed Arc wallet approves and deposits the exact USDC amount into `PairMatchEscrow`.
+2. The room becomes visible only after Arc readback confirms the deposit. Insufficient balance or a failed approval leaves no open room.
+3. A challenger selects an Agent and deposits the same stake. The backend links both Arc transaction hashes to one room.
+4. Both immutable Agent versions receive the same scenario and provider conditions. GenLayer compares the submitted outputs.
+5. The configured operator submits the bound result to Arc. The winner receives credit for both stakes with no Pair match platform fee.
+
+The creator can cancel an open room and recover the full stake. After a challenger joins, both players must approve early cancellation. An unjoined room becomes refundable after 24 hours; a joined room becomes refundable after seven days. Participant history requires authentication.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[React web app] --> API[Node API]
+    API --> DB[(SQLite state)]
+    API --> PROVIDER[Model provider]
+    PROVIDER --> API
+    API --> GL[GenLayer judges]
+    GL --> API
+    API --> ARC[Arc contracts]
+    ARC --> USDC[USDC credits and refunds]
+```
+
+| Layer | Responsibility |
+| --- | --- |
+| React frontend | Agent management, evaluation views, pair rooms, claims, and public evidence |
+| Node API | Authentication, private profile storage, orchestration, retries, and canonical readback |
+| Deterministic policy | Objective action, schema, budget, identity, and settlement checks |
+| GenLayer | Validator-controlled qualitative judgment over exact submitted evidence |
+| Arc | Agent ownership, ERC-20 USDC custody, credits, refunds, and marketplace settlement |
+
+## Current testnet deployments
+
+### Arc Testnet, chain ID `5042002`
+
+| Contract | Address |
+| --- | --- |
+| USDC | [`0x3600...0000`](https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000) |
+| PairMatchEscrow | [`0xD7CB...c6c1`](https://testnet.arcscan.app/address/0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1) |
+| TournamentEscrow V2 | [`0xc908...702B`](https://testnet.arcscan.app/address/0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B) |
+| AgentRegistry V2 | [`0xc427...Eada`](https://testnet.arcscan.app/address/0xc427dBf5Dc0b58245Ac94d6634856Dd472bdEada) |
+| AgentMarketplace | [`0x48c1...a2Df`](https://testnet.arcscan.app/address/0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df) |
+| EvoFeeEscrow | [`0xa769...98E9`](https://testnet.arcscan.app/address/0xa7693481E17736F1617b3a6dc199aA31D86398E9) |
+
+### GenLayer Studio development preview, chain ID `61997`
+
+| Contract | Address |
+| --- | --- |
+| AgentEvaluationJudge | [`0x0aA2...934d`](https://explorer-studio-dev.genlayer.com/address/0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d) |
+| ArenaComparisonJudge | [`0xe521...74BcB`](https://explorer-studio-dev.genlayer.com/address/0xe5210eCCC4182090A1416f515Dc7001B27274BcB) |
+
+Studio development deployments may be reset by the network operator. All contracts and funds referenced here are testnet only.
+
+## Technology
+
+- TypeScript, Node.js 24, React, Vite
+- Solidity, Foundry, viem
+- Python intelligent contracts and GenLayer SDK
+- Circle developer-controlled wallets
+- SQLite, Docker Compose, Caddy
+
+## Run locally
+
+### Requirements
+
+- Node.js 24 or newer
+- Python 3.12
+- Foundry for Solidity tests
+- PowerShell 7 on Windows for the combined check script
+
+### Install
+
+```sh
+git clone https://github.com/duclucky/arenaiss.git
+cd arenaiss
+npm ci
+cd frontend && npm ci && cd ..
+cp .env.example .env
+```
+
+Keep all API keys, private keys, SMTP credentials, Circle secrets, and wallet recovery material in the ignored `.env` or deployment runtime environment. Never place server secrets in variables prefixed with `VITE_`.
+
+### Start development services
+
+```sh
+npm run api:dev
+```
+
+In another terminal:
+
+```sh
+cd frontend
+npm run dev
+```
+
+### Verify
+
+```sh
+npm run check
+```
+
+The full check validates the GenLayer contracts, Python direct tests, TypeScript services, Solidity contracts, frontend tests, release manifest, and production frontend build.
+
+## Repository map
+
+```text
+contracts/          GenLayer and Arc contracts
+packages/           Domain, evaluation, persistence, settlement, and SDK modules
+services/api/       HTTP API and durable workers
+frontend/           React application
+tests/              Direct, integration, system, and operations tests
+docs/               Protocols, architecture decisions, runbooks, and sanitized evidence
+deploy/             Docker and service configuration
+```
+
+Start with:
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/EVALUATION-PROTOCOL-V1.md`](docs/EVALUATION-PROTOCOL-V1.md)
+- [`docs/PAIR-MATCH-ESCROW.md`](docs/PAIR-MATCH-ESCROW.md)
+- [`docs/CIRCLE-MANAGED-IDENTITY.md`](docs/CIRCLE-MANAGED-IDENTITY.md)
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+## Trust and security boundaries
+
+This release is a **trusted-operator testnet MVP**.
+
+- The backend can select provider inputs and transports the finalized GenLayer result to Arc.
+- GenLayer judges the exact evidence submitted to its contract; it does not prove that the backend collected every intended offchain artifact honestly.
+- Arc owns USDC custody and derives allowed credits, but it does not independently verify GenLayer consensus.
+- The platform evaluates observable answers, rationales, proposed actions, and outcomes. It does not claim access to hidden chain of thought.
+- The contracts have extensive project tests and bounded testnet evidence, but no independent production audit.
+
+Pair escrow has been exercised with two live Arc Testnet deposits, mutual cancellation, refund credits, and both withdrawals. The live GenLayer verdict to Arc winner-settlement path remains unverified.
+
+## Privacy
+
+- `.env`, runtime databases, logs, credentials, private keys, wallet exports, recovery files, local evidence, and deployment secrets are ignored by Git.
+- Public evidence contains testnet transaction hashes, public contract addresses, bounded results, and redacted operational metadata.
+- Private `AGENTS.md` content and provider output are owner-scoped in the API. Any bytes submitted to GenLayer must be treated as public.
 
 ## Status
 
-**TRUSTED-OPERATOR MVP — LOCAL IMPLEMENTATION AUTHORIZED FOR THIS PROJECT ONLY.**
-
-The complete application lifecycle is still the Tournament MVP. A bounded
-Evaluation feasibility slice is now implemented separately: the provider
-envelope makes one immutable `AGENTS.md` materially control Level 1 responses
-and Level 2 inert action proposals, deterministic code derives objective action
-policy findings, and `AgentEvaluationJudge` stores a six-dimension GenLayer
-scorecard with reasons. The first local multi-scenario `SOLO` runner and
-redacted/private Run Detail APIs are now implemented. A local owner-only EVAL-5
-API compares repeated SOLO cohorts for two versions of the same Agent and
-applies locked deterministic regression thresholds. Tournament convergence is
-now implemented additively: new attempts use the Evaluation provider envelope
-and a specialized rich `ComparisonRun`, while historical Tournament records
-retain their original verdict and transaction semantics. `SOLO` creation UI,
-executable tool sandbox traces and full Test Pack management remain planned.
-Agent detail now exposes owner-private version metadata without older AGENTS.md
-bodies and can run the locked EVAL-5 comparison against two finalized Evo
-campaigns.
-The local `EvaluationRun` core now durably records exact Agent/scenario/provider
-bindings, separates provider failure classes, submits the V5 evaluation ABI,
-tracks GenLayer finality, and accepts a scorecard only after canonical readback
-validation. The `SOLO` runner now binds a new run ID per scenario/attempt,
-resumes provider and GenLayer state after restart, and never executes proposed
-actions. This path has not been used for a new paid call or network transaction.
-The API process now owns Evo progression through a coalescing durable worker, so
-the browser submits once and polls read-only state. An authenticated Tournament
-operator control plane and UI cover create, progress, settle, expire and refund
-commands without accepting rankings or payout amounts. The production runner
-persists operations in SQLite, validates the registered roster against Arc,
-runs rich pair comparisons on Studio Next, stores the derived Top 5, and submits
-only that stored ranking to Arc settlement.
-
-The product owner approved the simplified MVP architecture on `2026-09-11`:
-
-- the platform backend stores contestant `AGENTS.md` plaintext, forms the bracket, selects
-  topics from the locked tournament policy, calls one configured model for both
-  sides, maps outputs back to agents, and advances the tournament;
-- a GenLayer Intelligent Contract judges each submitted output pair and stores a
-  canonical per-match verdict plus bounded reasons;
-- an Arc Solidity escrow holds entrant USDC and trusts one configured tournament
-  operator to submit the final ranking;
-- Arc derives the fixed 10% platform fee and winner credits itself; the operator
-  cannot supply arbitrary payout amounts; and
-- TEE/ACI provenance, GenLayer-to-Arc threshold proofs, reciprocal deployment
-  binding, and permissionless settlement are post-MVP trust-minimization work.
-
-This is an intentionally disclosed trust model. The backend can still substitute
-`AGENTS.md` content, outputs, model settings, bracket data, or the final ranking. GenLayer
-proves only the semantic verdict over the exact A/B artifacts submitted to it;
-Arc does not cryptographically prove that the operator-submitted ranking came
-from GenLayer in the MVP.
-
-Existing offline provenance, Arc-source, finality, semantic, randomness, and
-accounting spikes remain useful future-hardening evidence. They are not MVP
-admission prerequisites.
-
-The project-specific exception permits local contracts, services, frontend,
-tests, and reviewed dependencies. It does not mark mandatory gates passed or
-authorize future wallets, paid calls, deployments, network writes, publishing
-or submission without a separate action-time instruction. The owner explicitly
-authorized the bounded GenLayer deployment and tests recorded below.
-
-## MVP flow
-
-```text
-player registers agent + deposits USDC on Arc
-                    |
-                    v
-backend locks roster, creates bracket and match topics
-                    |
-                    v
-backend calls the same configured model for A and B
-                    |
-                    v
-GenLayer MatchJudge adjudicates submitted outputs
-                    |
-                    v
-backend waits for finalization, reads verdict, advances winner
-                    |
-                    v
-backend submits final top-five ranking to Arc
-                    |
-                    v
-Arc calculates 10% fee + 90% winner credits
-                    |
-                    v
-relayer pays each winner + owner fee; pull withdrawal remains fallback
-```
-
-Players do not need to return at tournament start, approve each match, operate
-tools, or keep a local agent process online. The platform pays model API and
-GenLayer transaction costs from its operations treasury.
-
-The Account page includes a Tournament credits tab. It lists the connected
-wallet's confirmed Arc tournament registrations and exposes a Claim button only
-for a positive pull credit left behind by automatic payout.
-
-An independent two-Agent room escrow is implemented locally for Arc Testnet:
-the creator chooses a USDC stake and deposits when creating the room, a
-challenger deposits the same amount, and the contract supports full refunds
-and a two-stake winner credit. The backend retains both deposit transaction
-hashes under one room ID. The contract is deployed on Arc Testnet and a local
-pair judgment/settlement worker is implemented. A live two-wallet value lifecycle
-has not yet been verified. See
-[`docs/PAIR-MATCH-ESCROW.md`](docs/PAIR-MATCH-ESCROW.md).
-
-A local, opt-in server integration now accepts wallet-signature or email-OTP
-login and provisions one Circle developer-controlled `ARC-TESTNET` EOA for the
-resulting Arena user. It is disabled until all server-only Circle and SMTP
-settings are present; no Circle wallet was created during implementation. The
-custody boundary, API, secret handling and the still-open transaction migration
-are documented in
-[`docs/CIRCLE-MANAGED-IDENTITY.md`](docs/CIRCLE-MANAGED-IDENTITY.md).
-
-## Product direction
-
-The platform-level core unit is an `EvaluationRun`, which binds one immutable
-Agent version, one versioned Test Scenario, one runtime policy, observable output
-and action evidence, deterministic rule findings, and a GenLayer semantic
-scorecard. Tournament matches will later be adapted onto that shared model.
-
-Deterministic code owns objective checks such as forbidden tool calls, required
-confirmation, budgets and fixture postconditions. GenLayer owns qualitative
-judgment over the exact submitted evidence. Arc participates only in campaigns
-with USDC stake, bounty, fee, refund or reward accounting.
-
-## Canonical documents
-
-- [`docs/ADR-002-AGENT-EVALUATION-PLATFORM.md`](docs/ADR-002-AGENT-EVALUATION-PLATFORM.md)
-  — accepted product direction, terminology, evaluation model and ordered expansion.
-- [`docs/CIRCLE-MANAGED-IDENTITY.md`](docs/CIRCLE-MANAGED-IDENTITY.md) —
-  wallet/email authentication and Circle developer-controlled wallet boundary.
-- [`docs/CONCEPT.md`](docs/CONCEPT.md) — locked MVP product behavior.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — trusted-operator boundaries
-  and the post-MVP trust-minimized roadmap.
-- [`docs/IMPLEMENTATION-SPEC.md`](docs/IMPLEMENTATION-SPEC.md) — dependency-
-  ordered implementation phases.
-- [`docs/TDD-PLAN.md`](docs/TDD-PLAN.md) — test-first waves and regression rules.
-- [`docs/EXECUTION-STATUS.md`](docs/EXECUTION-STATUS.md) — current verified
-  implementation status and next action.
-- [`docs/EXECUTION-OWNERSHIP-PLAN.md`](docs/EXECUTION-OWNERSHIP-PLAN.md) — work
-  split between the primary agent and the owner-operated Coding Agent.
-- [`docs/EVAL-6-BACKWARD-COMPATIBILITY-PLAN.md`](docs/EVAL-6-BACKWARD-COMPATIBILITY-PLAN.md)
-  — audited additive/no-rewrite migration constraints for Tournament convergence.
-- [`docs/GATE-REVIEW.md`](docs/GATE-REVIEW.md) — honest parent-policy and
-  submission implications of the trusted MVP.
-- [`docs/ADR-001-TRUSTED-OPERATOR-MVP.md`](docs/ADR-001-TRUSTED-OPERATOR-MVP.md)
-  — approved product decision and exact proposed project-scoped policy exception.
-- [`docs/TRUST-BLOCKER-RESOLUTION.md`](docs/TRUST-BLOCKER-RESOLUTION.md) —
-  retained post-MVP trust-minimization research, not the MVP critical path.
-
-## Network direction
-
-The intended MVP uses Arc Testnet for escrow and a GenLayer hosted development
-network for the judge. Stable historical lifecycle evidence remains on
-Studionet. Studio Next `v0.123.0-rc.6` (`61997`) is now the release-candidate
-target for continued compatibility work, but it may reset and is not durable
-deployment evidence. Every network write still requires explicit action-time
-authorization.
-
-The active Studio Next preview deployments are `AgentEvaluationJudge`
-`AgentEvaluationV5` at
-[`0x0aA2...934d`](https://explorer-studio-dev.genlayer.com/address/0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d)
-and the EVAL-6 comparison judge `ArenaComparisonJudge`
-(`AgentComparisonV1`) at
-[`0xe521...74BcB`](https://explorer-studio-dev.genlayer.com/address/0xe5210eCCC4182090A1416f515Dc7001B27274BcB).
-Their deployment and semantic smoke evidence finalized successfully with exact
-source readback. The former Studio Next `ArenaMatchJudge` at `0xbd55...B679`
-is archived: it remains on-chain and in immutable historical evidence, but is
-no longer part of runtime configuration, deployment verification or new writes.
-The comparison deployment and final-address deterministic smoke both finalized
-successfully with exact source and canonical readback evidence in
-[`docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json`](docs/evidence/studio-next/arena-comparison-deployment-2026-09-16.json).
-
-The historical Studionet judge deployment is revision V10 of `ArenaMatchJudge`, using
-the `GeneralResponseV7` rubric, at
-[`0x09Ba...b130`](https://explorer-studio.genlayer.com/address/0x09Ba3CE193E477a66Fdaf556bA63519A767eb130)
-on Studionet (`61999`). It is retained for historical readback only and receives
-no new writes. The active Arc Testnet escrow is verified V2 at
-[`0xc908...702B`](https://testnet.arcscan.app/address/0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B?tab=contract).
-The active Arc Testnet `AgentRegistry` is exact-match verified at
-[`0x4c0b...9E25`](https://testnet.arcscan.app/address/0x4c0b1787Ae48bE1A34E7dE7e767BA25016609E25?tab=contract).
-The additive Marketplace registry V2 is deployed at
-[`0xc427...Eada`](https://testnet.arcscan.app/address/0xc427dBf5Dc0b58245Ac94d6634856Dd472bdEada?tab=contract), and the unaudited
-Marketplace contract with a fixed 1% fee is deployed at
-[`0x48c1...a2Df`](https://testnet.arcscan.app/address/0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df?tab=contract). These contracts have
-configuration/readback evidence only; no live listing or purchase is claimed.
-The unaudited Arc Testnet Evo fee escrow is deployed at
-[`0xa769...98E9`](https://testnet.arcscan.app/address/0xa7693481E17736F1617b3a6dc199aA31D86398E9?tab=contract).
-It holds the fixed 1 USDC fee until the campaign finalizes, refunds infrastructure
-failures through the operator, and lets the payer claim a timeout refund after
-24 hours. A legacy 1 USDC direct fee for the failed live Evo campaign was
-returned to its originating managed wallet in
-[`0xda13...3563`](https://testnet.arcscan.app/tx/0xda138915cd5eddbfec8f3842805e5e87ebb44eb71ec6c9ebda504d435c6a3563).
-See
-[`docs/GENLAYER-JUDGE-FEASIBILITY.md`](docs/GENLAYER-JUDGE-FEASIBILITY.md) and
-the [`32-case adversarial report`](docs/GENLAYER-ADVERSARIAL-EVAL-REPORT.md).
-
-The independent evaluation feasibility contract is `AgentEvaluationJudge`
-revision V5 at
-[`0x7f9f...64BD`](https://explorer-studio.genlayer.com/address/0x7f9f5D4798e2A69576B5E1a5113849E2c4bF64BD).
-Four bounded Studionet cases across `RESPONSE` and `ACTION_DECISION` finalized
-with canonical scorecards and reasons. It evaluates action proposals only and
-cannot execute tools, advance a bracket, or move USDC.
-
-## Scope boundary
-
-A bounded trusted-operator testnet lifecycle, paid model calls, GenLayer
-verdicts, Arc USDC settlement/refund, and the prompt-envelope evaluation are
-recorded under `docs/evidence/`. They are testnet feasibility evidence, not a
-hosted production Arena, permissionless operation, or trustless cross-chain
-proof. No public release or mainnet lifecycle is claimed.
+The hosted demo is available at [arenaiss.xyz](https://arenaiss.xyz). Pair matches and the evaluation views are active on testnet. Tournament participation is marked Coming soon in the public interface.
