@@ -56,7 +56,12 @@ export class ArenaHttpApi {
       if (request.method === 'POST' && request.path === '/api/auth/email/verify') return await this.verifyEmail(request.body);
       if (request.method === 'POST' && request.path === '/api/auth/logout') return this.logout(request.headers);
       if (request.method === 'GET' && request.path === '/api/pair-rooms/config') return this.json(200, { enabled: this.pairRooms ? await this.pairRooms.ready() : false, network: 'Arc Testnet', usdcDecimals: 6 });
-      if (request.method === 'GET' && request.path === '/api/pair-rooms') return this.json(200, this.pairRooms?.list() ?? []);
+      if (request.method === 'GET' && request.path === '/api/pair-rooms') return this.json(200, this.pairRooms?.listOpen() ?? []);
+      if (request.method === 'GET' && request.path === '/api/pair-rooms/mine') {
+        const session = this.requireSessionRecord(request.headers);
+        if (!this.pairRooms) throw new Error('pair matches unavailable');
+        return this.json(200, this.pairRooms.listForPrincipal(session.principal));
+      }
       if (request.method === 'POST' && request.path === '/api/pair-rooms') {
         const session = this.requireManagedSession(request.headers);
         if (!this.pairRooms) throw new Error('pair matches unavailable');

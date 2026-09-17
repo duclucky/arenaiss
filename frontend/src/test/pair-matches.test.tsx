@@ -82,7 +82,7 @@ it('links the two escrow deposits and settlement evidence from one room', async 
       creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '1000000', joinDeadline: 1_999_999_999,
       resolutionDeadline: 2_000_000_000, state: 'SETTLED', createTx: hashes[0], joinTx: hashes[1], settleTx: hashes[2] }];
   } })));
-  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
   expect(await screen.findByRole('link', { name: 'Creator deposit' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[0]}`);
   expect(screen.getByRole('link', { name: 'Challenger deposit' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[1]}`);
   expect(screen.getByRole('link', { name: 'Arc settlement' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[2]}`);
@@ -119,4 +119,16 @@ it('shows that a joined room started automatically and exposes its current stage
   } })));
   render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
   expect(await screen.findByText('Match started automatically. Both Agents are producing responses.')).toBeInTheDocument();
+});
+
+it('does not request or render participant room history before login', async () => {
+  const fetcher = vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    return [{ roomId: `sha256:${'7'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, stake: '10000', state: 'SETTLED' }];
+  } }));
+  vi.stubGlobal('fetch', fetcher);
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText('Log in to see rooms you created or joined.')).toBeInTheDocument();
+  expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/api/pair-rooms/mine'))).toBe(false);
+  expect(screen.queryByText(new RegExp(`sha256:${'7'.repeat(64)}`))).not.toBeInTheDocument();
 });

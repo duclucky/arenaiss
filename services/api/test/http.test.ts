@@ -7,6 +7,7 @@ import { viemSignatureVerifier } from '../src/viem-verifier.ts';
 import { privateKeyToAccount } from 'viem/accounts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import { entrantId } from '../../../packages/protocol/src/canonical.ts';
+import type { PairRoomCoordinator } from '../src/pair-rooms.ts';
 
 const alice = '0x1111111111111111111111111111111111111111';
 const bob = '0x2222222222222222222222222222222222222222';
@@ -87,6 +88,25 @@ test('logout invalidates the server session and expires the browser cookie', asy
   assert.equal(logout.status, 204);
   assert.match(logout.headers['set-cookie'], /Max-Age=0/);
   assert.equal((await api.handle({ method: 'GET', path: '/api/agents', headers: { cookie } })).status, 401);
+});
+
+test('anonymous pair listing is open-only and participant rooms require a session', async () => {
+  const calls: string[] = [];
+  const pairs = {
+    listOpen() { return [{ roomId: `sha256:${'a'.repeat(64)}`, state: 'OPEN' }]; },
+    listForPrincipal(principal: string) { calls.push(principal); return [{ roomId: `sha256:${'b'.repeat(64)}`, state: 'JOINED' }]; },
+  } as unknown as PairRoomCoordinator;
+  const api = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, undefined, undefined, pairs);
+  const publicRooms = await api.handle({ method: 'GET', path: '/api/pair-rooms' });
+  assert.equal(publicRooms.status, 200);
+  assert.equal(publicRooms.body[0].state, 'OPEN');
+  assert.equal((await api.handle({ method: 'GET', path: '/api/pair-rooms/mine' })).status, 401);
+  await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+  const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+  const mine = await api.handle({ method: 'GET', path: '/api/pair-rooms/mine', headers: { cookie: auth.headers['set-cookie'].split(';')[0] } });
+  assert.equal(mine.status, 200);
+  assert.equal(mine.body[0].state, 'JOINED');
+  assert.deepEqual(calls, [alice]);
 });
 
 test('wallet login provisions one persisted Circle wallet and exposes it through the session', async () => {
