@@ -163,7 +163,24 @@ function normalizeMatch(value: unknown): Match {
   const state = text(item.state) as MatchState;
   if (!MATCH_STATES.has(state) || !Number.isSafeInteger(item.round) || (item.round as number) < 0) throw new Error('INVALID_ARENA_RESPONSE');
   const match: Match = { id: text(item.id), tournamentId: text(item.tournamentId), state, agentA: text(item.agentA), agentB: text(item.agentB), round: item.round as number };
+  if (item.stage !== undefined) {
+    if (!['preliminary', 'main', 'third_place', 'fifth_place'].includes(text(item.stage))) throw new Error('INVALID_ARENA_RESPONSE');
+    match.stage = text(item.stage) as Match['stage'];
+  }
+  if (item.agentIdA !== undefined && item.agentIdB !== undefined) {
+    match.agentIdA = text(item.agentIdA);
+    match.agentIdB = text(item.agentIdB);
+  }
   if (item.winner !== undefined) match.winner = text(item.winner);
+  if (item.events !== undefined) {
+    if (!Array.isArray(item.events) || item.events.length > 24) throw new Error('INVALID_ARENA_RESPONSE');
+    match.events = item.events.map((value) => {
+      const event = record(value);
+      const eventState = text(event.state) as MatchState;
+      if (!MATCH_STATES.has(eventState) || (event.at !== undefined && (!Number.isSafeInteger(event.at) || (event.at as number) < 1))) throw new Error('INVALID_ARENA_RESPONSE');
+      return { state: eventState, ...(event.at !== undefined ? { at: event.at as number } : {}) };
+    });
+  }
   return match;
 }
 function normalizeVerdict(value: unknown): MatchVerdict & { transactionHash?: string } {

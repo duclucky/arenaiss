@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../context';
 import { Tournament, Match } from '../adapters/interfaces';
 import { ShieldAlert, Info } from 'lucide-react';
+import { agentDisplayName } from './match-display';
 
 export function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
-  const { arenaRead, networkConfig } = useAppContext();
+  const { arenaRead, networkConfig, account, agentApi } = useAppContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
+  const [ownedAgentIds, setOwnedAgentIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!account || !agentApi || !id) { setOwnedAgentIds(new Set()); return; }
+    let active = true;
+    agentApi.listOwnedRegistrations()
+      .then((rows) => { if (active) setOwnedAgentIds(new Set(rows.filter((row) => row.tournamentId === id && row.agentId).map((row) => row.agentId!))); })
+      .catch(() => { if (active) setOwnedAgentIds(new Set()); });
+    return () => { active = false; };
+  }, [account, agentApi, id]);
 
   useEffect(() => {
     if (!id) return;
@@ -43,9 +55,28 @@ export function TournamentDetail() {
     );
   }
 
-  const bracketBase = tournament.entrantCount ? 2 ** Math.floor(Math.log2(tournament.entrantCount)) : 0;
-  const preliminaryCount = tournament.entrantCount ? tournament.entrantCount - bracketBase : 0;
-  const byeCount = tournament.entrantCount ? 2 * bracketBase - tournament.entrantCount : 0;
+  const entrantCount = tournament.entrantCount ?? tournament.entrantIds?.length ?? 0;
+  const bracketBase = entrantCount ? 2 ** Math.floor(Math.log2(entrantCount)) : 0;
+  const preliminaryCount = entrantCount ? entrantCount - bracketBase : 0;
+  const byeCount = entrantCount ? 2 * bracketBase - entrantCount : 0;
+  const rounds = bracketBase >= 2
+    ? [...(preliminaryCount > 0 ? ['0'] : []), ...Array.from({ length: Math.log2(bracketBase) }, (_, index) => String(index + 1)), 'third', 'fifth']
+    : [...new Set(matches.map((match) => String(match.round)))].sort();
+  const requestedRound = searchParams.get('round');
+  const activeRound = requestedRound && rounds.includes(requestedRound) ? requestedRound : rounds[0];
+  const visibleMatches = matches.filter((match) => activeRound === 'third' ? match.stage === 'third_place'
+    : activeRound === 'fifth' ? match.stage === 'fifth_place'
+    : match.round === Number(activeRound) && match.stage !== 'third_place' && match.stage !== 'fifth_place');
+  const roundLabel = (round: string) => {
+    if (round === 'third') return 'Third place';
+    if (round === 'fifth') return 'Fifth place';
+    if (round === '0') return 'Preliminary';
+    const matchCount = bracketBase / 2 ** Number(round);
+    return matchCount === 1 ? 'Final' : matchCount === 2 ? 'Semifinals' : matchCount === 4 ? 'Quarterfinals' : `Round of ${matchCount * 2}`;
+  };
+  const matchesInRound = (round: string) => matches.filter((match) => round === 'third' ? match.stage === 'third_place'
+    : round === 'fifth' ? match.stage === 'fifth_place'
+    : match.round === Number(round) && match.stage !== 'third_place' && match.stage !== 'fifth_place');
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -92,16 +123,23 @@ export function TournamentDetail() {
         </h2>
         <p className="mb-4 text-sm leading-relaxed text-neutral-700">This is the knockout match schedule. Arena locks the entrant list and pairs Agents deterministically from a fixed seed; winners advance through later rounds. For new Tournaments, the public pairing proof above identifies the Arc block used for that seed.</p>
         {tournament.bracketSeed && preliminaryCount > 0 && <p className="mb-4 text-sm text-neutral-700">Opening round: {preliminaryCount} preliminary {preliminaryCount === 1 ? 'match' : 'matches'}; {byeCount} Agents advance past that round by bye. Pairings that depend on an earlier winner appear once that result is final.</p>}
+        {rounds.length > 0 && <div role="tablist" aria-label="Tournament rounds" className="mb-5 flex flex-wrap gap-2">
+          {rounds.map((round) => <button key={round} type="button" role="tab" aria-selected={activeRound === round} aria-controls="round-matches" className={activeRound === round ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ round })}>
+            {roundLabel(round)} <span className="ml-1 text-xs">{matchesInRound(round).filter((match) => match.state === 'FINALIZED').length}/{round === 'third' ? 1 : round === 'fifth' ? 3 : round === '0' ? preliminaryCount : bracketBase / 2 ** Number(round)}</span>
+          </button>)}
+        </div>}
         {matches.length === 0 ? (
           <p className="text-muted-foreground">{tournament.status === 'UPCOMING' ? 'Pairings will appear here after registration closes and the Tournament starts.' : tournament.operationState === 'RECOVERY_REQUIRED' ? 'Tournament processing is paused. Pairings are being reconciled.' : 'Pairings are being prepared.'}</p>
+        ) : visibleMatches.length === 0 ? (
+          <p id="round-matches" role="tabpanel" className="text-muted-foreground">Pairings for {roundLabel(activeRound).toLowerCase()} will appear after the preceding results are final.</p>
         ) : (
-          <div className="space-y-4">
-            {matches.map((m) => (
+          <div id="round-matches" role="tabpanel" className="space-y-4">
+            {visibleMatches.map((m) => (
               <div key={m.id} className="retro-inset flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
                 <div className="flex flex-1 items-center justify-between gap-4 w-full">
-                  <div className={`flex-1 text-center font-mono ${m.winner === m.agentA ? 'text-accent font-bold' : ''}`}>{m.agentA}</div>
+                  <div className={`flex-1 text-center font-mono ${m.winner === m.agentA ? 'text-accent font-bold' : ''}`}>{agentDisplayName(m.agentA)} {m.agentIdA && ownedAgentIds.has(m.agentIdA) && <span className="font-sans text-xs font-bold text-accent">(YOU)</span>}</div>
                   <div className="retro-chip px-2 py-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">VS</div>
-                  <div className={`flex-1 text-center font-mono ${m.winner === m.agentB ? 'text-accent font-bold' : ''}`}>{m.agentB}</div>
+                  <div className={`flex-1 text-center font-mono ${m.winner === m.agentB ? 'text-accent font-bold' : ''}`}>{agentDisplayName(m.agentB)} {m.agentIdB && ownedAgentIds.has(m.agentIdB) && <span className="font-sans text-xs font-bold text-accent">(YOU)</span>}</div>
                 </div>
                 <div className="flex items-center gap-4">
                   <span data-testid={`lifecycle-${m.id}`} className={`retro-chip px-2 py-1 text-xs ${

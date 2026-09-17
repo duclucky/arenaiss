@@ -130,3 +130,39 @@ for (const retryResult of ["TIE", "RETRYABLE"] as const) {
     assert.deepEqual(inference.calls.map((call) => call.topic), ["t1", "t2", "t1"]);
   });
 }
+
+test("independent matches run concurrently while judge writes remain serialized", async () => {
+  let activeProviders = 0; let peakProviders = 0; let started = 0;
+  let releaseFirst!: () => void;
+  const firstBatch = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  const inference: OrchestratorInference = { async run(input) {
+    activeProviders += 1; peakProviders = Math.max(peakProviders, activeProviders);
+    if (++started === 3) releaseFirst();
+    await firstBatch;
+    activeProviders -= 1;
+    return { state: "OUTPUTS_READY", outputA: "A", outputB: "B", outputADigest: digest(`A-${input.attemptId}`), outputBDigest: digest(`B-${input.attemptId}`) };
+  } };
+  let activeJudges = 0; let peakJudges = 0;
+  const judge: OrchestratorJudge = { async judge() {
+    activeJudges += 1; peakJudges = Math.max(peakJudges, activeJudges);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    activeJudges -= 1;
+    return { state: "FINALIZED", result: "A_WIN" };
+  } };
+  const result = await new TournamentOrchestrator(inference, judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 3, expiresAt: 1000, now: () => 100 });
+  assert.equal(result.state, "RANKING_READY");
+  assert.equal(peakProviders, 3);
+  assert.equal(peakJudges, 1);
+});
+
+test("one blocked match does not prevent independent peers from finalizing in the same round", async () => {
+  let calls = 0;
+  const inference: OrchestratorInference = { async run(input) {
+    calls += 1;
+    return calls === 1 ? { state: "PARTIAL_PAIR", failureCode: "PROVIDER_ERROR" }
+      : { state: "OUTPUTS_READY", outputA: "A", outputB: "B", outputADigest: digest(`A-${input.attemptId}`), outputBDigest: digest(`B-${input.attemptId}`) };
+  } };
+  const result = await new TournamentOrchestrator(inference, new FakeJudge()).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 3, expiresAt: 1000, now: () => 100 });
+  assert.equal(result.state, "RECOVERY_REQUIRED");
+  assert.equal(result.results?.size, 3);
+});

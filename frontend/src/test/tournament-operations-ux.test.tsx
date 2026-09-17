@@ -6,6 +6,7 @@ import type { AgentApiAdapter, ArenaReadAdapter, ManagedIdentityAdapter, Tournam
 import { AppProvider } from '../context';
 import { Tournaments } from '../views/Tournaments';
 import { TournamentDetail } from '../views/TournamentDetail';
+import { MatchDetail } from '../views/MatchDetail';
 
 const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, identity: { kind: 'WALLET' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: `0x${'9'.repeat(40)}`, blockchain: 'ARC-TESTNET' as const, accountType: 'EOA' as const } };
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
@@ -44,6 +45,40 @@ describe('Tournament operator console', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('processing is paused');
     expect(screen.getByText('Agent A')).toBeInTheDocument();
     expect(screen.queryByText('No matches scheduled yet.')).not.toBeInTheDocument();
+  });
+
+  it('shows each round of a nine entrant bracket and marks the signed-in owner without entrant suffixes', async () => {
+    const id = `sha256:${'e'.repeat(64)}`;
+    const ownedId = `sha256:${'a'.repeat(64)}`;
+    const reads = { async getTournament() { return { id, name: 'Nine Agent Cup', status: 'ACTIVE', entrantIds: Array.from({ length: 9 }, (_, index) => `entrant-${index}`), prizePool: '9' }; }, async getMatches() { return [
+      { id: 'opening', tournamentId: id, agentA: 'My Agent · abcdef123456', agentB: 'Other Agent · 123456abcdef', agentIdA: ownedId, round: 0, state: 'SCHEDULED' },
+      { id: 'quarter', tournamentId: id, agentA: 'Third Agent', agentB: 'Fourth Agent', round: 1, state: 'SCHEDULED' },
+    ]; } } as unknown as ArenaReadAdapter;
+    const agentApi = { async listOwnedRegistrations() { return [{ tournamentId: id, entrantId: 'entrant-0', agentId: ownedId }]; }, async listOwnedAgents() { return []; } } as unknown as AgentApiAdapter;
+    render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider identityAdapter={identity} arenaReadAdapter={reads} agentApiAdapter={agentApi}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('tab', { name: /Preliminary/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Quarterfinals/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Semifinals/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Final/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Third place/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Fifth place/ })).toBeInTheDocument();
+    expect(await screen.findByText('My Agent')).toBeInTheDocument();
+    expect(screen.queryByText(/abcdef123456/)).not.toBeInTheDocument();
+    expect(await screen.findByText('(YOU)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /Quarterfinals/ }));
+    expect(screen.getByText('Third Agent')).toBeInTheDocument();
+    expect(screen.queryByText('My Agent')).not.toBeInTheDocument();
+  });
+
+  it('shows a public match lifecycle log before the verdict is final', async () => {
+    const id = `sha256:${'f'.repeat(64)}`;
+    const reads = { async getMatch() { return { id, tournamentId: `sha256:${'e'.repeat(64)}`, agentA: 'Alpha · abcdef123456', agentB: 'Beta · 123456abcdef', round: 0, state: 'JUDGING', events: [{ state: 'SCHEDULED', at: 1_789_603_200 }, { state: 'JUDGING', at: 1_789_603_230 }] }; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter initialEntries={[`/matches/${id}`]}><AppProvider arenaReadAdapter={reads}><Routes><Route path="/matches/:id" element={<MatchDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Match activity' })).toBeInTheDocument();
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('GenLayer judging')).toBeInTheDocument();
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.queryByText(/abcdef123456/)).not.toBeInTheDocument();
   });
 
   it('separates overview, live and joined Tournaments while hiding the archived demo', async () => {
