@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import { SoloEvaluationRunner, type SoloCampaignRecord } from '../../../packages/evaluation/src/solo-runner.ts';
 import type { WalletTransactionResult } from './managed-identity.ts';
+import { BoundedExecutionScheduler } from '../../../packages/operations/src/concurrency.ts';
 
 export type EvaluationFeeRecord = {
   schema: 'arena-evaluation-fee-v2'; campaignId: string; owner: string; amountUsdc: string;
@@ -28,15 +29,17 @@ export class EvaluationExecutionService {
   private readonly escrowAddress: string;
   private readonly feeUsdc: string;
   private readonly settlementOperations = new Map<string, { target: 'RELEASED' | 'REFUNDED'; operation: Promise<void> }>();
+  private readonly recoveryScheduler: BoundedExecutionScheduler;
   readonly model: string;
 
-  constructor(options: { runtime: SqliteRuntimeStore; fees: EvaluationFeePort; settlement: EvaluationSettlementPort; runner: SoloEvaluationRunner; operatorAddress: string; escrowAddress: string; feeUsdc: string; model?: string }) {
+  constructor(options: { runtime: SqliteRuntimeStore; fees: EvaluationFeePort; settlement: EvaluationSettlementPort; runner: SoloEvaluationRunner; operatorAddress: string; escrowAddress: string; feeUsdc: string; model?: string; workerConcurrency?: number }) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(options.operatorAddress)) throw new TypeError('evaluation operator address is invalid');
     if (!/^0x[0-9a-fA-F]{40}$/.test(options.escrowAddress)) throw new TypeError('evaluation escrow address is invalid');
     if (!/^\d+(?:\.\d{1,6})?$/.test(options.feeUsdc) || Number(options.feeUsdc) <= 0) throw new TypeError('evaluation fee is invalid');
     if (!options.model?.trim()) throw new TypeError('evaluation model is required');
     this.runtime = options.runtime; this.fees = options.fees; this.settlement = options.settlement; this.runner = options.runner;
     this.escrowAddress = options.escrowAddress.toLowerCase(); this.feeUsdc = options.feeUsdc; this.model = options.model.trim();
+    this.recoveryScheduler = new BoundedExecutionScheduler(options.workerConcurrency ?? 8);
   }
 
   async start(userId: string, owner: string, campaignId: string, options: { queueOnly?: boolean } = {}): Promise<SoloCampaignRecord> {
@@ -79,11 +82,9 @@ export class EvaluationExecutionService {
     const candidates = this.runtime.list<EvaluationFeeRecord>('evaluation-fees-v2')
       .filter((fee) => (fee.state === 'HELD' || fee.state === 'SETTLEMENT_FAILED') && this.runner.get(fee.campaignId)?.state !== 'RECOVERY_REQUIRED')
       .sort((left, right) => left.campaignId.localeCompare(right.campaignId));
-    let succeeded = 0; let failed = 0;
-    for (const fee of candidates) {
-      try { await this.advance(fee.owner, fee.campaignId); succeeded += 1; }
-      catch { failed += 1; }
-    }
+    const results = await Promise.allSettled(candidates.map((fee) => this.recoveryScheduler.run(() => this.advance(fee.owner, fee.campaignId))));
+    const succeeded = results.filter((result) => result.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
     return { attempted: candidates.length, succeeded, failed };
   }
 
@@ -158,11 +159,13 @@ export class EvaluationExecutionWorker {
   private stopped = true;
   private readonly execution: Pick<EvaluationExecutionService, 'resumePending'>;
   private readonly intervalMs: number;
+  private readonly heartbeat?: { success(): void; failure(): void };
 
-  constructor(execution: Pick<EvaluationExecutionService, 'resumePending'>, intervalMs = 5_000) {
+  constructor(execution: Pick<EvaluationExecutionService, 'resumePending'>, intervalMs = 5_000, heartbeat?: { success(): void; failure(): void }) {
     if (!Number.isSafeInteger(intervalMs) || intervalMs < 250) throw new TypeError('evaluation worker interval is invalid');
     this.execution = execution;
     this.intervalMs = intervalMs;
+    this.heartbeat = heartbeat;
   }
 
   runOnce(): Promise<{ attempted: number; succeeded: number; failed: number }> {
@@ -176,7 +179,8 @@ export class EvaluationExecutionWorker {
     if (!this.stopped) return;
     this.stopped = false;
     const tick = async () => {
-      await this.runOnce().catch(() => undefined);
+      try { await this.runOnce(); this.heartbeat?.success(); }
+      catch { this.heartbeat?.failure(); }
       if (!this.stopped) this.timer = setTimeout(tick, this.intervalMs);
     };
     void tick();

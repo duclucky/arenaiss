@@ -2,6 +2,7 @@ import { createAccount, createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 
 import type { GenLayerPort, JudgePair } from './tracker.ts';
+import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator, type TransactionSubmissionLane } from '../../operations/src/concurrency.ts';
 
 type SdkClient = {
   estimateTransactionFeesForWrite(input: WriteInput): Promise<FeeQuote>;
@@ -14,7 +15,8 @@ type FeeQuote = { distribution: unknown; messageAllocations: unknown; feeValue: 
 
 export class SdkGenLayerPort implements GenLayerPort {
   private client: SdkClient;
-  constructor(client: SdkClient) { this.client = client; }
+  private readonly submission?: { coordinator: TransactionSubmissionCoordinator; lane: TransactionSubmissionLane };
+  constructor(client: SdkClient, submission?: { coordinator: TransactionSubmissionCoordinator; lane: TransactionSubmissionLane }) { this.client = client; this.submission = submission; }
 
   async submit(pair: JudgePair, judgeAddress: string): Promise<string> {
     const input = {
@@ -23,7 +25,8 @@ export class SdkGenLayerPort implements GenLayerPort {
       args: [pair.matchId, pair.attemptId, pair.topic, pair.outputA, pair.outputB, pair.outputADigest, pair.outputBDigest, pair.rubricVersion],
     };
     const fees = await this.client.estimateTransactionFeesForWrite(input);
-    return this.client.writeContract({ ...input, fees });
+    const send = () => this.client.writeContract({ ...input, fees });
+    return this.submission ? this.submission.coordinator.submit(this.submission.lane, send) : send();
   }
 
   getReceipt(txHash: string): Promise<unknown> {
@@ -40,8 +43,8 @@ export class SdkGenLayerPort implements GenLayerPort {
   }
 }
 
-export function createStudionetGenLayerPort(privateKey: string): SdkGenLayerPort {
+export function createStudionetGenLayerPort(privateKey: string, coordinator: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator): SdkGenLayerPort {
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new Error('GenLayer operator private key is invalid');
   const account = createAccount(privateKey as `0x${string}`);
-  return new SdkGenLayerPort(createClient({ chain: studionet, account }) as unknown as SdkClient);
+  return new SdkGenLayerPort(createClient({ chain: studionet, account }) as unknown as SdkClient, { coordinator, lane: { network: 'GENLAYER', chainId: Number(studionet.id), signerAddress: account.address } });
 }

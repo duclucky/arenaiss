@@ -20,9 +20,11 @@ services:
       ARENA_OPERATOR_ADDRESS: ${ARENA_OPERATOR_ADDRESS:-0xC495ef51618D03267A1f227aFe5b27B38c748272}
       ARENA_RATE_LIMIT_MAX: ${ARENA_RATE_LIMIT_MAX:-60}
       ARENA_RATE_LIMIT_WINDOW_MS: ${ARENA_RATE_LIMIT_WINDOW_MS:-60000}
+      ARENA_TRUST_PROXY: ${ARENA_TRUST_PROXY:-1}
       ARENA_ONE_SHOT_TOURNAMENT: ""
       ARENA_DAILY_TOURNAMENT_STAKE_UNITS: ""
-      ARENA_TOURNAMENTS_PAUSED: "1"
+      ARENA_TOURNAMENTS_PAUSED: ${ARENA_TOURNAMENTS_PAUSED:-1}
+      EVALUATION_WORKER_CONCURRENCY: ${EVALUATION_WORKER_CONCURRENCY:-8}
       ARENA_PAIR_ROOMS_ENABLED: ${ARENA_PAIR_ROOMS_ENABLED:-1}
       ARC_PAIR_ESCROW_ADDRESS: ${ARC_PAIR_ESCROW_ADDRESS:-0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1}
       ARC_TESTNET_RPC_URL: ${ARC_TESTNET_RPC_URL:-https://rpc.testnet.arc.io}
@@ -37,7 +39,7 @@ services:
       - ./data:/data
       - ./backups:/backups
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -72,7 +74,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "${ARENA_BIND_ADDRESS:-0.0.0.0}:${ARENA_HTTP_PORT:-8080}:8080"
+      - "${ARENA_BIND_ADDRESS:-127.0.0.1}:${ARENA_HTTP_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 15s

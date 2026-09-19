@@ -5,14 +5,15 @@ import { HttpArenaReadAdapter, createArenaReadAdapter } from '../adapters/arena-
 describe('arena live-read adapter', () => {
   it('reads normalized tournament, match and verdict endpoints without authentication', async () => {
     const fetcher = vi.fn(async (url: string, _init?: RequestInit) => {
-      if (url.endsWith('/api/tournaments')) return new Response(JSON.stringify([{ id: 't1', name: 'Arena One', status: 'ACTIVE', prizePool: '800000' }]), { status: 200 });
-      if (url.endsWith('/api/tournaments/t1')) return new Response(JSON.stringify({ id: 't1', name: 'Arena One', status: 'ACTIVE', prizePool: '800000' }), { status: 200 });
+      if (url.endsWith('/api/tournaments')) return new Response(JSON.stringify([{ id: 't1', name: 'Arena One', status: 'ACTIVE', prizePool: '800000', stakeAmount: '1000000' }]), { status: 200 });
+      if (url.endsWith('/api/tournaments/t1')) return new Response(JSON.stringify({ id: 't1', name: 'Arena One', status: 'ACTIVE', prizePool: '800000', stakeAmount: '1000000' }), { status: 200 });
       if (url.endsWith('/api/tournaments/t1/matches')) return new Response(JSON.stringify([{ id: 'm1', tournamentId: 't1', state: 'FINALIZED', agentA: 'A', agentB: 'B', winner: 'A', round: 1 }]), { status: 200 });
       if (url.endsWith('/api/matches/m1/verdict')) return new Response(JSON.stringify({ id: 'v1', matchId: 'm1', winner: 'A', reasons: ['reason'], summary: 'A wins', transactionHash: `0x${'ab'.repeat(32)}` }), { status: 200 });
       return new Response(JSON.stringify({ id: 'm1', tournamentId: 't1', state: 'FINALIZED', agentA: 'A', agentB: 'B', winner: 'A', round: 1 }), { status: 200 });
     });
     const adapter = new HttpArenaReadAdapter('https://arena.example/', fetcher as typeof fetch, 'https://explorer.genlayer.com');
     expect((await adapter.listTournaments())[0].name).toBe('Arena One');
+    expect((await adapter.listTournaments())[0].stakeAmount).toBe('1000000');
     expect((await adapter.getTournament('t1'))?.status).toBe('ACTIVE');
     expect((await adapter.getMatches('t1'))[0].state).toBe('FINALIZED');
     expect((await adapter.getMatch('m1'))?.winner).toBe('A');

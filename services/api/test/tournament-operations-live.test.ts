@@ -26,13 +26,26 @@ class FakeArc implements TournamentArcOperations {
   private value(hash?: string) { return { state: this.state, entrantCount: this.state === 'DRAFT' ? 0 : this.entrantCount, totalLockedStakes: this.state === 'SETTLED' ? '0' : String(this.entrantCount * 1_000_000), totalLiability: this.state === 'SETTLED' ? String(this.entrantCount * 1_000_000) : '0', ...(hash ? { transactionHash: `0x${hash.repeat(64)}` } : {}) }; }
 }
 
+test('Tournament snapshot counts every projected judging and recovery match', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = { listMatches: () => [
+      { state: 'JUDGING' }, { state: 'JUDGING' }, { state: 'JUDGING' }, { state: 'JUDGING' },
+      { state: 'RETRYABLE' }, { state: 'RETRYABLE' }, { state: 'FINALIZED' },
+    ] } as any;
+    const operations = new LiveTournamentOperations(runtime, service, operator, new FakeArc(), {} as any, () => 40);
+    const snapshot = (operations as any).toSnapshot({ input: { tournamentId, name: 'Parallel', stakeAmount: '1' }, state: 'WAITING_FOR_JUDGE', finalizedMatchCount: 1 }, { state: 'RUNNING', entrantCount: 8, totalLiability: '0' }, []);
+    assert.deepEqual(snapshot.genLayer, { pendingCount: 4, finalizedCount: 1, recoveryCount: 2 });
+  } finally { runtime.close(); }
+});
+
 test('production Tournament runner derives ranking, persists it, then settles on Arc without caller ranking input', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     const arc = new FakeArc(); const published: any[] = []; let runs = 0;
     const service = { listTournamentOperatorEntrants: () => entrants, publishTournament: (_caller: string, value: any) => published.push(value), publishMatch() {}, getMatch: () => null, getPublicAgent: (id: string) => ({ name: id }) } as any;
     const ranking = entrants.slice(0, 5).map((row) => `sha256:${row.entrantId.slice(2)}`);
-    const orchestrator = { async run(input: any) { runs += 1; assert.equal(input.entrants.length, 8); return { state: 'RANKING_READY', ranking, results: new Map(Array.from({ length: 12 }, (_, index) => [`sha256:${String(index + 101).padStart(64, '0')}`, 'A_WIN'])) }; } } as any;
+    const orchestrator = { async run(input: any) { runs += 1; assert.equal(input.entrants.length, 8); assert.equal(input.maxConcurrentMatches, 30); return { state: 'RANKING_READY', ranking, results: new Map(Array.from({ length: 12 }, (_, index) => [`sha256:${String(index + 101).padStart(64, '0')}`, 'A_WIN'])) }; } } as any;
     const operations = new LiveTournamentOperations(runtime, service, operator, arc, orchestrator, () => 40);
     const input = { tournamentId, name: 'Production Cup', registrationOpensAt: 10, registrationClosesAt: 20, startsAt: 30, expiresAt: 1000, minEntrants: 8, maxEntrants: 8, stakeAmount: '1000000' };
 

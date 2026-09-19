@@ -4,6 +4,7 @@ import type { WalletTransactionResult } from './managed-identity.ts';
 import { arcTestnet } from 'viem/chains';
 import type { MarketplaceArcSnapshot } from './service.ts';
 import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
+import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator } from '../../../packages/operations/src/concurrency.ts';
 
 const REGISTRY_ABI = parseAbi(['function agents(bytes32) view returns (address owner, bytes32 version, bytes32 commitment, bool active)']);
 const MARKETPLACE_ABI = parseAbi(['function operator() view returns (address)', 'function platformRecipient() view returns (address)', 'function listings(uint256) view returns (bytes32 agentId, bytes32 version, bytes32 commitment, bytes32 eligibilityDigest, address seller, uint128 price, uint64 expiresAt, uint8 state)', 'function eligibility(bytes32) view returns (bytes32 agentId, bytes32 version, bytes32 commitment, uint64 validUntil, bool consumed)', 'function creditOf(address) view returns (uint256)', 'function approveEligibility(bytes32 digest,bytes32 agentId,bytes32 version,bytes32 commitment,uint64 validUntil)', 'function withdraw()', 'event ListingCreated(uint256 indexed listingId, bytes32 indexed agentId, address indexed seller, uint256 price, uint64 expiresAt, bytes32 eligibilityDigest)']);
@@ -19,14 +20,16 @@ export class ViemMarketplaceChainPort implements MarketplaceChainPort {
   private readonly client;
   private readonly walletClient;
   private readonly account;
+  private readonly transactions: TransactionSubmissionCoordinator;
 
-  constructor(input: { rpcUrl: string; registryAddress: string; marketplaceAddress: string; privateKey?: string }) {
+  constructor(input: { rpcUrl: string; registryAddress: string; marketplaceAddress: string; privateKey?: string; transactions?: TransactionSubmissionCoordinator }) {
     if (!ADDRESS.test(input.registryAddress) || !ADDRESS.test(input.marketplaceAddress) || new URL(input.rpcUrl).protocol !== 'https:') throw new Error('invalid Arc marketplace configuration');
     this.registry = input.registryAddress as Address;
     this.marketplace = input.marketplaceAddress as Address;
     this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(input.rpcUrl) });
     this.account = input.privateKey ? privateKeyToAccount(input.privateKey as Hex) : undefined;
     this.walletClient = this.account ? createWalletClient({ account: this.account, chain: arcTestnet, transport: arcWriteTransport(input.rpcUrl) }) : undefined;
+    this.transactions = input.transactions ?? sharedTransactionSubmissionCoordinator;
   }
 
   async snapshot(listingId: string): Promise<MarketplaceArcSnapshot> {
@@ -68,7 +71,7 @@ export class ViemMarketplaceChainPort implements MarketplaceChainPort {
     if (existing[0] !== `0x${'0'.repeat(64)}`) return { transactionId: `arc-readback:${input.digest}`, state: 'COMPLETE' };
     const operator = await this.client.readContract({ address: this.marketplace, abi: MARKETPLACE_ABI, functionName: 'operator' });
     if (operator.toLowerCase() !== this.account.address.toLowerCase()) throw new Error('configured signer is not Marketplace operator');
-    const hash = await this.walletClient.writeContract({ address: this.marketplace, abi: MARKETPLACE_ABI, functionName: 'approveEligibility', args: [digest, agentId, version, commitment, BigInt(input.validUntil)] });
+    const hash = await this.transactions.submit({ network: 'ARC', chainId: 5_042_002, signerAddress: this.account.address }, () => this.walletClient!.writeContract({ address: this.marketplace, abi: MARKETPLACE_ABI, functionName: 'approveEligibility', args: [digest, agentId, version, commitment, BigInt(input.validUntil)] }));
     const receipt = await this.client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 120_000 });
     if (receipt.status !== 'success') throw new Error('Marketplace eligibility approval reverted');
     return { transactionId: hash, state: 'COMPLETE', txHash: hash, explorerUrl: `https://testnet.arcscan.app/tx/${hash}` };
@@ -83,7 +86,7 @@ export class ViemMarketplaceChainPort implements MarketplaceChainPort {
     if (!this.walletClient || !this.account) throw new Error('marketplace operator signer unavailable');
     await this.requirePlatformSigner();
     if (BigInt(await this.creditOf(this.account.address)) === 0n) throw new Error('no Marketplace platform credit');
-    const hash = await this.walletClient.writeContract({ address: this.marketplace, abi: MARKETPLACE_ABI, functionName: 'withdraw' });
+    const hash = await this.transactions.submit({ network: 'ARC', chainId: 5_042_002, signerAddress: this.account.address }, () => this.walletClient!.writeContract({ address: this.marketplace, abi: MARKETPLACE_ABI, functionName: 'withdraw' }));
     const receipt = await this.client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 120_000 });
     if (receipt.status !== 'success') throw new Error('Marketplace platform withdrawal reverted');
     return { transactionId: hash, state: 'COMPLETE', txHash: hash, explorerUrl: `https://testnet.arcscan.app/tx/${hash}` };

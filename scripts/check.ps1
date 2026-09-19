@@ -15,6 +15,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & node --test `
+  "$PSScriptRoot\..\packages\operations\test\concurrency.test.ts" `
   "$PSScriptRoot\..\packages\protocol\test\canonical.test.ts" `
   "$PSScriptRoot\..\packages\domain\test\policy.test.ts" `
   "$PSScriptRoot\..\packages\domain\test\bracket.test.ts" `
@@ -59,6 +60,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   "$PSScriptRoot\..\services\api\test\tournament-arc-abi.test.ts" `
   "$PSScriptRoot\..\services\api\test\reference-tournament-launch.test.ts" `
   "$PSScriptRoot\..\services\api\test\server.test.ts" `
+  "$PSScriptRoot\..\services\api\test\operational-health.test.ts" `
   "$PSScriptRoot\..\tests\ops\backup.test.ts" `
   "$PSScriptRoot\..\tests\ops\arc-rpc-config.test.ts" `
   "$PSScriptRoot\..\tests\ops\seed-live-demo.test.ts" `

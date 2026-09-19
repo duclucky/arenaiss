@@ -3,7 +3,7 @@
 Arena ISS runs as a rootless Docker Compose stack with three services:
 
 - `api`: Node.js API and durable SQLite workers on the internal network;
-- `web`: Caddy serving the React build and proxying `/api` plus `/healthz`; and
+- `web`: Caddy serving the React build and proxying `/api`, `/livez`, `/readyz`, and `/healthz`; and
 - `tunnel`: an optional Cloudflare Tunnel with credentials mounted read-only.
 
 The production deployment is the trusted-operator testnet MVP at
@@ -31,7 +31,7 @@ public browser bundle.
 ```sh
 docker compose up -d --build --remove-orphans
 docker compose ps
-curl -fsS http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/readyz
 ```
 
 Expected health response:
@@ -71,4 +71,4 @@ Before a release:
 2. inspect the staged diff and tracked files for credentials or runtime data;
 3. build and start the Compose stack;
 4. verify that both `api` and `web` report healthy; and
-5. verify the public `/healthz` endpoint and affected browser route.
+5. verify the public `/readyz` endpoint (`/healthz` is its compatibility alias), `/livez`, and the affected browser route.

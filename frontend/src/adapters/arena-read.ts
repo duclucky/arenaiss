@@ -143,6 +143,7 @@ function normalizeTournament(value: unknown): Tournament {
   const status = text(item.status);
   if (!TOURNAMENT_STATES.has(status)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.registrationClosesAt !== undefined && (!Number.isSafeInteger(item.registrationClosesAt) || (item.registrationClosesAt as number) < 1)) throw new Error('INVALID_ARENA_RESPONSE');
+  if (item.stakeAmount !== undefined && (typeof item.stakeAmount !== 'string' || !/^[1-9][0-9]*$/.test(item.stakeAmount))) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.entrantIds !== undefined && (!Array.isArray(item.entrantIds) || item.entrantIds.some((id) => typeof id !== 'string'))) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.bracketRevision !== undefined && (!Number.isSafeInteger(item.bracketRevision) || (item.bracketRevision as number) < 1 || (item.bracketRevision as number) > 2)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.operationState !== undefined && !['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(String(item.operationState))) throw new Error('INVALID_ARENA_RESPONSE');
@@ -155,6 +156,7 @@ function normalizeTournament(value: unknown): Tournament {
     bracketSeed = { schema, seedDigest, rosterDigest, entropyBlockHash, entropyBlockNumber };
   }
   return { id: text(item.id), name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
+    ...(item.stakeAmount !== undefined ? { stakeAmount: item.stakeAmount as string } : {}),
     ...(item.registrationClosesAt !== undefined ? { registrationClosesAt: item.registrationClosesAt as number } : {}),
     ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}), ...(item.bracketRevision !== undefined ? { bracketRevision: item.bracketRevision as number } : {}),
     ...(bracketSeed ? { bracketSeed } : {}), ...(item.operationState ? { operationState: item.operationState as Tournament['operationState'] } : {}) };

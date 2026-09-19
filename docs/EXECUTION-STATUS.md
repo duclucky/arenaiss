@@ -1,5 +1,38 @@
 # Implementation execution status
 
+## 2026-09-20 runtime concurrency and operations hardening — local only
+
+The ordered hardening batch in
+`docs/RUNTIME-CONCURRENCY-AND-OPERATIONS-HARDENING-SPEC.md` is implemented
+locally. GenLayer and Arc submissions now share signer-scoped FIFO coordinators
+that release as soon as the transaction hash is returned; receipt/finality
+polling therefore does not block the next submission. Provider execution is
+bounded at the shared transport boundary with a configurable maximum of 30,
+and Evo resume work is parallelized with the same bounded scheduling model.
+Pair progress has separate provider, submission, finality and Arc-settlement
+state/retry accounting; a known GenLayer transaction continues finality polling
+without consuming a new submission retry. Tournament pending counts now include
+all judging/retryable matches and report recovery-required work separately.
+
+The API now exposes fail-closed runtime capabilities, liveness/readiness with
+worker heartbeat tracking, proxy-aware client identity, bounded rate-limit and
+authentication TTL cleanup, and a safe loopback host-port default. The UI uses
+the capabilities response before exposing Tournament entry actions. No paid
+provider request, transaction, wallet operation, deployment, push or publication
+was performed for this batch.
+
+Fresh local evidence: 347 Node tests pass, 133 frontend tests pass, frontend
+typecheck and an isolated production Vite build pass, 33 Foundry tests pass,
+and all three GenLayer contracts pass GenVM lint and validation. The aggregate
+`npm run check` remains incomplete because the installed GenLayer direct-test
+runtime cannot access
+`C:\Users\TBC\.cache\gltest-direct\trees-v2\v0.6.0-rc5\.extracted`
+(`WinError 5`); 12 direct tests run before the same cache permission failure
+blocks the remaining cases. A local Caddy binary/container runtime is also not
+available, so the Caddyfile could not be parsed by `caddy validate` locally.
+These environment limitations do not count as passing direct-test or Caddy
+validation evidence and must be cleared before any release.
+
 ## 2026-09-17 pair-room escrow — deployed contract, local flow
 
 An independent two-Agent `PairMatchEscrow` now has local create, equal-stake

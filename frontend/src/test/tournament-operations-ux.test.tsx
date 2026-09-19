@@ -12,11 +12,23 @@ const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, ident
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
 
 describe('Tournament operator console', () => {
-  it('marks Tournaments as coming soon and disables the build Agent action', () => {
-    render(<MemoryRouter><AppProvider><Tournaments /></AppProvider></MemoryRouter>);
-    expect(screen.getAllByText('Coming soon').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Build an agent' })).toBeDisabled();
-    expect(screen.queryByRole('link', { name: /Build an agent/ })).not.toBeInTheDocument();
+  it('loads the public Tournament schedule and leads with the open registration', async () => {
+    const openId = `sha256:${'a'.repeat(64)}`;
+    const completedId = `sha256:${'b'.repeat(64)}`;
+    const reads = { async listTournaments() { return [
+      { id: completedId, name: 'Yesterday Arena', status: 'COMPLETED', entrantIds: Array(8).fill('entrant'), prizePool: '8' },
+      { id: openId, name: 'Arena ISS Daily', status: 'UPCOMING', entrantIds: Array(5).fill('entrant'), prizePool: '5', stakeAmount: '1000000', registrationClosesAt: Math.floor(Date.now() / 1_000) + 3_600 },
+    ]; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter><AppProvider arenaReadAdapter={reads}><Tournaments /></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Arena ISS Daily' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Enter tournament' })).toHaveAttribute('href', `/tournaments/${openId}/submit`);
+    expect(screen.getByText('5 registered')).toBeInTheDocument();
+    expect(screen.getByText('1.00 USDC')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Yesterday Arena' })).toHaveAttribute('href', `/tournaments/${completedId}`);
+    expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveAttribute('href', '/agents/new');
+    expect(screen.getByRole('heading', { name: 'Register once' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Arena runs the bracket' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Claim on Arc' })).toBeInTheDocument();
   });
 
   it('shows UTC registration deadline and hides registration after the roster closes', async () => {
@@ -87,17 +99,19 @@ describe('Tournament operator console', () => {
     expect(screen.queryByText(/abcdef123456/)).not.toBeInTheDocument();
   });
 
-  it('directs players from the paused Tournament page to pair matches and existing claims', () => {
-    render(<MemoryRouter><AppProvider><Tournaments /></AppProvider></MemoryRouter>);
-    expect(screen.getByRole('heading', { name: 'Tournament play is paused' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Explore pair matches' })).toHaveAttribute('href', '/pairs');
-    expect(screen.getByRole('link', { name: 'View claims' })).toHaveAttribute('href', '/account?tab=claim');
+  it('shows a useful recovery action when the public Tournament schedule cannot load', async () => {
+    const reads = { async listTournaments() { throw new Error('offline'); } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter><AppProvider arenaReadAdapter={reads}><Tournaments /></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Tournament schedule could not be loaded');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View existing claims' })).toHaveAttribute('href', '/account?tab=claim');
   });
 
-  it('does not offer new Tournament registration or operator creation while paused', () => {
-    render(<MemoryRouter><AppProvider><Tournaments /></AppProvider></MemoryRouter>);
+  it('does not expose operator creation controls on the public Tournament page', async () => {
+    const reads = { async listTournaments() { return []; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter><AppProvider arenaReadAdapter={reads}><Tournaments /></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('No Tournament is accepting entries right now.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create tournament' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Register Agent' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: 'Tournament live' })).not.toBeInTheDocument();
   });
 });

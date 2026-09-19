@@ -198,6 +198,22 @@ test('durable Evo recovery advances every held campaign without stopping on one 
   } finally { runtime.close(); }
 });
 
+test('Evo recovery advances campaigns concurrently up to its configured bound', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  let active = 0; let peak = 0;
+  try {
+    const ids = Array.from({ length: 7 }, (_, index) => `sha256:${index.toString(16).repeat(64)}`);
+    for (const id of ids) runtime.put('evaluation-fees-v2', id, { schema: 'arena-evaluation-fee-v2', campaignId: id, owner, amountUsdc: '1', escrowAddress: escrow, approvalIdempotencyKey: 'approval', depositIdempotencyKey: 'deposit', settlementIdempotencyKey: 'settlement', state: 'HELD' });
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'cheap-5.6-sol', workerConcurrency: 3,
+      fees: {} as any, settlement: {} as any,
+      runner: { get(id: string) { return { campaignId: id, owner, state: 'RUNNING' }; }, async advance(id: string) { active += 1; peak = Math.max(peak, active); await new Promise((resolve) => setTimeout(resolve, 2)); active -= 1; return { campaignId: id, owner, state: 'RUNNING' }; }, failInfrastructure() { throw new Error('unexpected'); } } as any,
+    });
+    assert.deepEqual(await service.resumePending(), { attempted: 7, succeeded: 7, failed: 0 });
+    assert.equal(peak, 3);
+  } finally { runtime.close(); }
+});
+
 test('Evo worker coalesces overlapping ticks into one recovery pass', async () => {
   let calls = 0; let release!: () => void;
   const blocked = new Promise<void>((resolve) => { release = resolve; });

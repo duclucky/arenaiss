@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import type { ChainRoom, PairEvaluationFailureCode, PairRoom } from './pair-rooms.ts';
 
-export type PairOutcome = { state: 'WAITING'; failureCode: 'VERDICT_PENDING' }
-  | { state: 'RETRY_LATER'; failureCode: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' }
+export type PairOutcome = { state: 'WAITING'; failureCode: 'VERDICT_PENDING'; transactionHash?: string }
+  | { state: 'RETRY_LATER'; failureCode: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR'; transactionHash?: string }
   | { state: 'FINAL'; result: 'A_WIN' | 'B_WIN' | 'TIE'; transactionHash: string };
 export interface PairOutcomePort { resolve(room: PairRoom): Promise<PairOutcome>; }
 export interface PairSettlementArcPort {
@@ -11,6 +11,23 @@ export interface PairSettlementArcPort {
   settle(roomId: string, winner: string, verdictDigest: string): Promise<string>;
   expire(roomId: string): Promise<string>;
 }
+
+export type PairEvaluationPhase = 'PROVIDER' | 'GENLAYER_SUBMISSION' | 'GENLAYER_FINALITY' | 'ARC_SETTLEMENT' | 'COMPLETE' | 'RECOVERY_REQUIRED';
+export type PairEvaluationProgress = {
+  schema: 'pair-room-evaluation-progress-v2';
+  phase: PairEvaluationPhase;
+  providerFailures: number;
+  submissionFailures: number;
+  finalityPollFailures: number;
+  arcFailures: number;
+  nextAt: number;
+  verdictTx?: string;
+  lastFailureCode?: PairEvaluationFailureCode;
+  updatedAt: number;
+};
+
+const PROGRESS_NAMESPACE = 'pair-room-evaluation-progress-v2';
+const RETRY_BUDGET = 3;
 
 export class PairSettlementWorker {
   private readonly runtime: SqliteRuntimeStore;
@@ -29,7 +46,7 @@ export class PairSettlementWorker {
       try { await this.progress(room); }
       catch (error) {
         const message = error instanceof Error ? error.message : 'unknown error';
-        this.defer(room.roomId, classifyLegacyFailure(message), message);
+        this.deferPhase(room.roomId, 'ARC_SETTLEMENT', classifyLegacyFailure(message), message);
       } finally { this.runtime.releaseLease('pair-room-worker-leases-v2', room.roomId, owner); }
     }));
   }
@@ -42,10 +59,12 @@ export class PairSettlementWorker {
       if (intent && (!same(chain.winner, intent.winner) || chain.verdictDigest?.toLowerCase() !== `0x${intent.digest.slice(7)}`)) throw new Error('Arc settlement differs from persisted verdict');
       if (!same(chain.winner, room.creatorWallet) && !same(chain.winner, room.challengerWallet!)) throw new Error('Arc settled to an unknown wallet');
       this.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'SETTLED', evaluationStage: 'COMPLETE', evaluationFailureCode: undefined, evaluationAttempts: undefined, retryAt: undefined, ...(intent ? { verdictTx: intent.verdictTx } : {}) });
+      this.completeProgress(room.roomId, intent?.verdictTx);
       return;
     }
     if (chain.state === 4) {
       this.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'REFUNDABLE', evaluationStage: 'COMPLETE', evaluationFailureCode: undefined, evaluationAttempts: undefined, retryAt: undefined });
+      this.completeProgress(room.roomId);
       return;
     }
     if (room.state === 'JOINING') {
@@ -58,6 +77,7 @@ export class PairSettlementWorker {
         await this.arc.expire(room.roomId);
         if ((await this.arc.getRoom(room.roomId)).state !== 4) throw new Error('Arc refund readback is not final');
         this.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'REFUNDABLE', evaluationStage: 'COMPLETE', evaluationFailureCode: undefined, evaluationAttempts: undefined, retryAt: undefined });
+        this.completeProgress(room.roomId);
       }
       return;
     }
@@ -66,37 +86,48 @@ export class PairSettlementWorker {
       await this.arc.expire(room.roomId);
       if ((await this.arc.getRoom(room.roomId)).state !== 4) throw new Error('Arc refund readback is not final');
       this.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'REFUNDABLE', evaluationStage: 'COMPLETE', evaluationFailureCode: undefined, evaluationAttempts: undefined, retryAt: undefined });
+      this.completeProgress(room.roomId);
       return;
     }
     if (room.state === 'OPEN') return;
     let intent = this.runtime.get<SettlementIntent>('pair-room-settlement-intents', room.roomId);
     if (!intent) {
-      const retry = this.runtime.get<{ failures: number; nextAt: number }>('pair-room-worker-retries', room.roomId);
-      if (retry?.failures && retry.failures >= 3) {
+      const progress = this.progressFor(room.roomId);
+      if (progress.phase === 'RECOVERY_REQUIRED') {
         if (!room.evaluationFailureCode) {
           const prior = this.runtime.get<{ message?: string }>('pair-room-worker-errors', room.roomId);
           this.runtime.put('pair-rooms-v1', room.roomId, { ...room, evaluationFailureCode: classifyLegacyFailure(prior?.message) });
         }
         return;
       }
-      if (retry && this.now() < retry.nextAt) return;
+      if (this.now() < progress.nextAt) return;
       this.runtime.put('pair-rooms-v1', room.roomId, { ...room, evaluationStage: 'RUNNING_AGENTS', evaluationFailureCode: undefined });
       let outcome: PairOutcome;
       try { outcome = await this.outcome.resolve(room); }
       catch (error) {
         const message = error instanceof Error ? error.message : 'unknown evaluation error';
-        this.defer(room.roomId, classifyEvaluationFailure(message), message);
+        this.deferPhase(room.roomId, progress.phase === 'GENLAYER_FINALITY' ? 'GENLAYER_FINALITY' : 'GENLAYER_SUBMISSION', classifyEvaluationFailure(message), message);
         return;
       }
-      if (outcome.state === 'RETRY_LATER') { this.defer(room.roomId, outcome.failureCode, 'pair comparison requires a bounded retry'); return; }
-      if (outcome.state !== 'FINAL') { this.runtime.put('pair-rooms-v1', room.roomId, { ...room, evaluationStage: 'WAITING_VERDICT', evaluationFailureCode: outcome.failureCode, retryAt: undefined }); return; }
+      if (outcome.state === 'RETRY_LATER') {
+        const knownHash = outcome.transactionHash ?? progress.verdictTx;
+        this.deferPhase(room.roomId, knownHash ? 'GENLAYER_FINALITY' : outcome.failureCode === 'PROVIDER_ERROR' ? 'PROVIDER' : 'GENLAYER_SUBMISSION', outcome.failureCode, 'pair comparison requires retry', knownHash);
+        return;
+      }
+      if (outcome.state !== 'FINAL') {
+        this.putProgress(room.roomId, { ...progress, phase: 'GENLAYER_FINALITY', nextAt: 0, ...(outcome.transactionHash ? { verdictTx: outcome.transactionHash } : {}), lastFailureCode: outcome.failureCode, updatedAt: this.now() });
+        this.runtime.put('pair-rooms-v1', room.roomId, { ...room, evaluationStage: 'WAITING_VERDICT', evaluationFailureCode: outcome.failureCode, retryAt: undefined }); return;
+      }
       if (outcome.result === 'TIE') { this.runtime.put('pair-rooms-v1', room.roomId, { ...room, evaluationStage: 'TIE_WAITING_REFUND', evaluationFailureCode: undefined, retryAt: undefined }); return; }
       if (!/^0x[0-9a-fA-F]{64}$/.test(outcome.transactionHash)) throw new Error('comparison transaction is invalid');
       const winner = outcome.result === 'A_WIN' ? room.creatorWallet : room.challengerWallet!;
       intent = { winner, verdictTx: outcome.transactionHash, digest: sha(`arena-pair-verdict-v1|${room.roomId}|${outcome.result}|${outcome.transactionHash.toLowerCase()}`) };
       this.runtime.putIfAbsent('pair-room-settlement-intents', room.roomId, intent);
       intent = this.runtime.get<SettlementIntent>('pair-room-settlement-intents', room.roomId)!;
+      this.putProgress(room.roomId, { ...progress, phase: 'ARC_SETTLEMENT', nextAt: 0, verdictTx: intent.verdictTx, lastFailureCode: undefined, updatedAt: this.now() });
     }
+    const settlementProgress = this.progressFor(room.roomId);
+    if (settlementProgress.phase === 'RECOVERY_REQUIRED' || this.now() < settlementProgress.nextAt) return;
     this.runtime.put('pair-rooms-v1', room.roomId, { ...room, evaluationStage: 'SETTLING', evaluationFailureCode: undefined, retryAt: undefined, verdictTx: intent.verdictTx });
     if (!same(intent.winner, room.creatorWallet) && !same(intent.winner, room.challengerWallet!)) throw new Error('settlement intent has an unknown winner');
     const settleTx = await this.arc.settle(room.roomId, intent.winner, intent.digest);
@@ -104,6 +135,7 @@ export class PairSettlementWorker {
     if (settled.state !== 3 || !same(settled.winner, intent.winner)
       || settled.verdictDigest?.toLowerCase() !== `0x${intent.digest.slice(7)}`) throw new Error('Arc settlement readback mismatch');
     this.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'SETTLED', evaluationStage: 'COMPLETE', evaluationFailureCode: undefined, evaluationAttempts: undefined, retryAt: undefined, verdictTx: intent.verdictTx, settleTx });
+    this.completeProgress(room.roomId, intent.verdictTx);
   }
 
   private requireBinding(room: PairRoom, chain: ChainRoom): void {
@@ -115,14 +147,42 @@ export class PairSettlementWorker {
       || chain.challengerAgentVersion.toLowerCase() !== `0x${room.challengerVersion.slice(7)}`)) throw new Error('Arc room challenger binding mismatch');
   }
 
-  private defer(roomId: string, failureCode: PairEvaluationFailureCode, message: string): void {
-    const prior = this.runtime.get<{ failures: number }>('pair-room-worker-retries', roomId);
-    const failures = Math.min(3, (prior?.failures ?? 0) + 1);
-    const nextAt = this.now() + 600 * failures;
-    this.runtime.put('pair-room-worker-retries', roomId, { failures, nextAt });
+  private deferPhase(roomId: string, phase: Exclude<PairEvaluationPhase, 'COMPLETE' | 'RECOVERY_REQUIRED'>, failureCode: PairEvaluationFailureCode, message: string, verdictTx?: string): void {
+    const prior = this.progressFor(roomId);
+    const field = phase === 'PROVIDER' ? 'providerFailures' : phase === 'GENLAYER_SUBMISSION' ? 'submissionFailures' : phase === 'GENLAYER_FINALITY' ? 'finalityPollFailures' : 'arcFailures';
+    const failures = prior[field] + 1;
+    const bounded = phase !== 'GENLAYER_FINALITY';
+    const nextAt = this.now() + 600 * Math.min(RETRY_BUDGET, failures);
+    const nextPhase = bounded && failures >= RETRY_BUDGET ? 'RECOVERY_REQUIRED' : phase;
+    this.putProgress(roomId, { ...prior, phase: nextPhase, [field]: failures, nextAt, ...(verdictTx ? { verdictTx } : {}), lastFailureCode: failureCode, updatedAt: this.now() });
+    this.runtime.put('pair-room-worker-retries', roomId, { failures: Math.min(RETRY_BUDGET, failures), nextAt });
     this.runtime.put('pair-room-worker-errors', roomId, { at: this.now(), message });
     const room = this.runtime.get<PairRoom>('pair-rooms-v1', roomId);
-    if (room) this.runtime.put('pair-rooms-v1', roomId, { ...room, evaluationStage: 'RETRYING', evaluationFailureCode: failureCode, evaluationAttempts: failures, retryAt: nextAt });
+    if (room) this.runtime.put('pair-rooms-v1', roomId, { ...room, evaluationStage: nextPhase === 'RECOVERY_REQUIRED' ? 'RETRYING' : phase === 'GENLAYER_FINALITY' ? 'WAITING_VERDICT' : 'RETRYING', evaluationFailureCode: failureCode, evaluationAttempts: failures, retryAt: nextAt });
+  }
+
+  private progressFor(roomId: string): PairEvaluationProgress {
+    const current = this.runtime.get<PairEvaluationProgress>(PROGRESS_NAMESPACE, roomId);
+    if (current) return current;
+    const intent = this.runtime.get<SettlementIntent>('pair-room-settlement-intents', roomId);
+    const comparisonKey = `${sha(`arena-pair-match-v1|${roomId}`)}:${sha(`arena-pair-attempt-v1|${roomId}|1`)}`;
+    const comparison = this.runtime.get<{ transactionHash?: string }>('comparison-submissions', comparisonKey);
+    const legacy = this.runtime.get<{ failures?: number; nextAt?: number }>('pair-room-worker-retries', roomId);
+    const basePhase: PairEvaluationPhase = intent ? 'ARC_SETTLEMENT' : comparison?.transactionHash ? 'GENLAYER_FINALITY' : comparison ? 'GENLAYER_SUBMISSION' : 'PROVIDER';
+    const exhausted = (legacy?.failures ?? 0) >= RETRY_BUDGET && basePhase !== 'GENLAYER_FINALITY';
+    const phase: PairEvaluationPhase = exhausted ? 'RECOVERY_REQUIRED' : basePhase;
+    const migrated: PairEvaluationProgress = { schema: 'pair-room-evaluation-progress-v2', phase, providerFailures: basePhase === 'PROVIDER' ? legacy?.failures ?? 0 : 0, submissionFailures: basePhase === 'GENLAYER_SUBMISSION' ? legacy?.failures ?? 0 : 0, finalityPollFailures: basePhase === 'GENLAYER_FINALITY' ? legacy?.failures ?? 0 : 0, arcFailures: basePhase === 'ARC_SETTLEMENT' ? legacy?.failures ?? 0 : 0, nextAt: legacy?.nextAt ?? 0, ...(intent ? { verdictTx: intent.verdictTx } : comparison?.transactionHash ? { verdictTx: comparison.transactionHash } : {}), updatedAt: this.now() };
+    this.putProgress(roomId, migrated);
+    return migrated;
+  }
+
+  private putProgress(roomId: string, progress: PairEvaluationProgress): void {
+    this.runtime.put(PROGRESS_NAMESPACE, roomId, progress);
+  }
+
+  private completeProgress(roomId: string, verdictTx?: string): void {
+    const prior = this.progressFor(roomId);
+    this.putProgress(roomId, { ...prior, phase: 'COMPLETE', nextAt: 0, ...(verdictTx ? { verdictTx } : {}), lastFailureCode: undefined, updatedAt: this.now() });
   }
 }
 

@@ -104,8 +104,8 @@ export class DailyTournamentWorker {
   private async tick() {
     try {
       const result = await runDailyTournamentTick(this.runtime, this.operations, Math.floor(Date.now() / 1_000), this.stakeAmount);
+      this.report({ event: 'daily_tournament_tick', ...(result ? { tournamentId: result.tournamentId, state: result.state } : {}) });
       if (result) {
-        this.report({ event: 'daily_tournament_tick', tournamentId: result.tournamentId, state: result.state });
         if (result.state === 'RECOVERY_REQUIRED' && result.message !== this.lastRecoveryMessage) {
           this.lastRecoveryMessage = result.message;
           this.report({ event: 'daily_tournament_recovery_diagnostic', tournamentId: result.tournamentId, state: result.state, recovery: summarizeTournamentRecovery(this.runtime, result.message ?? '') });

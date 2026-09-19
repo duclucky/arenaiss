@@ -7,6 +7,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USER_ID = /^usr_[0-9a-f]{64}$/;
 const OTP_TTL_MS = 10 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
+const OTP_MAX_ENTRIES = 10_000;
 
 export type LoginIdentityKind = 'WALLET' | 'EMAIL';
 export type ManagedWallet = {
@@ -128,8 +129,10 @@ export class ManagedIdentityService {
   }
 
   async requestEmailCode(value: string): Promise<void> {
+    this.pruneEmailChallenges();
     const email = requireEmail(value);
     const identityKey = this.emailIdentityKey(email);
+    if (!this.emailChallenges.has(identityKey) && this.emailChallenges.size >= OTP_MAX_ENTRIES) throw new Error('email authentication capacity reached');
     const code = this.generateEmailCode();
     if (!/^\d{6}$/.test(code)) throw new Error('email code generator is invalid');
     this.emailChallenges.set(identityKey, {
@@ -144,6 +147,7 @@ export class ManagedIdentityService {
   }
 
   async loginEmail(value: string, code: string): Promise<ManagedAccount> {
+    this.pruneEmailChallenges();
     const email = requireEmail(value);
     const identityKey = this.emailIdentityKey(email);
     const challenge = this.emailChallenges.get(identityKey);
@@ -160,6 +164,11 @@ export class ManagedIdentityService {
     this.emailChallenges.delete(identityKey);
     const principal = `usr_${createHash('sha256').update(identityKey).digest('hex')}`;
     return this.login(identityKey, 'EMAIL', principal);
+  }
+
+  private pruneEmailChallenges(): void {
+    const now = this.now();
+    for (const [key, value] of this.emailChallenges) if (value.expiresAt <= now) this.emailChallenges.delete(key);
   }
 
   async getAccount(userId: string, kind: LoginIdentityKind): Promise<ManagedAccount> {

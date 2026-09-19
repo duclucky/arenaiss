@@ -41,13 +41,16 @@ describe('Arc registration screen', () => {
   beforeEach(() => window.history.pushState({}, '', `/tournaments/${digest('a')}/submit`));
   it('loads an owned agent, confirms exact stake, approves USDC, registers and reports confirmation', async () => {
     const wallet = new Wallet();
+    const arenaRead = { async getTournament() { return { id: digest('a'), name: 'Daily', status: 'UPCOMING', entrantIds: [], prizePool: '0', stakeAmount: '100000' }; } } as unknown as ArenaReadAdapter;
     const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', usdcAddress: '0x3600000000000000000000000000000000000000', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
-    render(<App config={config} walletAdapter={wallet} agentApiAdapter={new AgentApi()} />);
+    render(<App config={config} walletAdapter={wallet} agentApiAdapter={new AgentApi()} arenaReadAdapter={arenaRead} />);
     fireEvent.click(screen.getByRole('button', { name: 'Login' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Wallet' }));
     const option = await screen.findByRole('option', { name: 'Strategist' });
     fireEvent.change(screen.getByLabelText('Agent'), { target: { value: option.getAttribute('value') } });
+    expect(screen.getByText('0.1 USDC')).toBeInTheDocument();
+    expect(screen.getByText('Your wallet may ask for an approval and a registration signature.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Approve and enter' }));
     expect(await screen.findByText('Registration confirmed on Arc.')).toBeInTheDocument();
     expect(wallet.approvals).toEqual(['100000']);
@@ -80,5 +83,19 @@ describe('Arc registration screen', () => {
     expect(await screen.findByText('Your available Agents have already entered this Tournament.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Enter with managed wallet' })).toBeDisabled();
     expect(registerTournamentEntrant).not.toHaveBeenCalled();
+  });
+
+  it('blocks wallet signatures when the Tournament registration deadline has passed', async () => {
+    const wallet = new Wallet();
+    const arenaRead = { async getTournament() { return { id: digest('a'), name: 'Closed Daily', status: 'UPCOMING', entrantIds: [], prizePool: '0', stakeAmount: '1000000', registrationClosesAt: 1 }; } } as unknown as ArenaReadAdapter;
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', usdcAddress: '0x3600000000000000000000000000000000000000', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} walletAdapter={wallet} agentApiAdapter={new AgentApi()} arenaReadAdapter={arenaRead} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Wallet' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Registration is closed');
+    expect(screen.getByRole('button', { name: 'Registration closed' })).toBeDisabled();
+    expect(wallet.approvals).toHaveLength(0);
+    expect(wallet.registrations).toHaveLength(0);
   });
 });

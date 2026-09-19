@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { ArcWalletAdapter, ArcNetworkConfig, ArenaWriteAdapter, AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, ManagedAccount, ManagedIdentityAdapter, MarketplaceApiAdapter, TournamentOperationsApiAdapter } from './adapters/interfaces';
+import { ArcWalletAdapter, ArcNetworkConfig, ArenaWriteAdapter, AgentApiAdapter, ArenaReadAdapter, GenLayerReadAdapter, ManagedAccount, ManagedIdentityAdapter, MarketplaceApiAdapter, TournamentOperationsApiAdapter, type ProductCapabilities } from './adapters/interfaces';
 import { LazyBrowserArcWalletAdapter } from './adapters/wallet-lazy';
 import { HttpAgentAdapter } from './adapters/agent-api';
 import { createArenaReadAdapter } from './adapters/arena-read';
@@ -23,6 +23,7 @@ interface AppContextType {
   managedIdentityEnabled: boolean;
   marketplaceApi: MarketplaceApiAdapter | null;
   tournamentOperationsApi: TournamentOperationsApiAdapter | null;
+  capabilities: ProductCapabilities;
   connectWallet: (providerUuid: string) => Promise<void>;
   requestEmailCode: (email: string) => Promise<void>;
   signInWithEmail: (email: string, code: string) => Promise<void>;
@@ -139,6 +140,9 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
   const [account, setAccount] = useState<string | null>(null);
   const [managedAccount, setManagedAccount] = useState<ManagedAccount | null>(null);
   const [managedIdentityEnabled, setManagedIdentityEnabled] = useState(Boolean(identityAdapter));
+  const [capabilities, setCapabilities] = useState<ProductCapabilities>(() => arenaReadAdapter || agentApiAdapter || tournamentOperationsApiAdapter
+    ? { schema: 'arena-capabilities-v1', tournament: { visible: true, operationEnabled: true, registrationEnabled: true }, pair: { enabled: true }, evaluation: { enabled: true } }
+    : { schema: 'arena-capabilities-v1', tournament: { visible: true, operationEnabled: false, registrationEnabled: false, reason: 'NOT_CONFIGURED' }, pair: { enabled: false }, evaluation: { enabled: false } });
   
   const networkConfig = config !== undefined 
     ? config 
@@ -214,6 +218,17 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
     return () => { cancelled = true; };
   }, [identity]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (networkConfig?.apiUrl === undefined) return () => { cancelled = true; };
+    const base = networkConfig?.apiUrl?.replace(/\/$/, '') ?? '';
+    fetch(`${base}/api/capabilities`, { headers: { accept: 'application/json' } })
+      .then(async (response) => { if (!response.ok) throw new Error('capabilities unavailable'); return response.json() as Promise<ProductCapabilities>; })
+      .then((value) => { if (!cancelled && value.schema === 'arena-capabilities-v1') setCapabilities(value); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [networkConfig?.apiUrl]);
+
   return (
     <AppContext.Provider
       value={{
@@ -230,6 +245,7 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
         managedIdentityEnabled,
         marketplaceApi,
         tournamentOperationsApi,
+        capabilities,
         connectWallet,
         requestEmailCode,
         signInWithEmail,

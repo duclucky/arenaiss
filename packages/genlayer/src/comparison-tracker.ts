@@ -137,6 +137,10 @@ export class ComparisonRunTracker {
     return { state: "FINALIZED", run };
   }
 
+  transactionHash(matchId: string, attemptId: string): string | undefined {
+    return this.store.get(this.key(matchId, attemptId))?.transactionHash;
+  }
+
   private key(matchId: string, attemptId: string): string { return `${matchId}:${attemptId}`; }
 
   private validateSubmission(value: ComparisonJudgeSubmission): void {

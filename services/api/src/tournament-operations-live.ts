@@ -10,7 +10,8 @@ import { OpenAICompatibleEvaluationProvider, providerConfigurationFromEnvironmen
 import { ComparisonRunRegistry } from '../../../packages/evaluation/src/tournament-comparison.ts';
 import { ComparisonRunTracker, PersistentComparisonSubmissionStore } from '../../../packages/genlayer/src/comparison-tracker.ts';
 import { createStudioNextComparisonJudgePort } from '../../../packages/genlayer/src/comparison-sdk-port.ts';
-import { TournamentOrchestrator, type Entrant, type OrchestratorResult } from '../../../packages/orchestrator/src/orchestrator.ts';
+import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator } from '../../../packages/operations/src/concurrency.ts';
+import { MAX_CONCURRENT_MATCHES, TournamentOrchestrator, type Entrant, type OrchestratorResult } from '../../../packages/orchestrator/src/orchestrator.ts';
 import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import type { ArenaApiService, TournamentOperatorEntrant } from './service.ts';
 import type { CreateTournamentOperation, TournamentOperationAction, TournamentOperationSnapshot, TournamentOperationState, TournamentOperationsPort } from './tournament-operations.ts';
@@ -188,7 +189,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     const entrants = record.entrants;
     this.publish(record, arc, entrants.map((item) => item.entrantId));
     this.publishOpeningMatches(record);
-    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: record.bracketRevision ?? 1, retryCap: 3, maxConcurrentMatches: 3, expiresAt: record.input.expiresAt, now: this.now });
+    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: record.bracketRevision ?? 1, retryCap: 3, maxConcurrentMatches: MAX_CONCURRENT_MATCHES, expiresAt: record.input.expiresAt, now: this.now });
     this.publishMatchProgress(record, result);
     this.applyOrchestrator(record, result, entrants.length);
     this.publish(record, arc, entrants.map((item) => item.entrantId));
@@ -298,16 +299,20 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
   }
 
   private toSnapshot(record: OperationRecord, arc: ArcSnapshot, entrants: readonly unknown[]): TournamentOperationSnapshot {
-    return { tournamentId: record.input.tournamentId, name: record.input.name, state: record.state, entrantCount: arc.entrantCount || entrants.length, matchCount: bracketMatchCount(Math.max(arc.entrantCount, entrants.length), record.bracketRevision ?? 1), finalizedMatchCount: record.finalizedMatchCount, nextActions: nextActions(record.state), arc: { state: arc.state, ...(arc.transactionHash || record.transactionHash ? { transactionHash: arc.transactionHash || record.transactionHash } : {}), totalLiability: arc.totalLiability }, genLayer: { pendingCount: record.state === 'WAITING_FOR_JUDGE' ? 1 : 0, finalizedCount: record.finalizedMatchCount }, ...(record.message ? { message: record.message } : {}) };
+    const projectedMatches = typeof this.service.listMatches === 'function' ? this.service.listMatches(record.input.tournamentId) : undefined;
+    const pendingCount = projectedMatches ? projectedMatches.filter((match) => match.state === 'JUDGING').length : record.state === 'WAITING_FOR_JUDGE' ? 1 : 0;
+    const recoveryCount = projectedMatches?.filter((match) => match.state === 'RETRYABLE').length ?? (record.state === 'RECOVERY_REQUIRED' ? 1 : 0);
+    return { tournamentId: record.input.tournamentId, name: record.input.name, state: record.state, entrantCount: arc.entrantCount || entrants.length, matchCount: bracketMatchCount(Math.max(arc.entrantCount, entrants.length), record.bracketRevision ?? 1), finalizedMatchCount: record.finalizedMatchCount, nextActions: nextActions(record.state), arc: { state: arc.state, ...(arc.transactionHash || record.transactionHash ? { transactionHash: arc.transactionHash || record.transactionHash } : {}), totalLiability: arc.totalLiability }, genLayer: { pendingCount, finalizedCount: record.finalizedMatchCount, recoveryCount }, ...(record.message ? { message: record.message } : {}) };
   }
 }
 
 export class ViemTournamentArcOperations implements TournamentArcOperations {
-  private readonly client; private readonly wallet; private readonly account; private readonly escrow: Address;
-  constructor(input: { rpcUrl: string; escrowAddress: string; privateKey: string }) {
+  private readonly client; private readonly wallet; private readonly account; private readonly escrow: Address; private readonly transactions: TransactionSubmissionCoordinator;
+  constructor(input: { rpcUrl: string; escrowAddress: string; privateKey: string; transactions?: TransactionSubmissionCoordinator }) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(input.escrowAddress) || !/^0x[0-9a-fA-F]{64}$/.test(input.privateKey) || new URL(input.rpcUrl).protocol !== 'https:') throw new Error('invalid Tournament Arc configuration');
     this.escrow = input.escrowAddress as Address; this.account = privateKeyToAccount(input.privateKey as Hex);
     this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(input.rpcUrl) }); this.wallet = createWalletClient({ account: this.account, chain: arcTestnet, transport: arcWriteTransport(input.rpcUrl) });
+    this.transactions = input.transactions ?? sharedTransactionSubmissionCoordinator;
   }
   async create(input: CreateTournamentOperation): Promise<ArcSnapshot> {
     await this.requireChain(); const existing = await this.snapshot(input.tournamentId); const raw = await this.raw(input.tournamentId);
@@ -348,7 +353,7 @@ export class ViemTournamentArcOperations implements TournamentArcOperations {
   refund(id: string, reasonDigest: string) { return this.write(id, 'cancelAndOpenRefunds', [toBytes32(id), toBytes32(reasonDigest)]); }
   private raw(id: string) { return this.client.readContract({ address: this.escrow, abi: TOURNAMENT_ABI, functionName: 'getTournament', args: [toBytes32(id)] }); }
   private async requireChain() { if (await this.client.getChainId() !== ARC_CHAIN_ID) throw new Error('wrong Arc chain'); }
-  private async write(id: string, functionName: 'createTournament' | 'closeRegistration' | 'markRunning' | 'settleByOperator' | 'cancelAndOpenRefunds', args: readonly unknown[]): Promise<ArcSnapshot> { await this.requireChain(); const simulation = await this.client.simulateContract({ account: this.account, address: this.escrow, abi: TOURNAMENT_ABI, functionName, args: args as any }); const hash = await this.wallet.writeContract(simulation.request); const receipt = await this.client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 120_000 }); if (receipt.status !== 'success') throw new Error(`Arc Tournament action reverted: ${functionName}`); return { ...await this.snapshot(id), transactionHash: hash }; }
+  private async write(id: string, functionName: 'createTournament' | 'closeRegistration' | 'markRunning' | 'settleByOperator' | 'cancelAndOpenRefunds', args: readonly unknown[]): Promise<ArcSnapshot> { await this.requireChain(); const simulation = await this.client.simulateContract({ account: this.account, address: this.escrow, abi: TOURNAMENT_ABI, functionName, args: args as any }); const hash = await this.transactions.submit({ network: 'ARC', chainId: ARC_CHAIN_ID, signerAddress: this.account.address }, () => this.wallet.writeContract(simulation.request)); const receipt = await this.client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 120_000 }); if (receipt.status !== 'success') throw new Error(`Arc Tournament action reverted: ${functionName}`); return { ...await this.snapshot(id), transactionHash: hash }; }
 }
 
 export function tournamentOperationsFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, service: ArenaApiService, operatorAddress: string): TournamentOperationsPort | undefined {

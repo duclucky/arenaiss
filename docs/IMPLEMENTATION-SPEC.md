@@ -990,6 +990,14 @@ The live two-wallet deposit, GenLayer verdict, Arc settlement and withdrawal
 lifecycle remains open; EVAL-7 has not passed. See `PAIR-MATCH-ESCROW.md` for
 the room-specific safety cards and value matrix.
 
+The owner-requested pre-release runtime hardening for shared signer nonce safety,
+Pair finality recovery, process-wide provider concurrency, Tournament capability
+and observability, worker readiness, proxy-aware rate limiting and release
+verification is specified in
+[`RUNTIME-CONCURRENCY-AND-OPERATIONS-HARDENING-SPEC.md`](RUNTIME-CONCURRENCY-AND-OPERATIONS-HARDENING-SPEC.md).
+It is an ordered hardening overlay on the implemented EVAL-6/bounded EVAL-7
+runtime, not a new product phase or an EVAL-7 completion claim.
+
 1. Leaderboard luôn scope theo TestPack version, runtime/scoring policy và run
    count; không có universal score.
 2. Shared report khóa AgentVersion/evidence references và trạng thái finality.

@@ -90,6 +90,18 @@ test('logout invalidates the server session and expires the browser cookie', asy
   assert.equal((await api.handle({ method: 'GET', path: '/api/agents', headers: { cookie } })).status, 401);
 });
 
+test('product capabilities keep Tournament visible but gate operations and registration honestly', async () => {
+  const operations = { list: async () => [], get: async () => null, create: async () => { throw new Error('unused'); }, execute: async () => { throw new Error('unused'); } } as any;
+  const paused = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, operations, undefined, undefined, { tournamentsPaused: true });
+  assert.deepEqual((await paused.handle({ method: 'GET', path: '/api/capabilities' })).body, {
+    schema: 'arena-capabilities-v1', tournament: { visible: true, operationEnabled: false, registrationEnabled: false, reason: 'OPERATOR_PAUSED' }, pair: { enabled: false }, evaluation: { enabled: false },
+  });
+  const enabled = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, operations, undefined, undefined, { tournamentsPaused: false });
+  assert.equal((await enabled.handle({ method: 'GET', path: '/api/capabilities' })).body.tournament.registrationEnabled, true);
+  const missing = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { tournamentsPaused: false });
+  assert.equal((await missing.handle({ method: 'GET', path: '/api/capabilities' })).body.tournament.reason, 'NOT_CONFIGURED');
+});
+
 test('anonymous pair listing is open-only and participant rooms require a session', async () => {
   const calls: string[] = [];
   const pairs = {

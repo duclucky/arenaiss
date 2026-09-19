@@ -61,3 +61,29 @@ test("E6 SDK adapter estimates v0.6 fees and submits the exact comparison ABI", 
   assert.equal(calls[0][1].args.length, 16);
   assert.deepEqual(calls[1][1].fees, fees);
 });
+
+test("comparison SDK serializes transaction sends across clients but releases on transaction hash", async () => {
+  let activeWrites = 0; let peakWrites = 0; let startedWrites = 0;
+  let releaseFirst!: () => void;
+  const firstWrite = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  const client = () => ({
+    async estimateTransactionFeesForWrite() { return { distribution: {}, messageAllocations: {}, feeValue: 1n }; },
+    async writeContract() {
+      activeWrites += 1; startedWrites += 1; peakWrites = Math.max(peakWrites, activeWrites);
+      if (startedWrites === 1) await firstWrite;
+      activeWrites -= 1;
+      return tx;
+    },
+    async getTransaction() {},
+    async readContract() {},
+  });
+  const first = new SdkComparisonJudgePort(client()).submit(submission, judge);
+  const second = new SdkComparisonJudgePort(client()).submit({ ...submission, attemptId: digest("second-attempt") }, judge);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const writesBeforeFirstHash = startedWrites;
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.equal(writesBeforeFirstHash, 1);
+  assert.equal(peakWrites, 1);
+  assert.equal(startedWrites, 2);
+});

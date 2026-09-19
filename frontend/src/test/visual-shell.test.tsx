@@ -58,12 +58,12 @@ describe('Arena ISS visual shell', () => {
     }));
     const { container } = render(<App walletAdapter={new VisualWallet()} />);
 
-    const heading = await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards\. Test AI agents on practical tasks and safety rules\. Pair matches are live\. Tournaments coming soon\. Buy or sell agents that pass evaluation\./i });
+    const heading = await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards\. Test AI agents on practical tasks and safety rules\. Pair matches are live; Tournament availability is reported by the operator\. Buy or sell agents that pass evaluation\./i });
     expect(heading.querySelectorAll('[data-hero-line]')).toHaveLength(5);
     expect(heading.querySelector('[data-hero-line="brand"]')).toHaveTextContent('Arena ISS');
     expect(heading.querySelector('[data-hero-line="standard"]')).toHaveTextContent('Arena Intelligence, Safety & Standards.');
     expect(heading.querySelector('[data-hero-line="promise"]')).toHaveTextContent('Test AI agents on practical tasks and safety rules.');
-    expect(heading.querySelector('[data-hero-line="detail"]')).toHaveTextContent('Pair matches are live. Tournaments coming soon.');
+    expect(heading.querySelector('[data-hero-line="detail"]')).toHaveTextContent('Pair matches are live; Tournament availability is reported by the operator.');
     expect(heading.querySelector('[data-hero-line="marketplace"]')).toHaveTextContent('Buy or sell agents that pass evaluation.');
     expect(screen.queryByRole('link', { name: 'Arena ISS' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
@@ -201,9 +201,8 @@ describe('Arena ISS visual shell', () => {
     expect(container.querySelector('.app-shell')).toHaveAttribute('data-surface', 'editorial');
     expect(container.querySelector('.brand-mark')).toHaveAttribute('src', '/brand/arena-iss-mark.png');
     expect(container.querySelector('.brand-star')).not.toBeInTheDocument();
-    expect(container.querySelector('.page-kicker')).toHaveTextContent('Future competition mode');
-    expect(screen.getByRole('button', { name: 'Build an agent' })).toBeDisabled();
-    expect(screen.getByRole('link', { name: 'Explore pair matches' })).toHaveAttribute('href', '/pairs');
+    expect(container.querySelector('.page-kicker')).toHaveTextContent('Tournament mode');
+    expect(screen.getByRole('link', { name: 'Build an agent' })).toHaveAttribute('href', '/agents/new');
   });
 
   it('does not expose product navigation before login', async () => {
@@ -214,11 +213,13 @@ describe('Arena ISS visual shell', () => {
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument();
   });
 
-  it('shows the paused Tournament page without loading an obsolete live list', async () => {
+  it('loads the live Tournament list from the public read adapter', async () => {
     window.history.pushState({}, '', '/tournaments');
     const arenaRead = new RecoveringArenaRead();
     render(<App walletAdapter={new VisualWallet()} arenaReadAdapter={arenaRead} />);
-    expect(await screen.findByRole('heading', { name: 'Tournament play is paused' })).toBeInTheDocument();
-    expect(arenaRead.calls).toBe(0);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Tournament schedule could not be loaded');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('heading', { name: 'Recovered Arena' })).toBeInTheDocument();
+    expect(arenaRead.calls).toBe(2);
   });
 });

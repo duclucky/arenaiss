@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { privateKeyToAccount } from 'viem/accounts';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
+import type { ArcPairChainPort } from '../src/pair-arc.ts';
+import { LivePairSettlementArc } from '../src/pair-settlement-live.ts';
 import { PairSettlementWorker, type PairOutcomePort, type PairSettlementArcPort } from '../src/pair-settlement.ts';
 import type { PairRoom, ChainRoom } from '../src/pair-rooms.ts';
 
@@ -85,6 +88,24 @@ test('provider failures have a bounded retry budget while timeout refunds remain
     await f.worker.tick();
     assert.equal(f.expirations, 1);
     assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'REFUNDABLE');
+  } finally { f.runtime.close(); }
+});
+
+test('known GenLayer transaction keeps polling finality beyond three transient failures', async () => {
+  const f = fixture();
+  try {
+    f.runtime.put('pair-rooms-v1', room.roomId, { ...room, resolutionDeadline: 20_000 });
+    f.setArc({ ...chainRoom, resolutionDeadline: 20_000 });
+    f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR', transactionHash: `0x${'5'.repeat(64)}` } as any);
+    for (const timestamp of [200, 800, 2_000, 3_800, 6_200]) {
+      f.setNow(timestamp);
+      await f.worker.tick();
+    }
+    assert.equal(f.resolves, 5);
+    const progress = f.runtime.get<any>('pair-room-evaluation-progress-v2', room.roomId);
+    assert.equal(progress.phase, 'GENLAYER_FINALITY');
+    assert.equal(progress.finalityPollFailures, 5);
+    assert.equal(progress.submissionFailures, 0);
   } finally { f.runtime.close(); }
 });
 
@@ -183,4 +204,79 @@ test('confirmed pending join is reconciled from Arc and becomes eligible for jud
     await f.worker.tick();
     assert.equal(f.resolves, 1);
   } finally { f.runtime.close(); }
+});
+
+test('independent Pair Match rooms progress concurrently', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  let active = 0; let peak = 0; let started = 0;
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => { release = resolve; });
+  const rooms = Array.from({ length: 8 }, (_, index) => ({ ...room, roomId: digest((index + 1).toString(16)) }));
+  for (const item of rooms) runtime.put('pair-rooms-v1', item.roomId, item);
+  const arc: PairSettlementArcPort = {
+    async getRoom() { return structuredClone(chainRoom); },
+    async settle() { throw new Error('settlement must not run'); },
+    async expire() { throw new Error('expiry must not run'); },
+  };
+  const outcome: PairOutcomePort = {
+    async resolve() {
+      active += 1; started += 1; peak = Math.max(peak, active);
+      await barrier;
+      active -= 1;
+      return { state: 'WAITING', failureCode: 'VERDICT_PENDING' };
+    },
+  };
+  try {
+    const pending = new PairSettlementWorker(runtime, arc, outcome, () => 200).tick();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const observedStarted = started;
+    release();
+    await pending;
+    assert.equal(observedStarted, rooms.length);
+    assert.equal(peak, rooms.length);
+  } finally {
+    release();
+    runtime.close();
+  }
+});
+
+test('Pair Arc serializes transaction sends but waits for receipts concurrently', async () => {
+  const privateKey = `0x${'0'.repeat(63)}1` as const;
+  const operator = privateKeyToAccount(privateKey).address;
+  let activeWrites = 0; let peakWrites = 0; let startedWrites = 0; let receiptWaits = 0;
+  let releaseFirstWrite!: () => void;
+  let releaseReceipts!: () => void;
+  const firstWrite = new Promise<void>((resolve) => { releaseFirstWrite = resolve; });
+  const receipts = new Promise<void>((resolve) => { releaseReceipts = resolve; });
+  const chain = {
+    escrowAddress: address('9'),
+    async assertReady() {},
+  } as unknown as ArcPairChainPort;
+  const publicClient = {
+    async simulateContract(input: any) { return { request: input }; },
+    async waitForTransactionReceipt() { receiptWaits += 1; await receipts; return { status: 'success' }; },
+  };
+  const walletClient = {
+    async writeContract() {
+      activeWrites += 1; startedWrites += 1; peakWrites = Math.max(peakWrites, activeWrites);
+      if (startedWrites === 1) await firstWrite;
+      activeWrites -= 1;
+      return `0x${String(startedWrites).repeat(64)}` as const;
+    },
+  };
+  const arc = new LivePairSettlementArc(chain, privateKey, operator, undefined, { publicClient, walletClient });
+  const first = arc.settle(digest('a'), operator, digest('b'));
+  const second = arc.settle(digest('c'), operator, digest('d'));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const writesBeforeFirstHash = startedWrites;
+  releaseFirstWrite();
+  for (let index = 0; index < 10 && startedWrites < 2; index += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+  const writesWhileFirstReceiptPending = startedWrites;
+  const pendingReceipts = receiptWaits;
+  releaseReceipts();
+  await Promise.all([first, second]);
+  assert.equal(writesBeforeFirstHash, 1);
+  assert.equal(writesWhileFirstReceiptPending, 2);
+  assert.equal(pendingReceipts, 2);
+  assert.equal(peakWrites, 1);
 });

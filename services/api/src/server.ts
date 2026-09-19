@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { isIP } from 'node:net';
 
 import { ArenaHttpApi } from './http.ts';
 import { ArenaApiService } from './service.ts';
@@ -26,6 +27,7 @@ import { PairRoomCoordinator } from './pair-rooms.ts';
 import { ArcPairChainPort } from './pair-arc.ts';
 import { pairSettlementFromEnvironment } from './pair-settlement-live.ts';
 import { ARC_TESTNET_RPC_URL } from './arc-rpc.ts';
+import { OperationalHealthRegistry } from './operational-health.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -33,23 +35,31 @@ type RequestLog = { event: 'http_request'; method: string; path: string; status:
 type ServerOptions = {
   now?: () => number;
   logger?: (entry: RequestLog) => void;
-  rateLimit?: { maxRequests: number; windowMs: number };
+  rateLimit?: { maxRequests: number; windowMs: number; maxEntries?: number };
+  trustProxy?: boolean;
   tournamentOperations?: TournamentOperationsPort;
   onTournamentOperationsReady?: (operations: TournamentOperationsPort | undefined) => void;
+  healthRegistry?: OperationalHealthRegistry;
 };
 
 export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore, options: ServerOptions = {}) {
+  const now = options.now ?? Date.now;
+  const health = options.healthRegistry ?? new OperationalHealthRegistry(now);
   const service = new ArenaApiService(operator, runtime);
   const managedIdentity = runtime ? managedIdentityFromEnvironment(runtime) : undefined;
   const managedIdentityService = runtime && managedIdentity ? new ManagedIdentityService(managedIdentity) : undefined;
   const evaluationExecution = runtime && managedIdentityService ? evaluationExecutionFromEnvironment(runtime, managedIdentityService, operator) : undefined;
-  const evaluationWorker = evaluationExecution ? new EvaluationExecutionWorker(evaluationExecution, envPositiveInteger('EVALUATION_WORKER_INTERVAL_MS', 5_000)) : undefined;
+  const evaluationIntervalMs = envPositiveInteger('EVALUATION_WORKER_INTERVAL_MS', 5_000);
+  if (evaluationExecution) health.register('evaluation-worker', evaluationIntervalMs);
+  const evaluationWorker = evaluationExecution ? new EvaluationExecutionWorker(evaluationExecution, evaluationIntervalMs, { success: () => health.success('evaluation-worker'), failure: () => health.failure('evaluation-worker') }) : undefined;
   const marketplaceChain = marketplaceChainFromEnvironment(process.env);
   const agentRegistry = agentRegistryFromEnvironment(process.env);
   const pairAddress = process.env.ARC_PAIR_ESCROW_ADDRESS?.trim();
   const pairsEnabled = process.env.ARENA_PAIR_ROOMS_ENABLED === '1';
   const pairChain = pairsEnabled && pairAddress ? new ArcPairChainPort({ escrowAddress: pairAddress, expectedOperator: operator, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() }) : undefined;
   const pairWorker = pairsEnabled && runtime && pairChain && managedIdentityService ? pairSettlementFromEnvironment(process.env, runtime, service, pairChain, operator) : undefined;
+  const pairIntervalMs = 10_000;
+  if (pairWorker) health.register('pair-worker', pairIntervalMs);
   const pairRooms = pairWorker && pairAddress && runtime && managedIdentityService && pairChain ? new PairRoomCoordinator(runtime, service, {
     account: async (userId) => managedIdentityService.pairAccount(userId),
     create: (userId, input) => managedIdentityService.pairCreate(userId, input),
@@ -61,20 +71,27 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const pairTick = async () => {
     if (!pairWorker || pairWorkerBusy) return;
     pairWorkerBusy = true;
-    try { await pairWorker.tick(); } finally { pairWorkerBusy = false; }
+    try { await pairWorker.tick(); health.success('pair-worker'); } catch (error) { health.failure('pair-worker'); throw error; } finally { pairWorkerBusy = false; }
   };
   const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
   const dailyStake = process.env.ARENA_DAILY_TOURNAMENT_STAKE_UNITS?.trim();
   if (dailyStake && (!runtime || !tournamentOperations)) throw new Error('daily Tournament requires persistent runtime and Tournament operations');
-  const dailyWorker = dailyStake ? new DailyTournamentWorker(runtime!, tournamentOperations!, dailyStake) : undefined;
+  const dailyIntervalMs = 30_000;
+  if (dailyStake) health.register('daily-tournament-worker', dailyIntervalMs);
+  const dailyWorker = dailyStake ? new DailyTournamentWorker(runtime!, tournamentOperations!, dailyStake, dailyIntervalMs, (result) => {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (result.event === 'daily_tournament_failed') health.failure('daily-tournament-worker');
+    else if (result.event === 'daily_tournament_tick') health.success('daily-tournament-worker');
+  }) : undefined;
   options.onTournamentOperationsReady?.(tournamentOperations);
-  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms);
-  const now = options.now ?? Date.now;
+  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms, { tournamentsPaused: process.env.ARENA_TOURNAMENTS_PAUSED === '1', degraded: () => !health.readiness().ready });
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
     maxRequests: envPositiveInteger('ARENA_RATE_LIMIT_MAX', 60),
     windowMs: envPositiveInteger('ARENA_RATE_LIMIT_WINDOW_MS', 60_000),
+    maxEntries: 10_000,
   });
+  const trustProxy = options.trustProxy ?? process.env.ARENA_TRUST_PROXY === '1';
   const server = createServer(async (request, response) => {
     const startedAt = now();
     const method = request.method || 'GET';
@@ -82,13 +99,19 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
     let status = 500;
     try {
       path = decodePathname(new URL(request.url || '/', 'http://arena.local').pathname);
-      if (method === 'GET' && path === '/healthz') {
+      if (method === 'GET' && path === '/livez') {
         status = 200;
         writeResponse(response, status, { 'content-type': 'application/json; charset=utf-8' }, { status: 'ok' });
         return;
       }
+      if (method === 'GET' && (path === '/readyz' || path === '/healthz')) {
+        const readiness = health.readiness();
+        status = readiness.ready ? 200 : 503;
+        writeResponse(response, status, { 'content-type': 'application/json; charset=utf-8' }, readiness.ready ? { status: 'ok' } : { status: 'degraded', components: readiness.components });
+        return;
+      }
       if (isMutation(method)) {
-        const decision = limiter.take(clientIdentifier(request), now());
+        const decision = limiter.take(clientIdentifier(request, trustProxy), now());
         if (!decision.allowed) {
           status = 429;
           writeResponse(response, status, {
@@ -115,7 +138,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
-  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); if (pairWorker) { void pairTick().catch(() => undefined); pairWorkerTimer = setInterval(() => void pairTick().catch(() => undefined), 10_000); } });
+  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); if (pairWorker) { void pairTick().catch(() => undefined); pairWorkerTimer = setInterval(() => void pairTick().catch(() => undefined), pairIntervalMs); } });
   server.once('close', () => { evaluationWorker?.stop(); dailyWorker?.stop(); if (pairWorkerTimer) clearInterval(pairWorkerTimer); });
   return server;
 }
@@ -132,7 +155,7 @@ function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: M
   const judge = createStudioNextAgentEvaluationPort(privateKey!);
   const runner = new SoloEvaluationRunner(provider, new EvaluationRunTracker(judge, new PersistentEvaluationRunStore(runtime), judgeAddress!), new PersistentSoloCampaignStore(runtime));
   const settlement = new ViemEvoFeeSettlement({ privateKey: privateKey!, escrowAddress: escrowAddress!, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() });
-  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model: routing.model });
+  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model: routing.model, workerConcurrency: envBoundedInteger('EVALUATION_WORKER_CONCURRENCY', 8, 1, 30) });
 }
 
 export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
@@ -174,18 +197,23 @@ function marketplaceChainFromEnvironment(environment: NodeJS.ProcessEnv): ViemMa
 class FixedWindowRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
+  private readonly maxEntries: number;
   private readonly windows = new Map<string, { startedAt: number; count: number }>();
 
-  constructor(config: { maxRequests: number; windowMs: number }) {
+  constructor(config: { maxRequests: number; windowMs: number; maxEntries?: number }) {
     if (!Number.isSafeInteger(config.maxRequests) || config.maxRequests < 1
       || !Number.isSafeInteger(config.windowMs) || config.windowMs < 1) throw new TypeError('rate limit configuration is invalid');
     this.maxRequests = config.maxRequests;
     this.windowMs = config.windowMs;
+    this.maxEntries = config.maxEntries ?? 10_000;
+    if (!Number.isSafeInteger(this.maxEntries) || this.maxEntries < 1) throw new TypeError('rate limit max entries is invalid');
   }
 
   take(identifier: string, now: number): { allowed: boolean; retryAfterSeconds: number } {
+    for (const [key, window] of this.windows) if (now - window.startedAt >= this.windowMs) this.windows.delete(key);
     const current = this.windows.get(identifier);
     if (!current || now - current.startedAt >= this.windowMs) {
+      if (!current && this.windows.size >= this.maxEntries) return { allowed: false, retryAfterSeconds: 1 };
       this.windows.set(identifier, { startedAt: now, count: 1 });
       return { allowed: true, retryAfterSeconds: 0 };
     }
@@ -201,9 +229,9 @@ function isMutation(method: string): boolean {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 }
 
-function clientIdentifier(request: IncomingMessage): string {
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+function clientIdentifier(request: IncomingMessage, trustProxy: boolean): string {
+  const trusted = request.headers['x-arena-client-ip'];
+  if (trustProxy && typeof trusted === 'string' && isIP(trusted.trim())) return trusted.trim();
   return request.socket.remoteAddress || 'unknown';
 }
 
@@ -212,6 +240,12 @@ function envPositiveInteger(name: string, fallback: number): number {
   if (raw === undefined || raw === '') return fallback;
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} is invalid`);
+  return value;
+}
+
+function envBoundedInteger(name: string, fallback: number, minimum: number, maximum: number): number {
+  const value = envPositiveInteger(name, fallback);
+  if (value < minimum || value > maximum) throw new Error(`${name} must be between ${minimum} and ${maximum}`);
   return value;
 }
 

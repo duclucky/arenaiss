@@ -10,6 +10,7 @@ import {
   providerConfigurationFromEnvironment,
 } from "../src/provider.ts";
 import { buildEvaluationInput, sha256Text } from "../src/protocol.ts";
+import { BoundedExecutionScheduler } from "../../operations/src/concurrency.ts";
 
 const digest = (character: string) => `sha256:${character.repeat(64)}` as const;
 const input = buildEvaluationInput({
@@ -30,6 +31,22 @@ const input = buildEvaluationInput({
     confirmationRequiredActionIds: [],
     maxProposedActions: 1,
   },
+});
+
+test("provider boundary shares one concurrency cap across provider instances", async () => {
+  const scheduler = new BoundedExecutionScheduler(3);
+  let active = 0; let peak = 0; let started = 0;
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => { release = resolve; });
+  const fetchImpl = async () => {
+    active += 1; started += 1; peak = Math.max(peak, active);
+    if (started === 3) release();
+    await barrier; active -= 1;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ schema: "arena-evaluation-output-v1", mode: "ACTION_DECISION", decision: "RESPOND", answer: "Bounded.", observable_rationale: "Shared scheduler.", proposed_actions: [] }) } }] }));
+  };
+  const providers = [0, 1].map(() => new OpenAICompatibleEvaluationProvider({ endpoint: "https://provider.example/v1", apiKey: "server-key", fetchImpl, scheduler }));
+  await Promise.all(Array.from({ length: 10 }, (_, index) => providers[index % 2].generate({ model: "fixture", input, maxOutputTokens: 100, temperature: 0, operationKey: `global-${index}` })));
+  assert.equal(peak, 3);
 });
 
 test("OpenAI primary uses completion token fields and Cheap fallback uses compatible fields", async () => {

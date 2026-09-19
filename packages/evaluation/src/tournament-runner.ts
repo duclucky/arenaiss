@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
-import type { ComparisonRunTracker } from "../../genlayer/src/comparison-tracker.ts";
-import type { InferenceInput, OrchestratorInference, OrchestratorJudge, PairOutput } from "../../orchestrator/src/orchestrator.ts";
+import type { ComparisonJudgeSubmission, ComparisonRunTracker } from "../../genlayer/src/comparison-tracker.ts";
+import type { InferenceInput, OrchestratorInference, OrchestratorJudge, OrchestratorJudgeInput, OrchestratorJudgeOutcome, PairOutput } from "../../orchestrator/src/orchestrator.ts";
 import type { SqliteRuntimeStore } from "../../persistence/src/sqlite-runtime.ts";
 import { classifyEvaluationProviderError, isTransientEvaluationProviderError, type EvaluationProviderResult } from "./provider.ts";
 import { buildEvaluationInput, sha256Text, type EvaluationProviderInput, type EvaluationScenario } from "./protocol.ts";
@@ -90,19 +90,24 @@ export class TournamentEvaluationPairRunner implements OrchestratorInference {
       : { state: "OUTPUTS_READY", outputA: a.rawOutput, outputB: b.rawOutput, outputADigest: a.responseDigest as `sha256:${string}`, outputBDigest: b.responseDigest as `sha256:${string}` };
     return { output, timedOut, transientFailure, otherFailure };
   }
+
 }
 
 export class TournamentComparisonJudgeAdapter implements OrchestratorJudge {
   constructor(privateTracker: ComparisonRunTracker) { this.tracker = privateTracker; }
   private readonly tracker: ComparisonRunTracker;
-  async judge(input: InferenceInput & Required<Omit<PairOutput, "state">>) {
+  private submission(input: OrchestratorJudgeInput): ComparisonJudgeSubmission {
     const scenarioJson = JSON.stringify(toProviderScenario(tournamentScenario(input)));
-    await this.tracker.submit({ matchId: input.matchId, attemptId: input.attemptId, agentVersionIdA: input.agentA.agentsVersion, agentVersionIdB: input.agentB.agentsVersion, mode: "RESPONSE", agentsMdA: input.agentA.agentsMd, agentsMdB: input.agentB.agentsMd, scenarioJson, responseJsonA: input.outputA, responseJsonB: input.outputB, agentsDigestA: input.agentA.agentsCommitment, agentsDigestB: input.agentB.agentsCommitment, scenarioDigest: sha256Text(scenarioJson), responseDigestA: input.outputADigest, responseDigestB: input.outputBDigest, rubricVersion: "AgentComparisonV1" });
+    return { matchId: input.matchId, attemptId: input.attemptId, agentVersionIdA: input.agentA.agentsVersion, agentVersionIdB: input.agentB.agentsVersion, mode: "RESPONSE", agentsMdA: input.agentA.agentsMd, agentsMdB: input.agentB.agentsMd, scenarioJson, responseJsonA: input.outputA, responseJsonB: input.outputB, agentsDigestA: input.agentA.agentsCommitment, agentsDigestB: input.agentB.agentsCommitment, scenarioDigest: sha256Text(scenarioJson), responseDigestA: input.outputADigest, responseDigestB: input.outputBDigest, rubricVersion: "AgentComparisonV1" };
+  }
+  async submit(input: OrchestratorJudgeInput): Promise<void> { await this.tracker.submit(this.submission(input)); }
+  async poll(input: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome> {
     const outcome = await this.tracker.poll(input.matchId, input.attemptId);
     if (outcome.state !== "FINALIZED" || !outcome.run) return { state: outcome.state as "SUBMITTED" | "PENDING" | "ACCEPTED" | "FAILED" };
     if (outcome.run.result === "TIE" || outcome.run.result === "RETRYABLE") return { state: "FINALIZED" as const, result: outcome.run.result };
     return { state: "FINALIZED" as const, result: resultForTournamentProgression(outcome.run) };
   }
+  async judge(input: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome> { await this.submit(input); return this.poll(input); }
 }
 
 export function tournamentScenario(input: InferenceInput): EvaluationScenario {

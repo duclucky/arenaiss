@@ -23,11 +23,18 @@ export type InferenceInput = {
 export type PairOutput = { state: "OUTPUTS_READY" | "PARTIAL_PAIR"; outputA?: string; outputB?: string; outputADigest?: Digest; outputBDigest?: Digest; failureCode?: "EMPTY_OUTPUT" | "PROVIDER_TIMEOUT" | "PROVIDER_ERROR" | "INVALID_OUTPUT" };
 
 export interface OrchestratorInference { run(input: InferenceInput): Promise<PairOutput>; }
+export type OrchestratorJudgeInput = InferenceInput & Required<Omit<PairOutput, "state">>;
 export type OrchestratorJudgeOutcome =
   | { state: "SUBMITTED" | "PENDING" | "ACCEPTED" }
   | { state: "FAILED" }
   | { state: "FINALIZED"; result: MatchResult };
-export interface OrchestratorJudge { judge(input: InferenceInput & Required<Omit<PairOutput, "state">>): Promise<OrchestratorJudgeOutcome>; }
+export interface OrchestratorJudge {
+  judge(input: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome>;
+  submit?(input: OrchestratorJudgeInput): Promise<void>;
+  poll?(input: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome>;
+}
+
+export const MAX_CONCURRENT_MATCHES = 30;
 
 export type OrchestratorInput = {
   tournamentId: Digest;
@@ -52,14 +59,24 @@ export type OrchestratorResult =
 export class TournamentOrchestrator {
   private inference: OrchestratorInference;
   private judge: OrchestratorJudge;
+  private submissionTail = Promise.resolve();
   constructor(inference: OrchestratorInference, judge: OrchestratorJudge) { this.inference = inference; this.judge = judge; }
+
+  private async runJudgeSubmissionSerially<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.submissionTail;
+    let unlock = () => {};
+    this.submissionTail = new Promise<void>((resolve) => { unlock = resolve; });
+    await previous;
+    try { return await operation(); }
+    finally { unlock(); }
+  }
 
   async run(input: OrchestratorInput): Promise<OrchestratorResult> {
     if (input.now() >= input.expiresAt) return { state: "REFUND_REQUIRED", reason: "TOURNAMENT_EXPIRED" };
     if (!input.topics.length || input.topics.some((topic) => !topic)) throw new Error("topic deck is empty or invalid");
     if (input.topicSelection === "seeded-shuffle-v1" && new Set(input.topics).size !== input.topics.length) throw new Error("seeded topic deck contains duplicates");
     if (!Number.isSafeInteger(input.retryCap) || input.retryCap < 1) throw new Error("retry cap is invalid");
-    if (input.maxConcurrentMatches !== undefined && (!Number.isSafeInteger(input.maxConcurrentMatches) || input.maxConcurrentMatches < 1 || input.maxConcurrentMatches > 4)) throw new Error("match concurrency is invalid");
+    if (input.maxConcurrentMatches !== undefined && (!Number.isSafeInteger(input.maxConcurrentMatches) || input.maxConcurrentMatches < 1 || input.maxConcurrentMatches > MAX_CONCURRENT_MATCHES)) throw new Error("match concurrency is invalid");
     const abandonedAttemptIds = new Set(input.abandonedAttemptIds ?? []);
     if (abandonedAttemptIds.size !== (input.abandonedAttemptIds?.length ?? 0)) throw new Error("duplicate abandoned attempt ID");
     const entrantMap = new Map(input.entrants.map((entrant) => [entrant.entrantId, entrant]));
@@ -115,13 +132,10 @@ export class TournamentOrchestrator {
     input: OrchestratorInput, matches: readonly MatchBlueprint[], entrants: ReadonlyMap<Digest, Entrant>,
     topics: readonly string[], abandoned: ReadonlySet<Digest>, results: Map<Digest, MatchResult>,
   ): Promise<OrchestratorResult> {
-    let judgeTail = Promise.resolve();
-    const judgeSerially = async (context: InferenceInput & Required<Omit<PairOutput, "state">>) => {
-      const previous = judgeTail;
-      let unlock = () => {};
-      judgeTail = new Promise<void>((resolve) => { unlock = resolve; });
-      await previous;
-      try { return await this.judge.judge(context); } finally { unlock(); }
+    const judgeWithSafeSubmission = async (context: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome> => {
+      if (!this.judge.submit || !this.judge.poll) return this.runJudgeSubmissionSerially(() => this.judge.judge(context));
+      await this.runJudgeSubmissionSerially(() => this.judge.submit!(context));
+      return this.judge.poll(context);
     };
     for (let start = 0; start < matches.length;) {
       let end = start + 1;
@@ -146,7 +160,7 @@ export class TournamentOrchestrator {
             catch { return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: "PROVIDER_ERROR" as const }; }
             if (pair.state !== "OUTPUTS_READY" || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: pair.failureCode ?? "PROVIDER_INCOMPLETE" as const };
             let outcome: OrchestratorJudgeOutcome;
-            try { outcome = await judgeSerially({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest }); }
+            try { outcome = await judgeWithSafeSubmission({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest }); }
             catch { return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_ERROR" as const }; }
             if (outcome.state === "SUBMITTED" || outcome.state === "PENDING" || outcome.state === "ACCEPTED") return { state: "WAITING_FOR_JUDGE" as const, matchId: match.matchId, attemptId: currentAttempt };
             if (outcome.state === "FAILED") return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_FAILED" as const };

@@ -3,6 +3,7 @@ export type Tournament = {
   name: string;
   status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   prizePool: string;
+  stakeAmount?: string;
   registrationClosesAt?: number;
   entrantCount?: number;
   entrantIds?: string[];
@@ -16,6 +17,13 @@ export type Tournament = {
   bracketRevision?: number;
   operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING';
   demo?: TournamentDemoDetail;
+};
+
+export type ProductCapabilities = {
+  schema: 'arena-capabilities-v1';
+  tournament: { visible: true; operationEnabled: boolean; registrationEnabled: boolean; reason?: 'OPERATOR_PAUSED' | 'NOT_CONFIGURED' | 'DEGRADED' };
+  pair: { enabled: boolean };
+  evaluation: { enabled: boolean };
 };
 
 export type TournamentDemoRound = {
@@ -267,7 +275,7 @@ export type TournamentOperationSnapshot = {
   entrantCount: number; matchCount: number; finalizedMatchCount: number;
   nextActions: readonly TournamentOperationAction[];
   arc?: { state: string; transactionHash?: string; totalLiability?: string };
-  genLayer?: { pendingCount: number; finalizedCount: number };
+  genLayer?: { pendingCount: number; finalizedCount: number; recoveryCount?: number };
   message?: string;
 };
 export interface TournamentOperationsApiAdapter {

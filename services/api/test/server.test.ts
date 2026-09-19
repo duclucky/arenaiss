@@ -107,6 +107,30 @@ test('Node HTTP boundary rate limits mutation bursts and emits secret-free struc
   }
 });
 
+test('rate limiting ignores spoofed forwarding headers and trusts only the Caddy-owned header when configured', async () => {
+  const operator = '0x9999999999999999999999999999999999999999';
+  const start = async (trustProxy: boolean) => {
+    const server = createArenaServer(operator, undefined, { rateLimit: { maxRequests: 1, windowMs: 60_000, maxEntries: 10 }, now: () => 1_000, logger: () => undefined, trustProxy });
+    server.listen(0, '127.0.0.1'); await once(server, 'listening'); return server;
+  };
+  const direct = await start(false);
+  try {
+    const location = direct.address(); if (!location || typeof location === 'string') throw new Error('missing port');
+    const url = `http://127.0.0.1:${location.port}/api/auth/challenge`;
+    const request = (headers: Record<string, string>) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ address: '0x1111111111111111111111111111111111111111' }) });
+    assert.equal((await request({ 'x-forwarded-for': '198.51.100.1' })).status, 200);
+    assert.equal((await request({ 'x-forwarded-for': '198.51.100.2', 'x-arena-client-ip': '198.51.100.2' })).status, 429);
+  } finally { direct.close(); await once(direct, 'close'); }
+  const proxied = await start(true);
+  try {
+    const location = proxied.address(); if (!location || typeof location === 'string') throw new Error('missing port');
+    const url = `http://127.0.0.1:${location.port}/api/auth/challenge`;
+    const request = (ip: string) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-arena-client-ip': ip }, body: JSON.stringify({ address: '0x1111111111111111111111111111111111111111' }) });
+    assert.equal((await request('198.51.100.1')).status, 200);
+    assert.equal((await request('198.51.100.2')).status, 200);
+  } finally { proxied.close(); await once(proxied, 'close'); }
+});
+
 test('managed identity configuration is optional but rejects every partial secret set', () => {
   const database = new SqliteRuntimeStore(':memory:');
   try {

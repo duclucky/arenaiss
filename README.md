@@ -13,7 +13,7 @@ Arena ISS is a testnet platform for evaluating versioned AI agent profiles again
 - **Pair matches:** lets one user create a room with a chosen USDC stake and another user join with the same stake. Arc holds both deposits until a winner or refund path is finalized.
 - **Version comparison:** compares two versions of the same Agent only when their scenario, rubric, provider, and execution bindings are compatible.
 - **Marketplace:** limits listings to Agent versions that satisfy the locked evaluation policy and settles purchases in Arc Testnet USDC.
-- **Tournament engine:** includes deterministic bracket progression, GenLayer comparisons, Arc payouts, and refund recovery. Its public UI is currently marked **Coming soon** while operational recovery is refined.
+- **Tournament engine:** includes deterministic bracket progression, parallel pair execution, GenLayer comparisons, Arc payouts, and refund recovery. The public UI reads `/api/capabilities`; history stays visible while new operations or registration may be operator-paused.
 
 ## Pair match flow
 
@@ -159,4 +159,6 @@ Pair escrow has been exercised with two live Arc Testnet deposits, mutual cancel
 
 ## Status
 
-The hosted demo is available at [arenaiss.xyz](https://arenaiss.xyz). Pair matches and the evaluation views are active on testnet. Tournament participation is marked Coming soon in the public interface.
+The hosted demo is available at [arenaiss.xyz](https://arenaiss.xyz). Pair matches and the evaluation views are active on testnet. Tournament participation is enabled only when the runtime capability endpoint reports that operator operations and registration are ready; otherwise existing brackets, results, credits, and refunds remain visible.
+
+Operational endpoints are `/livez` for process liveness and `/readyz` for dependency/worker readiness; `/healthz` remains a compatibility alias of readiness. Provider work is globally capped at 30 requests, while `EVALUATION_WORKER_CONCURRENCY` defaults to 8 and accepts values from 1 through 30. `ARENA_TOURNAMENTS_PAUSED` defaults to `1`. `ARENA_TRUST_PROXY=1` trusts only Caddy's overwritten `X-Arena-Client-IP` header; direct deployments should leave it disabled.

@@ -3,6 +3,7 @@ import { studionet } from "genlayer-js/chains";
 
 import type { EvaluationJudgePort, EvaluationJudgeSubmission } from "../../evaluation/src/run-tracker.ts";
 import { studioNextChain } from "./studio-next.ts";
+import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator, type TransactionSubmissionLane } from "../../operations/src/concurrency.ts";
 
 type EvaluationSdkClient = {
   estimateTransactionFeesForWrite(input: EvaluationWriteInput): Promise<FeeQuote>;
@@ -15,9 +16,11 @@ type FeeQuote = { distribution: unknown; messageAllocations: unknown; feeValue: 
 
 export class SdkAgentEvaluationPort implements EvaluationJudgePort {
   private readonly client: EvaluationSdkClient;
+  private readonly submission?: { coordinator: TransactionSubmissionCoordinator; lane: TransactionSubmissionLane };
 
-  constructor(client: EvaluationSdkClient) {
+  constructor(client: EvaluationSdkClient, submission?: { coordinator: TransactionSubmissionCoordinator; lane: TransactionSubmissionLane }) {
     this.client = client;
+    this.submission = submission;
   }
 
   async submit(submission: EvaluationJudgeSubmission, judgeAddress: string): Promise<string> {
@@ -38,7 +41,8 @@ export class SdkAgentEvaluationPort implements EvaluationJudgePort {
       ],
     };
     const fees = await this.client.estimateTransactionFeesForWrite(input);
-    return this.client.writeContract({ ...input, fees });
+    const send = () => this.client.writeContract({ ...input, fees });
+    return this.submission ? this.submission.coordinator.submit(this.submission.lane, send) : send();
   }
 
   getReceipt(transactionHash: string): Promise<unknown> {
@@ -50,20 +54,20 @@ export class SdkAgentEvaluationPort implements EvaluationJudgePort {
   }
 }
 
-export function createStudionetAgentEvaluationPort(privateKey: string): SdkAgentEvaluationPort {
+export function createStudionetAgentEvaluationPort(privateKey: string, coordinator: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator): SdkAgentEvaluationPort {
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new TypeError("GenLayer private key is invalid");
   const account = createAccount(privateKey as `0x${string}`);
   const client = createClient({ chain: studionet, account });
-  return new SdkAgentEvaluationPort(client as unknown as EvaluationSdkClient);
+  return new SdkAgentEvaluationPort(client as unknown as EvaluationSdkClient, { coordinator, lane: { network: "GENLAYER", chainId: Number(studionet.id), signerAddress: account.address } });
 }
 
-export function createStudioDevAgentEvaluationPort(privateKey: string): SdkAgentEvaluationPort {
-  return createStudioNextAgentEvaluationPort(privateKey);
+export function createStudioDevAgentEvaluationPort(privateKey: string, coordinator: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator): SdkAgentEvaluationPort {
+  return createStudioNextAgentEvaluationPort(privateKey, coordinator);
 }
 
-export function createStudioNextAgentEvaluationPort(privateKey: string): SdkAgentEvaluationPort {
+export function createStudioNextAgentEvaluationPort(privateKey: string, coordinator: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator): SdkAgentEvaluationPort {
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new TypeError("GenLayer private key is invalid");
   const account = createAccount(privateKey as `0x${string}`);
   const client = createClient({ chain: studioNextChain(), account });
-  return new SdkAgentEvaluationPort(client as unknown as EvaluationSdkClient);
+  return new SdkAgentEvaluationPort(client as unknown as EvaluationSdkClient, { coordinator, lane: { network: "GENLAYER", chainId: 61_997, signerAddress: account.address } });
 }

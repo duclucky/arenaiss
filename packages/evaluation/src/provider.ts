@@ -1,4 +1,5 @@
 import { parseEvaluationOutput, type EvaluationOutput, type EvaluationProviderInput } from "./protocol.ts";
+import { BoundedExecutionScheduler, type ExecutionScheduler } from "../../operations/src/concurrency.ts";
 
 export const EVALUATION_PLATFORM_WRAPPER_V1 = [
   "ARENA_ISS_EVALUATION_PROVIDER_V1",
@@ -50,6 +51,8 @@ export function buildEvaluationProviderBody(value: { style: EvaluationProviderSt
 }
 
 export type EvaluationProviderFailure = "EMPTY_OUTPUT" | "PROVIDER_TIMEOUT" | "PROVIDER_ERROR" | "INVALID_OUTPUT";
+export const MAX_CONCURRENT_EVALUATION_PROVIDER_REQUESTS = 30;
+export const sharedEvaluationProviderScheduler = new BoundedExecutionScheduler(MAX_CONCURRENT_EVALUATION_PROVIDER_REQUESTS);
 export function classifyEvaluationProviderError(error: unknown): EvaluationProviderFailure {
   if (error instanceof DOMException && error.name === "AbortError") return "PROVIDER_TIMEOUT";
   const message = error instanceof Error ? error.message : String(error);
@@ -98,8 +101,9 @@ export class OpenAICompatibleEvaluationProvider {
   private timeoutMs: number;
   private primaryFormat: ChatRequestFormat;
   private fallbackFormat: ChatRequestFormat;
+  private scheduler: ExecutionScheduler;
 
-  constructor(config: { endpoint: string; fallbackEndpoint?: string; apiKey: string; fallbackApiKey?: string; fallbackModel?: string; style?: EvaluationProviderStyle; primaryFormat?: ChatRequestFormat; fallbackFormat?: ChatRequestFormat; fetchImpl?: FetchLike; timeoutMs?: number }) {
+  constructor(config: { endpoint: string; fallbackEndpoint?: string; apiKey: string; fallbackApiKey?: string; fallbackModel?: string; style?: EvaluationProviderStyle; primaryFormat?: ChatRequestFormat; fallbackFormat?: ChatRequestFormat; fetchImpl?: FetchLike; timeoutMs?: number; scheduler?: ExecutionScheduler }) {
     if (!config.apiKey) throw new TypeError("provider API key is required server-side");
     this.style = config.style ?? "chat-completions";
     this.endpoint = this.normalizeEndpoint(config.endpoint, "provider");
@@ -117,6 +121,7 @@ export class OpenAICompatibleEvaluationProvider {
     this.fallbackFormat = config.fallbackFormat ?? "openai";
     this.fetchImpl = config.fetchImpl ?? fetch;
     this.timeoutMs = config.timeoutMs ?? 120_000;
+    this.scheduler = config.scheduler ?? sharedEvaluationProviderScheduler;
   }
 
   getFallbackModel(): string | undefined { return this.fallback?.model; }
@@ -171,26 +176,25 @@ export class OpenAICompatibleEvaluationProvider {
   }
 
   private async request(endpoint: string, apiKey: string, body: string, operationKey: string): Promise<unknown> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      let response: Response;
+    return this.scheduler.run(async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       try {
-        response = await this.fetchImpl(endpoint, {
+        const response = await this.fetchImpl(endpoint, {
           method: "POST",
           headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "idempotency-key": operationKey },
           body,
           signal: controller.signal,
         });
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+        return await response.json();
       } catch (error) {
         if (error instanceof TypeError) throw new Error("NETWORK_ERROR");
         throw error;
+      } finally {
+        clearTimeout(timeout);
       }
-      if (!response.ok) throw new Error(`HTTP_${response.status}`);
-      return await response.json();
-    } finally {
-      clearTimeout(timeout);
-    }
+    });
   }
 
   private isTemporaryFailure(error: unknown): boolean {

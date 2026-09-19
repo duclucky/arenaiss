@@ -10,7 +10,7 @@ export type TournamentOperationSnapshot = {
   finalizedMatchCount: number;
   nextActions: readonly TournamentOperationAction[];
   arc?: { state: string; transactionHash?: string; totalLiability?: string };
-  genLayer?: { pendingCount: number; finalizedCount: number };
+  genLayer?: { pendingCount: number; finalizedCount: number; recoveryCount?: number };
   message?: string;
 };
 

@@ -163,6 +163,61 @@ test("independent matches run concurrently while judge writes remain serialized"
   assert.equal(peakJudges, 1);
 });
 
+test("split judge serializes transaction submission but polls finality concurrently", async () => {
+  let activeSubmissions = 0; let peakSubmissions = 0;
+  let activePolls = 0; let peakPolls = 0; let startedPolls = 0;
+  let releasePolls!: () => void;
+  const pollBarrier = new Promise<void>((resolve) => { releasePolls = resolve; });
+  const judge = {
+    async judge() { throw new Error("concurrent path must use split submit and poll"); },
+    async submit() {
+      activeSubmissions += 1; peakSubmissions = Math.max(peakSubmissions, activeSubmissions);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      activeSubmissions -= 1;
+    },
+    async poll() {
+      activePolls += 1; peakPolls = Math.max(peakPolls, activePolls);
+      if (++startedPolls === 4) releasePolls();
+      await pollBarrier;
+      activePolls -= 1;
+      return { state: "PENDING" as const };
+    },
+  } satisfies OrchestratorJudge;
+  const result = await new TournamentOrchestrator(new FakeInference(), judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 4, expiresAt: 1000, now: () => 100 });
+  assert.equal(result.state, "WAITING_FOR_JUDGE");
+  assert.equal(peakSubmissions, 1);
+  assert.equal(peakPolls, 4);
+});
+
+test("split judge shares one submission queue across concurrent Tournament runs", async () => {
+  let activeSubmissions = 0; let peakSubmissions = 0;
+  const judge = {
+    async judge() { throw new Error("concurrent path must use split submit and poll"); },
+    async submit() {
+      activeSubmissions += 1; peakSubmissions = Math.max(peakSubmissions, activeSubmissions);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      activeSubmissions -= 1;
+    },
+    async poll() { return { state: "PENDING" as const }; },
+  } satisfies OrchestratorJudge;
+  const orchestrator = new TournamentOrchestrator(new FakeInference(), judge);
+  const results = await Promise.all([
+    orchestrator.run({ tournamentId, seedDigest: digest("seed-a"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 4, expiresAt: 1000, now: () => 100 }),
+    orchestrator.run({ tournamentId: digest("tournament-b"), seedDigest: digest("seed-b"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 4, expiresAt: 1000, now: () => 100 }),
+  ]);
+  assert.equal(results.every((result) => result.state === "WAITING_FOR_JUDGE"), true);
+  assert.equal(peakSubmissions, 1);
+});
+
+test("match worker accepts thirty concurrent matches but rejects a higher limit", async () => {
+  const accepted = await new TournamentOrchestrator(new FakeInference(), new FakeJudge()).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 30, expiresAt: 1000, now: () => 100 });
+  assert.equal(accepted.state, "RANKING_READY");
+  await assert.rejects(
+    new TournamentOrchestrator(new FakeInference(), new FakeJudge()).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, maxConcurrentMatches: 31, expiresAt: 1000, now: () => 100 }),
+    /match concurrency is invalid/,
+  );
+});
+
 test("one blocked match does not prevent independent peers from finalizing in the same round", async () => {
   let calls = 0;
   const inference: OrchestratorInference = { async run(input) {

@@ -12,10 +12,17 @@ type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
 export type ApiResponse = { status: number; headers: Headers; body?: any };
 export type SignatureVerifier = (input: { address: string; message: string; signature: string }) => Promise<boolean>;
+export type ArenaCapabilities = {
+  schema: 'arena-capabilities-v1';
+  tournament: { visible: true; operationEnabled: boolean; registrationEnabled: boolean; reason?: 'OPERATOR_PAUSED' | 'NOT_CONFIGURED' | 'DEGRADED' };
+  pair: { enabled: boolean };
+  evaluation: { enabled: boolean };
+};
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const CHALLENGE_TTL_MS = 15 * 60_000;
 const SESSION_TTL_MS = 12 * 60 * 60_000;
+const MAX_AUTH_ENTRIES = 10_000;
 
 export class ArenaHttpApi {
   private service: ArenaApiService;
@@ -29,8 +36,11 @@ export class ArenaHttpApi {
   private tournamentOperations?: TournamentOperationsPort;
   private agentRegistry?: AgentRegistryPort;
   private pairRooms?: PairRoomCoordinator;
+  private tournamentsPaused: boolean;
+  private degraded: () => boolean;
+  private enforceCapabilities: boolean;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator, capabilityOptions: { tournamentsPaused?: boolean; degraded?: boolean | (() => boolean) } = {}) {
     this.service = service;
     this.verifySignature = verifySignature;
     this.marketplaceChain = marketplaceChain;
@@ -38,6 +48,9 @@ export class ArenaHttpApi {
     this.tournamentOperations = tournamentOperations;
     this.agentRegistry = agentRegistry;
     this.pairRooms = pairRooms;
+    this.tournamentsPaused = capabilityOptions.tournamentsPaused ?? process.env.ARENA_TOURNAMENTS_PAUSED === '1';
+    this.degraded = typeof capabilityOptions.degraded === 'function' ? capabilityOptions.degraded : () => capabilityOptions.degraded ?? false;
+    this.enforceCapabilities = Object.keys(capabilityOptions).length > 0;
     this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
     void this.managedIdentity?.resumeUsdcTransfers().catch(() => undefined);
@@ -46,6 +59,7 @@ export class ArenaHttpApi {
   async handle(request: ApiRequest): Promise<ApiResponse> {
     try {
       if (request.method === 'POST' && request.path === '/api/auth/challenge') return this.challenge(request.body);
+      if (request.method === 'GET' && request.path === '/api/capabilities') return this.json(200, this.capabilities());
       if (request.method === 'GET' && request.path === '/api/auth/capabilities') return this.json(200, { wallet: true, email: Boolean(this.managedIdentity), managedWallet: Boolean(this.managedIdentity) });
       if (request.method === 'POST' && request.path === '/api/auth/verify') return await this.verify(request.body);
       if (request.method === 'POST' && request.path === '/api/auth/email/challenge') {
@@ -111,7 +125,7 @@ export class ArenaHttpApi {
         if (!this.tournamentOperations) throw new Error('tournament operations unavailable');
         if (request.method === 'GET') return this.json(200, await this.tournamentOperations.list());
         if (request.method === 'POST') {
-          if (process.env.ARENA_TOURNAMENTS_PAUSED === '1') throw new Error('Tournament creation is paused');
+          if (!this.capabilities().tournament.operationEnabled) throw new Error('Tournament creation is paused');
           const body = request.body || {};
           requireExactKeys(body, ['tournamentId', 'name', 'registrationOpensAt', 'registrationClosesAt', 'startsAt', 'expiresAt', 'minEntrants', 'maxEntrants', 'stakeAmount']);
           const input = {
@@ -391,14 +405,14 @@ export class ArenaHttpApi {
       }
       const registrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/registrations$/);
       if (request.method === 'POST' && registrationMatch) {
-        if (process.env.ARENA_TOURNAMENTS_PAUSED === '1') throw new Error('Tournament registration is paused');
+        if (this.tournamentsPaused || (this.enforceCapabilities && !this.capabilities().tournament.registrationEnabled)) throw new Error('Tournament registration is paused');
         const owner = this.requireSession(request.headers);
         const agentId = requireString(request.body?.agentId);
         return this.json(200, this.service.prepareRegistration(owner, registrationMatch[1] as `sha256:${string}`, agentId as `sha256:${string}`));
       }
       const managedRegistrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/managed-registration$/);
       if (request.method === 'POST' && managedRegistrationMatch) {
-        if (process.env.ARENA_TOURNAMENTS_PAUSED === '1') throw new Error('Tournament registration is paused');
+        if (this.tournamentsPaused || (this.enforceCapabilities && !this.capabilities().tournament.registrationEnabled)) throw new Error('Tournament registration is paused');
         const session = this.requireManagedSession(request.headers);
         if (!this.managedIdentity) throw new Error('managed Tournament registration unavailable');
         const agentId = requireString(request.body?.agentId);
@@ -413,17 +427,20 @@ export class ArenaHttpApi {
       return this.json(404, { error: 'not found' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'request failed';
-      const status = message === 'unauthorized' ? 401 : message.endsWith('unavailable') || message === 'managed wallet provisioning failed' ? 503 : 400;
+      const status = message === 'unauthorized' ? 401 : message.endsWith('unavailable') || message.endsWith('capacity reached') || message === 'managed wallet provisioning failed' ? 503 : 400;
       return this.json(status, { error: message });
     }
   }
 
   private challenge(body: Record<string, unknown> | undefined): ApiResponse {
+    this.pruneAuthMaps();
     const address = requireAddress(body?.address);
+    if (!this.challenges.has(address) && this.challenges.size >= MAX_AUTH_ENTRIES) throw new Error('authentication capacity reached');
     const nonce = randomBytes(24).toString('hex');
     const message = `Arena ISS sign-in\nAddress: ${address}\nNonce: ${nonce}`;
-    this.challenges.set(address, { message, expiresAt: Date.now() + CHALLENGE_TTL_MS });
-    return this.json(200, { address, message, expiresAt: Date.now() + CHALLENGE_TTL_MS });
+    const expiresAt = Date.now() + CHALLENGE_TTL_MS;
+    this.challenges.set(address, { message, expiresAt });
+    return this.json(200, { address, message, expiresAt });
   }
 
   private async verify(body: Record<string, unknown> | undefined): Promise<ApiResponse> {
@@ -444,6 +461,8 @@ export class ArenaHttpApi {
   }
 
   private createSession(principal: string, userId?: string, identityKind?: LoginIdentityKind): ApiResponse {
+    this.pruneAuthMaps();
+    if (this.sessions.size >= MAX_AUTH_ENTRIES) throw new Error('authentication capacity reached');
     const token = randomBytes(32).toString('base64url');
     this.sessions.set(token, { principal, userId, identityKind, expiresAt: Date.now() + SESSION_TTL_MS });
     return { status: 204, headers: { 'set-cookie': `arena_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}` } };
@@ -460,6 +479,7 @@ export class ArenaHttpApi {
   }
 
   private requireSessionRecord(headers: Headers | undefined) {
+    this.pruneAuthMaps();
     const token = this.sessionToken(headers);
     if (!token) throw new Error('unauthorized');
     const session = this.sessions.get(token);
@@ -489,6 +509,23 @@ export class ArenaHttpApi {
 
   private json(status: number, body: any): ApiResponse {
     return { status, headers: { 'content-type': 'application/json; charset=utf-8' }, body };
+  }
+
+  private pruneAuthMaps(): void {
+    const now = Date.now();
+    for (const [key, value] of this.challenges) if (value.expiresAt <= now) this.challenges.delete(key);
+    for (const [key, value] of this.sessions) if (value.expiresAt <= now) this.sessions.delete(key);
+  }
+
+  private capabilities(): ArenaCapabilities {
+    const reason = this.degraded() ? 'DEGRADED' as const : this.tournamentsPaused ? 'OPERATOR_PAUSED' as const : !this.tournamentOperations ? 'NOT_CONFIGURED' as const : undefined;
+    const enabled = reason === undefined;
+    return {
+      schema: 'arena-capabilities-v1',
+      tournament: { visible: true, operationEnabled: enabled, registrationEnabled: enabled, ...(reason ? { reason } : {}) },
+      pair: { enabled: Boolean(this.pairRooms) },
+      evaluation: { enabled: Boolean(this.evaluationExecution) },
+    };
   }
 
   private async reconcileMarketplaceListings(): Promise<any[]> {

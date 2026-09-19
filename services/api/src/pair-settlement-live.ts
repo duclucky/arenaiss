@@ -15,11 +15,18 @@ import { ArcPairChainPort } from './pair-arc.ts';
 import type { PairRoom } from './pair-rooms.ts';
 import { PairSettlementWorker, type PairOutcome, type PairOutcomePort, type PairSettlementArcPort } from './pair-settlement.ts';
 import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
+import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator } from '../../../packages/operations/src/concurrency.ts';
 
 const ARC_ABI = parseAbi(['function settle(bytes32,address,bytes32)', 'function expireRoom(bytes32)']);
 const TOPIC = 'A payment API times out after a charge request. Explain the safe retry plan, the evidence needed to determine whether payment occurred, and how to avoid a duplicate charge.';
 function digest(value: string): `sha256:${string}` { return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`; }
 function bytes32(value: string): Hex { if (!/^sha256:[0-9a-f]{64}$/.test(value)) throw new Error('invalid pair digest'); return `0x${value.slice(7)}`; }
+
+type PairArcPublicClient = {
+  simulateContract(input: any): Promise<{ request: any }>;
+  waitForTransactionReceipt(input: any): Promise<{ status: string }>;
+};
+type PairArcWalletClient = { writeContract(input: any): Promise<Hex> };
 
 export class LivePairOutcome implements PairOutcomePort {
   private readonly inference: TournamentEvaluationPairRunner;
@@ -64,10 +71,17 @@ export class LivePairOutcome implements PairOutcomePort {
     try { pair = await (legacy && this.legacyInference ? this.legacyInference : this.inference).run(context); }
     catch { return { state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' }; }
     if (pair.state !== 'OUTPUTS_READY' || !pair.outputA || !pair.outputB || !pair.outputADigest || !pair.outputBDigest) return { state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' };
+    const judgeInput = { ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest, failureCode: pair.failureCode! };
     try {
-      const judgment = await this.judge.judge({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest, failureCode: pair.failureCode! });
+      await this.judge.submit(judgeInput);
+    } catch (error) {
+      return { state: 'RETRY_LATER', failureCode: isGenLayerBusy(error) ? 'GENLAYER_BUSY' : 'GENLAYER_ERROR' };
+    }
+    const transactionHash = this.tracker.transactionHash(context.matchId, context.attemptId);
+    try {
+      const judgment = await this.judge.poll(judgeInput);
       if (judgment.state === 'FAILED') return { state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR' };
-      if (judgment.state !== 'FINALIZED') return { state: 'WAITING', failureCode: 'VERDICT_PENDING' };
+      if (judgment.state !== 'FINALIZED') return { state: 'WAITING', failureCode: 'VERDICT_PENDING', ...(transactionHash ? { transactionHash } : {}) };
       const canonical = await this.tracker.poll(context.matchId, context.attemptId);
       if (canonical.state !== 'FINALIZED' || !canonical.run || canonical.run.judge.finality !== 'FINALIZED' || canonical.run.judge.execution !== 'SUCCESS'
         || canonical.run.source.matchId !== context.matchId || canonical.run.source.attemptId !== context.attemptId
@@ -75,7 +89,7 @@ export class LivePairOutcome implements PairOutcomePort {
         || canonical.run.result !== judgment.result || !['A_WIN', 'B_WIN', 'TIE'].includes(canonical.run.result)) return { state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR' };
       return { state: 'FINAL', result: canonical.run.result as 'A_WIN' | 'B_WIN' | 'TIE', transactionHash: canonical.run.judge.transactionHash };
     } catch (error) {
-      return { state: 'RETRY_LATER', failureCode: isGenLayerBusy(error) ? 'GENLAYER_BUSY' : 'GENLAYER_ERROR' };
+      return { state: 'RETRY_LATER', failureCode: isGenLayerBusy(error) ? 'GENLAYER_BUSY' : 'GENLAYER_ERROR', ...(transactionHash ? { transactionHash } : {}) };
     }
   }
 }
@@ -91,15 +105,18 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
   private readonly wallet;
   private readonly account;
   private readonly escrow: Address;
+  private readonly transactions: TransactionSubmissionCoordinator;
 
-  constructor(chain: ArcPairChainPort, privateKey: string, expectedOperator: string, rpcUrl?: string) {
+  constructor(chain: ArcPairChainPort, privateKey: string, expectedOperator: string, rpcUrl?: string,
+    clients?: { publicClient: PairArcPublicClient; walletClient: PairArcWalletClient }, transactions: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new Error('pair operator key is invalid');
     this.account = privateKeyToAccount(privateKey as Hex);
     if (this.account.address.toLowerCase() !== expectedOperator.toLowerCase()) throw new Error('pair operator signer mismatch');
     this.chain = chain;
     this.escrow = chain.escrowAddress as Address;
-    this.client = createPublicClient({ chain: arcTestnet, transport: arcReadTransport(rpcUrl) });
-    this.wallet = createWalletClient({ chain: arcTestnet, account: this.account, transport: arcWriteTransport(rpcUrl) });
+    this.client = clients?.publicClient ?? createPublicClient({ chain: arcTestnet, transport: arcReadTransport(rpcUrl) });
+    this.wallet = clients?.walletClient ?? createWalletClient({ chain: arcTestnet, account: this.account, transport: arcWriteTransport(rpcUrl) });
+    this.transactions = transactions;
   }
 
   async getRoom(roomId: string) { await this.chain.assertReady(); return this.chain.getRoom(roomId); }
@@ -109,11 +126,12 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
   private async write(functionName: 'settle' | 'expireRoom', args: readonly unknown[]): Promise<string> {
     await this.chain.assertReady();
     const simulated = await this.client.simulateContract({ account: this.account, address: this.escrow, abi: ARC_ABI, functionName, args: args as any });
-    const hash = await this.wallet.writeContract(simulated.request);
+    const hash = await this.transactions.submit({ network: 'ARC', chainId: 5_042_002, signerAddress: this.account.address }, () => this.wallet.writeContract(simulated.request));
     const receipt = await this.client.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 120_000 });
     if (receipt.status !== 'success') throw new Error(`pair Arc ${functionName} transaction reverted`);
     return hash;
   }
+
 }
 
 export function pairSettlementFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, agents: ArenaApiService, chain: ArcPairChainPort, operator: string): PairSettlementWorker | undefined {
