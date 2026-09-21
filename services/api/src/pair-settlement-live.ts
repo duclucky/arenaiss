@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createPublicClient, createWalletClient, parseAbi, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arcTestnet } from 'viem/chains';
@@ -11,8 +11,9 @@ import { createStudioNextComparisonJudgePort } from '../../../packages/genlayer/
 import type { InferenceInput } from '../../../packages/orchestrator/src/orchestrator.ts';
 import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import type { ArenaApiService } from './service.ts';
+import type { ManagedIdentityService } from './managed-identity.ts';
 import { ArcPairChainPort } from './pair-arc.ts';
-import type { PairRoom } from './pair-rooms.ts';
+import type { PairEvaluationFailureCode, PairRoom } from './pair-rooms.ts';
 import { PairSettlementWorker, type PairOutcome, type PairOutcomePort, type PairSettlementArcPort } from './pair-settlement.ts';
 import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
 import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator } from '../../../packages/operations/src/concurrency.ts';
@@ -110,9 +111,10 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
   private readonly account;
   private readonly escrow: Address;
   private readonly transactions: TransactionSubmissionCoordinator;
+  private readonly refunds?: PairAutomaticRefundPort;
 
   constructor(chain: ArcPairChainPort, privateKey: string, expectedOperator: string, rpcUrl?: string,
-    clients?: { publicClient: PairArcPublicClient; walletClient: PairArcWalletClient }, transactions: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator) {
+    refunds?: PairAutomaticRefundPort, clients?: { publicClient: PairArcPublicClient; walletClient: PairArcWalletClient }, transactions: TransactionSubmissionCoordinator = sharedTransactionSubmissionCoordinator) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) throw new Error('pair operator key is invalid');
     this.account = privateKeyToAccount(privateKey as Hex);
     if (this.account.address.toLowerCase() !== expectedOperator.toLowerCase()) throw new Error('pair operator signer mismatch');
@@ -121,11 +123,16 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
     this.client = clients?.publicClient ?? createPublicClient({ chain: arcTestnet, transport: arcReadTransport(rpcUrl) });
     this.wallet = clients?.walletClient ?? createWalletClient({ chain: arcTestnet, account: this.account, transport: arcWriteTransport(rpcUrl) });
     this.transactions = transactions;
+    this.refunds = refunds;
   }
 
   async getRoom(roomId: string) { await this.chain.assertReady(); return this.chain.getRoom(roomId); }
   settle(roomId: string, winner: string, verdictDigest: string) { return this.write('settle', [bytes32(roomId), winner as Address, bytes32(verdictDigest)]); }
   expire(roomId: string) { return this.write('expireRoom', [bytes32(roomId)]); }
+  refund(room: PairRoom, failureCode?: PairEvaluationFailureCode) {
+    if (!this.refunds) throw new Error('automatic pair refunds are unavailable');
+    return this.refunds.refund(room, failureCode);
+  }
 
   private async write(functionName: 'settle' | 'expireRoom', args: readonly unknown[]): Promise<string> {
     await this.chain.assertReady();
@@ -138,12 +145,60 @@ export class LivePairSettlementArc implements PairSettlementArcPort {
 
 }
 
-export function pairSettlementFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, agents: ArenaApiService, chain: ArcPairChainPort, operator: string): PairSettlementWorker | undefined {
+type PairAutomaticRefundPort = { refund(room: PairRoom, failureCode?: PairEvaluationFailureCode): Promise<string> };
+type PairRefundIdentityPort = {
+  pairActionForPrincipal(principal: string, input: { escrowAddress: string; roomId: string; kind: 'REQUEST_CANCEL' | 'WITHDRAW'; executionKey: string }): Promise<{ txHash?: string }>;
+};
+
+export class LivePairAutomaticRefund implements PairAutomaticRefundPort {
+  private readonly runtime: SqliteRuntimeStore;
+  private readonly identities: PairRefundIdentityPort;
+  private readonly escrowAddress: string;
+
+  constructor(runtime: SqliteRuntimeStore, identities: PairRefundIdentityPort, escrowAddress: string) {
+    this.runtime = runtime;
+    this.identities = identities;
+    this.escrowAddress = escrowAddress;
+  }
+
+  async refund(room: PairRoom, failureCode?: PairEvaluationFailureCode): Promise<string> {
+    if (!room.challenger) throw new Error('joined pair room has no challenger identity');
+    this.runtime.putIfAbsent('pair-room-automatic-refunds', room.roomId, { failureCode, createdAt: Date.now() });
+    const creator = await this.identities.pairActionForPrincipal(room.creator, this.action(room, room.creator, 'REQUEST_CANCEL'));
+    const challenger = await this.identities.pairActionForPrincipal(room.challenger, this.action(room, room.challenger, 'REQUEST_CANCEL'));
+    const refundTx = challenger.txHash ?? creator.txHash;
+    if (!refundTx || !/^0x[0-9a-fA-F]{64}$/.test(refundTx)) throw new Error('automatic pair refund transaction is unavailable');
+    const deliveries = await Promise.allSettled([
+      this.deliver(room, room.creator),
+      this.deliver(room, room.challenger),
+    ]);
+    this.runtime.put('pair-room-automatic-refund-deliveries', room.roomId, deliveries.map((result) => result.status === 'fulfilled'
+      ? { status: 'DELIVERED', txHash: result.value }
+      : { status: 'CLAIM_REQUIRED' }));
+    return refundTx;
+  }
+
+  private async deliver(room: PairRoom, principal: string): Promise<string> {
+    const result = await this.identities.pairActionForPrincipal(principal, this.action(room, principal, 'WITHDRAW'));
+    if (!result.txHash || !/^0x[0-9a-fA-F]{64}$/.test(result.txHash)) throw new Error('automatic pair refund delivery transaction is unavailable');
+    return result.txHash;
+  }
+
+  private action(room: PairRoom, principal: string, kind: 'REQUEST_CANCEL' | 'WITHDRAW') {
+    const key = `${room.roomId}:${kind}:${principal}`;
+    this.runtime.putIfAbsent('pair-room-automatic-refund-keys', key, { executionKey: randomUUID() });
+    const stored = this.runtime.get<{ executionKey: string }>('pair-room-automatic-refund-keys', key)!;
+    return { escrowAddress: this.escrowAddress, roomId: room.roomId, kind, executionKey: stored.executionKey };
+  }
+}
+
+export function pairSettlementFromEnvironment(environment: NodeJS.ProcessEnv, runtime: SqliteRuntimeStore, agents: ArenaApiService, identities: ManagedIdentityService, chain: ArcPairChainPort, operator: string): PairSettlementWorker | undefined {
   const privateKey = environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim();
   const judgeAddress = environment.GENLAYER_COMPARISON_JUDGE_ADDRESS?.trim();
   const routing = providerConfigurationFromEnvironment(environment);
   if (!privateKey || !judgeAddress || !routing) return undefined;
-  const arc = new LivePairSettlementArc(chain, privateKey, operator, environment.ARC_TESTNET_RPC_URL?.trim());
+  const refunds = new LivePairAutomaticRefund(runtime, identities, chain.escrowAddress);
+  const arc = new LivePairSettlementArc(chain, privateKey, operator, environment.ARC_TESTNET_RPC_URL?.trim(), refunds);
   const outcome = new LivePairOutcome(runtime, agents, { privateKey, judgeAddress, ...routing.provider, model: routing.model });
   return new PairSettlementWorker(runtime, arc, outcome);
 }

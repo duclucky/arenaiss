@@ -42,6 +42,16 @@ export function purgeArchivedTournamentLogs(runtime: SqliteRuntimeStore): Runtim
 }
 
 type RequestLog = { event: 'http_request'; method: string; path: string; status: number; durationMs: number };
+type PairWorker = { tick(): Promise<void> };
+type PairWorkerHealth = { success(): void; failure(): void };
+
+export function createPairWorkerTick(worker: PairWorker, health: PairWorkerHealth): () => Promise<void> {
+  return async () => {
+    try { await worker.tick(); health.success(); }
+    catch (error) { health.failure(); throw error; }
+  };
+}
+
 type ServerOptions = {
   now?: () => number;
   logger?: (entry: RequestLog) => void;
@@ -67,7 +77,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const pairAddress = process.env.ARC_PAIR_ESCROW_ADDRESS?.trim();
   const pairsEnabled = process.env.ARENA_PAIR_ROOMS_ENABLED === '1';
   const pairChain = pairsEnabled && pairAddress ? new ArcPairChainPort({ escrowAddress: pairAddress, expectedOperator: operator, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() }) : undefined;
-  const pairWorker = pairsEnabled && runtime && pairChain && managedIdentityService ? pairSettlementFromEnvironment(process.env, runtime, service, pairChain, operator) : undefined;
+  const pairWorker = pairsEnabled && runtime && pairChain && managedIdentityService ? pairSettlementFromEnvironment(process.env, runtime, service, managedIdentityService, pairChain, operator) : undefined;
   const pairIntervalMs = 10_000;
   if (pairWorker) health.register('pair-worker', pairIntervalMs);
   const pairRooms = pairWorker && pairAddress && runtime && managedIdentityService && pairChain ? new PairRoomCoordinator(runtime, service, {
@@ -76,13 +86,11 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
     join: (userId, input) => managedIdentityService.pairJoin(userId, input),
     action: (userId, input) => managedIdentityService.pairAction(userId, input),
   }, pairChain) : undefined;
-  let pairWorkerBusy = false;
   let pairWorkerTimer: ReturnType<typeof setInterval> | undefined;
-  const pairTick = async () => {
-    if (!pairWorker || pairWorkerBusy) return;
-    pairWorkerBusy = true;
-    try { await pairWorker.tick(); health.success('pair-worker'); } catch (error) { health.failure('pair-worker'); throw error; } finally { pairWorkerBusy = false; }
-  };
+  const pairTick = pairWorker ? createPairWorkerTick(pairWorker, {
+    success: () => health.success('pair-worker'),
+    failure: () => health.failure('pair-worker'),
+  }) : undefined;
   const tournamentOperations = options.tournamentOperations ?? (runtime ? tournamentOperationsFromEnvironment(process.env, runtime, service, operator) : undefined);
   const dailyStake = process.env.ARENA_DAILY_TOURNAMENT_STAKE_UNITS?.trim();
   if (dailyStake && (!runtime || !tournamentOperations)) throw new Error('daily Tournament requires persistent runtime and Tournament operations');
@@ -148,7 +156,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
       logger({ event: 'http_request', method, path, status, durationMs: Math.max(0, now() - startedAt) });
     }
   });
-  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); if (pairWorker) { void pairTick().catch(() => undefined); pairWorkerTimer = setInterval(() => void pairTick().catch(() => undefined), pairIntervalMs); } });
+  server.once('listening', () => { evaluationWorker?.start(); dailyWorker?.start(); if (pairTick) { void pairTick().catch(() => undefined); pairWorkerTimer = setInterval(() => void pairTick().catch(() => undefined), pairIntervalMs); } });
   server.once('close', () => { evaluationWorker?.stop(); dailyWorker?.stop(); if (pairWorkerTimer) clearInterval(pairWorkerTimer); });
   return server;
 }

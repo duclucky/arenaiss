@@ -8,7 +8,7 @@ type Room = {
   creatorAgentId: string; challengerAgentId?: string; challengerVersion?: string; stake: string;
   joinDeadline: number; resolutionDeadline: number; state: 'OPEN' | 'JOINING' | 'JOINED' | 'REFUNDABLE' | 'SETTLED';
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
-  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'REFUNDING' | 'COMPLETE';
   evaluationFailureCode?: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'GENLAYER_NO_CONSENSUS' | 'VERDICT_PENDING' | 'ARC_ERROR';
   evaluationAttempts?: number; retryAt?: number;
   providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
@@ -25,7 +25,7 @@ type VerdictDetail = {
 function failureExplanation(code?: Room['evaluationFailureCode']): string {
   if (code === 'PROVIDER_ERROR') return 'The Agent response provider did not produce both valid outputs.';
   if (code === 'GENLAYER_BUSY') return 'GenLayer has no free execution slot for this comparison.';
-  if (code === 'GENLAYER_NO_CONSENSUS') return 'GenLayer finalized the comparison without validator consensus. No winner was selected; both deposits remain in escrow until a valid verdict or refund.';
+  if (code === 'GENLAYER_NO_CONSENSUS') return 'GenLayer finalized the comparison without validator consensus. No winner was selected, so Arena opened an automatic refund for both deposits.';
   if (code === 'GENLAYER_ERROR') return 'GenLayer did not accept or finalize a valid comparison.';
   if (code === 'VERDICT_PENDING') return 'The comparison was submitted and its finalized GenLayer verdict is still pending.';
   if (code === 'ARC_ERROR') return 'Arc escrow state could not be read or updated safely.';
@@ -42,16 +42,19 @@ function parseStake(value: string): string {
 
 function units(value: string): string { const number = BigInt(value); return `${number / 1_000_000n}.${(number % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '') || '0'}`; }
 function progress(room: Room): string {
-  if (room.state !== 'JOINED') return room.state === 'REFUNDABLE' ? 'Refund credits are available to the depositors.' : room.state === 'SETTLED' ? 'Arc settlement is final. The winner can claim any remaining payout credit.' : '';
+  if (room.state !== 'JOINED') return room.state === 'REFUNDABLE' ? 'The automatic refund is final. Any transfer that could not be delivered remains available to claim.' : room.state === 'SETTLED' ? 'Arc settlement is final. The winner can claim any remaining payout credit.' : '';
   if (room.evaluationStage === 'RUNNING_AGENTS') return 'Match started automatically. Both Agents are producing responses.';
   if (room.evaluationStage === 'NO_CONSENSUS') return failureExplanation('GENLAYER_NO_CONSENSUS');
   if (room.evaluationStage === 'WAITING_VERDICT') return failureExplanation(room.evaluationFailureCode);
+  if (room.evaluationStage === 'REFUNDING') return room.evaluationFailureCode === 'ARC_ERROR'
+    ? 'The automatic refund transaction could not be confirmed. Arena will retry it; once refund credits open, any failed delivery remains available to claim.'
+    : `${failureExplanation(room.evaluationFailureCode)} Arena is returning both deposits now.`;
   if (room.evaluationStage === 'RETRYING') {
     const attempts = room.evaluationAttempts ?? 1;
-    if (attempts >= 3) return `${failureExplanation(room.evaluationFailureCode)} Evaluation paused after ${attempts} failed attempts. No winner was selected. Both players can approve an early refund, or refunds open after ${new Date(room.resolutionDeadline * 1_000).toLocaleString()}.`;
+    if (attempts >= 3) return `${failureExplanation(room.evaluationFailureCode)} Automatic recovery is paused after ${attempts} failed attempts.`;
     return `${failureExplanation(room.evaluationFailureCode)} Automatic retry ${attempts} is scheduled${room.retryAt ? ` for ${new Date(room.retryAt * 1_000).toLocaleString()}` : ''}.`;
   }
-  if (room.evaluationStage === 'TIE_WAITING_REFUND') return 'GenLayer returned a tie. Both stakes become refundable at the resolution deadline.';
+  if (room.evaluationStage === 'TIE_WAITING_REFUND') return 'GenLayer returned a tie. Arena is opening an automatic refund for both stakes.';
   if (room.evaluationStage === 'SETTLING') return 'The verdict is final. Arc payout settlement is being confirmed.';
   return 'Both deposits are held. The match is queued to start automatically.';
 }

@@ -162,7 +162,7 @@ it('labels a settled loss from the signed-in participant perspective', async () 
   expect(screen.queryByText('YOU WON')).not.toBeInTheDocument();
 });
 
-it('explains when the bounded evaluation retries are exhausted', async () => {
+it('explains when automatic recovery retries are exhausted', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };
     return [{ roomId: `sha256:${'8'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
@@ -170,7 +170,7 @@ it('explains when the bounded evaluation retries are exhausted', async () => {
       resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'RETRYING', evaluationAttempts: 3, retryAt: 1_999_999_000 }];
   } })));
   render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
-  expect(await screen.findByText(/Evaluation paused after 3 failed attempts/)).toHaveTextContent(/Both players can approve an early refund/);
+  expect(await screen.findByText(/Automatic recovery is paused after 3 failed attempts/)).toBeInTheDocument();
 });
 
 it('shows when a joined room is using the fallback provider model', async () => {
@@ -190,7 +190,7 @@ it('shows the safe evaluation failure code and its specific explanation', async 
     if (url.endsWith('/config')) return { enabled: true };
     return [{ roomId: `sha256:${'6'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
       creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '10000', joinDeadline: 1_999_999_999,
-      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'RETRYING',
+      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'REFUNDING',
       evaluationFailureCode: 'GENLAYER_BUSY', evaluationAttempts: 1, retryAt: 1_999_999_000 }];
   } })));
   render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
@@ -201,14 +201,15 @@ it('shows the safe evaluation failure code and its specific explanation', async 
 it('labels a finalized GenLayer disagreement as no consensus rather than an execution error', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };
+    if (url.endsWith('/credit')) return { amount: '0' };
     return [{ roomId: `sha256:${'6'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
       creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '10000', joinDeadline: 1_999_999_999,
-      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'NO_CONSENSUS',
+      resolutionDeadline: 2_000_000_000, state: 'REFUNDABLE', evaluationStage: 'COMPLETE',
       evaluationFailureCode: 'GENLAYER_NO_CONSENSUS', evaluationAttempts: 1 }];
   } })));
-  render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
   expect(await screen.findByText('GENLAYER_NO_CONSENSUS')).toBeInTheDocument();
-  expect(screen.getByText(/finalized the comparison without validator consensus/i)).toHaveTextContent(/No winner was selected/);
+  expect(screen.getByText(/automatic refund is final/i)).toBeInTheDocument();
   expect(screen.queryByText(/GenLayer did not accept or finalize a valid comparison/i)).not.toBeInTheDocument();
 });
 

@@ -400,6 +400,12 @@ export class ManagedIdentityService {
     return this.circleWallets.pairAction({ walletId: wallet.walletId, ...input });
   }
 
+  async pairActionForPrincipal(principal: string, input: { escrowAddress: string; roomId: string; kind: 'REQUEST_CANCEL' | 'WITHDRAW'; executionKey: string }): Promise<WalletTransactionResult> {
+    const identity = this.runtime.list<IdentityRecord>('auth-identities').find((record) => record.principal === principal);
+    if (!identity) throw new Error('pair participant identity is unavailable');
+    return this.pairAction(identity.userId, input);
+  }
+
   private async login(identityKey: string, kind: LoginIdentityKind, principal: string): Promise<ManagedAccount> {
     let identity = this.runtime.get<IdentityRecord>('auth-identities', identityKey);
     if (!identity) {

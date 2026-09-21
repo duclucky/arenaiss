@@ -3,8 +3,27 @@ import test from 'node:test';
 import { once } from 'node:events';
 import { privateKeyToAccount } from 'viem/accounts';
 
-import { createArenaServer, managedIdentityFromEnvironment, purgeArchivedTournamentLogs } from '../src/server.ts';
+import { createArenaServer, createPairWorkerTick, managedIdentityFromEnvironment, purgeArchivedTournamentLogs } from '../src/server.ts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
+
+test('Pair worker ticks overlap so a slow room batch cannot block the next scan', async () => {
+  let calls = 0;
+  let releaseFirst!: () => void;
+  const firstBlocked = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  const worker = {
+    async tick() {
+      calls += 1;
+      if (calls === 1) await firstBlocked;
+    },
+  };
+  const pairTick = createPairWorkerTick(worker, { success() {}, failure() {} });
+  const first = pairTick();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const second = pairTick();
+  await second;
+  try { assert.equal(calls, 2); }
+  finally { releaseFirst(); await first; }
+});
 
 test('startup purge removes only the two archived Tournament graphs and is idempotent', () => {
   const database = new SqliteRuntimeStore(':memory:');

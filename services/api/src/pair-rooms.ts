@@ -15,7 +15,7 @@ export type PairRoom = {
   challenger?: string; challengerWallet?: string; challengerAgentId?: string; challengerVersion?: string;
   stake: string; joinDeadline: number; resolutionDeadline: number; state: PairRoomState;
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
-  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'REFUNDING' | 'COMPLETE';
   evaluationFailureCode?: PairEvaluationFailureCode; evaluationAttempts?: number; retryAt?: number;
   providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
   createdAt: number;

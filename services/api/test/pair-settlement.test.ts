@@ -4,7 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import type { ArcPairChainPort } from '../src/pair-arc.ts';
-import { LivePairSettlementArc } from '../src/pair-settlement-live.ts';
+import { LivePairAutomaticRefund, LivePairSettlementArc } from '../src/pair-settlement-live.ts';
 import { PairSettlementWorker, type PairOutcomePort, type PairSettlementArcPort } from '../src/pair-settlement.ts';
 import type { PairRoom, ChainRoom } from '../src/pair-rooms.ts';
 
@@ -30,6 +30,7 @@ function fixture() {
   let now = 200;
   let settlements = 0;
   let expirations = 0;
+  let refunds = 0;
   let resolves = 0;
   let arcFailure: Error | undefined;
   const arc: PairSettlementArcPort = {
@@ -40,10 +41,11 @@ function fixture() {
       return `0x${'3'.repeat(64)}`;
     },
     async expire() { expirations++; arcRoom = { ...arcRoom, state: 4 }; return `0x${'4'.repeat(64)}`; },
+    async refund() { refunds++; arcRoom = { ...arcRoom, state: 4 }; return `0x${'6'.repeat(64)}`; },
   };
   const judge: PairOutcomePort = { async resolve() { resolves++; return outcome; } };
   const worker = new PairSettlementWorker(runtime, arc, judge, () => now);
-  return { runtime, worker, get settlements() { return settlements; }, get expirations() { return expirations; }, get resolves() { return resolves; },
+  return { runtime, worker, get settlements() { return settlements; }, get expirations() { return expirations; }, get refunds() { return refunds; }, get resolves() { return resolves; },
     setOutcome(value: typeof outcome) { outcome = value; }, setArc(value: ChainRoom) { arcRoom = value; }, setArcFailure(value?: Error) { arcFailure = value; }, setNow(value: number) { now = value; } };
 }
 
@@ -65,7 +67,21 @@ test('settles only a canonical finalized comparison, persists its intent, and re
   } finally { f.runtime.close(); }
 });
 
-test('provider failures have a bounded retry budget while timeout refunds remain available', async () => {
+test('provider failure immediately refunds both participants through Arc', async () => {
+  const f = fixture();
+  try {
+    f.setOutcome({ state: 'RETRY_LATER', failureCode: 'PROVIDER_ERROR' });
+    await f.worker.tick();
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(f.refunds, 1);
+    assert.equal(stored?.state, 'REFUNDABLE');
+    assert.equal(stored?.refundTx, `0x${'6'.repeat(64)}`);
+    assert.equal(stored?.evaluationStage, 'COMPLETE');
+    assert.equal(stored?.evaluationFailureCode, 'PROVIDER_ERROR');
+  } finally { f.runtime.close(); }
+});
+
+test('provider failure refunds on the first failure without another evaluation attempt', async () => {
   const f = fixture();
   try {
     f.runtime.put('pair-rooms-v1', room.roomId, { ...room, resolutionDeadline: 5000 });
@@ -74,38 +90,28 @@ test('provider failures have a bounded retry budget while timeout refunds remain
     await f.worker.tick();
     await f.worker.tick();
     assert.equal(f.resolves, 1);
-    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationStage, 'RETRYING');
-    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationAttempts, 1);
+    assert.equal(f.refunds, 1);
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationStage, 'COMPLETE');
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'REFUNDABLE');
     f.setNow(800);
     await f.worker.tick();
-    f.setNow(2000);
-    await f.worker.tick();
-    assert.equal(f.resolves, 3);
-    f.setNow(3000);
-    await f.worker.tick();
-    assert.equal(f.resolves, 3);
-    f.setNow(5000);
-    await f.worker.tick();
-    assert.equal(f.expirations, 1);
-    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'REFUNDABLE');
+    assert.equal(f.resolves, 1);
+    assert.equal(f.expirations, 0);
   } finally { f.runtime.close(); }
 });
 
-test('known GenLayer transaction keeps polling finality beyond three transient failures', async () => {
+test('known failed GenLayer transaction refunds immediately and preserves its hash', async () => {
   const f = fixture();
   try {
     f.runtime.put('pair-rooms-v1', room.roomId, { ...room, resolutionDeadline: 20_000 });
     f.setArc({ ...chainRoom, resolutionDeadline: 20_000 });
     f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR', transactionHash: `0x${'5'.repeat(64)}` } as any);
-    for (const timestamp of [200, 800, 2_000, 3_800, 6_200]) {
-      f.setNow(timestamp);
-      await f.worker.tick();
-    }
-    assert.equal(f.resolves, 5);
-    const progress = f.runtime.get<any>('pair-room-evaluation-progress-v2', room.roomId);
-    assert.equal(progress.phase, 'GENLAYER_FINALITY');
-    assert.equal(progress.finalityPollFailures, 5);
-    assert.equal(progress.submissionFailures, 0);
+    await f.worker.tick();
+    assert.equal(f.resolves, 1);
+    assert.equal(f.refunds, 1);
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(stored?.state, 'REFUNDABLE');
+    assert.equal(stored?.verdictTx, `0x${'5'.repeat(64)}`);
   } finally { f.runtime.close(); }
 });
 
@@ -115,8 +121,9 @@ test('persists a safe evaluation failure code for participant diagnostics', asyn
     f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_BUSY' });
     await f.worker.tick();
     const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
-    assert.equal(stored?.evaluationStage, 'RETRYING');
+    assert.equal(stored?.evaluationStage, 'COMPLETE');
     assert.equal((stored as PairRoom & { evaluationFailureCode?: string })?.evaluationFailureCode, 'GENLAYER_BUSY');
+    assert.equal(stored?.state, 'REFUNDABLE');
   } finally { f.runtime.close(); }
 });
 
@@ -126,9 +133,10 @@ test('exposes finalized validator disagreement as no consensus instead of a GenL
     f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_NO_CONSENSUS', transactionHash: `0x${'5'.repeat(64)}` });
     await f.worker.tick();
     const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
-    assert.equal(stored?.evaluationStage, 'NO_CONSENSUS');
+    assert.equal(stored?.evaluationStage, 'COMPLETE');
     assert.equal(stored?.evaluationFailureCode, 'GENLAYER_NO_CONSENSUS');
-    assert.equal(stored?.state, 'JOINED');
+    assert.equal(stored?.state, 'REFUNDABLE');
+    assert.equal(f.refunds, 1);
     assert.equal(f.settlements, 0);
   } finally { f.runtime.close(); }
 });
@@ -179,15 +187,14 @@ test('rejects a changed Arc participant binding before paying provider or settli
   } finally { f.runtime.close(); }
 });
 
-test('a tie cannot choose a winner and deadline expiry opens both refunds', async () => {
+test('a tie immediately opens both refunds without choosing a winner', async () => {
   const f = fixture();
   try {
     f.setOutcome({ state: 'FINAL', result: 'TIE', transactionHash: `0x${'5'.repeat(64)}` });
     await f.worker.tick();
     assert.equal(f.settlements, 0);
-    f.setNow(1000);
-    await f.worker.tick();
-    assert.equal(f.expirations, 1);
+    assert.equal(f.refunds, 1);
+    assert.equal(f.expirations, 0);
     assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'REFUNDABLE');
   } finally { f.runtime.close(); }
 });
@@ -230,6 +237,7 @@ test('independent Pair Match rooms progress concurrently', async () => {
     async getRoom() { return structuredClone(chainRoom); },
     async settle() { throw new Error('settlement must not run'); },
     async expire() { throw new Error('expiry must not run'); },
+    async refund() { throw new Error('refund must not run'); },
   };
   const outcome: PairOutcomePort = {
     async resolve() {
@@ -251,6 +259,36 @@ test('independent Pair Match rooms progress concurrently', async () => {
     release();
     runtime.close();
   }
+});
+
+test('automatic refund opens both credits and leaves a failed delivery claimable', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  const calls: Array<{ principal: string; kind: string; executionKey: string }> = [];
+  let transaction = 0;
+  const identities = {
+    async pairActionForPrincipal(principal: string, input: { escrowAddress: string; roomId: string; kind: 'REQUEST_CANCEL' | 'WITHDRAW'; executionKey: string }) {
+      calls.push({ principal, kind: input.kind, executionKey: input.executionKey });
+      if (principal === room.challenger && input.kind === 'WITHDRAW') throw new Error('delivery unavailable');
+      transaction += 1;
+      return { txHash: `0x${transaction.toString(16).padStart(64, '0')}` };
+    },
+  };
+  try {
+    const refunds = new LivePairAutomaticRefund(runtime, identities, address('9'));
+    const refundTx = await refunds.refund(room, 'GENLAYER_BUSY');
+    assert.equal(refundTx, `0x${'2'.padStart(64, '0')}`);
+    assert.deepEqual(calls.map(({ principal, kind }) => ({ principal, kind })), [
+      { principal: room.creator, kind: 'REQUEST_CANCEL' },
+      { principal: room.challenger, kind: 'REQUEST_CANCEL' },
+      { principal: room.creator, kind: 'WITHDRAW' },
+      { principal: room.challenger, kind: 'WITHDRAW' },
+    ]);
+    assert.deepEqual(runtime.get('pair-room-automatic-refund-deliveries', room.roomId), [
+      { status: 'DELIVERED', txHash: `0x${'3'.padStart(64, '0')}` },
+      { status: 'CLAIM_REQUIRED' },
+    ]);
+    assert.equal(new Set(calls.map((call) => call.executionKey)).size, 4);
+  } finally { runtime.close(); }
 });
 
 test('Pair Arc serializes transaction sends but waits for receipts concurrently', async () => {
@@ -277,7 +315,7 @@ test('Pair Arc serializes transaction sends but waits for receipts concurrently'
       return `0x${String(startedWrites).repeat(64)}` as const;
     },
   };
-  const arc = new LivePairSettlementArc(chain, privateKey, operator, undefined, { publicClient, walletClient });
+  const arc = new LivePairSettlementArc(chain, privateKey, operator, undefined, undefined, { publicClient, walletClient });
   const first = arc.settle(digest('a'), operator, digest('b'));
   const second = arc.settle(digest('c'), operator, digest('d'));
   await new Promise<void>((resolve) => setImmediate(resolve));
