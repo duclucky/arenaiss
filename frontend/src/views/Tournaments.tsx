@@ -4,6 +4,11 @@ import { ArrowUpRight, Bot, Clock3, GitBranch, RefreshCw, Trophy, Users, WalletC
 import { useAppContext } from '../context';
 import type { Tournament } from '../adapters/interfaces';
 
+const ARCHIVED_TOURNAMENT_IDS = new Set([
+  'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
+  'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
+]);
+
 export function Tournaments() {
   const { arenaRead, capabilities } = useAppContext();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -21,10 +26,15 @@ export function Tournaments() {
     return () => { active = false; };
   }, [arenaRead, reload]);
 
-  const ordered = useMemo(() => [...tournaments].sort((a, b) => {
-    const priority = tournamentPriority(a) - tournamentPriority(b);
-    return priority || (b.registrationClosesAt ?? 0) - (a.registrationClosesAt ?? 0);
-  }), [tournaments]);
+  const ordered = useMemo(
+    () => tournaments
+      .filter((tournament) => !ARCHIVED_TOURNAMENT_IDS.has(tournament.id))
+      .sort((a, b) => {
+        const priority = tournamentPriority(a) - tournamentPriority(b);
+        return priority || (b.registrationClosesAt ?? 0) - (a.registrationClosesAt ?? 0);
+      }),
+    [tournaments],
+  );
   const featured = ordered[0];
 
   return <section className="mx-auto max-w-6xl space-y-8">

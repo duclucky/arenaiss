@@ -62,3 +62,60 @@ test("invalid namespaces, keys, lease timing and non-JSON values reject before m
     temp.cleanup();
   }
 });
+
+test("purgeIdentifiers removes a connected runtime graph without touching unrelated records", () => {
+  const temp = fixture();
+  let store: SqliteRuntimeStore | undefined;
+  try {
+    store = new SqliteRuntimeStore(temp.path);
+    const tournamentId = `sha256:${"a".repeat(64)}`;
+    const onchainId = `0x${"a".repeat(64)}`;
+    const matchId = `sha256:${"b".repeat(64)}`;
+    const attemptId = `sha256:${"c".repeat(64)}`;
+    store.put("api-tournaments", tournamentId, { id: tournamentId, name: "test" });
+    store.put("api-registrations", "registration-key", { tournamentId: onchainId });
+    store.put("api-matches", matchId, { id: matchId, tournamentId });
+    store.put("evaluation-comparison-runs", attemptId, { runId: attemptId, source: { matchId } });
+    store.put("unrelated", "keep", { id: `sha256:${"d".repeat(64)}` });
+    store.put("unrelated", "embedded-reference", { note: `Do not purge ${tournamentId} from prose` });
+    store.increment("inference-cost", tournamentId, 4);
+    store.increment("unrelated-cost", "keep", 7);
+    store.claimLease("tournament-operation-leases", tournamentId, tournamentId, "worker", 1, 100);
+    store.claimLease("unrelated-leases", "keep", "keep", "worker", 1, 100);
+
+    const deleted = store.purgeIdentifiers([tournamentId, onchainId]);
+
+    assert.ok(deleted.records >= 4);
+    assert.equal(deleted.counters, 1);
+    assert.equal(deleted.leases, 1);
+    assert.deepEqual(store.list("api-tournaments"), []);
+    assert.deepEqual(store.list("api-registrations"), []);
+    assert.deepEqual(store.list("api-matches"), []);
+    assert.deepEqual(store.list("evaluation-comparison-runs"), []);
+    assert.deepEqual(store.list("unrelated"), [
+      { note: `Do not purge ${tournamentId} from prose` },
+      { id: `sha256:${"d".repeat(64)}` },
+    ]);
+    assert.equal(store.counter("unrelated-cost", "keep"), 7);
+    assert.equal(store.releaseLease("unrelated-leases", "keep", "worker"), true);
+  } finally {
+    store?.close();
+    temp.cleanup();
+  }
+});
+
+test("purgeIdentifiers validates every seed before changing runtime state", () => {
+  const temp = fixture();
+  try {
+    const store = new SqliteRuntimeStore(temp.path);
+    const tournamentId = `sha256:${"a".repeat(64)}`;
+    store.put("api-tournaments", tournamentId, { id: tournamentId });
+
+    assert.throws(() => store.purgeIdentifiers([]), /purge identifiers/i);
+    assert.throws(() => store.purgeIdentifiers([tournamentId, ""]), /purge identifier/i);
+    assert.deepEqual(store.list("api-tournaments"), [{ id: tournamentId }]);
+    store.close();
+  } finally {
+    temp.cleanup();
+  }
+});

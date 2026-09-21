@@ -7,7 +7,7 @@ import { isIP } from 'node:net';
 import { ArenaHttpApi } from './http.ts';
 import { ArenaApiService } from './service.ts';
 import { viemSignatureVerifier } from './viem-verifier.ts';
-import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
+import { SqliteRuntimeStore, type RuntimePurgeResult } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import { circleManagedWalletFromSecrets } from './circle-managed-wallet.ts';
 import { SmtpEmailLoginSender } from './smtp-email.ts';
 import { ManagedIdentityService, type ManagedIdentityOptions } from './managed-identity.ts';
@@ -30,6 +30,16 @@ import { ARC_TESTNET_RPC_URL } from './arc-rpc.ts';
 import { OperationalHealthRegistry } from './operational-health.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
+const ARCHIVED_TOURNAMENT_IDENTIFIERS = [
+  'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
+  '0x4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
+  'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
+  '0x3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
+] as const;
+
+export function purgeArchivedTournamentLogs(runtime: SqliteRuntimeStore): RuntimePurgeResult {
+  return runtime.purgeIdentifiers(ARCHIVED_TOURNAMENT_IDENTIFIERS);
+}
 
 type RequestLog = { event: 'http_request'; method: string; path: string; status: number; durationMs: number };
 type ServerOptions = {
@@ -293,6 +303,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const resolvedDatabasePath = resolve(databasePath);
   mkdirSync(dirname(resolvedDatabasePath), { recursive: true });
   const runtime = new SqliteRuntimeStore(resolvedDatabasePath);
+  const purged = purgeArchivedTournamentLogs(runtime);
+  if (purged.records || purged.counters || purged.leases) {
+    process.stdout.write(`${JSON.stringify({ event: 'archived_tournament_logs_purged', ...purged })}\n`);
+  }
   let tournamentOperations: TournamentOperationsPort | undefined;
   const server = createArenaServer(operator, runtime, { onTournamentOperationsReady: (operations) => { tournamentOperations = operations; } });
   let referenceWorkerTimer: NodeJS.Timeout | undefined;
