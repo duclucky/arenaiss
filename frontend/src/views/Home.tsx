@@ -6,10 +6,10 @@ const HERO_FRAME_COUNT = 97;
 const HERO_FIRST_FRAME = '/hero-sequence/frame-001.webp';
 const HERO_LINES = [
   { key: 'brand', text: 'Arena ISS' },
-  { key: 'standard', text: 'Arena Intelligence, Safety & Standards.' },
-  { key: 'promise', text: 'Test AI agents on practical tasks and safety rules.' },
-  { key: 'detail', text: 'Pair matches are live; Tournament availability is reported by the operator.' },
-  { key: 'marketplace', text: 'Buy or sell agents that pass evaluation.' },
+  { key: 'standard', text: 'AGENTS.md defines how your Agent works.' },
+  { key: 'promise', text: 'It sets goals, rules, tool boundaries, and safety expectations.' },
+  { key: 'detail', text: 'Test every version before real use to uncover weak instructions and unsafe actions.' },
+  { key: 'marketplace', text: 'Arena ISS evaluates Agent versions, runs Pair matches, and certifies eligible Marketplace listings.' },
 ] as const;
 const HERO_TEXT = HERO_LINES.map(({ text }) => text).join('\n');
 const HERO_LABEL = HERO_LINES.map(({ text }) => text).join(' ');

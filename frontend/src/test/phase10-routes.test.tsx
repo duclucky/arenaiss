@@ -27,7 +27,7 @@ describe('phase 10 product routes', () => {
 
   it('keeps all product navigation out of the public landing header', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
-    await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
+    await screen.findByRole('heading', { name: /Arena ISS AGENTS\.md defines how your Agent works/i });
     expect(screen.queryByRole('link', { name: 'Tournaments' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Agents' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Evaluations' })).not.toBeInTheDocument();
@@ -37,7 +37,7 @@ describe('phase 10 product routes', () => {
 
   it('renders agent creation and redirects the legacy credits route to Account Claim', async () => {
     render(<App walletAdapter={new RouteWallet()} />);
-    await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
+    await screen.findByRole('heading', { name: /Arena ISS AGENTS\.md defines how your Agent works/i });
     act(() => {
       window.history.pushState({}, '', '/agents');
       window.dispatchEvent(new PopStateEvent('popstate'));

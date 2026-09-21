@@ -310,7 +310,7 @@ describe('App Tests', () => {
     const spyFetch = vi.spyOn(globalThis, 'fetch');
     const testAdapter = new TestWalletAdapter();
     render(<App walletAdapter={testAdapter} />);
-    await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards/i });
+    await screen.findByRole('heading', { name: /Arena ISS AGENTS\.md defines how your Agent works/i });
     expect(spyFetch).not.toHaveBeenCalled();
   });
 

@@ -58,13 +58,13 @@ describe('Arena ISS visual shell', () => {
     }));
     const { container } = render(<App walletAdapter={new VisualWallet()} />);
 
-    const heading = await screen.findByRole('heading', { name: /Arena ISS Arena Intelligence, Safety & Standards\. Test AI agents on practical tasks and safety rules\. Pair matches are live; Tournament availability is reported by the operator\. Buy or sell agents that pass evaluation\./i });
+    const heading = await screen.findByRole('heading', { name: /Arena ISS AGENTS\.md defines how your Agent works\. It sets goals, rules, tool boundaries, and safety expectations\. Test every version before real use to uncover weak instructions and unsafe actions\. Arena ISS evaluates Agent versions, runs Pair matches, and certifies eligible Marketplace listings\./i });
     expect(heading.querySelectorAll('[data-hero-line]')).toHaveLength(5);
     expect(heading.querySelector('[data-hero-line="brand"]')).toHaveTextContent('Arena ISS');
-    expect(heading.querySelector('[data-hero-line="standard"]')).toHaveTextContent('Arena Intelligence, Safety & Standards.');
-    expect(heading.querySelector('[data-hero-line="promise"]')).toHaveTextContent('Test AI agents on practical tasks and safety rules.');
-    expect(heading.querySelector('[data-hero-line="detail"]')).toHaveTextContent('Pair matches are live; Tournament availability is reported by the operator.');
-    expect(heading.querySelector('[data-hero-line="marketplace"]')).toHaveTextContent('Buy or sell agents that pass evaluation.');
+    expect(heading.querySelector('[data-hero-line="standard"]')).toHaveTextContent('AGENTS.md defines how your Agent works.');
+    expect(heading.querySelector('[data-hero-line="promise"]')).toHaveTextContent('It sets goals, rules, tool boundaries, and safety expectations.');
+    expect(heading.querySelector('[data-hero-line="detail"]')).toHaveTextContent('Test every version before real use to uncover weak instructions and unsafe actions.');
+    expect(heading.querySelector('[data-hero-line="marketplace"]')).toHaveTextContent('Arena ISS evaluates Agent versions, runs Pair matches, and certifies eligible Marketplace listings.');
     expect(screen.queryByRole('link', { name: 'Arena ISS' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
     expect(container.querySelector('.site-header')).not.toBeInTheDocument();
