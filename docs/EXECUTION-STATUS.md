@@ -1,5 +1,19 @@
 # Implementation execution status
 
+## 2026-09-21 no-consensus scenario retry — local only
+
+Tournament and Pair Match orchestration now treat a finalized GenLayer
+`MAJORITY_DISAGREE` as `NO_CONSENSUS`, not as a generic execution error. The
+affected match creates a new whole-pair attempt with a different scenario while
+independent matches continue normally. Pair Match permits the initial attempt
+plus at most three no-consensus retries, persists the winning attempt for exact
+scorecard readback, and opens the existing automatic Arc refund path only after
+all four attempts lack consensus. Provider, GenLayer execution and malformed
+comparison failures retain their immediate recovery/refund behavior; a semantic
+tie remains a finalized consensus outcome and is not retried. No GenLayer or Arc
+contract source was changed and no provider call, transaction, deployment, push
+or publication was performed for this batch.
+
 ## 2026-09-20 runtime concurrency and operations hardening — local only
 
 The ordered hardening batch in

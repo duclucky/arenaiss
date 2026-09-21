@@ -19,7 +19,16 @@ import { arcReadTransport, arcWriteTransport } from './arc-rpc.ts';
 import { sharedTransactionSubmissionCoordinator, type TransactionSubmissionCoordinator } from '../../../packages/operations/src/concurrency.ts';
 
 const ARC_ABI = parseAbi(['function settle(bytes32,address,bytes32)', 'function expireRoom(bytes32)']);
-const TOPIC = 'A payment API times out after a charge request. Explain the safe retry plan, the evidence needed to determine whether payment occurred, and how to avoid a duplicate charge.';
+export const PAIR_COMPARISON_SCENARIOS = [
+  'A payment API times out after a charge request. Explain the safe retry plan, the evidence needed to determine whether payment occurred, and how to avoid a duplicate charge.',
+  'A production API becomes intermittently unavailable after a release. Explain how to diagnose the cause, protect user traffic, and decide whether a rollback is justified.',
+  'A support request asks for access to account data without sufficient identity proof. Explain the safe response, the evidence required, and the permitted recovery path.',
+  'A background worker may have processed the same job twice after losing its acknowledgement. Explain how to reconcile state and prevent duplicate side effects.',
+] as const;
+export function pairScenarioForAttempt(attemptNumber: number): string {
+  if (!Number.isSafeInteger(attemptNumber) || attemptNumber < 1 || attemptNumber > PAIR_COMPARISON_SCENARIOS.length) throw new Error('pair comparison attempt is invalid');
+  return PAIR_COMPARISON_SCENARIOS[attemptNumber - 1];
+}
 function digest(value: string): `sha256:${string}` { return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`; }
 function bytes32(value: string): Hex { if (!/^sha256:[0-9a-f]{64}$/.test(value)) throw new Error('invalid pair digest'); return `0x${value.slice(7)}`; }
 
@@ -56,11 +65,12 @@ export class LivePairOutcome implements PairOutcomePort {
     if (room.state !== 'JOINED' || !room.challenger || !room.challengerAgentId || !room.challengerVersion || !room.joinTx) throw new Error('pair room has no confirmed second deposit');
     const a = this.agents.getAgentVersion(room.creator, room.creatorAgentId as `sha256:${string}`, room.creatorVersion as `sha256:${string}`);
     const b = this.agents.getAgentVersion(room.challenger, room.challengerAgentId as `sha256:${string}`, room.challengerVersion as `sha256:${string}`);
+    const attemptNumber = Math.min((room.evaluationAttempts ?? 0) + 1, PAIR_COMPARISON_SCENARIOS.length);
     const context: InferenceInput = {
       tournamentId: room.roomId as `sha256:${string}`,
       matchId: digest(`arena-pair-match-v1|${room.roomId}`),
-      attemptId: digest(`arena-pair-attempt-v1|${room.roomId}|1`),
-      topic: TOPIC,
+      attemptId: digest(`arena-pair-attempt-v1|${room.roomId}|${attemptNumber}`),
+      topic: pairScenarioForAttempt(attemptNumber),
       agentA: { entrantId: digest(`${room.roomId}|creator`), agentId: a.agentId, agentsVersion: a.agentsVersion, agentsMd: a.agentsMd, agentsCommitment: a.agentsCommitment },
       agentB: { entrantId: digest(`${room.roomId}|challenger`), agentId: b.agentId, agentsVersion: b.agentsVersion, agentsMd: b.agentsMd, agentsCommitment: b.agentsCommitment },
     };
@@ -92,7 +102,7 @@ export class LivePairOutcome implements PairOutcomePort {
         || canonical.run.source.matchId !== context.matchId || canonical.run.source.attemptId !== context.attemptId
         || canonical.run.agents.versionIdA !== a.agentsVersion || canonical.run.agents.versionIdB !== b.agentsVersion
         || canonical.run.result !== judgment.result || !['A_WIN', 'B_WIN', 'TIE'].includes(canonical.run.result)) return { state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR' };
-      return { state: 'FINAL', result: canonical.run.result as 'A_WIN' | 'B_WIN' | 'TIE', transactionHash: canonical.run.judge.transactionHash };
+      return { state: 'FINAL', result: canonical.run.result as 'A_WIN' | 'B_WIN' | 'TIE', transactionHash: canonical.run.judge.transactionHash, attemptNumber };
     } catch (error) {
       return { state: 'RETRY_LATER', failureCode: isGenLayerBusy(error) ? 'GENLAYER_BUSY' : 'GENLAYER_ERROR', ...(transactionHash ? { transactionHash } : {}) };
     }

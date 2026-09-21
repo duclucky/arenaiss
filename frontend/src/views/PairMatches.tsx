@@ -25,7 +25,7 @@ type VerdictDetail = {
 function failureExplanation(code?: Room['evaluationFailureCode']): string {
   if (code === 'PROVIDER_ERROR') return 'The Agent response provider did not produce both valid outputs.';
   if (code === 'GENLAYER_BUSY') return 'GenLayer has no free execution slot for this comparison.';
-  if (code === 'GENLAYER_NO_CONSENSUS') return 'GenLayer finalized the comparison without validator consensus. No winner was selected, so Arena opened an automatic refund for both deposits.';
+  if (code === 'GENLAYER_NO_CONSENSUS') return 'GenLayer finalized the comparison without validator consensus.';
   if (code === 'GENLAYER_ERROR') return 'GenLayer did not accept or finalize a valid comparison.';
   if (code === 'VERDICT_PENDING') return 'The comparison was submitted and its finalized GenLayer verdict is still pending.';
   if (code === 'ARC_ERROR') return 'Arc escrow state could not be read or updated safely.';

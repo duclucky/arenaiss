@@ -116,7 +116,10 @@ export class TournamentOrchestrator {
         if (outcome.state === "SUBMITTED" || outcome.state === "PENDING" || outcome.state === "ACCEPTED") {
           return { state: "WAITING_FOR_JUDGE", matchId: match.matchId, attemptId: currentAttempt, results };
         }
-        if (outcome.state === "FAILED") return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_FAILED", results };
+        if (outcome.state === "FAILED") {
+          if (outcome.failureReason === "NO_CONSENSUS") continue;
+          return { state: "RECOVERY_REQUIRED", matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_FAILED", results };
+        }
         const verdict = outcome.result;
         if (verdict === "A_WIN" || verdict === "B_WIN") { terminal = verdict; break; }
       }
@@ -163,7 +166,10 @@ export class TournamentOrchestrator {
             try { outcome = await judgeWithSafeSubmission({ ...context, outputA: pair.outputA, outputB: pair.outputB, outputADigest: pair.outputADigest, outputBDigest: pair.outputBDigest }); }
             catch { return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_ERROR" as const }; }
             if (outcome.state === "SUBMITTED" || outcome.state === "PENDING" || outcome.state === "ACCEPTED") return { state: "WAITING_FOR_JUDGE" as const, matchId: match.matchId, attemptId: currentAttempt };
-            if (outcome.state === "FAILED") return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_FAILED" as const };
+            if (outcome.state === "FAILED") {
+              if (outcome.failureReason === "NO_CONSENSUS") continue;
+              return { state: "RECOVERY_REQUIRED" as const, matchId: match.matchId, attemptId: currentAttempt, reason: "JUDGE_FAILED" as const };
+            }
             if (outcome.result === "A_WIN" || outcome.result === "B_WIN") return { state: "WIN" as const, matchId: match.matchId, result: outcome.result };
           }
           return { state: "REFUND_REQUIRED" as const, reason: "RETRY_EXHAUSTED" as const };

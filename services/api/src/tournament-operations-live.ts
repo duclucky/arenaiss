@@ -189,7 +189,7 @@ export class LiveTournamentOperations implements TournamentOperationsPort {
     const entrants = record.entrants;
     this.publish(record, arc, entrants.map((item) => item.entrantId));
     this.publishOpeningMatches(record);
-    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: record.bracketRevision ?? 1, retryCap: 3, maxConcurrentMatches: MAX_CONCURRENT_MATCHES, expiresAt: record.input.expiresAt, now: this.now });
+    const result = await this.orchestrator.run({ tournamentId: record.input.tournamentId as `sha256:${string}`, seedDigest: record.seedDigest!, entrants, topics: record.topicPoolVersion === 2 ? record.topics! : LEGACY_TOPICS, ...(record.topicPoolVersion === 2 ? { topicSelection: 'seeded-shuffle-v1' as const } : {}), bracketRevision: record.bracketRevision ?? 1, retryCap: 4, maxConcurrentMatches: MAX_CONCURRENT_MATCHES, expiresAt: record.input.expiresAt, now: this.now });
     this.publishMatchProgress(record, result);
     this.applyOrchestrator(record, result, entrants.length);
     this.publish(record, arc, entrants.map((item) => item.entrantId));

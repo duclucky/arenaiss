@@ -109,6 +109,36 @@ test("finalized execution failure requires recovery without creating a new attem
   if (result.state === "RECOVERY_REQUIRED") assert.equal(result.reason, "JUDGE_FAILED");
 });
 
+test("finalized no-consensus retries the whole pair with a new attempt and next scenario", async () => {
+  const inference = new FakeInference();
+  const judge: OrchestratorJudge & { calls: number } = {
+    calls: 0,
+    async judge() {
+      this.calls += 1;
+      return this.calls === 1
+        ? { state: "FAILED" as const, failureReason: "NO_CONSENSUS" as const }
+        : { state: "FINALIZED" as const, result: "A_WIN" as const };
+    },
+  };
+  const result = await new TournamentOrchestrator(inference, judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1", "t2"], bracketRevision: 1, retryCap: 4, expiresAt: 1000, now: () => 100 });
+  assert.equal(result.state, "RANKING_READY");
+  assert.notEqual(inference.calls[0].attemptId, inference.calls[1].attemptId);
+  assert.deepEqual(inference.calls.slice(0, 2).map((call) => call.topic), ["t1", "t2"]);
+});
+
+test("three no-consensus retries exhaust after four distinct attempts", async () => {
+  const inference = new FakeInference();
+  const judge: OrchestratorJudge & { calls: number } = {
+    calls: 0,
+    async judge() { this.calls += 1; return { state: "FAILED" as const, failureReason: "NO_CONSENSUS" as const }; },
+  };
+  const result = await new TournamentOrchestrator(inference, judge).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1", "t2", "t3", "t4"], bracketRevision: 1, retryCap: 4, expiresAt: 1000, now: () => 100 });
+  assert.deepEqual(result, { state: "REFUND_REQUIRED", reason: "RETRY_EXHAUSTED" });
+  assert.equal(judge.calls, 4);
+  assert.equal(new Set(inference.calls.map((call) => call.attemptId)).size, 4);
+  assert.deepEqual(inference.calls.map((call) => call.topic), ["t1", "t2", "t3", "t4"]);
+});
+
 test("expiry requests refund instead of inventing a winner", async () => {
   const result = await new TournamentOrchestrator(new FakeInference(), new FakeJudge()).run({ tournamentId, seedDigest: digest("seed"), entrants, topics: ["t1"], bracketRevision: 1, retryCap: 1, expiresAt: 100, now: () => 100 });
   assert.deepEqual(result, { state: "REFUND_REQUIRED", reason: "TOURNAMENT_EXPIRED" });

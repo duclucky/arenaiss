@@ -3,7 +3,7 @@
   "createdAt": "2026-09-21",
   "scope": "LOCAL_ONLY",
   "fileCount": 308,
-  "sourceBundleSha256": "8bcae8379f09005237b84dcd16ad1da13ff780988f974ddacc6e85f7047650a9",
+  "sourceBundleSha256": "81e3c177e5a3721ef4f5b6a8ba72bb9093591decb1970915d13cd439ad767347",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -52,8 +52,8 @@
     "package.json": "b23c174fb806132683373d7ab2fca50a388df18319648c990b9f65903e74e84b",
     "scripts/check.ps1": "39cf7a8f69baa002557284116db04fb40b8b0222f3ff20669e318e51360b23af",
     "services/api/src/pair-arc.ts": "0e2ffbdeacd20991c49ef111dc52f2b137a8e94cc493d344cbda7f507022eec6",
-    "services/api/src/pair-rooms.ts": "39c80d7126df10b0e535494489e4558e97eaa35a2d3c23e5257b975d576203df",
-    "frontend/src/views/PairMatches.tsx": "18de7d8bceaa8ad396f60ed97ab14ce3f7348995c3fb62a964aac096599fad70",
+    "services/api/src/pair-rooms.ts": "8c7508657366d95a5dcd650502604a369354807d6a0b7084d15150233aca4034",
+    "frontend/src/views/PairMatches.tsx": "e3b661de1d24eaaae97a2385dc29afabd9e4ec18cd2ab3115289a42bdf92bdeb",
     "scripts/deploy-agent-marketplace.mjs": "e96a21c6ca14e04fc580ac75f9b7a64dfeedfa5237cde8c067fca370a5c14109",
     "packages/marketplace/src/eligibility.ts": "05fb6dbee91d132b25f3dc51fa4effd82c8116889dd878d912bd48557eb3c5ba",
     "packages/marketplace/test/eligibility.test.ts": "a816a98eaf35df8f22c3dd189779d735e081a4388edff0f321f03ae3d92cbdf9",
@@ -143,17 +143,17 @@
     "packages/operations/test/concurrency.test.ts": "1bd6d8024e38a3b1b3bbfe25cb9bcd2cd2063d65b2885ed9cd2dbd6cfa868e15",
     "services/api/src/operational-health.ts": "62e01e4d044d18ba41f5661ecc0b33c78769c9122c4a51282ccf3c5c13b457fe",
     "services/api/test/operational-health.test.ts": "01c0654c054d6acc7064a1cb3fa6216440770a0c1dfa1e22ea7c40194c81e5dc",
-    "services/api/src/pair-settlement.ts": "090c6dec7baea6116b44d8f2abd8bb08af703e25df749be8e435c7669fef673d",
-    "services/api/src/pair-settlement-live.ts": "81e731e6cf5721077505388bfc852a0537f1af82654f1bf751021b1605ebaeda",
-    "services/api/src/tournament-operations-live.ts": "f9e717b85f466e870fc7064ef02e702d4b765487dce62584c3728b397b60592f",
-    "services/api/test/pair-settlement.test.ts": "13e0c0747340e508040433135b2ab20bcd713e75ef8dc94b15d0fadba4977af5",
+    "services/api/src/pair-settlement.ts": "9ff0bc61a1f3e85026ffa3d35ba61a6c991e4ca529038f28afa7f58d94c47aa3",
+    "services/api/src/pair-settlement-live.ts": "c19b5a5c903490a36563f3cc64ac70aa1b27a0efcdae028fcfea9f97e94b9658",
+    "services/api/src/tournament-operations-live.ts": "310b65d24105d76a6ef44dbfc1d23a0866e3e7b01d270175c3eb9f76e4641a87",
+    "services/api/test/pair-settlement.test.ts": "d621724f159052a1f5c1aa0a4ec890e864e4675b2e7a0f00b9707fb6339a8c81",
     "services/api/test/tournament-operations-live.test.ts": "f14bdc1fe23ef507cac6cfca04cde4535526fad8bdadaa11be022895ab77bfd7"
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 354,
+    "typescriptTests": 361,
     "foundryTests": 33,
-    "frontendTests": 135
+    "frontendTests": 137
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

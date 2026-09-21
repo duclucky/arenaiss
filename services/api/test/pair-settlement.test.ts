@@ -5,6 +5,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 import type { ArcPairChainPort } from '../src/pair-arc.ts';
 import { LivePairAutomaticRefund, LivePairSettlementArc } from '../src/pair-settlement-live.ts';
+import { PAIR_COMPARISON_SCENARIOS, pairScenarioForAttempt } from '../src/pair-settlement-live.ts';
 import { PairSettlementWorker, type PairOutcomePort, type PairSettlementArcPort } from '../src/pair-settlement.ts';
 import type { PairRoom, ChainRoom } from '../src/pair-rooms.ts';
 
@@ -48,6 +49,13 @@ function fixture() {
   return { runtime, worker, get settlements() { return settlements; }, get expirations() { return expirations; }, get refunds() { return refunds; }, get resolves() { return resolves; },
     setOutcome(value: typeof outcome) { outcome = value; }, setArc(value: ChainRoom) { arcRoom = value; }, setArcFailure(value?: Error) { arcFailure = value; }, setNow(value: number) { now = value; } };
 }
+
+test('each no-consensus retry uses a different fixed scenario', () => {
+  assert.equal(PAIR_COMPARISON_SCENARIOS.length, 4);
+  assert.equal(new Set(PAIR_COMPARISON_SCENARIOS).size, 4);
+  assert.deepEqual([1, 2, 3, 4].map(pairScenarioForAttempt), [...PAIR_COMPARISON_SCENARIOS]);
+  assert.throws(() => pairScenarioForAttempt(5), /attempt is invalid/);
+});
 
 test('settles only a canonical finalized comparison, persists its intent, and reconciles retry', async () => {
   const f = fixture();
@@ -127,17 +135,37 @@ test('persists a safe evaluation failure code for participant diagnostics', asyn
   } finally { f.runtime.close(); }
 });
 
-test('exposes finalized validator disagreement as no consensus instead of a GenLayer error', async () => {
+test('retries finalized validator disagreement before settling a later scenario', async () => {
   const f = fixture();
   try {
     f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_NO_CONSENSUS', transactionHash: `0x${'5'.repeat(64)}` });
     await f.worker.tick();
-    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
-    assert.equal(stored?.evaluationStage, 'COMPLETE');
-    assert.equal(stored?.evaluationFailureCode, 'GENLAYER_NO_CONSENSUS');
-    assert.equal(stored?.state, 'REFUNDABLE');
+    const retrying = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(retrying?.evaluationStage, 'RETRYING');
+    assert.equal(retrying?.evaluationFailureCode, 'GENLAYER_NO_CONSENSUS');
+    assert.equal(retrying?.evaluationAttempts, 1);
+    assert.equal(retrying?.state, 'JOINED');
+    assert.equal(f.refunds, 0);
+    f.setOutcome({ state: 'FINAL', result: 'A_WIN', transactionHash: `0x${'7'.repeat(64)}` });
+    await f.worker.tick();
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'SETTLED');
+    assert.equal(f.settlements, 1);
+  } finally { f.runtime.close(); }
+});
+
+test('refunds only after the initial comparison and three no-consensus retries', async () => {
+  const f = fixture();
+  try {
+    f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_NO_CONSENSUS', transactionHash: `0x${'5'.repeat(64)}` });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await f.worker.tick();
+      assert.equal(f.refunds, 0);
+      assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationAttempts, attempt);
+    }
+    await f.worker.tick();
+    assert.equal(f.resolves, 4);
     assert.equal(f.refunds, 1);
-    assert.equal(f.settlements, 0);
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.state, 'REFUNDABLE');
   } finally { f.runtime.close(); }
 });
 

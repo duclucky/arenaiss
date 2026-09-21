@@ -202,7 +202,7 @@ test('participant reads a redacted finalized GenLayer judgment for a settled roo
     const sha = (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
     const roomId = sha('settled-room');
     const matchId = sha(`arena-pair-match-v1|${roomId}`);
-    const attemptId = sha(`arena-pair-attempt-v1|${roomId}|1`);
+    const attemptId = sha(`arena-pair-attempt-v1|${roomId}|2`);
     const runId = sha(`arena-comparison-run-v1|${matchId}|${attemptId}`);
     const verdictTx = `0x${'8'.repeat(64)}`;
     const scenarioDigest = sha('scenario');
@@ -210,7 +210,7 @@ test('participant reads a redacted finalized GenLayer judgment for a settled roo
     const responseDigestB = sha('response-b');
     f.runtime.put('pair-rooms-v1', roomId, { roomId, creator: 'creator-principal', creatorWallet: CREATOR, creatorAgentId: AGENT, creatorVersion: VERSION_A,
       challenger: 'challenger-principal', challengerWallet: CHALLENGER, challengerAgentId: AGENT, challengerVersion: VERSION_B,
-      stake: '1000000', joinDeadline: 1000, resolutionDeadline: 2000, state: 'SETTLED', verdictTx, evaluationStage: 'COMPLETE', createdAt: 100 });
+      stake: '1000000', joinDeadline: 1000, resolutionDeadline: 2000, state: 'SETTLED', verdictTx, verdictAttempt: 2, evaluationStage: 'COMPLETE', createdAt: 100 });
     f.runtime.put('evaluation-comparison-runs', runId, {
       schema: 'arena-comparison-run-v1', comparisonRunId: runId, sourceKind: 'RICH_TOURNAMENT', source: { matchId, attemptId },
       agents: { versionIdA: VERSION_A, versionIdB: VERSION_B }, evidence: { scenarioDigest, responseDigestA, responseDigestB, rubricVersion: 'AgentComparisonV1' },

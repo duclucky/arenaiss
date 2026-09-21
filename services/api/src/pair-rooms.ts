@@ -15,6 +15,7 @@ export type PairRoom = {
   challenger?: string; challengerWallet?: string; challengerAgentId?: string; challengerVersion?: string;
   stake: string; joinDeadline: number; resolutionDeadline: number; state: PairRoomState;
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
+  verdictAttempt?: number;
   evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'REFUNDING' | 'COMPLETE';
   evaluationFailureCode?: PairEvaluationFailureCode; evaluationAttempts?: number; retryAt?: number;
   providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
@@ -95,7 +96,8 @@ export class PairRoomCoordinator {
   private withProviderRoute(row: PairRoom): PairRoom {
     const room = structuredClone(row);
     if (room.state !== 'JOINED' && room.state !== 'SETTLED' && room.state !== 'REFUNDABLE') return room;
-    const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|1`);
+    const attemptNumber = room.verdictAttempt ?? Math.min((room.evaluationAttempts ?? 0) + 1, 4);
+    const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|${attemptNumber}`);
     const a = this.runtime.get<{ model?: string; route?: 'PRIMARY' | 'FALLBACK' }>('evaluation-tournament-provider-runs', `${attemptId}:A`);
     const b = this.runtime.get<{ model?: string; route?: 'PRIMARY' | 'FALLBACK' }>('evaluation-tournament-provider-runs', `${attemptId}:B`);
     if (a?.model && a.model === b?.model && a.route === 'PRIMARY' && b?.route === 'PRIMARY' && /^[^\s]{1,160}$/.test(a.model)) {
@@ -114,7 +116,7 @@ export class PairRoomCoordinator {
     if (principal !== room.creator && principal !== room.challenger) throw new Error('unauthorized pair verdict');
     if (room.state !== 'SETTLED' || !room.challengerVersion || !room.verdictTx) throw new Error('pair verdict is not final');
     const matchId = sha(`arena-pair-match-v1|${room.roomId}`);
-    const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|1`);
+    const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|${room.verdictAttempt ?? 1}`);
     const runId = sha(`arena-comparison-run-v1|${matchId}|${attemptId}`);
     const run = this.runtime.get<any>('evaluation-comparison-runs', runId);
     const scorecard = run?.scorecard;
