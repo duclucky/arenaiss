@@ -25,6 +25,7 @@ class CreditsAgentApi implements AgentApiAdapter {
 
 class CreditsWallet implements ArcWalletAdapter {
   withdrawn: string[] = [];
+  refunds: string[] = [];
   creditReads = new Map([[tournamentA, 0], [tournamentB, 0]]);
   async getProviders(): Promise<WalletProvider[]> { return [{ name: 'Test Wallet', icon: '', uuid: 'wallet', isInstalled: true, request: async () => [] }]; }
   async connect() { return account; }
@@ -39,6 +40,8 @@ class CreditsWallet implements ArcWalletAdapter {
   async getEntrant(tournamentId: string, entrantId: string): Promise<CanonicalEntrant> {
     return { tournamentId, entrantId, agentId: entrant('d'), agentsVersion: entrant('e'), agentsCommitment: entrant('f'), wallet: account, registered: tournamentId !== tournamentNotRegistered, ranked: false };
   }
+  async canClaimRefund(tournamentId: string) { return tournamentId === tournamentA && this.refunds.length === 0; }
+  async claimRefund(tournamentId: string) { this.refunds.push(tournamentId); return { hash: `0x${'8'.repeat(64)}`, state: 'SUBMITTED' as const }; }
   async approveEscrow(): Promise<WalletTransaction> { throw new Error('unused'); }
   async registerEntrant(): Promise<WalletTransaction> { throw new Error('unused'); }
   async withdrawCredit(tournamentId: string): Promise<WalletTransaction> { this.withdrawn.push(tournamentId); return { hash: `0x${'9'.repeat(64)}`, state: 'SUBMITTED' }; }
@@ -71,6 +74,17 @@ describe('Account tournament credits', () => {
     expect(await screen.findByText('Claim confirmed.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Claim Tournament reward' })).not.toBeInTheDocument());
     expect(wallet.withdrawn).toEqual([tournamentB]);
+  });
+
+  it('opens a cancelled Tournament refund credit before offering its withdrawal', async () => {
+    const wallet = new CreditsWallet();
+    const config: ArcNetworkConfig = { chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', escrowAddress: '0x2875BeA04e01EdaAA762987431ad5a87CF11445d' };
+    render(<App config={config} walletAdapter={wallet} agentApiAdapter={new CreditsAgentApi()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Test Wallet' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Claim Tournament refund' }));
+    await waitFor(() => expect(wallet.refunds).toEqual([tournamentA]));
   });
 
   it('claims Marketplace sale proceeds from the same Claim page', async () => {

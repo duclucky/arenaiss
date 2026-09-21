@@ -73,6 +73,17 @@ test('Circle adapter withdraws a Tournament credit through the beneficiary SCA',
   assert.deepEqual(executions[0].abiParameters, [`0x${'a'.repeat(64)}`]);
 });
 
+test('Circle adapter opens the registered Tournament refund credit through the beneficiary SCA', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: 'refund-id' } }; },
+    async getTransaction() { return { data: { transaction: { id: 'refund-id', state: 'COMPLETE', txHash: `0x${'8'.repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+  await adapter.claimTournamentRefund({ walletId: 'wallet-id', escrowAddress: '0x4444444444444444444444444444444444444444', tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, idempotencyKey: 'refund-key' });
+  assert.equal(executions[0].abiFunctionSignature, 'claimRefund(bytes32,bytes32)');
+  assert.deepEqual(executions[0].abiParameters, [`0x${'a'.repeat(64)}`, `0x${'b'.repeat(64)}`]);
+});
+
 test('Circle adapter approves the stake and registers a Tournament entrant through the managed SCA', async () => {
   const executions: any[] = [];
   const adapter = new CircleManagedWalletAdapter({

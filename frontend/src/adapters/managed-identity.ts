@@ -66,7 +66,12 @@ export class HttpManagedIdentityAdapter implements ManagedIdentityAdapter {
   }
 
   claimTournamentCredit(tournamentId: string, idempotencyKey: string): Promise<ManagedWalletTransaction> {
-    return this.request(`/api/account/tournament-credits/${encodeURIComponent(tournamentId)}/withdraw`, { method: 'POST', body: JSON.stringify({ idempotencyKey }) });
+    const canonicalId = /^0x[0-9a-fA-F]{64}$/.test(tournamentId) ? `sha256:${tournamentId.slice(2)}` : tournamentId;
+    return this.request(`/api/account/tournament-credits/${encodeURIComponent(canonicalId)}/withdraw`, { method: 'POST', body: JSON.stringify({ idempotencyKey }) });
+  }
+
+  claimTournamentRefund(tournamentId: string, entrantId: string, idempotencyKey: string): Promise<ManagedWalletTransaction> {
+    return this.request('/api/account/tournament-refunds/claim', { method: 'POST', body: JSON.stringify({ tournamentId, entrantId, idempotencyKey }) });
   }
 
   registerTournamentEntrant(tournamentId: string, agentId: string): Promise<ManagedWalletTransaction> {

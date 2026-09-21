@@ -35,4 +35,14 @@ describe('managed identity HTTP adapter', () => {
     await expect(unauthorized.restore()).resolves.toBeNull();
     await expect(unavailable.restore()).resolves.toBeNull();
   });
+
+  it('uses canonical Tournament IDs for withdrawal and exact bytes32 IDs for refund claims', async () => {
+    const fetcher = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ transactionId: 'tx-1', state: 'COMPLETE' }), { status: 202 }));
+    const adapter = new HttpManagedIdentityAdapter('', fetcher);
+    await adapter.claimTournamentCredit(`0x${'a'.repeat(64)}`, 'credit-key');
+    await adapter.claimTournamentRefund(`0x${'a'.repeat(64)}`, `0x${'b'.repeat(64)}`, 'refund-key');
+    expect(fetcher.mock.calls[0][0]).toContain(`/api/account/tournament-credits/sha256%3A${'a'.repeat(64)}/withdraw`);
+    expect(fetcher.mock.calls[1][0]).toContain('/api/account/tournament-refunds/claim');
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, idempotencyKey: 'refund-key' });
+  });
 });

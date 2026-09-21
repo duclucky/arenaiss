@@ -186,6 +186,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
         ],
         transferUsdc: async (input: any) => { calls.push(['transfer', input]); return { transactionId: 'tx-1', state: 'SENT' }; },
         withdrawTournamentCredit: async (input: any) => { calls.push(['claim', input]); return { transactionId: 'claim-1', state: 'COMPLETE' }; },
+        claimTournamentRefund: async (input: any) => { calls.push(['refund', input]); return { transactionId: 'refund-1', state: 'COMPLETE' }; },
         bridgeUsdcToArc: async (input: any) => {
           calls.push(['bridge', input]);
           input.onProgress?.('APPROVING');
@@ -196,7 +197,8 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
       },
       emailSender: { sendLoginCode: async () => undefined },
     };
-    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any);
+    const service = new ArenaApiService(operator, runtime);
+    const api = new ArenaHttpApi(service, async () => true, managed as any);
     assert.equal((await api.handle({ method: 'GET', path: '/api/account/usdc-balances' })).status, 401);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', body: { sourceChain: 'ARB-SEPOLIA', amount: '2' } })).status, 401);
     await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
@@ -208,6 +210,12 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.25' } })).status, 202);
     const tournamentId = `sha256:${'a'.repeat(64)}`;
     assert.equal((await api.handle({ method: 'POST', path: `/api/account/tournament-credits/${tournamentId}/withdraw`, headers: { cookie }, body: { idempotencyKey: '11111111-1111-4111-8111-111111111111' } })).status, 202);
+    const refundBody = { tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, idempotencyKey: '11111111-1111-4111-8111-111111111111' };
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/tournament-refunds/claim', headers: { cookie }, body: refundBody })).status, 400);
+    assert.equal(calls.filter(([kind]) => kind === 'refund').length, 0);
+    service.listOwnedRegistrations = () => [{ tournamentId: refundBody.tournamentId, entrantId: refundBody.entrantId, agentId: `0x${'c'.repeat(64)}` }];
+    assert.equal((await api.handle({ method: 'POST', path: '/api/account/tournament-refunds/claim', headers: { cookie }, body: refundBody })).status, 202);
+    assert.equal(calls.filter(([kind]) => kind === 'refund').length, 1);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ETH-SEPOLIA', amount: '2' } })).status, 400);
     const bridgePromise = api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ARB-SEPOLIA', amount: '2' } });
     const bridge = await Promise.race([
@@ -241,7 +249,7 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     const bobCookie = bobAuth.headers['set-cookie'].split(';')[0];
     assert.equal((await api.handle({ method: 'GET', path: `/api/account/cctp-transfers/${bridge.body.operationId}`, headers: { cookie: bobCookie } })).status, 400);
     assert.deepEqual((await api.handle({ method: 'GET', path: '/api/account/cctp-transfers', headers: { cookie: bobCookie } })).body, []);
-    assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'claim', 'bridge']);
+    assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'claim', 'refund', 'bridge']);
   } finally { runtime.close(); }
 });
 

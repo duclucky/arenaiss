@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, custom, defineChain, getAddress, http } from 'viem';
+import { BaseError, ContractFunctionRevertedError, createPublicClient, createWalletClient, custom, defineChain, getAddress, http } from 'viem';
 import { ArcWalletAdapter, WalletProvider, ArcNetworkConfig, EntrantRegistration, WalletTransaction, CanonicalEntrant } from './interfaces';
 
 const usdcAbi = [{
@@ -19,6 +19,10 @@ const escrowAbi = [
   {
     type: 'function', name: 'withdrawCredit', stateMutability: 'nonpayable', outputs: [],
     inputs: [{ name: 'tournamentId', type: 'bytes32' }],
+  },
+  {
+    type: 'function', name: 'claimRefund', stateMutability: 'nonpayable', outputs: [],
+    inputs: [{ name: 'tournamentId', type: 'bytes32' }, { name: 'entrantId', type: 'bytes32' }],
   },
   {
     type: 'function', name: 'creditOf', stateMutability: 'view',
@@ -283,6 +287,33 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
     const hash = await client.writeContract({
       address: getAddress(config.escrowAddress), abi: escrowAbi, functionName: 'withdrawCredit',
       args: [tournamentId as `0x${string}`],
+    });
+    return { hash, state: 'SUBMITTED' };
+  }
+
+  async canClaimRefund(tournamentId: string, entrantId: string, address: string, config: ArcNetworkConfig): Promise<boolean> {
+    if (!isBytes32(tournamentId) || !isBytes32(entrantId)) throw new Error('INVALID_BYTES32');
+    if (!isAddress(address)) throw new Error('INVALID_ADDRESS');
+    if (!config.escrowAddress || !isConfiguredAddress(config.escrowAddress)) throw new Error('NOT_CONFIGURED');
+    try {
+      await createPublicClient({ chain: arcChain(config), transport: http(config.rpcUrl) }).simulateContract({
+        address: getAddress(config.escrowAddress), abi: escrowAbi, functionName: 'claimRefund',
+        args: [tournamentId as `0x${string}`, entrantId as `0x${string}`], account: getAddress(address),
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof BaseError && error.walk((cause) => cause instanceof ContractFunctionRevertedError)) return false;
+      throw error;
+    }
+  }
+
+  async claimRefund(tournamentId: string, entrantId: string, config: ArcNetworkConfig): Promise<WalletTransaction> {
+    if (!isBytes32(tournamentId) || !isBytes32(entrantId)) throw new Error('INVALID_BYTES32');
+    const { client } = this.requireWriteClient(config);
+    if (!config.escrowAddress || !isConfiguredAddress(config.escrowAddress)) throw new Error('NOT_CONFIGURED');
+    const hash = await client.writeContract({
+      address: getAddress(config.escrowAddress), abi: escrowAbi, functionName: 'claimRefund',
+      args: [tournamentId as `0x${string}`, entrantId as `0x${string}`],
     });
     return { hash, state: 'SUBMITTED' };
   }

@@ -168,6 +168,14 @@ export class ArenaHttpApi {
         const session = this.requireManagedSession(request.headers);
         return this.json(202, await this.managedIdentity!.withdrawTournamentCredit(session.userId!, tournamentCreditWithdrawal[1], requireString(request.body?.idempotencyKey)));
       }
+      if (request.method === 'POST' && request.path === '/api/account/tournament-refunds/claim') {
+        const session = this.requireManagedSession(request.headers);
+        const tournamentId = requireString(request.body?.tournamentId);
+        const entrantId = requireString(request.body?.entrantId);
+        if (!/^0x[0-9a-fA-F]{64}$/.test(tournamentId) || !/^0x[0-9a-fA-F]{64}$/.test(entrantId) ||
+            !this.service.listOwnedRegistrations(session.principal).some((row) => row.tournamentId.toLowerCase() === tournamentId.toLowerCase() && row.entrantId.toLowerCase() === entrantId.toLowerCase())) throw new Error('invalid tournament registration');
+        return this.json(202, await this.managedIdentity!.claimTournamentRefund(session.userId!, tournamentId, entrantId, requireString(request.body?.idempotencyKey)));
+      }
       if (request.method === 'POST' && request.path === '/api/account/usdc-transfers') {
         const session = this.requireManagedSession(request.headers);
         return this.json(202, await this.managedIdentity!.startUsdcTransfer(session.userId!, requireString(request.body?.destinationAddress), requireString(request.body?.amount)));

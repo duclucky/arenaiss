@@ -32,6 +32,12 @@ export class LazyBrowserArcWalletAdapter implements ArcWalletAdapter {
   async getEntrant(tournamentId: string, entrantId: string, config: ArcNetworkConfig): Promise<CanonicalEntrant> {
     return (await this.delegate()).getEntrant(tournamentId, entrantId, config);
   }
+  async canClaimRefund(tournamentId: string, entrantId: string, address: string, config: ArcNetworkConfig): Promise<boolean> {
+    return (await this.delegate()).canClaimRefund!(tournamentId, entrantId, address, config);
+  }
+  async claimRefund(tournamentId: string, entrantId: string, config: ArcNetworkConfig): Promise<WalletTransaction> {
+    return (await this.delegate()).claimRefund!(tournamentId, entrantId, config);
+  }
   async approveEscrow(amount: string, config: ArcNetworkConfig): Promise<WalletTransaction> {
     return (await this.delegate()).approveEscrow(amount, config);
   }

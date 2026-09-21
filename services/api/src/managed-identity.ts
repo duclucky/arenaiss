@@ -48,6 +48,7 @@ export type CircleWalletPort = {
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   withdrawTournamentCredit(input: { walletId: string; escrowAddress: string; tournamentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  claimTournamentRefund(input: { walletId: string; escrowAddress: string; tournamentId: string; entrantId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   registerTournamentEntrant(input: { walletId: string; escrowAddress: string; stakeAmount: string; tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string; approvalIdempotencyKey: string; registrationIdempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceCancel(input: { walletId: string; marketplaceAddress: string; listingId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -347,6 +348,12 @@ export class ManagedIdentityService {
     const wallet = this.requireReadyWallet(userId);
     if (!this.tournamentEscrowAddress) throw new Error('tournament escrow unavailable');
     return this.circleWallets.withdrawTournamentCredit({ walletId: wallet.walletId, escrowAddress: this.tournamentEscrowAddress, tournamentId, idempotencyKey });
+  }
+
+  async claimTournamentRefund(userId: string, tournamentId: string, entrantId: string, idempotencyKey: string): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.tournamentEscrowAddress) throw new Error('tournament escrow unavailable');
+    return this.circleWallets.claimTournamentRefund({ walletId: wallet.walletId, escrowAddress: this.tournamentEscrowAddress, tournamentId, entrantId, idempotencyKey });
   }
 
   async registerTournamentEntrant(userId: string, input: { stakeAmount: string; tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string }): Promise<WalletTransactionResult> {

@@ -118,6 +118,10 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeComplete(input.walletId, input.escrowAddress, 'withdrawCredit(bytes32)', [digestBytes32(input.tournamentId)], input.idempotencyKey, 'arena-iss-tournament-credit-withdraw');
   }
 
+  async claimTournamentRefund(input: { walletId: string; escrowAddress: string; tournamentId: string; entrantId: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    return this.executeComplete(input.walletId, input.escrowAddress, 'claimRefund(bytes32,bytes32)', [requireBytes32(input.tournamentId), requireBytes32(input.entrantId)], input.idempotencyKey, 'arena-iss-tournament-refund-claim');
+  }
+
   async pairCreate(input: { walletId: string; escrowAddress: string; roomId: string; version: string; stake: string; joinDeadline: number; resolutionDeadline: number; approvalKey: string; executionKey: string }): Promise<WalletTransactionResult> {
     const stake = requirePairStake(input.stake);
     await this.executeComplete(input.walletId, ARC_USDC, 'approve(address,uint256)', [input.escrowAddress, stake], input.approvalKey, 'arena-iss-pair-approve');

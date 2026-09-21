@@ -4,7 +4,7 @@ import type { ManagedCctpTransfer, ManagedUsdcBalance, ManagedUsdcTransfer } fro
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-type CreditRow = { tournamentId: string; credit: string };
+type CreditRow = { tournamentId: string; entrantId: string; credit: string; refundAvailable: boolean };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
 type WalletAction = { state: 'submitting' | 'error'; message?: string };
 type LegacyBridgeAction = { state: 'submitting' | 'done' | 'error'; operation: ManagedCctpTransfer; message?: string };
@@ -21,6 +21,7 @@ export function Account() {
   const [creditsState, setCreditsState] = useState<CreditsState>('idle');
   const [creditsError, setCreditsError] = useState('');
   const [claimState, setClaimState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
+  const [refundState, setRefundState] = useState<Record<string, 'submitting' | 'confirmed' | 'failed'>>({});
   const [marketplaceCredit, setMarketplaceCredit] = useState('0');
   const [marketplaceClaimState, setMarketplaceClaimState] = useState<'idle' | 'loading' | 'submitting' | 'confirmed' | 'failed'>('idle');
   const [evoRefunds, setEvoRefunds] = useState<EvoRefundRow[]>([]);
@@ -140,13 +141,14 @@ export function Account() {
           registration,
           entrant: await wallet.getEntrant(registration.tournamentId, registration.entrantId, networkConfig),
         })));
-        const tournamentIds = [...new Set(verified
+        const registrationsByTournament = [...new Map(verified
           .filter(({ entrant }) => entrant.registered && entrant.wallet.toLowerCase() === account.toLowerCase())
-          .map(({ registration }) => registration.tournamentId))].sort();
-        return Promise.all(tournamentIds.map(async (tournamentId) => ({
-          tournamentId,
-          credit: await wallet.getCredit(tournamentId, account, networkConfig),
-        })));
+          .map(({ registration }) => [registration.tournamentId, registration] as const)).values()]
+          .sort((a, b) => a.tournamentId.localeCompare(b.tournamentId));
+        return Promise.all(registrationsByTournament.map(async ({ tournamentId, entrantId }) => {
+          const credit = await wallet.getCredit(tournamentId, account, networkConfig);
+          return { tournamentId, entrantId, credit, refundAvailable: BigInt(credit) === 0n && !!(await wallet.canClaimRefund?.(tournamentId, entrantId, account, networkConfig)) };
+        }));
       })
       .then((rows) => {
         if (cancelled) return;
@@ -227,6 +229,26 @@ export function Account() {
       setClaimState((current) => ({ ...current, [tournamentId]: 'confirmed' }));
     } catch {
       setClaimState((current) => ({ ...current, [tournamentId]: 'failed' }));
+    }
+  }
+
+  async function claimRefund(tournamentId: string, entrantId: string) {
+    if (!account || !networkConfig) return;
+    setRefundState((current) => ({ ...current, [tournamentId]: 'submitting' }));
+    try {
+      if (managedAccount) {
+        if (!managedIdentity?.claimTournamentRefund) throw new Error('Managed refund claim is unavailable.');
+        await managedIdentity.claimTournamentRefund(tournamentId, entrantId, crypto.randomUUID());
+      } else {
+        if (!wallet.claimRefund) throw new Error('Refund claim is unavailable.');
+        const transaction = await wallet.claimRefund(tournamentId, entrantId, networkConfig);
+        const receipt = await wallet.waitForTransaction(transaction.hash, networkConfig);
+        if (receipt !== 'CONFIRMED') throw new Error('Refund claim failed on Arc.');
+      }
+      setRefundState((current) => ({ ...current, [tournamentId]: 'confirmed' }));
+      setReload((value) => value + 1);
+    } catch {
+      setRefundState((current) => ({ ...current, [tournamentId]: 'failed' }));
     }
   }
 
@@ -416,11 +438,14 @@ export function Account() {
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tournament ID</p>
                 <p className="mt-2 break-all font-mono text-xs sm:text-sm">{row.tournamentId}</p>
-                <p className={claimable ? 'mt-3 font-semibold text-emerald-800' : 'mt-3 text-sm text-muted-foreground'}>{claimable ? `${formatUsdc(row.credit)} USDC claimable` : 'Settled · no credit to claim'}</p>
+                <p className={claimable ? 'mt-3 font-semibold text-emerald-800' : 'mt-3 text-sm text-muted-foreground'}>{claimable ? `${formatUsdc(row.credit)} USDC claimable` : row.refundAvailable ? 'Refund is available in escrow. Open its credit, then withdraw USDC.' : 'No claimable credit or refund at this time.'}</p>
+                {refundState[row.tournamentId] === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Refund credit requested. Refresh to confirm it on Arc, then withdraw.</p>}
+                {refundState[row.tournamentId] === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Refund claim failed or is uncertain. Refresh Arc status before retrying.</p>}
                 {state === 'confirmed' && <p role="status" className="mt-2 text-sm font-semibold text-emerald-800">Claim confirmed.</p>}
                 {state === 'failed' && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Claim failed or was rejected. No payout was recorded.</p>}
               </div>
               {claimable && <button type="button" className="metal-button-solid shrink-0" disabled={state === 'submitting'} onClick={() => claim(row.tournamentId)}>{state === 'submitting' ? 'Claiming…' : 'Claim Tournament reward'}</button>}
+              {!claimable && row.refundAvailable && <button type="button" className="metal-button-solid shrink-0" disabled={refundState[row.tournamentId] === 'submitting' || refundState[row.tournamentId] === 'confirmed'} onClick={() => claimRefund(row.tournamentId, row.entrantId)}>{refundState[row.tournamentId] === 'submitting' ? 'Opening refund…' : 'Claim Tournament refund'}</button>}
             </li>;
           })}
         </ul>}

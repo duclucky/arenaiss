@@ -207,6 +207,7 @@ export interface ManagedIdentityAdapter {
   listCctpTransfers?(): Promise<ManagedCctpTransfer[]>;
   getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
   claimTournamentCredit?(tournamentId: string, idempotencyKey: string): Promise<ManagedWalletTransaction>;
+  claimTournamentRefund?(tournamentId: string, entrantId: string, idempotencyKey: string): Promise<ManagedWalletTransaction>;
   registerTournamentEntrant?(tournamentId: string, agentId: string): Promise<ManagedWalletTransaction>;
   logout(): Promise<void>;
 }
@@ -342,6 +343,8 @@ export interface ArcWalletAdapter {
   getAllowance(address: string, config: ArcNetworkConfig): Promise<string>;
   getCredit(tournamentId: string, address: string, config: ArcNetworkConfig): Promise<string>;
   getEntrant(tournamentId: string, entrantId: string, config: ArcNetworkConfig): Promise<CanonicalEntrant>;
+  canClaimRefund?(tournamentId: string, entrantId: string, address: string, config: ArcNetworkConfig): Promise<boolean>;
+  claimRefund?(tournamentId: string, entrantId: string, config: ArcNetworkConfig): Promise<WalletTransaction>;
   approveEscrow(amount: string, config: ArcNetworkConfig): Promise<WalletTransaction>;
   registerEntrant(input: EntrantRegistration, config: ArcNetworkConfig): Promise<WalletTransaction>;
   withdrawCredit(tournamentId: string, config: ArcNetworkConfig): Promise<WalletTransaction>;
