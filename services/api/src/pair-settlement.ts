@@ -3,7 +3,7 @@ import type { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlit
 import type { ChainRoom, PairEvaluationFailureCode, PairRoom } from './pair-rooms.ts';
 
 export type PairOutcome = { state: 'WAITING'; failureCode: 'VERDICT_PENDING'; transactionHash?: string }
-  | { state: 'RETRY_LATER'; failureCode: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR'; transactionHash?: string }
+  | { state: 'RETRY_LATER'; failureCode: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'GENLAYER_NO_CONSENSUS'; transactionHash?: string }
   | { state: 'FINAL'; result: 'A_WIN' | 'B_WIN' | 'TIE'; transactionHash: string };
 export interface PairOutcomePort { resolve(room: PairRoom): Promise<PairOutcome>; }
 export interface PairSettlementArcPort {
@@ -158,7 +158,15 @@ export class PairSettlementWorker {
     this.runtime.put('pair-room-worker-retries', roomId, { failures: Math.min(RETRY_BUDGET, failures), nextAt });
     this.runtime.put('pair-room-worker-errors', roomId, { at: this.now(), message });
     const room = this.runtime.get<PairRoom>('pair-rooms-v1', roomId);
-    if (room) this.runtime.put('pair-rooms-v1', roomId, { ...room, evaluationStage: nextPhase === 'RECOVERY_REQUIRED' ? 'RETRYING' : phase === 'GENLAYER_FINALITY' ? 'WAITING_VERDICT' : 'RETRYING', evaluationFailureCode: failureCode, evaluationAttempts: failures, retryAt: nextAt });
+    if (room) this.runtime.put('pair-rooms-v1', roomId, {
+      ...room,
+      evaluationStage: failureCode === 'GENLAYER_NO_CONSENSUS'
+        ? 'NO_CONSENSUS'
+        : nextPhase === 'RECOVERY_REQUIRED' ? 'RETRYING' : phase === 'GENLAYER_FINALITY' ? 'WAITING_VERDICT' : 'RETRYING',
+      evaluationFailureCode: failureCode,
+      evaluationAttempts: failures,
+      retryAt: nextAt,
+    });
   }
 
   private progressFor(roomId: string): PairEvaluationProgress {

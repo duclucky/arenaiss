@@ -43,7 +43,7 @@ describe('Arena ISS product documentation', () => {
     expect(screen.getByText(/fixed 1% platform fee/i)).toBeInTheDocument();
     expect(screen.getByText(/creator chooses the stake and deposits it when the room is created/i)).toBeInTheDocument();
     expect(screen.getByText(/creator can cancel while the room is still open/i)).toBeInTheDocument();
-    expect(screen.getByText(/PROVIDER_ERROR.*GENLAYER_BUSY.*GENLAYER_ERROR.*VERDICT_PENDING.*ARC_ERROR/i)).toBeInTheDocument();
+    expect(screen.getByText(/PROVIDER_ERROR.*GENLAYER_BUSY.*GENLAYER_NO_CONSENSUS.*GENLAYER_ERROR.*VERDICT_PENDING.*ARC_ERROR/i)).toBeInTheDocument();
     expect(screen.getAllByText(/trusted operator/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/including AGENTS.md bytes for Agent evaluations and Tournament comparisons/i)).toBeInTheDocument();
     expect(screen.queryByText(/does not receive private AGENTS.md/i)).not.toBeInTheDocument();

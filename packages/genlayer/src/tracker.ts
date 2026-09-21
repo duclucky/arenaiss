@@ -20,7 +20,11 @@ export interface GenLayerPort {
   getResult(judgeAddress: string, matchId: string, attemptId: string): Promise<unknown>;
 }
 
-export type NormalizedReceipt = { finality: "SUBMITTED" | "PENDING" | "ACCEPTED" | "FINALIZED"; execution: "PENDING" | "SUCCESS" | "FAILED" };
+export type NormalizedReceipt = {
+  finality: "SUBMITTED" | "PENDING" | "ACCEPTED" | "FINALIZED";
+  execution: "PENDING" | "SUCCESS" | "FAILED";
+  failureReason?: "NO_CONSENSUS";
+};
 type SubmissionRecord = { key: string; matchId: string; attemptId: string; judgeAddress: string; outputADigest: string; outputBDigest: string; topicDigest: string; rubricVersion: string; state: string; txHash?: string; progressionApplied: boolean; result?: string };
 export type TrackerOutcome = { state: string; result?: string; progressionApplied: boolean };
 
@@ -60,7 +64,10 @@ export function normalizeReceipt(value: any): NormalizedReceipt {
   else throw new Error("malformed GenLayer receipt execution");
   if (failedTerminal.includes(status)) executionState = "FAILED";
   if (finality === "FINALIZED" && consensus && consensus !== "MAJORITY_AGREE") executionState = "FAILED";
-  return { finality, execution: executionState };
+  const failureReason = status === "UNDETERMINED" || consensus === "MAJORITY_DISAGREE" || consensus === "UNDETERMINED"
+    ? "NO_CONSENSUS" as const
+    : undefined;
+  return { finality, execution: executionState, ...(failureReason ? { failureReason } : {}) };
 }
 
 export interface JudgeStore {

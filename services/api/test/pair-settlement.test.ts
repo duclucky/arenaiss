@@ -120,6 +120,19 @@ test('persists a safe evaluation failure code for participant diagnostics', asyn
   } finally { f.runtime.close(); }
 });
 
+test('exposes finalized validator disagreement as no consensus instead of a GenLayer error', async () => {
+  const f = fixture();
+  try {
+    f.setOutcome({ state: 'RETRY_LATER', failureCode: 'GENLAYER_NO_CONSENSUS', transactionHash: `0x${'5'.repeat(64)}` });
+    await f.worker.tick();
+    const stored = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId);
+    assert.equal(stored?.evaluationStage, 'NO_CONSENSUS');
+    assert.equal(stored?.evaluationFailureCode, 'GENLAYER_NO_CONSENSUS');
+    assert.equal(stored?.state, 'JOINED');
+    assert.equal(f.settlements, 0);
+  } finally { f.runtime.close(); }
+});
+
 test('marks a submitted comparison as verdict pending without treating it as a provider error', async () => {
   const f = fixture();
   try {

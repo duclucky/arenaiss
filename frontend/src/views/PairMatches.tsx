@@ -8,8 +8,8 @@ type Room = {
   creatorAgentId: string; challengerAgentId?: string; challengerVersion?: string; stake: string;
   joinDeadline: number; resolutionDeadline: number; state: 'OPEN' | 'JOINING' | 'JOINED' | 'REFUNDABLE' | 'SETTLED';
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
-  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
-  evaluationFailureCode?: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'VERDICT_PENDING' | 'ARC_ERROR';
+  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationFailureCode?: 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'GENLAYER_NO_CONSENSUS' | 'VERDICT_PENDING' | 'ARC_ERROR';
   evaluationAttempts?: number; retryAt?: number;
   providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
 };
@@ -25,6 +25,7 @@ type VerdictDetail = {
 function failureExplanation(code?: Room['evaluationFailureCode']): string {
   if (code === 'PROVIDER_ERROR') return 'The Agent response provider did not produce both valid outputs.';
   if (code === 'GENLAYER_BUSY') return 'GenLayer has no free execution slot for this comparison.';
+  if (code === 'GENLAYER_NO_CONSENSUS') return 'GenLayer finalized the comparison without validator consensus. No winner was selected; both deposits remain in escrow until a valid verdict or refund.';
   if (code === 'GENLAYER_ERROR') return 'GenLayer did not accept or finalize a valid comparison.';
   if (code === 'VERDICT_PENDING') return 'The comparison was submitted and its finalized GenLayer verdict is still pending.';
   if (code === 'ARC_ERROR') return 'Arc escrow state could not be read or updated safely.';
@@ -43,6 +44,7 @@ function units(value: string): string { const number = BigInt(value); return `${
 function progress(room: Room): string {
   if (room.state !== 'JOINED') return room.state === 'REFUNDABLE' ? 'Refund credits are available to the depositors.' : room.state === 'SETTLED' ? 'Arc settlement is final. The winner can claim any remaining payout credit.' : '';
   if (room.evaluationStage === 'RUNNING_AGENTS') return 'Match started automatically. Both Agents are producing responses.';
+  if (room.evaluationStage === 'NO_CONSENSUS') return failureExplanation('GENLAYER_NO_CONSENSUS');
   if (room.evaluationStage === 'WAITING_VERDICT') return failureExplanation(room.evaluationFailureCode);
   if (room.evaluationStage === 'RETRYING') {
     const attempts = room.evaluationAttempts ?? 1;

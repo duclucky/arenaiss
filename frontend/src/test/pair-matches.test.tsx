@@ -198,6 +198,20 @@ it('shows the safe evaluation failure code and its specific explanation', async 
   expect(screen.getByText(/GenLayer has no free execution slot/)).toBeInTheDocument();
 });
 
+it('labels a finalized GenLayer disagreement as no consensus rather than an execution error', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    return [{ roomId: `sha256:${'6'.repeat(64)}`, creator: account.principal, creatorWallet: wallet,
+      creatorAgentId: `sha256:${'a'.repeat(64)}`, stake: '10000', joinDeadline: 1_999_999_999,
+      resolutionDeadline: 2_000_000_000, state: 'JOINED', evaluationStage: 'NO_CONSENSUS',
+      evaluationFailureCode: 'GENLAYER_NO_CONSENSUS', evaluationAttempts: 1 }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText('GENLAYER_NO_CONSENSUS')).toBeInTheDocument();
+  expect(screen.getByText(/finalized the comparison without validator consensus/i)).toHaveTextContent(/No winner was selected/);
+  expect(screen.queryByText(/GenLayer did not accept or finalize a valid comparison/i)).not.toBeInTheDocument();
+});
+
 it('does not request or render participant room history before login', async () => {
   const fetcher = vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };

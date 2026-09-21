@@ -9,13 +9,13 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 const STORE = 'pair-rooms-v1';
 
 export type PairRoomState = 'PENDING' | 'OPEN' | 'JOINING' | 'JOINED' | 'REFUNDABLE' | 'SETTLED';
-export type PairEvaluationFailureCode = 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'VERDICT_PENDING' | 'ARC_ERROR';
+export type PairEvaluationFailureCode = 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'GENLAYER_NO_CONSENSUS' | 'VERDICT_PENDING' | 'ARC_ERROR';
 export type PairRoom = {
   roomId: string; creator: string; creatorWallet: string; creatorAgentId: string; creatorVersion: string;
   challenger?: string; challengerWallet?: string; challengerAgentId?: string; challengerVersion?: string;
   stake: string; joinDeadline: number; resolutionDeadline: number; state: PairRoomState;
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
-  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
+  evaluationStage?: 'QUEUED' | 'RUNNING_AGENTS' | 'WAITING_VERDICT' | 'NO_CONSENSUS' | 'RETRYING' | 'TIE_WAITING_REFUND' | 'SETTLING' | 'COMPLETE';
   evaluationFailureCode?: PairEvaluationFailureCode; evaluationAttempts?: number; retryAt?: number;
   providerRoute?: 'PRIMARY' | 'FALLBACK'; providerModel?: string;
   createdAt: number;

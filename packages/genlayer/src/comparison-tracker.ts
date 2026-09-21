@@ -102,7 +102,7 @@ export class ComparisonRunTracker {
     return transactionHash;
   }
 
-  async poll(matchId: string, attemptId: string): Promise<{ state: string; run?: ComparisonRun }> {
+  async poll(matchId: string, attemptId: string): Promise<{ state: string; run?: ComparisonRun; failureReason?: "NO_CONSENSUS" }> {
     const key = this.key(matchId, attemptId);
     const record = this.store.get(key);
     if (!record?.transactionHash) throw new Error("comparison transaction is unknown");
@@ -114,7 +114,7 @@ export class ComparisonRunTracker {
     }
     if (receipt.execution === "FAILED") {
       this.store.put({ ...record, state: "FAILED" });
-      return { state: "FAILED" };
+      return { state: "FAILED", ...(receipt.failureReason ? { failureReason: receipt.failureReason } : {}) };
     }
     const scorecard = this.validateCanonical(await this.port.getComparison(this.judgeAddress, matchId, attemptId), record.submission);
     const run = this.registry.put(projectRichComparisonAttempt({

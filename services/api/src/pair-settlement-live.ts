@@ -80,7 +80,11 @@ export class LivePairOutcome implements PairOutcomePort {
     const transactionHash = this.tracker.transactionHash(context.matchId, context.attemptId);
     try {
       const judgment = await this.judge.poll(judgeInput);
-      if (judgment.state === 'FAILED') return { state: 'RETRY_LATER', failureCode: 'GENLAYER_ERROR' };
+      if (judgment.state === 'FAILED') return {
+        state: 'RETRY_LATER',
+        failureCode: judgment.failureReason === 'NO_CONSENSUS' ? 'GENLAYER_NO_CONSENSUS' : 'GENLAYER_ERROR',
+        ...(transactionHash ? { transactionHash } : {}),
+      };
       if (judgment.state !== 'FINALIZED') return { state: 'WAITING', failureCode: 'VERDICT_PENDING', ...(transactionHash ? { transactionHash } : {}) };
       const canonical = await this.tracker.poll(context.matchId, context.attemptId);
       if (canonical.state !== 'FINALIZED' || !canonical.run || canonical.run.judge.finality !== 'FINALIZED' || canonical.run.judge.execution !== 'SUCCESS'

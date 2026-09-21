@@ -49,7 +49,7 @@ test("a finalized validator disagreement cannot produce a match result", async (
   await tracker.submit(submission);
   port.receipt = { statusName: "FINALIZED", resultName: "MAJORITY_DISAGREE", txExecutionResultName: "FINISHED_WITH_RETURN" };
   port.getComparison = async () => { throw new Error("canonical read must not run"); };
-  assert.deepEqual(await tracker.poll(submission.matchId, submission.attemptId), { state: "FAILED" });
+  assert.deepEqual(await tracker.poll(submission.matchId, submission.attemptId), { state: "FAILED", failureReason: "NO_CONSENSUS" });
 });
 
 test("E6 SDK adapter estimates v0.6 fees and submits the exact comparison ABI", async () => {

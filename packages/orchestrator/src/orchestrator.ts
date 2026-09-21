@@ -26,7 +26,7 @@ export interface OrchestratorInference { run(input: InferenceInput): Promise<Pai
 export type OrchestratorJudgeInput = InferenceInput & Required<Omit<PairOutput, "state">>;
 export type OrchestratorJudgeOutcome =
   | { state: "SUBMITTED" | "PENDING" | "ACCEPTED" }
-  | { state: "FAILED" }
+  | { state: "FAILED"; failureReason?: "NO_CONSENSUS" }
   | { state: "FINALIZED"; result: MatchResult };
 export interface OrchestratorJudge {
   judge(input: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome>;

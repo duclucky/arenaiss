@@ -103,7 +103,10 @@ export class TournamentComparisonJudgeAdapter implements OrchestratorJudge {
   async submit(input: OrchestratorJudgeInput): Promise<void> { await this.tracker.submit(this.submission(input)); }
   async poll(input: OrchestratorJudgeInput): Promise<OrchestratorJudgeOutcome> {
     const outcome = await this.tracker.poll(input.matchId, input.attemptId);
-    if (outcome.state !== "FINALIZED" || !outcome.run) return { state: outcome.state as "SUBMITTED" | "PENDING" | "ACCEPTED" | "FAILED" };
+    if (outcome.state !== "FINALIZED" || !outcome.run) return {
+      state: outcome.state as "SUBMITTED" | "PENDING" | "ACCEPTED" | "FAILED",
+      ...(outcome.failureReason ? { failureReason: outcome.failureReason } : {}),
+    };
     if (outcome.run.result === "TIE" || outcome.run.result === "RETRYABLE") return { state: "FINALIZED" as const, result: outcome.run.result };
     return { state: "FINALIZED" as const, result: resultForTournamentProgression(outcome.run) };
   }
