@@ -74,6 +74,7 @@ export class PairSettlementWorker {
         this.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'JOINED', evaluationStage: 'QUEUED', evaluationFailureCode: undefined, evaluationAttempts: undefined, retryAt: undefined });
         return;
       }
+      if (chain.state === 2) return; // The join receipt can precede the wallet adapter's transaction-hash response.
       if (chain.state !== 1) throw new Error('pending Arc join requires reconciliation');
       if (this.now() >= room.joinDeadline) {
         await this.arc.expire(room.roomId);
@@ -152,7 +153,7 @@ export class PairSettlementWorker {
     if (!same(chain.creator, room.creatorWallet) || chain.stake !== BigInt(room.stake)
       || chain.creatorAgentVersion.toLowerCase() !== `0x${room.creatorVersion.slice(7)}`
       || chain.joinDeadline !== room.joinDeadline || chain.resolutionDeadline !== room.resolutionDeadline) throw new Error('Arc room creator binding mismatch');
-    if ((room.state === 'JOINED' || (room.state === 'JOINING' && room.joinTx && chain.state === 2)) && (!room.challengerWallet || !room.challengerVersion || !room.joinTx
+    if ((room.state === 'JOINED' || (room.state === 'JOINING' && chain.state === 2)) && (!room.challengerWallet || !room.challengerVersion || (room.state === 'JOINED' && !room.joinTx)
       || !same(chain.challenger, room.challengerWallet)
       || chain.challengerAgentVersion.toLowerCase() !== `0x${room.challengerVersion.slice(7)}`)) throw new Error('Arc room challenger binding mismatch');
   }

@@ -226,6 +226,33 @@ test('confirmed pending join is reconciled from Arc and becomes eligible for jud
   } finally { f.runtime.close(); }
 });
 
+test('Arc confirming a join before its transaction hash is stored does not delay evaluation', async () => {
+  const f = fixture();
+  try {
+    f.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'JOINING', joinTx: undefined, evaluationStage: undefined });
+    await f.worker.tick();
+    const pending = f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)!;
+    assert.equal(pending.state, 'JOINING');
+    assert.equal(pending.evaluationFailureCode, undefined);
+    assert.equal(f.runtime.get('pair-room-worker-retries', room.roomId), undefined);
+    f.runtime.put('pair-rooms-v1', room.roomId, { ...pending, state: 'JOINED', joinTx: room.joinTx, evaluationStage: 'QUEUED' });
+    await f.worker.tick();
+    assert.equal(f.resolves, 1);
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationStage, 'WAITING_VERDICT');
+  } finally { f.runtime.close(); }
+});
+
+test('an unrecorded join with a different Arc challenger is not accepted', async () => {
+  const f = fixture();
+  try {
+    f.runtime.put('pair-rooms-v1', room.roomId, { ...room, state: 'JOINING', joinTx: undefined });
+    f.setArc({ ...chainRoom, challenger: address('9') });
+    await f.worker.tick();
+    assert.equal(f.resolves, 0);
+    assert.equal(f.runtime.get<PairRoom>('pair-rooms-v1', room.roomId)?.evaluationFailureCode, 'ARC_ERROR');
+  } finally { f.runtime.close(); }
+});
+
 test('independent Pair Match rooms progress concurrently', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   let active = 0; let peak = 0; let started = 0;
