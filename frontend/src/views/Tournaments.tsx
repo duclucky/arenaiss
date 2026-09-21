@@ -7,6 +7,7 @@ import type { Tournament } from '../adapters/interfaces';
 const ARCHIVED_TOURNAMENT_IDS = new Set([
   'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
   'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
+  'sha256:17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480',
 ]);
 
 export function Tournaments() {

@@ -25,23 +25,25 @@ test('Pair worker ticks overlap so a slow room batch cannot block the next scan'
   finally { releaseFirst(); await first; }
 });
 
-test('startup purge removes only the two archived Tournament graphs and is idempotent', () => {
+test('startup purge removes only the three archived Tournament graphs and is idempotent', () => {
   const database = new SqliteRuntimeStore(':memory:');
   try {
     const recoveryId = `sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd`;
     const referenceId = `sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
+    const referenceCupId = 'sha256:17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480';
     const recoveryArcId = `0x4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd`;
     const referenceArcId = `0x3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
     const pairId = `sha256:${'9'.repeat(64)}`;
     database.put('api-tournaments', recoveryId, { id: recoveryId });
     database.put('tournament-operations', referenceId, { input: { tournamentId: referenceId } });
+    database.put('api-tournaments', referenceCupId, { id: referenceCupId, name: 'Arena ISS Reference Cup', status: 'CANCELLED' });
     database.put('api-registrations', 'recovery-registration', { tournamentId: recoveryArcId });
     database.put('api-registrations', 'reference-registration', { tournamentId: referenceArcId });
     database.put('pair-rooms-v1', pairId, { roomId: pairId, state: 'JOINED' });
     database.increment('inference-cost', recoveryId, 3);
     database.claimLease('tournament-operation-leases', referenceId, referenceId, 'worker', 1, 100);
 
-    assert.deepEqual(purgeArchivedTournamentLogs(database), { records: 4, counters: 1, leases: 1 });
+    assert.deepEqual(purgeArchivedTournamentLogs(database), { records: 5, counters: 1, leases: 1 });
     assert.deepEqual(database.list('api-tournaments'), []);
     assert.deepEqual(database.list('tournament-operations'), []);
     assert.deepEqual(database.list('api-registrations'), []);

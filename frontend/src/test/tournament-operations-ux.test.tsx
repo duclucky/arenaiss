@@ -15,10 +15,12 @@ describe('Tournament operator console', () => {
   it('keeps archived production Tournaments out of the public schedule', async () => {
     const archivedRecoveryId = 'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd';
     const archivedReferenceId = 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61';
+    const archivedReferenceCupId = 'sha256:17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480';
     const visibleId = `sha256:${'b'.repeat(64)}`;
     const reads = { async listTournaments() { return [
       { id: archivedRecoveryId, name: 'Arena ISS Daily 2026-09-17 UTC', status: 'ACTIVE', operationState: 'RECOVERY_REQUIRED', entrantIds: Array(9).fill('entrant'), prizePool: '9' },
       { id: archivedReferenceId, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', entrantIds: [], prizePool: '0.008' },
+      { id: archivedReferenceCupId, name: 'Arena ISS Reference Cup', status: 'CANCELLED', entrantIds: [], prizePool: '0' },
       { id: visibleId, name: 'Visible Tournament history', status: 'CANCELLED', entrantIds: [], prizePool: '0' },
     ]; } } as unknown as ArenaReadAdapter;
 
@@ -27,6 +29,7 @@ describe('Tournament operator console', () => {
     expect(await screen.findByRole('heading', { name: 'Visible Tournament history' })).toBeInTheDocument();
     expect(screen.queryByText('Arena ISS Daily 2026-09-17 UTC')).not.toBeInTheDocument();
     expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
+    expect(screen.queryByText('Arena ISS Reference Cup')).not.toBeInTheDocument();
   });
 
   it('loads the public Tournament schedule and leads with the open registration', async () => {
