@@ -54,7 +54,7 @@ it('does not show stale evaluation metadata on an open room', async () => {
   render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches /></AppProvider></MemoryRouter>);
   expect(await screen.findByRole('button', { name: 'Join and deposit' })).toBeInTheDocument();
   expect(screen.queryByText('Evaluation code:')).not.toBeInTheDocument();
-  expect(screen.queryByText('ARC_ERROR')).not.toBeInTheDocument();
+  expect(screen.queryByText('ARC ERROR')).not.toBeInTheDocument();
 });
 
 it('shows a room read failure and retries the list without implying no rooms exist', async () => {
@@ -160,7 +160,7 @@ it('opens the finalized GenLayer scorecard from a completed room', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'View GenLayer judgment' }));
   expect(await screen.findByRole('region', { name: 'GenLayer judgment details' })).toHaveTextContent('Creator followed the retry safety requirements more completely.');
   expect(screen.getByText('Creator covered every required step.')).toBeInTheDocument();
-  expect(screen.getByText('MISSING_CONFIRMATION')).toBeInTheDocument();
+  expect(screen.getByText('MISSING CONFIRMATION')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open transaction in GenLayer explorer' })).toHaveAttribute('href', `https://explorer-studio-dev.genlayer.com/transactions/${verdictTx}`);
 });
 
@@ -211,7 +211,7 @@ it('shows the safe evaluation failure code and its specific explanation', async 
       evaluationFailureCode: 'GENLAYER_BUSY', evaluationAttempts: 1, retryAt: 1_999_999_000 }];
   } })));
   render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
-  expect(await screen.findByText('GENLAYER_BUSY')).toBeInTheDocument();
+  expect(await screen.findByText('GENLAYER BUSY')).toBeInTheDocument();
   expect(screen.getByText(/GenLayer has no free execution slot/)).toBeInTheDocument();
 });
 
@@ -225,7 +225,7 @@ it('labels a finalized GenLayer disagreement as no consensus rather than an exec
       evaluationFailureCode: 'GENLAYER_NO_CONSENSUS', evaluationAttempts: 1 }];
   } })));
   render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
-  expect(await screen.findByText('GENLAYER_NO_CONSENSUS')).toBeInTheDocument();
+  expect(await screen.findByText('GENLAYER NO CONSENSUS')).toBeInTheDocument();
   expect(screen.getByText(/automatic refund is final/i)).toBeInTheDocument();
   expect(screen.queryByText(/GenLayer did not accept or finalize a valid comparison/i)).not.toBeInTheDocument();
 });

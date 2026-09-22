@@ -4,6 +4,7 @@ import { useAppContext } from '../context';
 import { Match, MatchVerdict } from '../adapters/interfaces';
 import { ExternalLink } from 'lucide-react';
 import { agentDisplayName } from './match-display';
+import { displayLabel } from '../display-label';
 
 function isValidAbsoluteUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -45,7 +46,7 @@ export function MatchDetail() {
     </div>;
   }
 
-  if (error) return <div role="alert" className="glass-panel mx-auto max-w-3xl rounded-[28px] p-8"><p className="text-lg">{error}</p><button className="metal-button-ghost mt-5" onClick={() => setReload((value) => value + 1)}>Retry</button></div>;
+  if (error) return <div role="alert" className="glass-panel mx-auto max-w-3xl rounded-[28px] p-8"><p className="text-lg">{displayLabel(error)}</p><button className="metal-button-ghost mt-5" onClick={() => setReload((value) => value + 1)}>Retry</button></div>;
 
   if (!match) {
     return (
@@ -71,7 +72,7 @@ export function MatchDetail() {
             match.state === 'FAILED' || match.state === 'RETRY' || match.state === 'RETRYABLE' ? 'border-destructive text-destructive bg-destructive/10' :
             'border-border text-muted-foreground bg-muted'
           }`}>
-            {match.state}
+            {displayLabel(match.state)}
           </span>
         </div>
       </div>
@@ -95,7 +96,7 @@ export function MatchDetail() {
           {(match.events?.length ? match.events : [{ state: match.state }]).map((event, index) => {
             const labels: Record<string, string> = { SCHEDULED: 'Scheduled', WAITING_FOR_OUTPUTS: 'Awaiting Agent outputs', JUDGING: 'GenLayer judging', ACCEPTED: 'Judgment accepted', FAILED: 'Attempt failed', RETRYABLE: 'Retry required', FINALIZED: 'Verdict finalized', TIE: 'Tie', RETRY: 'Retrying', WINNER_ADVANCED: 'Winner advanced' };
             return <li key={`${index}-${event.state}`} className="retro-inset flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-              <span className="font-semibold">{labels[event.state] ?? event.state}</span>
+              <span className="font-semibold">{labels[event.state] ?? displayLabel(event.state)}</span>
               <span className="font-mono text-xs text-neutral-600">{event.at ? new Date(event.at * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC' : 'Time unavailable'}</span>
             </li>;
           })}
@@ -174,7 +175,7 @@ export function MatchDetail() {
                 <DetailFact label="Judge contract" value={verdict.judgeAddress} mono />
                 <DetailFact label="Canonical match ID" value={verdict.canonicalMatchId} mono />
                 <DetailFact label="Attempt ID" value={verdict.attemptId} mono />
-                <DetailFact label="Safety class" value={verdict.safetyClass} mono />
+                <DetailFact label="Safety class" value={verdict.safetyClass ? displayLabel(verdict.safetyClass) : undefined} mono />
                 <DetailFact label="Arc terminal state" value={verdict.arcState} />
                 <DetailFact label="Arc tournament" value={verdict.arcTournamentId} mono />
                 <DetailFact label="Arc escrow" value={verdict.arcEscrowAddress} mono />

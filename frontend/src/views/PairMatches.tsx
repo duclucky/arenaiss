@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { AgentProfile } from '../adapters/interfaces';
 import { useAppContext } from '../context';
+import { displayLabel } from '../display-label';
 
 type Room = {
   roomId: string; creator: string; challenger?: string; creatorWallet: string; challengerWallet?: string;
@@ -184,7 +185,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
         <NavLink key={key} to={`/pairs/${key}`} className={({ isActive }) => `metal-button-ghost ${isActive ? 'is-active' : ''}`}>{label}</NavLink>)}
     </nav>
     {!enabled && <div className="glass-panel p-6" role="status">Pair matches are being prepared. Deposits are disabled until the Arc escrow is deployed and verified.</div>}
-    {error && <p className="retro-inset p-4 text-red-900" role="alert">{error}</p>}
+    {error && <p className="retro-inset p-4 text-red-900" role="alert">{displayLabel(error)}</p>}
     {notice && <p className="retro-inset p-4" role="status">{notice}</p>}
     {view === 'open' && enabled && managedAccount && <form className="glass-panel space-y-4 p-6" onSubmit={(event) => { event.preventDefault(); if (!selected) return; void perform(async () => {
       await request('/api/pair-rooms', { agentId: selected.agentId, version: selected.agentsVersion, stake: parseStake(stake), idempotencyKey: createKey.current });
@@ -197,10 +198,10 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
       <button type="submit" className="metal-button-solid" disabled={pending || !selected}>Create and deposit</button>
     </form>}
     <section aria-labelledby="pair-rooms-heading"><h2 id="pair-rooms-heading" className="mb-4 text-2xl font-semibold">{viewCopy.title}</h2>
-      {roomsError ? <div className="glass-panel p-6" role="alert"><p>{roomsError}</p><button type="button" className="metal-button-ghost mt-4" onClick={() => void refresh().catch(() => undefined)}>Retry rooms</button></div>
+      {roomsError ? <div className="glass-panel p-6" role="alert"><p>{displayLabel(roomsError)}</p><button type="button" className="metal-button-ghost mt-4" onClick={() => void refresh().catch(() => undefined)}>Retry rooms</button></div>
         : !roomsLoaded ? <p className="glass-panel p-6" role="status">Loading rooms…</p>
         : visibleRooms.length === 0 ? <p className="glass-panel p-6">{viewCopy.empty}</p> : <ul className="space-y-3">{visibleRooms.map((room) => { const outcome = settledOutcome(room); return <li className="glass-panel space-y-3 p-5" key={room.roomId}>
-        <div className="flex flex-wrap items-center justify-between gap-3"><strong>{units(room.stake)} USDC each</strong><div className="flex flex-wrap items-center gap-2">{outcome && <span className={`pair-outcome ${outcome === 'YOU WON' ? 'pair-outcome--won' : 'pair-outcome--lost'}`}>{outcome}</span>}<span className="retro-chip px-3 py-1 text-xs">{room.state}</span></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><strong>{units(room.stake)} USDC each</strong><div className="flex flex-wrap items-center gap-2">{outcome && <span className={`pair-outcome ${outcome === 'YOU WON' ? 'pair-outcome--won' : 'pair-outcome--lost'}`}>{outcome}</span>}<span className="retro-chip px-3 py-1 text-xs">{displayLabel(room.state)}</span></div></div>
         <p className="break-all font-mono text-xs">Room {room.roomId}</p>
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           {room.createTx && <a className="underline" href={`https://testnet.arcscan.app/tx/${room.createTx}`} target="_blank" rel="noreferrer">Creator deposit</a>}
@@ -210,7 +211,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
         </div>
         <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
         {room.providerRoute && room.providerModel && <p className="break-all text-xs text-neutral-700">{room.providerRoute === 'FALLBACK' ? 'Fallback provider' : 'Primary provider'} · {room.providerModel}</p>}
-        {room.state !== 'OPEN' && room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{room.evaluationFailureCode}</code></p>}
+        {room.state !== 'OPEN' && room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{displayLabel(room.evaluationFailureCode)}</code></p>}
         {view === 'completed' && room.state === 'SETTLED' && room.verdictTx && <button type="button" className="metal-button-ghost" disabled={verdictLoading === room.roomId} onClick={() => void toggleVerdict(room.roomId)}>{expandedVerdict === room.roomId ? 'Hide GenLayer judgment' : verdictLoading === room.roomId ? 'Loading GenLayer judgment…' : 'View GenLayer judgment'}</button>}
         {expandedVerdict === room.roomId && verdictErrors[room.roomId] && <p role="alert" className="retro-inset p-4 text-sm text-red-900">{verdictErrors[room.roomId]}</p>}
         {expandedVerdict === room.roomId && verdictDetails[room.roomId] && <VerdictPanel detail={verdictDetails[room.roomId]} />}
@@ -233,9 +234,9 @@ function VerdictPanel({ detail }: { detail: VerdictDetail }) {
   return <section role="region" aria-label="GenLayer judgment details" className="retro-inset space-y-4 p-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="page-kicker">Final GenLayer judgment</p><h3 className="text-xl font-semibold">{sideLabel(detail.winner)} wins</h3></div><span className="retro-chip px-3 py-1 text-xs">{detail.evidence.rubricVersion}</span></div>
     <p className="text-sm leading-relaxed">{detail.summary}</p>
-    <dl className="grid gap-3 text-sm sm:grid-cols-3"><div><dt className="font-semibold">Creator score</dt><dd>{detail.scoreCreator}</dd></div><div><dt className="font-semibold">Challenger score</dt><dd>{detail.scoreChallenger}</dd></div><div><dt className="font-semibold">Safety class</dt><dd>{detail.safetyClass}</dd></div></dl>
-    <div><h4 className="font-semibold">Dimension decisions</h4><ul className="mt-2 space-y-2">{detail.dimensions.map((row) => <li key={row.dimensionId} className="border-t border-black/20 pt-2 text-sm"><strong>{dimensionLabels[row.dimensionId] ?? row.dimensionId}: {sideLabel(row.winner)}</strong><p className="mt-1 text-neutral-700">{row.reason}</p></li>)}</ul></div>
-    {(detail.policyFindingsCreator.length > 0 || detail.policyFindingsChallenger.length > 0) && <div><h4 className="font-semibold">Policy findings</h4><div className="mt-2 flex flex-wrap gap-2">{detail.policyFindingsCreator.map((code) => <code key={`creator-${code}`} className="retro-chip px-2 py-1">Creator · {code}</code>)}{detail.policyFindingsChallenger.map((code) => <code key={`challenger-${code}`} className="retro-chip px-2 py-1">{code}</code>)}</div></div>}
+    <dl className="grid gap-3 text-sm sm:grid-cols-3"><div><dt className="font-semibold">Creator score</dt><dd>{detail.scoreCreator}</dd></div><div><dt className="font-semibold">Challenger score</dt><dd>{detail.scoreChallenger}</dd></div><div><dt className="font-semibold">Safety class</dt><dd>{displayLabel(detail.safetyClass)}</dd></div></dl>
+    <div><h4 className="font-semibold">Dimension decisions</h4><ul className="mt-2 space-y-2">{detail.dimensions.map((row) => <li key={row.dimensionId} className="border-t border-black/20 pt-2 text-sm"><strong>{dimensionLabels[row.dimensionId] ?? displayLabel(row.dimensionId)}: {sideLabel(row.winner)}</strong><p className="mt-1 text-neutral-700">{row.reason}</p></li>)}</ul></div>
+    {(detail.policyFindingsCreator.length > 0 || detail.policyFindingsChallenger.length > 0) && <div><h4 className="font-semibold">Policy findings</h4><div className="mt-2 flex flex-wrap gap-2">{detail.policyFindingsCreator.map((code) => <code key={`creator-${code}`} className="retro-chip px-2 py-1">Creator · {displayLabel(code)}</code>)}{detail.policyFindingsChallenger.map((code) => <code key={`challenger-${code}`} className="retro-chip px-2 py-1">{displayLabel(code)}</code>)}</div></div>}
     <details><summary className="cursor-pointer font-semibold">Evidence bindings</summary><dl className="mt-3 space-y-2 break-all font-mono text-xs"><div><dt>Scenario</dt><dd>{detail.evidence.scenarioDigest}</dd></div><div><dt>Creator response</dt><dd>{detail.evidence.responseDigestCreator}</dd></div><div><dt>Challenger response</dt><dd>{detail.evidence.responseDigestChallenger}</dd></div></dl></details>
     <a className="underline" href={`https://explorer-studio-dev.genlayer.com/transactions/${detail.judge.transactionHash}`} target="_blank" rel="noreferrer">Open transaction in GenLayer explorer</a>
   </section>;

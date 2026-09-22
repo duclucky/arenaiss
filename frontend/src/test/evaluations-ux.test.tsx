@@ -302,7 +302,7 @@ describe('evaluation product UX', () => {
     const getRun = vi.fn(async (_id: string, privateView = false) => privateView ? privateRun : { ...run, scorecard: { ...run.scorecard, resultClass: 'FAIL', overallScore: 0 } });
     render(<MemoryRouter initialEntries={['/evaluation-runs/run_1']}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={{ ...evaluationApi, getRun }}><Routes><Route path="/evaluation-runs/:id" element={<EvaluationRunDetail />} /></Routes></AppProvider></MemoryRouter>);
     expect(await screen.findByText('Check existing receipts first.')).toBeInTheDocument();
-    expect(screen.getByText(/DUPLICATE_ACTION/)).toBeInTheDocument();
+    expect(screen.getByText(/DUPLICATE ACTION/)).toBeInTheDocument();
     expect(screen.getAllByText(/evidence\.read/).length).toBeGreaterThan(1);
     expect(screen.getAllByText('Repeated action ID')).toHaveLength(2);
     expect(screen.getByText(/80\/100 before the policy rule/i)).toBeInTheDocument();

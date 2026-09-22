@@ -3,6 +3,7 @@ import { ArrowLeft, Mail, WalletCards, X } from 'lucide-react';
 
 import { WalletProvider } from '../adapters/interfaces';
 import { useAppContext } from '../context';
+import { displayLabel } from '../display-label';
 
 type LoginMethod = 'choice' | 'wallet' | 'email';
 
@@ -163,7 +164,7 @@ export function LoginModal({ onClose, onAuthenticated }: { onClose: () => void; 
         {emailStep === 'email' ? <form onSubmit={submitEmail} className="space-y-4"><div><label htmlFor="login-email" className="mb-2 block text-sm font-semibold">Email address</label><input id="login-email" className="field-control" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></div><button className="metal-button-solid w-full" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send code'}</button></form> : <form onSubmit={submitCode} className="space-y-4"><div role="status" className="text-sm leading-relaxed text-emerald-800"><p>Code sent to <strong className="break-all">{email}</strong>.</p><p className="mt-1 text-xs text-neutral-700">Check the spelling and your spam folder. Only the newest code works.</p></div><div><label htmlFor="login-code" className="mb-2 block text-sm font-semibold">6-digit code</label><input id="login-code" className="field-control font-mono" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></div><button className="metal-button-solid w-full" type="submit" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify and sign in'}</button><button className="metal-button-ghost w-full" type="button" disabled={busy} onClick={resendCode}>{busy ? 'Sending…' : 'Resend code'}</button><button className="metal-button-ghost w-full" type="button" disabled={busy} onClick={() => { setEmailStep('email'); setCode(''); setError(''); }}>Use another email</button></form>}
       </div>}
 
-      {error && <p role="alert" className="mt-4 text-sm font-semibold text-destructive">{error}</p>}
+      {error && <p role="alert" className="mt-4 text-sm font-semibold text-destructive">{displayLabel(error)}</p>}
     </div>
   </div>;
 }

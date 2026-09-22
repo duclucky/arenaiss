@@ -4,6 +4,7 @@ import { useAppContext } from '../context';
 import { Tournament, Match } from '../adapters/interfaces';
 import { ShieldAlert, Info } from 'lucide-react';
 import { agentDisplayName } from './match-display';
+import { displayLabel } from '../display-label';
 
 export function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -44,7 +45,7 @@ export function TournamentDetail() {
     </div>;
   }
 
-  if (error) return <div role="alert" className="glass-panel mx-auto max-w-3xl rounded-[28px] p-8"><p className="text-lg">{error}</p><button className="metal-button-ghost mt-5" onClick={() => setReload((value) => value + 1)}>Retry</button></div>;
+  if (error) return <div role="alert" className="glass-panel mx-auto max-w-3xl rounded-[28px] p-8"><p className="text-lg">{displayLabel(error)}</p><button className="metal-button-ghost mt-5" onClick={() => setReload((value) => value + 1)}>Retry</button></div>;
 
   if (!tournament) {
     return (
@@ -158,7 +159,7 @@ export function TournamentDetail() {
                     m.state === 'FAILED' || m.state === 'RETRY' || m.state === 'RETRYABLE' ? 'border-destructive text-destructive' :
                     'border-border text-muted-foreground'
                   }`}>
-                    {m.state}
+                    {displayLabel(m.state)}
                   </span>
                   <Link
                     to={`/matches/${m.id}`}
@@ -205,7 +206,7 @@ function DemoTournamentDetail({ detail }: { detail: NonNullable<Tournament['demo
             <div className="min-w-0 flex-1 border-b border-black/10 pb-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><h3 className="font-semibold">{event.label}</h3><time className="font-mono text-xs text-neutral-600">{event.time}</time></div>
               <p className="mt-1 text-sm leading-relaxed text-neutral-700">{event.detail}</p>
-              <span className="mt-2 inline-flex retro-chip px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider">{event.status}</span>
+              <span className="mt-2 inline-flex retro-chip px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider">{displayLabel(event.status)}</span>
             </div>
           </li>)}
         </ol>
@@ -215,7 +216,7 @@ function DemoTournamentDetail({ detail }: { detail: NonNullable<Tournament['demo
         <div className="glass-panel rounded-[28px] p-5 md:p-6">
           <p className="page-kicker">Bracket state</p><h2 className="text-xl font-bold">Rounds</h2>
           <div className="mt-5 space-y-3">
-            {detail.rounds.map((round) => <div key={round.name} className="retro-inset flex items-center justify-between gap-3 p-3"><div><p className="font-semibold">{round.name}</p><p className="mt-1 text-xs text-neutral-600">{round.completedCount} / {round.matchCount} matches finalized</p></div><span className="retro-chip px-2 py-1 text-[11px] font-bold uppercase tracking-wider">{round.status}</span></div>)}
+            {detail.rounds.map((round) => <div key={round.name} className="retro-inset flex items-center justify-between gap-3 p-3"><div><p className="font-semibold">{round.name}</p><p className="mt-1 text-xs text-neutral-600">{round.completedCount} / {round.matchCount} matches finalized</p></div><span className="retro-chip px-2 py-1 text-[11px] font-bold uppercase tracking-wider">{displayLabel(round.status)}</span></div>)}
           </div>
         </div>
         <div className="glass-panel rounded-[28px] p-5 md:p-6">

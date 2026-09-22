@@ -4,6 +4,7 @@ import { AlertTriangle, ShoppingBag, Tag } from 'lucide-react';
 import { formatUnits, parseUnits } from 'viem';
 import { useAppContext } from '../context';
 import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, MarketplaceListing } from '../adapters/interfaces';
+import { displayLabel } from '../display-label';
 
 const uuid = () => crypto.randomUUID();
 const nowSeconds = () => Math.floor(Date.now() / 1000);
@@ -36,10 +37,10 @@ function eligibilityReasons(message: string): Array<{ code: string; explanation:
 
 function MarketplaceError({ message, onRefresh }: { message: string; onRefresh: () => void }) {
   const reasons = eligibilityReasons(message);
-  if (!reasons) return <div role="alert" className="mt-8 border border-red-700 bg-red-50 p-4 text-sm">{message} <button type="button" className="ml-3 underline" onClick={onRefresh}>Refresh state</button></div>;
+  if (!reasons) return <div role="alert" className="mt-8 border border-red-700 bg-red-50 p-4 text-sm">{displayLabel(message)} <button type="button" className="ml-3 underline" onClick={onRefresh}>Refresh state</button></div>;
   return <section role="alert" aria-labelledby="marketplace-eligibility-error" className="mt-8 border border-red-700 bg-red-50 p-5 text-sm">
     <div className="flex items-start gap-3"><AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-red-800" size={20}/><div className="min-w-0"><h2 id="marketplace-eligibility-error" className="text-lg font-bold text-red-950">This Agent version is not eligible yet</h2><p className="mt-2 leading-relaxed text-red-950">Marketplace certification stopped because the selected evaluations failed these requirements:</p></div></div>
-    <ul className="mt-4 space-y-3">{reasons.map((reason) => <li key={reason.code} className="retro-inset p-4"><p className="font-mono text-xs font-bold text-red-950">{reason.code}</p><p className="mt-2 leading-relaxed text-neutral-800">{reason.explanation}</p></li>)}</ul>
+    <ul className="mt-4 space-y-3">{reasons.map((reason) => <li key={reason.code} className="retro-inset p-4"><p className="font-mono text-xs font-bold text-red-950">{displayLabel(reason.code)}</p><p className="mt-2 leading-relaxed text-neutral-800">{reason.explanation}</p></li>)}</ul>
     <p className="mt-4 leading-relaxed text-red-950"><strong>How to qualify:</strong> Review the failed runs, update this Agent version, then complete two new evaluations. All required runs must have no blocking policy findings, an average score of at least 80, and a score spread of 20 points or less.</p>
     <div className="mt-4 flex flex-wrap gap-3"><Link className="metal-button-ghost" to="/evaluations">Open evaluations</Link><button type="button" className="metal-button-ghost" onClick={onRefresh}>Refresh after new evaluations</button></div>
   </section>;
@@ -197,7 +198,7 @@ export function Marketplace() {
     <div role="tablist" aria-label="Marketplace sections" className="mt-8 grid gap-2 sm:grid-cols-2"><button role="tab" aria-selected={activeView === 'browse'} className={activeView === 'browse' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({}, { replace: true })}><ShoppingBag size={17} aria-hidden="true" /> Agents for sale</button><button role="tab" aria-selected={activeView === 'sell'} className={activeView === 'sell' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ view: 'sell' }, { replace: true })}><Tag size={17} aria-hidden="true" /> Sell my Agent</button></div>
     {error && <MarketplaceError message={error} onRefresh={() => refresh().catch((cause) => setError(cause instanceof Error ? cause.message : 'Refresh failed.'))}/>}
     {activeView === 'browse' && <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{listings.map((row) => <article className="glass-panel flex min-h-64 flex-col p-5" key={row.listingId}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">Agent listing</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip px-2 py-1 text-xs">{row.state}</span></div>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">Agent listing</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
       <dl className="mt-8 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
       <div className="mt-auto pt-6">{listingAction(row)}</div>
     </article>)}</div>}

@@ -3,6 +3,7 @@ import { ChevronRight, Copy, ShieldAlert } from 'lucide-react';
 import type { ManagedCctpTransfer, ManagedUsdcBalance, ManagedUsdcTransfer } from '../adapters/interfaces';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { displayLabel } from '../display-label';
 
 type CreditRow = { tournamentId: string; entrantId: string; credit: string; refundAvailable: boolean };
 type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
@@ -377,7 +378,7 @@ export function Account() {
 
             {walletAction && <div role={walletAction.state === 'error' ? 'alert' : 'status'} className={walletAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
               {walletAction.state === 'submitting' && 'Submitting securely through Circle…'}
-              {walletAction.state === 'error' && walletAction.message}
+              {walletAction.state === 'error' && walletAction.message && displayLabel(walletAction.message)}
             </div>}
 
             {usdcTransfer && <div role={usdcTransfer.state === 'FAILED' || usdcTransfer.state === 'RECOVERY_REQUIRED' ? 'alert' : 'status'} className="text-sm font-semibold">
@@ -392,7 +393,7 @@ export function Account() {
 
             {legacyBridgeAction && <div role={legacyBridgeAction.state === 'error' ? 'alert' : 'status'} className={legacyBridgeAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
               {legacyBridgeAction.state === 'submitting' && cctpStatusText(legacyBridgeAction.operation)}
-              {legacyBridgeAction.state === 'error' && legacyBridgeAction.message}
+              {legacyBridgeAction.state === 'error' && legacyBridgeAction.message && displayLabel(legacyBridgeAction.message)}
               {legacyBridgeAction.state === 'done' && <>CCTP source burn submitted · {legacyBridgeAction.operation.explorerUrl
                 ? <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
                 : legacyBridgeAction.operation.transactionId}</>}
@@ -428,7 +429,7 @@ export function Account() {
         {account && !networkConfig && <div role="alert" className="glass-panel rounded-[28px] p-6 text-destructive">Arc Testnet is not configured.</div>}
         {account && networkConfig && !agentApi && <div role="status" className="glass-panel rounded-[28px] p-6 text-muted-foreground">Preparing your wallet session…</div>}
         {account && creditsState === 'loading' && <div role="status" aria-atomic="true" className="glass-panel rounded-[28px] p-8 text-muted-foreground">Verifying tournament registrations and escrow credits…</div>}
-        {account && creditsState === 'error' && <div role="alert" className="glass-panel rounded-[28px] p-6"><p className="text-destructive">{creditsError}</p><button type="button" className="metal-button-ghost mt-4" onClick={() => setReload((value) => value + 1)}>Try again</button></div>}
+        {account && creditsState === 'error' && <div role="alert" className="glass-panel rounded-[28px] p-6"><p className="text-destructive">{displayLabel(creditsError)}</p><button type="button" className="metal-button-ghost mt-4" onClick={() => setReload((value) => value + 1)}>Try again</button></div>}
         {account && creditsState === 'ready' && creditRows.length === 0 && <div className="glass-panel rounded-[28px] p-8 text-muted-foreground">No confirmed tournament participation was found for this wallet.</div>}
         {account && creditsState === 'ready' && creditRows.length > 0 && <ul className="space-y-3" aria-label="Participated tournaments">
           {creditRows.map((row) => {

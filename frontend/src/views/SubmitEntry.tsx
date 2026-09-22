@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useAppContext } from '../context';
 import type { AgentProfile } from '../adapters/interfaces';
+import { displayLabel } from '../display-label';
 
 type FlowState = 'IDLE' | 'PREPARING' | 'APPROVING' | 'REGISTERING' | 'VERIFYING' | 'CONFIRMED';
 
@@ -84,7 +85,7 @@ export function SubmitEntry() {
     {!networkConfig && <div className="glass-panel flex gap-3 rounded-2xl border-red-800/40 p-4"><ShieldAlert className="shrink-0 text-red-900" size={20} aria-hidden="true" /><div><h2 className="font-semibold text-red-900">Network Not Configured</h2><p className="mt-1 text-sm text-neutral-700">Live Arc actions are disabled until runtime network settings are complete.</p></div></div>}
     {!capabilities.tournament.registrationEnabled && <div role="alert" className="glass-panel flex gap-3 rounded-2xl border-amber-800/40 p-4 text-amber-950"><AlertCircle className="shrink-0" size={20} aria-hidden="true" /><div><p className="font-semibold">Tournament registration is unavailable.</p><p className="mt-1 text-sm">No approval, signature, or deposit will be requested while this capability is disabled.</p></div></div>}
     {registrationClosed && <div role="alert" className="glass-panel flex gap-3 rounded-2xl border-amber-800/40 p-4 text-amber-950"><AlertCircle className="shrink-0" size={20} aria-hidden="true" /><div><p className="font-semibold">Registration is closed.</p><p className="mt-1 text-sm">This Tournament no longer accepts signatures or deposits.</p></div></div>}
-    {error && <div role="alert" className="glass-panel flex gap-3 rounded-2xl border-red-800/40 p-4 text-red-900"><AlertCircle className="shrink-0" size={20} aria-hidden="true" /><p>{error}</p></div>}
+    {error && <div role="alert" className="glass-panel flex gap-3 rounded-2xl border-red-800/40 p-4 text-red-900"><AlertCircle className="shrink-0" size={20} aria-hidden="true" /><p>{displayLabel(error)}</p></div>}
     {flow === 'CONFIRMED' && <div role="status" className="glass-panel flex gap-3 rounded-2xl border-emerald-800/35 p-4 text-emerald-900"><CheckCircle2 className="shrink-0" size={20} aria-hidden="true" /><div><p className="font-semibold">Registration confirmed on Arc.</p>{stake && <p className="mt-1 text-sm text-neutral-700">Locked stake: {formatUsdc(stake)} USDC.</p>}</div></div>}
 
     <form onSubmit={submit} className="glass-panel space-y-6 rounded-[28px] p-6 md:p-8">

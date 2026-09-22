@@ -55,8 +55,8 @@ describe('Marketplace website UX', () => {
     expect(screen.getByText(/at least one evaluation run contains a blocking policy finding/i)).toBeInTheDocument();
     expect(screen.getByText(/highest and lowest evaluation scores is greater than the allowed 20 points/i)).toBeInTheDocument();
     expect(screen.getByText(/review the failed runs, update this Agent version, then complete two new evaluations/i)).toBeInTheDocument();
-    expect(screen.getByText('CRITICAL_POLICY_FINDING')).toBeInTheDocument();
-    expect(screen.getByText('SCORE_SPREAD_ABOVE_THRESHOLD')).toBeInTheDocument();
+    expect(screen.getByText('CRITICAL POLICY FINDING')).toBeInTheDocument();
+    expect(screen.getByText('SCORE SPREAD ABOVE THRESHOLD')).toBeInTheDocument();
   });
 
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context';
 import type { AgentDetail, AgentProfile, RegressionPolicy, VersionComparison } from '../adapters/interfaces';
+import { displayLabel } from '../display-label';
 
 const LOCKED_REGRESSION_POLICY: RegressionPolicy = {
   schema: 'arena-regression-policy-v1', requiredRunsPerScenario: 1, minimumScenarioCoverageBps: 10_000,
@@ -82,7 +83,7 @@ export function Agents() {
       <Link to="/agents/new" className="metal-button-solid">Create Agent</Link>
     </div>
     {receipt && <div role="status" className="glass-panel flex items-center justify-between gap-4 p-4"><span>Agent deactivated on Arc.</span><a href={receipt} target="_blank" rel="noreferrer" className="font-semibold underline">View Arc transaction <ExternalLink className="inline" size={14}/></a></div>}
-    {error && <div role="alert" className="glass-panel border-red-800/40 p-4 text-red-900">{error}</div>}
+    {error && <div role="alert" className="glass-panel border-red-800/40 p-4 text-red-900">{displayLabel(error)}</div>}
     {!account ? <div className="glass-panel rounded-[28px] p-7 text-neutral-700">Connect a wallet to load your agents.</div>
       : !agentApi ? <div className="glass-panel rounded-[28px] p-7 text-neutral-700">Agent API is not configured.</div>
       : loading ? <div role="status" className="glass-panel rounded-[28px] p-7">Loading agents…</div>
@@ -98,7 +99,7 @@ export function Agents() {
       {detail.registration?.explorerUrl && <a href={detail.registration.explorerUrl} target="_blank" rel="noreferrer" className="mb-5 inline-block font-semibold underline">Registered on Arc <ExternalLink className="inline" size={14}/></a>}
       <div className="flex items-center justify-between gap-3"><h3 className="font-bold">AGENTS.md</h3><button type="button" className="metal-button-ghost" onClick={() => navigator.clipboard.writeText(detail.agentsMd)}><Copy size={15}/> Copy</button></div>
       <pre className="retro-inset mt-3 max-h-64 overflow-auto whitespace-pre-wrap p-4 text-sm">{detail.agentsMd}</pre>
-      <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${item.status}`)}/><History title="Evaluations" rows={detail.evaluations.map((item) => `Agent evaluation · ${item.state}`)}/></div>
+      <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${displayLabel(item.status)}`)}/><History title="Evaluations" rows={detail.evaluations.map((item) => `Agent evaluation · ${displayLabel(item.state)}`)}/></div>
       <section className="mt-6 border-t border-black/20 pt-5" aria-labelledby="comparison-heading">
         <p className="page-kicker">Regression check</p><h3 id="comparison-heading" className="text-xl font-bold">Version comparison</h3>
         <p className="mt-2 text-sm text-neutral-600">Compares finalized evaluation evidence under the locked Arena ISS thresholds.</p>
@@ -108,7 +109,7 @@ export function Agents() {
         </div>
         <button type="button" className="metal-button-solid mt-4" disabled={!evaluationApi || detail.versions.length < 2 || baselineVersion === candidateVersion || comparing} onClick={compareVersions}>{comparing ? 'Comparing...' : 'Compare versions'}</button>
         {detail.versions.length < 2 && <p className="mt-3 text-sm text-neutral-600">Create and evaluate another version before comparing.</p>}
-        {comparison && <div role="status" className="retro-inset mt-4 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-lg">{comparison.status}</strong><span>{comparison.coverageBps / 100}% coverage</span></div><p className="mt-2 text-sm">Baseline {comparison.baseline?.overallScore ?? 'N/A'} · Candidate {comparison.candidate?.overallScore ?? 'N/A'}</p>{comparison.findings.length > 0 && <ul className="mt-3 list-disc pl-5 text-sm">{comparison.findings.map((finding) => <li key={`${finding.code}-${finding.dimension || ''}`}>{finding.code}{finding.dimension ? `: ${finding.dimension}` : ''}</li>)}</ul>}</div>}
+        {comparison && <div role="status" className="retro-inset mt-4 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-lg">{displayLabel(comparison.status)}</strong><span>{comparison.coverageBps / 100}% coverage</span></div><p className="mt-2 text-sm">Baseline {comparison.baseline?.overallScore ?? 'N/A'} · Candidate {comparison.candidate?.overallScore ?? 'N/A'}</p>{comparison.findings.length > 0 && <ul className="mt-3 list-disc pl-5 text-sm">{comparison.findings.map((finding) => <li key={`${finding.code}-${finding.dimension || ''}`}>{displayLabel(finding.code)}{finding.dimension ? `: ${displayLabel(finding.dimension)}` : ''}</li>)}</ul>}</div>}
       </section>
     </Modal>}
     {deleting && <Modal title={`Deactivate ${deleting.name}`} closeLabel="Cancel deactivation" onClose={() => setDeleting(null)}>

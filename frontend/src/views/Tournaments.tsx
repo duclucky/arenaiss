@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, Bot, Clock3, GitBranch, RefreshCw, Trophy, Users, WalletCards } from 'lucide-react';
 import { useAppContext } from '../context';
 import type { Tournament } from '../adapters/interfaces';
+import { displayLabel } from '../display-label';
 
 const ARCHIVED_TOURNAMENT_IDS = new Set([
   'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
@@ -52,7 +53,7 @@ export function Tournaments() {
       <LifecycleStep icon={<WalletCards size={20} aria-hidden="true" />} number="03" title="Claim on Arc" copy="Top-five credits, cancellations, and insufficient-entry refunds remain claimable from your Account." />
     </section>
 
-    {loading ? <TournamentSkeleton /> : error ? <div role="alert" className="glass-panel rounded-[28px] p-6 md:p-8"><p className="text-lg font-semibold">Tournament schedule could not be loaded</p><p className="mt-2 text-sm text-neutral-700">{error}</p><div className="mt-5 flex flex-wrap gap-3"><button type="button" className="metal-button-solid" onClick={() => setReload((value) => value + 1)}><RefreshCw size={16} aria-hidden="true" /> Try again</button><Link to="/account?tab=claim" className="metal-button-ghost">View existing claims</Link></div></div>
+    {loading ? <TournamentSkeleton /> : error ? <div role="alert" className="glass-panel rounded-[28px] p-6 md:p-8"><p className="text-lg font-semibold">Tournament schedule could not be loaded</p><p className="mt-2 text-sm text-neutral-700">{displayLabel(error)}</p><div className="mt-5 flex flex-wrap gap-3"><button type="button" className="metal-button-solid" onClick={() => setReload((value) => value + 1)}><RefreshCw size={16} aria-hidden="true" /> Try again</button><Link to="/account?tab=claim" className="metal-button-ghost">View existing claims</Link></div></div>
       : !featured ? <div className="glass-panel rounded-[28px] p-8 md:p-10"><span className="retro-icon-box inline-flex p-3"><Trophy size={22} aria-hidden="true" /></span><h2 className="mt-6 text-2xl font-semibold tracking-tight">No Tournament is accepting entries right now.</h2><p className="mt-3 max-w-2xl leading-relaxed text-neutral-700">The next Daily Tournament appears here after the previous run reaches settlement or refund. You can prepare an Agent now or review any existing claim.</p><div className="mt-6 flex flex-wrap gap-3"><Link to="/agents/new" className="metal-button-solid">Prepare an agent</Link><Link to="/account?tab=claim" className="metal-button-ghost">View claims</Link></div></div>
       : <><FeaturedTournament tournament={featured} registrationEnabled={capabilities.tournament.registrationEnabled} />{ordered.length > 1 && <section aria-labelledby="tournament-history-heading"><div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><p className="page-kicker">Schedule and history</p><h2 id="tournament-history-heading" className="text-2xl font-semibold tracking-tight">Other Tournaments</h2></div><Link to="/account?tab=claim" className="text-sm font-semibold underline decoration-neutral-400 underline-offset-4 hover:decoration-black">Review claims and refunds</Link></div><div className="space-y-3">{ordered.slice(1).map((tournament) => <TournamentRow key={tournament.id} tournament={tournament} />)}</div></section>}</>}
 
