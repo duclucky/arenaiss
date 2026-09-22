@@ -3,7 +3,7 @@
   "createdAt": "2026-09-21",
   "scope": "LOCAL_ONLY",
   "fileCount": 308,
-  "sourceBundleSha256": "81e3c177e5a3721ef4f5b6a8ba72bb9093591decb1970915d13cd439ad767347",
+  "sourceBundleSha256": "c4108274f66cbf828565ae878d12d14c7c9e07135c6e40bd0d09be357b081a2f",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -53,7 +53,7 @@
     "scripts/check.ps1": "39cf7a8f69baa002557284116db04fb40b8b0222f3ff20669e318e51360b23af",
     "services/api/src/pair-arc.ts": "0e2ffbdeacd20991c49ef111dc52f2b137a8e94cc493d344cbda7f507022eec6",
     "services/api/src/pair-rooms.ts": "8c7508657366d95a5dcd650502604a369354807d6a0b7084d15150233aca4034",
-    "frontend/src/views/PairMatches.tsx": "e3b661de1d24eaaae97a2385dc29afabd9e4ec18cd2ab3115289a42bdf92bdeb",
+    "frontend/src/views/PairMatches.tsx": "917ec5e94ec6b17d6ada5a0b5b1850f0161ab41d34cf64c714b2c0aedf4ae55f",
     "scripts/deploy-agent-marketplace.mjs": "e96a21c6ca14e04fc580ac75f9b7a64dfeedfa5237cde8c067fca370a5c14109",
     "packages/marketplace/src/eligibility.ts": "05fb6dbee91d132b25f3dc51fa4effd82c8116889dd878d912bd48557eb3c5ba",
     "packages/marketplace/test/eligibility.test.ts": "a816a98eaf35df8f22c3dd189779d735e081a4388edff0f321f03ae3d92cbdf9",
@@ -153,7 +153,7 @@
     "pythonDirectTests": 84,
     "typescriptTests": 361,
     "foundryTests": 33,
-    "frontendTests": 137
+    "frontendTests": 138
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

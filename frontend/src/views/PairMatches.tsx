@@ -210,7 +210,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
         </div>
         <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
         {room.providerRoute && room.providerModel && <p className="break-all text-xs text-neutral-700">{room.providerRoute === 'FALLBACK' ? 'Fallback provider' : 'Primary provider'} · {room.providerModel}</p>}
-        {room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{room.evaluationFailureCode}</code></p>}
+        {room.state !== 'OPEN' && room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{room.evaluationFailureCode}</code></p>}
         {view === 'completed' && room.state === 'SETTLED' && room.verdictTx && <button type="button" className="metal-button-ghost" disabled={verdictLoading === room.roomId} onClick={() => void toggleVerdict(room.roomId)}>{expandedVerdict === room.roomId ? 'Hide GenLayer judgment' : verdictLoading === room.roomId ? 'Loading GenLayer judgment…' : 'View GenLayer judgment'}</button>}
         {expandedVerdict === room.roomId && verdictErrors[room.roomId] && <p role="alert" className="retro-inset p-4 text-sm text-red-900">{verdictErrors[room.roomId]}</p>}
         {expandedVerdict === room.roomId && verdictDetails[room.roomId] && <VerdictPanel detail={verdictDetails[room.roomId]} />}

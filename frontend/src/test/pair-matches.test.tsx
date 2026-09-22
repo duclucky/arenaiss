@@ -40,6 +40,23 @@ it('shows cancel and refund for an email owner whose managed wallet funded the o
   expect(screen.queryByRole('button', { name: 'Join and deposit' })).not.toBeInTheDocument();
 });
 
+it('does not show stale evaluation metadata on an open room', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
+    ok: true,
+    async json() {
+      if (url.endsWith('/config')) return { enabled: true };
+      return [{ roomId: `sha256:${'3'.repeat(64)}`, creator: `usr_${'4'.repeat(64)}`, creatorWallet: `0x${'5'.repeat(40)}`,
+        creatorAgentId: `sha256:${'6'.repeat(64)}`, stake: '3000000', joinDeadline: 1_999_999_999,
+        resolutionDeadline: 2_000_000_000, state: 'OPEN', evaluationStage: 'RETRYING',
+        evaluationFailureCode: 'ARC_ERROR', evaluationAttempts: 16 }];
+    },
+  })));
+  render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches /></AppProvider></MemoryRouter>);
+  expect(await screen.findByRole('button', { name: 'Join and deposit' })).toBeInTheDocument();
+  expect(screen.queryByText('Evaluation code:')).not.toBeInTheDocument();
+  expect(screen.queryByText('ARC_ERROR')).not.toBeInTheDocument();
+});
+
 it('shows a room read failure and retries the list without implying no rooms exist', async () => {
   let roomReads = 0;
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
