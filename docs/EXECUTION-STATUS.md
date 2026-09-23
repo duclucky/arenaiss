@@ -1,5 +1,16 @@
 # Implementation execution status
 
+## 2026-09-24 Marketplace Arena ownership handoff
+
+Marketplace reconciliation now transfers the backend Agent owner and stored
+ERC-8004 owner address only after an exact canonical Arc `SOLD` snapshot binds
+the token ID, Agent version, commitment, seller, buyer, price and expiry. The
+buyer receives Agent read, update and deactivation control, while the seller
+loses those permissions. A finalized sale whose onchain NFT moved before this
+change is included in reconciliation until the persisted Arena ownership is
+repaired. Focused service and HTTP regression tests cover new sales, restart,
+idempotent backfill and seller revocation.
+
 ## 2026-09-24 ERC-8004 Marketplace V2 — Arc Testnet deployed
 
 `AgentMarketplaceV2` replaces the legacy Arena registry as Marketplace

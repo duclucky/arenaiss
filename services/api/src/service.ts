@@ -608,7 +608,9 @@ export class ArenaApiService {
     else if (snapshot.state === "ACTIVE" && snapshot.registryOwner.toLowerCase() !== row.sellerAddress) throw new Error("canonical seller mismatch");
     if (row.state === "SOLD" && snapshot.state !== "SOLD") throw new Error("marketplace state cannot regress");
     if ((row.state === "BUY_SUBMITTED" || row.state === "CANCEL_SUBMITTED") && snapshot.state === "ACTIVE") return this.publicMarketplaceListing(row);
-    row.state = snapshot.state; this.runtime?.put("marketplace-listings", row.listingId, row); return this.publicMarketplaceListing(row); }
+    row.state = snapshot.state; this.runtime?.put("marketplace-listings", row.listingId, row);
+    if (row.state === "SOLD") this.transferMarketplaceAgentOwnership(row);
+    return this.publicMarketplaceListing(row); }
   beginMarketplacePurchase(caller: string, listingId: string, buyerAddress: string, keys: { approvalIdempotencyKey: string; buyIdempotencyKey: string }): { approvalIdempotencyKey: string; buyIdempotencyKey: string } {
     const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId);
     if (!row || row.seller === buyer || !ADDRESS.test(buyerAddress)) throw new Error("marketplace listing is unavailable");
@@ -634,7 +636,7 @@ export class ArenaApiService {
   }
   submitMarketplacePurchase(caller: string, listingId: string, buyerAddress: string, transaction: MarketplaceTransaction): PublicMarketplaceListing { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "BUY_SUBMITTED" || row.buyer !== buyer || row.buyerAddress !== buyerAddress.toLowerCase()) throw new Error("marketplace listing is unavailable"); row.purchase = structuredClone(transaction); this.runtime?.put("marketplace-listings", row.listingId, row); return this.publicMarketplaceListing(row); }
   listMarketplaceListings(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state !== "SUBMITTED").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
-  listMarketplaceListingsForReconciliation(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state === "SUBMITTED" || row.state === "BUY_SUBMITTED" || row.state === "CANCEL_SUBMITTED").map((row) => this.publicMarketplaceListing(row)); }
+  listMarketplaceListingsForReconciliation(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state === "SUBMITTED" || row.state === "BUY_SUBMITTED" || row.state === "CANCEL_SUBMITTED" || this.marketplaceOwnershipIsStale(row)).map((row) => this.publicMarketplaceListing(row)); }
   listOwnedMarketplaceListings(caller: string): PublicMarketplaceListing[] { const owner = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.seller === owner).map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   listOwnedMarketplacePurchases(caller: string): PublicMarketplaceListing[] { const buyer = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.buyer === buyer && row.state === "SOLD").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   getMarketplaceDelivery(caller: string, listingId: string, snapshot: MarketplaceArcSnapshot): { agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; agentsMd: string } { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "SOLD" || row.buyer !== buyer || snapshot.state !== "SOLD" || snapshot.registryOwner.toLowerCase() !== row.buyerAddress || snapshot.buyerAddress?.toLowerCase() !== row.buyerAddress || snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment) throw new Error("marketplace delivery unavailable"); const agent = this.agents.get(row.agentId)!; const version = agent.versions.find((item) => item.agentsVersion === row.agentVersionId)!; return { agentId: row.agentId, agentVersionId: row.agentVersionId, agentsCommitment: row.agentsCommitment, agentsMd: version.agentsMd }; }
@@ -685,6 +687,24 @@ export class ArenaApiService {
       .filter((record) => record.agentVersionId === latest.agentsVersion)
       .sort((left, right) => right.createdAt - left.createdAt)[0];
     return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}), ...(agent.erc8004Identity ? { erc8004Identity: structuredClone(agent.erc8004Identity) } : {}), ...(reputation ? { erc8004Reputation: { state: reputation.state, value: reputation.value, ...(reputation.feedbackIndex !== undefined ? { feedbackIndex: reputation.feedbackIndex } : {}), ...(reputation.transaction ? { transaction: structuredClone(reputation.transaction) } : {}) } } : {}) };
+  }
+
+  private marketplaceOwnershipIsStale(listing: MarketplaceListing): boolean {
+    if (listing.state !== "SOLD" || !listing.buyer || !listing.buyerAddress) return false;
+    const agent = this.agents.get(listing.agentId);
+    return !agent || agent.owner !== listing.buyer || agent.erc8004Identity?.ownerAddress.toLowerCase() !== listing.buyerAddress;
+  }
+
+  private transferMarketplaceAgentOwnership(listing: MarketplaceListing): void {
+    if (!listing.buyer || !listing.buyerAddress) throw new Error("marketplace buyer binding missing");
+    const agent = this.agents.get(listing.agentId);
+    if (!agent?.erc8004Identity || agent.erc8004Identity.tokenId !== listing.erc8004TokenId) throw new Error("Marketplace Agent identity binding mismatch");
+    if (agent.owner !== listing.seller && agent.owner !== listing.buyer) throw new Error("Marketplace Agent owner mismatch");
+    const identityOwner = agent.erc8004Identity.ownerAddress.toLowerCase();
+    if (identityOwner !== listing.sellerAddress && identityOwner !== listing.buyerAddress) throw new Error("Marketplace Agent wallet owner mismatch");
+    agent.owner = listing.buyer;
+    agent.erc8004Identity.ownerAddress = listing.buyerAddress;
+    this.runtime?.put("api-agents", agent.agentId, agent);
   }
   private agentStats(agent: Agent): AgentStats {
     const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));

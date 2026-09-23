@@ -6,6 +6,7 @@ import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-run
 
 const operator = `0x${'a'.repeat(40)}`;
 const alice = `0x${'b'.repeat(40)}`;
+const bob = `0x${'c'.repeat(40)}`;
 
 test('Marketplace routes are public-read, owner-private and fail closed without an Arc port', async () => {
   const api = new ArenaHttpApi(new ArenaApiService(operator), async () => true);
@@ -106,6 +107,44 @@ test('Marketplace reconciles a submitted listing from Arc after service restart'
     assert.equal(reads, 1);
     assert.deepEqual(response.body.map((row: { state: string }) => row.state), ['ACTIVE']);
     assert.equal(runtime.get<{ state: string }>('marketplace-listings', '1')?.state, 'ACTIVE');
+  } finally { runtime.close(); }
+});
+
+test('Public Agent reconciliation transfers Arena control after a canonical ERC-8004 sale', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const agentId = `sha256:${'1'.repeat(64)}`;
+    const version = `sha256:${'2'.repeat(64)}`;
+    const commitment = `sha256:${'3'.repeat(64)}`;
+    runtime.put('api-agents', agentId, {
+      agentId, owner: alice, name: 'Transferred Agent', active: true,
+      erc8004Identity: { schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5_042_002,
+        registryAddress: `0x${'d'.repeat(40)}`, tokenId: '42', ownerAddress: alice,
+        agentUri: 'https://arenaiss.xyz/api/agents/example/erc8004.json', transaction: { transactionId: 'identity', state: 'COMPLETE' } },
+      versions: [{ agentId, agentsVersion: version, agentsCommitment: commitment, agentsMd: '# Private', createdAt: 1 }],
+    });
+    runtime.put('marketplace-listings', '7', {
+      schema: 'arena-marketplace-listing-v1', listingId: '7', certificateDigest: `sha256:${'4'.repeat(64)}`,
+      agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: '42',
+      name: 'Transferred Agent', seller: alice, sellerAddress: alice, buyer: bob, buyerAddress: bob,
+      price: '3000000', expiresAt: 2_000_000_000, state: 'SOLD',
+    });
+    let reads = 0;
+    const chain = { async snapshot(listingId: string) {
+      reads += 1;
+      return { listingId, tokenId: '42', agentId, version, commitment, sellerAddress: alice,
+        buyerAddress: bob, price: '3000000', expiresAt: 2_000_000_000, state: 'SOLD' as const,
+        registryOwner: bob, registryActive: true };
+    } };
+    const service = new ArenaApiService(operator, runtime);
+    const api = new ArenaHttpApi(service, async () => true, undefined, chain);
+    const response = await api.handle({ method: 'GET', path: '/api/public/agents' });
+    assert.equal(response.status, 200);
+    assert.equal(reads, 1);
+    assert.equal(response.body[0].owner, bob);
+    assert.equal(response.body[0].erc8004Identity.ownerAddress, bob);
+    assert.deepEqual(service.listOwnedAgents(bob).map((agent) => agent.agentId), [agentId]);
+    assert.deepEqual(service.listOwnedAgents(alice), []);
   } finally { runtime.close(); }
 });
 

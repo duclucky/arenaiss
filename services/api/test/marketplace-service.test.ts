@@ -10,30 +10,76 @@ const agentId = `sha256:${'1'.repeat(64)}` as const;
 const version = `sha256:${'2'.repeat(64)}` as const;
 const commitment = `sha256:${'3'.repeat(64)}` as const;
 const certificateDigest = `sha256:${'4'.repeat(64)}` as const;
+const tokenId = '42';
+
+function seedAgent(runtime: SqliteRuntimeStore, owner = seller, ownerAddress = seller) {
+  runtime.put('api-agents', agentId, {
+    agentId, owner, name: 'Private Agent', active: true,
+    erc8004Identity: {
+      schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5_042_002,
+      registryAddress: `0x${'d'.repeat(40)}`, tokenId, ownerAddress,
+      agentUri: 'https://arenaiss.xyz/api/agents/example/erc8004.json',
+      transaction: { transactionId: 'identity', state: 'COMPLETE' },
+    },
+    versions: [{ agentId, agentsVersion: version, agentsCommitment: commitment, agentsMd: '# Private Agent', createdAt: 1 }],
+  });
+}
 
 test('Marketplace projection requires exact Arc bindings and delivery requires current buyer ownership', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
-    runtime.put('marketplace-listings', '1', { schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, name: 'Private Agent', seller, sellerAddress: seller, price: '1000000', expiresAt: 2000, state: 'BUY_SUBMITTED', buyer, buyerAddress: buyer });
+    seedAgent(runtime);
+    runtime.put('marketplace-listings', '1', { schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId, name: 'Private Agent', seller, sellerAddress: seller, price: '1000000', expiresAt: 2000, state: 'BUY_SUBMITTED', buyer, buyerAddress: buyer });
     const service = new ArenaApiService(operator, runtime);
-    const snapshot = { listingId: '1', agentId, version, commitment, sellerAddress: seller, buyerAddress: buyer, price: '1000000', expiresAt: 2000, state: 'SOLD' as const, registryOwner: buyer, registryActive: true };
+    const snapshot = { listingId: '1', tokenId, agentId, version, commitment, sellerAddress: seller, buyerAddress: buyer, price: '1000000', expiresAt: 2000, state: 'SOLD' as const, registryOwner: buyer, registryActive: true };
     assert.throws(() => service.publishMarketplaceListing(seller, snapshot), /operator/);
     assert.throws(() => service.publishMarketplaceListing(operator, { ...snapshot, registryOwner: seller }), /buyer/);
     assert.throws(() => service.publishMarketplaceListing(operator, { ...snapshot, price: '1000001' }), /binding/);
     assert.equal(service.publishMarketplaceListing(operator, snapshot).state, 'SOLD');
     assert.deepEqual(service.listOwnedMarketplacePurchases(buyer).map((row) => row.listingId), ['1']);
     assert.deepEqual(service.listOwnedMarketplacePurchases(seller), []);
+    assert.deepEqual(service.listOwnedAgents(buyer).map((row) => row.agentId), [agentId]);
+    assert.deepEqual(service.listOwnedAgents(seller), []);
+    assert.equal(service.getAgentDetail(buyer, agentId).agentsMd, '# Private Agent');
+    assert.throws(() => service.getAgentDetail(seller, agentId), /unauthorized/);
+    assert.equal(service.getPublicAgent(agentId).erc8004Identity?.ownerAddress, buyer);
+    assert.equal(runtime.get<any>('api-agents', agentId)?.owner, buyer);
     assert.throws(() => service.getMarketplaceDelivery(buyer, '1', { ...snapshot, registryOwner: seller }), /delivery/);
     assert.throws(() => service.getMarketplaceDelivery(seller, '1', snapshot), /delivery/);
     assert.equal(JSON.stringify(service.listMarketplaceListings()).includes('seller"'), false);
   } finally { runtime.close(); }
 });
 
+test('Marketplace reconciliation repairs a previously finalized sale with stale Arena ownership', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    seedAgent(runtime);
+    runtime.put('marketplace-listings', '9', {
+      schema: 'arena-marketplace-listing-v1', listingId: '9', certificateDigest, agentId,
+      agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId,
+      name: 'Private Agent', seller, sellerAddress: seller, buyer, buyerAddress: buyer,
+      price: '3000000', expiresAt: 3000, state: 'SOLD',
+    });
+    const service = new ArenaApiService(operator, runtime);
+    assert.deepEqual(service.listMarketplaceListingsForReconciliation().map((row) => row.listingId), ['9']);
+    const snapshot = { listingId: '9', tokenId, agentId, version, commitment, sellerAddress: seller,
+      buyerAddress: buyer, price: '3000000', expiresAt: 3000, state: 'SOLD' as const,
+      registryOwner: buyer, registryActive: true };
+    assert.equal(service.publishMarketplaceListing(operator, snapshot).state, 'SOLD');
+    assert.deepEqual(service.listMarketplaceListingsForReconciliation(), []);
+    const restarted = new ArenaApiService(operator, runtime);
+    assert.deepEqual(restarted.listOwnedAgents(buyer).map((row) => row.agentId), [agentId]);
+    assert.throws(() => restarted.updateAgent(seller, agentId, '# Seller must not retain control'), /unauthorized/);
+    assert.equal(restarted.updateAgent(buyer, agentId, '# Buyer controls the Agent').agentsVersion.startsWith('sha256:'), true);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace purchase binds buyer and replay keys before Circle and recovers a sale after restart', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
+    seedAgent(runtime);
     runtime.put('marketplace-listings', '2', { schema: 'arena-marketplace-listing-v1', listingId: '2',
-      certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment,
+      certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId,
       name: 'Agent', seller, sellerAddress: seller, price: '1000000', expiresAt: 2000, state: 'ACTIVE' });
     const service = new ArenaApiService(operator, runtime);
     const keys = { approvalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
@@ -44,7 +90,7 @@ test('Marketplace purchase binds buyer and replay keys before Circle and recover
     const restarted = new ArenaApiService(operator, runtime);
     assert.deepEqual(restarted.beginMarketplacePurchase(buyer, '2', buyer, { approvalIdempotencyKey: 'new', buyIdempotencyKey: 'new' }), keys);
     assert.throws(() => restarted.beginMarketplacePurchase(operator, '2', operator, keys), /unavailable/);
-    const snapshot = { listingId: '2', agentId, version, commitment, sellerAddress: seller,
+    const snapshot = { listingId: '2', tokenId, agentId, version, commitment, sellerAddress: seller,
       buyerAddress: buyer, price: '1000000', expiresAt: 2000, state: 'SOLD' as const,
       registryOwner: buyer, registryActive: true };
     assert.equal(restarted.publishMarketplaceListing(operator, snapshot).state, 'SOLD');
