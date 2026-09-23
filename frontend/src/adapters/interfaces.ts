@@ -227,14 +227,14 @@ export interface ManagedIdentityAdapter {
   logout(): Promise<void>;
 }
 
-export type MarketplaceCertificate = { schema: string; certificateDigest: string; evidenceDigest: string; owner: string; agentId: string; agentVersionId: string; agentsCommitment: string; packId: string; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: 'ELIGIBLE' | 'APPROVED'; authorization?: ManagedWalletTransaction };
-export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; name: string; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'CANCEL_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
+export type MarketplaceCertificate = { schema: string; certificateDigest: string; evidenceDigest: string; owner: string; agentId: string; agentVersionId: string; agentsCommitment: string; erc8004TokenId: string; packId: string; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: 'ELIGIBLE' | 'APPROVED'; authorization?: ManagedWalletTransaction };
+export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; erc8004TokenId: string; name: string; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'CANCEL_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
 export interface MarketplaceApiAdapter {
   listListings(): Promise<MarketplaceListing[]>;
   listPurchases?(): Promise<MarketplaceListing[]>;
   listCertificates(): Promise<MarketplaceCertificate[]>;
   createEligibility(input: { agentId: string; agentsVersion: string; campaignIds: string[]; issuedAt: number; expiresAt: number; network: string; chainId: number; judgeAddress: string }): Promise<MarketplaceCertificate>;
-  createListing(input: { listingId: string; certificateDigest: string; agentId: string; agentsVersion: string; agentsCommitment: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<MarketplaceListing>;
+  createListing(input: { listingId: string; certificateDigest: string; agentId: string; agentsVersion: string; agentsCommitment: string; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string }): Promise<MarketplaceListing>;
   cancelListing?(listingId: string, idempotencyKey: string): Promise<MarketplaceListing>;
   buy(listingId: string, approvalIdempotencyKey: string, buyIdempotencyKey: string): Promise<MarketplaceListing>;
   getDelivery(listingId: string): Promise<{ agentId: string; agentVersionId: string; agentsCommitment: string; agentsMd: string }>;

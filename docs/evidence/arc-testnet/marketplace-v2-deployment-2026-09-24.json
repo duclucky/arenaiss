@@ -1,0 +1,24 @@
+{
+  "schema": "arena-marketplace-deployment-v2",
+  "network": "arc-testnet",
+  "chain_id": 5042002,
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "erc8004_identity_registry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+  "owner": "0xC495ef51618D03267A1f227aFe5b27B38c748272",
+  "marketplace": {
+    "address": "0x2763dF7a2f4e29EeA87Cc6f79aA09caE30a94819",
+    "deployment_transaction": "0xa2dd5c63a411b147258a06ae4ab1ba15361baf930deaf1fc65f428be30b2fdff",
+    "block_number": 63630781,
+    "gas_used": "923416",
+    "platform_fee_bps": 100,
+    "source_sha256": "3f6fadda3fbf6499e2cfd6ad55ee575d99b4a9e416a030543bac8f9b5a0d3b7b",
+    "runtime_bytecode_sha256": "5a6aeb940492c948586d814330bb39daea6c6b9ef5dbdc23171d97d13c2f9119"
+  },
+  "review": {
+    "arc_studio_app": "a54cf8de-df4f-431f-b645-e75a34f3dd05",
+    "critical_findings": 0,
+    "high_findings": 0,
+    "medium_findings": 0
+  },
+  "status": "DEPLOYED_ARC_STUDIO_REVIEWED_TESTNET"
+}

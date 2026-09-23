@@ -47,7 +47,7 @@ test('Marketplace eligibility is approved automatically by the configured system
       agentVersionId: `sha256:${'2'.repeat(64)}`, agentsCommitment: `sha256:${'3'.repeat(64)}`,
       packId: `sha256:${'6'.repeat(64)}`, packVersion: '1.0.0', rubricVersion: 'v1',
       coverageBps: 10000, overallScore: 90, dimensionScores: {}, maxSpread: 0,
-      issuedAt: 1, expiresAt: 9999999999, state: 'ELIGIBLE' as const };
+      issuedAt: 1, expiresAt: 9999999999, state: 'ELIGIBLE' as const, erc8004TokenId: '42' };
     runtime.put('marketplace-certificates', certificateDigest, certificate);
     const service = new ArenaApiService(operator, runtime);
     service.createMarketplaceEligibility = (() => structuredClone(certificate)) as typeof service.createMarketplaceEligibility;
@@ -78,7 +78,7 @@ test('Marketplace eligibility is approved automatically by the configured system
       network: 'studio-next', chainId: 61997, judgeAddress: operator,
     } });
     assert.equal(replay.body.certificateDigest, certificateDigest);
-    assert.equal(approvalCalls, 1);
+    assert.equal(approvalCalls, 2);
   } finally { runtime.close(); }
 });
 
@@ -90,14 +90,14 @@ test('Marketplace reconciles a submitted listing from Arc after service restart'
     const commitment = `sha256:${'3'.repeat(64)}`;
     runtime.put('marketplace-listings', '1', {
       schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest: `sha256:${'4'.repeat(64)}`,
-      agentId, agentVersionId: version, agentsCommitment: commitment, name: 'Agent',
+      agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: '42', name: 'Agent',
       seller: alice, sellerAddress: alice, price: '1000000', expiresAt: 2_000_000_000,
       state: 'SUBMITTED', transaction: { transactionId: 'circle-1', state: 'SENT', txHash: `0x${'5'.repeat(64)}` },
     });
     let reads = 0;
     const chain = { async snapshot(listingId: string) {
       reads += 1;
-      return { listingId, agentId, version, commitment, sellerAddress: alice, price: '1000000',
+      return { listingId, tokenId: '42', agentId, version, commitment, sellerAddress: alice, price: '1000000',
         expiresAt: 2_000_000_000, state: 'ACTIVE' as const, registryOwner: alice, registryActive: true };
     } };
     const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, undefined, chain);
@@ -117,26 +117,26 @@ test('Marketplace listing records intent before Circle and reuses the receipt af
     const commitment = `sha256:${'3'.repeat(64)}`;
     const certificateDigest = `sha256:${'4'.repeat(64)}`;
     const userId = `usr_${'9'.repeat(64)}`;
-    runtime.put('api-agents', agentId, { agentId, owner: alice, name: 'Agent', versions: [
+    runtime.put('api-agents', agentId, { agentId, owner: alice, name: 'Agent', erc8004Identity: { tokenId: '42' }, versions: [
       { agentId, agentsVersion: version, agentsCommitment: commitment, agentsMd: '# Agent', createdAt: 1 },
     ], active: true });
     runtime.put('marketplace-certificates', certificateDigest, { schema: 'arena-marketplace-certificate-v1',
       certificateDigest, evidenceDigest: `sha256:${'5'.repeat(64)}`, owner: alice, agentId,
       agentVersionId: version, agentsCommitment: commitment, packId: `sha256:${'6'.repeat(64)}`,
       packVersion: '1.0.0', rubricVersion: 'v1', coverageBps: 10000, overallScore: 90,
-      dimensionScores: {}, maxSpread: 0, issuedAt: 1, expiresAt: 3_000_000_000, state: 'APPROVED' });
+      dimensionScores: {}, maxSpread: 0, issuedAt: 1, expiresAt: 3_000_000_000, state: 'APPROVED', erc8004TokenId: '42' });
     let calls = 0;
     let resolves = 0;
     const managed = { loginWallet: async () => ({ principal: alice, userId, identity: { kind: 'WALLET' } }),
       getAccount: async () => ({ principal: alice, userId, identity: { kind: 'WALLET' }, managedWallet: { address: alice } }),
-      marketplaceCreateListing: async (inputUserId: string, input: { idempotencyKey: string }) => {
+      marketplaceCreateListing: async (inputUserId: string, input: { listingIdempotencyKey: string }) => {
         assert.equal(inputUserId, userId);
-        assert.equal(runtime.get<any>('marketplace-listing-intents', certificateDigest)?.idempotencyKey, input.idempotencyKey);
+        assert.equal(runtime.get<any>('marketplace-listing-intents', certificateDigest)?.listingIdempotencyKey, input.listingIdempotencyKey);
         calls += 1;
         return { transactionId: 'circle-list', state: 'COMPLETE', txHash: `0x${'7'.repeat(64)}` };
       },
       resumeCctpTransfers: async () => {}, resumeUsdcTransfers: async () => {} };
-    const chain = { async snapshot() { throw new Error('unused'); }, async resolveCreatedListingId() {
+    const chain = { async snapshot() { throw new Error('unused'); }, async approveEligibility() { return { transactionId: 'marketplace-v2-readback', state: 'COMPLETE' }; }, async resolveCreatedListingId() {
       resolves += 1;
       if (resolves === 1) throw new Error('Arc receipt temporarily unavailable');
       return '3';
@@ -147,11 +147,11 @@ test('Marketplace listing records intent before Circle and reuses the receipt af
     const headers = { cookie: login.headers['set-cookie'].split(';')[0] };
     const body = { listingId: '123', agentId, agentsVersion: version, agentsCommitment: commitment,
       certificateDigest, price: '1000000', expiresAt: 2_000_000_000,
-      idempotencyKey: '11111111-1111-4111-8111-111111111111' };
+      nftApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111', listingIdempotencyKey: '22222222-2222-4222-8222-222222222222' };
     assert.equal((await api.handle({ method: 'POST', path: '/api/marketplace/listings', headers, body })).status, 503);
     assert.equal(calls, 1);
     const recovered = await api.handle({ method: 'POST', path: '/api/marketplace/listings', headers,
-      body: { ...body, idempotencyKey: '22222222-2222-4222-8222-222222222222' } });
+      body: { ...body, nftApprovalIdempotencyKey: '33333333-3333-4333-8333-333333333333', listingIdempotencyKey: '44444444-4444-4444-8444-444444444444' } });
     assert.equal(recovered.status, 202);
     assert.equal(recovered.body.listingId, '3');
     assert.equal(calls, 1);

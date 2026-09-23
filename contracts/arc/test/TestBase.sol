@@ -6,6 +6,7 @@ interface Vm {
     function prank(address sender) external;
     function startPrank(address sender) external;
     function stopPrank() external;
+    function expectRevert() external;
     function expectRevert(bytes4 selector) external;
 }
 

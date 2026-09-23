@@ -35,7 +35,7 @@ New Agents created through an Arena managed Circle wallet use the official ERC-8
 4. The registration URI exposes the Arena Agent ID, version and commitment, owner address, network, and supported reputation trust model. It does not expose `AGENTS.md` plaintext.
 5. After all six Evo scenarios finalize, the separate evaluator wallet writes the campaign average with `giveFeedback` to the ERC-8004 Reputation Registry. Arena verifies the event and canonical `readFeedback` result before marking the feedback complete.
 
-Identity registration is part of Agent creation and fails closed. Reputation publication is durable and retryable, but it cannot roll back a finalized evaluation or its Arc fee settlement. The current Marketplace contract transfers Arena's legacy registry ownership; transferring the ERC-8004 token as part of a sale is not yet wired into Marketplace settlement.
+Identity registration is part of Agent creation and fails closed. Reputation publication is durable and retryable, but it cannot roll back a finalized evaluation or its Arc fee settlement. Marketplace V2 uses the official ERC-8004 Identity Registry as its sole ownership authority. Listing automatically approves the exact identity NFT for the Marketplace, and purchase atomically transfers that NFT while settling Arc Testnet USDC.
 
 Bounded live Arc Testnet evidence: ERC-8004 Agent `#896819` was [registered](https://testnet.arcscan.app/tx/0x749a42cc9a88ee89fa0246c16b854429221967acccaea7c07c57834f3c8f4d81), and its finalized Evo campaign published [98/100 reputation feedback](https://testnet.arcscan.app/tx/0x0b5dd785b458d4852c62811d57798045fb7f0dc93e8417b4541452457394680d). This proves that bounded testnet path, not universal Agent quality or mainnet readiness.
 
@@ -59,7 +59,7 @@ flowchart LR
 | Node API | Authentication, private profile storage, orchestration, retries, and canonical readback |
 | Deterministic policy | Objective action, schema, budget, identity, and settlement checks |
 | GenLayer | Validator-controlled qualitative judgment over exact submitted evidence |
-| Arc | ERC-8004 identity and reputation, Arena registry ownership, ERC-20 USDC custody, credits, refunds, and marketplace settlement |
+| Arc | ERC-8004 identity and reputation, ERC-20 USDC custody, credits, refunds, and atomic marketplace identity settlement |
 
 ## Current testnet deployments
 
@@ -73,7 +73,7 @@ flowchart LR
 | PairMatchEscrow | [`0xD7CB...c6c1`](https://testnet.arcscan.app/address/0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1) |
 | TournamentEscrow V2 | [`0xc908...702B`](https://testnet.arcscan.app/address/0xc908a4BFb6E94dDD3F32C34d9bfEBf774E3b702B) |
 | AgentRegistry V2 | [`0xc427...Eada`](https://testnet.arcscan.app/address/0xc427dBf5Dc0b58245Ac94d6634856Dd472bdEada) |
-| AgentMarketplace | [`0x48c1...a2Df`](https://testnet.arcscan.app/address/0x48c15e258D9b87933B823c91Ace6EBC209Fba2Df) |
+| AgentMarketplaceV2 | [`0x2763...4819`](https://testnet.arcscan.app/address/0x2763dF7a2f4e29EeA87Cc6f79aA09caE30a94819) |
 | EvoFeeEscrow | [`0xa769...98E9`](https://testnet.arcscan.app/address/0xa7693481E17736F1617b3a6dc199aA31D86398E9) |
 
 ### GenLayer Studio development preview, chain ID `61997`

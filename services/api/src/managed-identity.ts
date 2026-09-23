@@ -52,7 +52,7 @@ export type CircleWalletPort = {
   withdrawTournamentCredit(input: { walletId: string; escrowAddress: string; tournamentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   claimTournamentRefund(input: { walletId: string; escrowAddress: string; tournamentId: string; entrantId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   registerTournamentEntrant(input: { walletId: string; escrowAddress: string; stakeAmount: string; tournamentId: string; entrantId: string; agentId: string; agentsVersion: string; agentsCommitment: string; approvalIdempotencyKey: string; registrationIdempotencyKey: string }): Promise<WalletTransactionResult>;
-  marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; identityRegistryAddress: string; tokenId: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceCancel(input: { walletId: string; marketplaceAddress: string; listingId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult>;
   marketplaceWithdraw(input: { walletId: string; marketplaceAddress: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -88,6 +88,7 @@ export type ManagedIdentityOptions = {
   generateEmailCode?: () => string;
   now?: () => number;
   agentRegistryAddress?: string;
+  erc8004IdentityRegistryAddress?: string;
   marketplaceAddress?: string;
   evaluationEscrowAddress?: string;
   tournamentEscrowAddress?: string;
@@ -102,6 +103,7 @@ export class ManagedIdentityService {
   private readonly generateEmailCode: () => string;
   private readonly now: () => number;
   private readonly agentRegistryAddress?: string;
+  private readonly erc8004IdentityRegistryAddress?: string;
   private readonly marketplaceAddress?: string;
   private readonly evaluationEscrowAddress?: string;
   private readonly tournamentEscrowAddress?: string;
@@ -120,6 +122,7 @@ export class ManagedIdentityService {
     this.generateEmailCode = options.generateEmailCode ?? (() => String(randomInt(0, 1_000_000)).padStart(6, '0'));
     this.now = options.now ?? Date.now;
     this.agentRegistryAddress = options.agentRegistryAddress ? requireAddress(options.agentRegistryAddress) : undefined;
+    this.erc8004IdentityRegistryAddress = options.erc8004IdentityRegistryAddress ? requireAddress(options.erc8004IdentityRegistryAddress) : undefined;
     this.marketplaceAddress = options.marketplaceAddress ? requireAddress(options.marketplaceAddress) : undefined;
     this.evaluationEscrowAddress = options.evaluationEscrowAddress ? requireAddress(options.evaluationEscrowAddress) : undefined;
     this.tournamentEscrowAddress = options.tournamentEscrowAddress ? requireAddress(options.tournamentEscrowAddress) : undefined;
@@ -378,9 +381,9 @@ export class ManagedIdentityService {
     return this.circleWallets.registerTournamentEntrant({ walletId: wallet.walletId, escrowAddress: this.tournamentEscrowAddress, ...input, ...keys });
   }
 
-  async marketplaceCreateListing(userId: string, input: { agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {
-    const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress) throw new Error('marketplace unavailable');
-    return this.circleWallets.marketplaceCreateListing({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, ...input });
+  async marketplaceCreateListing(userId: string, input: { tokenId: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId); if (!this.marketplaceAddress || !this.erc8004IdentityRegistryAddress) throw new Error('marketplace unavailable');
+    return this.circleWallets.marketplaceCreateListing({ walletId: wallet.walletId, marketplaceAddress: this.marketplaceAddress, identityRegistryAddress: this.erc8004IdentityRegistryAddress, ...input });
   }
 
   async marketplaceBuy(userId: string, listingId: string, price: string, approvalIdempotencyKey: string, buyIdempotencyKey: string): Promise<WalletTransactionResult> {

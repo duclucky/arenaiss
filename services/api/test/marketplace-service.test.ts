@@ -56,17 +56,17 @@ test('Marketplace purchase binds buyer and replay keys before Circle and recover
 test('Marketplace listing validates and persists a reusable Circle intent before an Arc write', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
-    runtime.put('api-agents', agentId, { agentId, owner: seller, name: 'Agent', versions: [
+    runtime.put('api-agents', agentId, { agentId, owner: seller, name: 'Agent', erc8004Identity: { tokenId: '42' }, versions: [
       { agentId, agentsVersion: version, agentsCommitment: commitment, agentsMd: '# Agent', createdAt: 1 },
     ], active: true });
     runtime.put('marketplace-certificates', certificateDigest, { schema: 'arena-marketplace-certificate-v1',
       certificateDigest, evidenceDigest: `sha256:${'5'.repeat(64)}`, owner: seller,
       agentId, agentVersionId: version, agentsCommitment: commitment, packId: `sha256:${'6'.repeat(64)}`,
       packVersion: '1.0.0', rubricVersion: 'v1', coverageBps: 10000, overallScore: 90,
-      dimensionScores: {}, maxSpread: 0, issuedAt: 1, expiresAt: 3_000_000_000, state: 'APPROVED' });
+      dimensionScores: {}, maxSpread: 0, issuedAt: 1, expiresAt: 3_000_000_000, state: 'APPROVED', erc8004TokenId: '42' });
     const input = { certificateDigest, agentId, agentsVersion: version, agentsCommitment: commitment,
       sellerAddress: seller, price: '1000000', expiresAt: 2_000_000_000,
-      idempotencyKey: '11111111-1111-4111-8111-111111111111' };
+      nftApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111', listingIdempotencyKey: '22222222-2222-4222-8222-222222222222' };
     const service = new ArenaApiService(operator, runtime);
     assert.throws(() => service.beginMarketplaceListing(buyer, input), /approved marketplace certificate/);
     assert.equal(runtime.list('marketplace-listing-intents').length, 0);
@@ -74,9 +74,9 @@ test('Marketplace listing validates and persists a reusable Circle intent before
     assert.throws(() => service.beginMarketplaceListing(seller, { ...input, price: (2n ** 128n).toString() }), /invalid marketplace listing/);
     assert.equal(runtime.list('marketplace-listing-intents').length, 0);
     const prepared = service.beginMarketplaceListing(seller, input);
-    assert.equal(runtime.get<any>('marketplace-listing-intents', certificateDigest)?.idempotencyKey, input.idempotencyKey);
+    assert.equal(runtime.get<any>('marketplace-listing-intents', certificateDigest)?.nftApprovalIdempotencyKey, input.nftApprovalIdempotencyKey);
     const restarted = new ArenaApiService(operator, runtime);
-    assert.equal(restarted.beginMarketplaceListing(seller, { ...input, idempotencyKey: '22222222-2222-4222-8222-222222222222' }).idempotencyKey, prepared.idempotencyKey);
+    assert.equal(restarted.beginMarketplaceListing(seller, { ...input, nftApprovalIdempotencyKey: '33333333-3333-4333-8333-333333333333', listingIdempotencyKey: '44444444-4444-4444-8444-444444444444' }).listingIdempotencyKey, prepared.listingIdempotencyKey);
     assert.throws(() => restarted.beginMarketplaceListing(seller, { ...input, price: '2000000' }), /conflicting marketplace listing intent/);
     restarted.recordMarketplaceListingTransaction(seller, certificateDigest, { transactionId: 'circle-listing', state: 'COMPLETE', txHash: `0x${'7'.repeat(64)}` });
     const listing = restarted.finishMarketplaceListing(seller, certificateDigest, '3');

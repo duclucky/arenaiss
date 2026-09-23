@@ -280,6 +280,27 @@ test('Circle adapter cancels a Marketplace listing through the seller SCA', asyn
   assert.equal(result.state, 'COMPLETE');
 });
 
+test('Circle adapter approves the ERC-8004 identity before creating a V2 listing', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `market-${executions.length}` } }; },
+    async getTransaction({ id }: any) { return { data: { transaction: { id, state: 'COMPLETE', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+  await adapter.marketplaceCreateListing({
+    walletId: 'wallet-id', marketplaceAddress: '0x2222222222222222222222222222222222222222',
+    identityRegistryAddress: '0x8004A818BFB912233c491871b3d84c89A494BD9e', tokenId: '42',
+    agentId: `sha256:${'a'.repeat(64)}`, version: `sha256:${'b'.repeat(64)}`,
+    commitment: `sha256:${'c'.repeat(64)}`, certificateDigest: `sha256:${'d'.repeat(64)}`,
+    price: '1000000', expiresAt: 2_000_000_000,
+    nftApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+    listingIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+  });
+  assert.deepEqual(executions.map((row) => ({ address: row.contractAddress, signature: row.abiFunctionSignature, parameters: row.abiParameters, key: row.idempotencyKey })), [
+    { address: '0x8004A818BFB912233c491871b3d84c89A494BD9e', signature: 'approve(address,uint256)', parameters: ['0x2222222222222222222222222222222222222222', '42'], key: '11111111-1111-4111-8111-111111111111' },
+    { address: '0x2222222222222222222222222222222222222222', signature: 'createListing(uint256,bytes32,bytes32,bytes32,bytes32,uint128,uint64)', parameters: ['42', `0x${'a'.repeat(64)}`, `0x${'b'.repeat(64)}`, `0x${'c'.repeat(64)}`, `0x${'d'.repeat(64)}`, '1000000', '2000000000'], key: '22222222-2222-4222-8222-222222222222' },
+  ]);
+});
+
 test('Circle adapter reuses separately persisted approval and burn idempotency keys', async () => {
   const executions: any[] = [];
   const progress: string[] = [];

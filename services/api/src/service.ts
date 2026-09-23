@@ -69,11 +69,11 @@ export type EvaluationPackRecord = { schema: "arena-evaluation-pack-v1"; packId:
 export type PublicEvaluationPack = { schema: "arena-public-evaluation-pack-v1"; packId: string; version: string; name: string; scenarioIds: string[]; scenarioCount: number };
 export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; packId: string; packVersion: string; rubricVersion: string; state: string; createdAt?: number; startedAt?: number; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; providerModel?: string; providerRoute?: 'PRIMARY' | 'FALLBACK'; failureStage?: string; failureCode?: string }> };
 export type MarketplaceTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
-export type MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1"; certificateDigest: Digest; evidenceDigest: string; owner: string; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; packId: Digest; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: "ELIGIBLE" | "APPROVED"; authorization?: MarketplaceTransaction };
-export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "CANCEL_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; purchaseApprovalIdempotencyKey?: string; purchaseIdempotencyKey?: string; cancellationIdempotencyKey?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
+export type MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1"; certificateDigest: Digest; evidenceDigest: string; owner: string; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; erc8004TokenId: string; packId: Digest; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: "ELIGIBLE" | "APPROVED"; authorization?: MarketplaceTransaction };
+export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; erc8004TokenId: string; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "CANCEL_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; purchaseApprovalIdempotencyKey?: string; purchaseIdempotencyKey?: string; cancellationIdempotencyKey?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
 export type PublicMarketplaceListing = Omit<MarketplaceListing, "seller" | "buyer" | "purchaseApprovalIdempotencyKey" | "purchaseIdempotencyKey" | "cancellationIdempotencyKey">;
-export type MarketplaceArcSnapshot = { listingId: string; agentId: Digest; version: Digest; commitment: Digest; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: "ACTIVE" | "SOLD" | "CANCELLED" | "EXPIRED"; registryOwner: string; registryActive: boolean };
-export type MarketplaceListingIntent = { certificateDigest: Digest; owner: string; sellerAddress: string; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; price: string; expiresAt: number; idempotencyKey: string; transaction?: MarketplaceTransaction; listingId?: string };
+export type MarketplaceArcSnapshot = { listingId: string; tokenId: string; agentId: Digest; version: Digest; commitment: Digest; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: "ACTIVE" | "SOLD" | "CANCELLED" | "EXPIRED"; registryOwner: string; registryActive: boolean };
+export type MarketplaceListingIntent = { protocol: "ERC8004_V2"; certificateDigest: Digest; owner: string; sellerAddress: string; tokenId: string; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string; transaction?: MarketplaceTransaction; listingId?: string };
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const USER_PRINCIPAL = /^usr_[0-9a-f]{64}$/;
@@ -118,8 +118,16 @@ export class ArenaApiService {
         this.registrations.set(this.registrationKey(`sha256:${registration.tournamentId.slice(2)}` as Digest, owner, `sha256:${registration.agentId.slice(2)}` as Digest), registration);
       }
       for (const pack of runtime.list<EvaluationPackRecord>("evaluation-packs")) this.evaluationPacks.set(this.packKey(pack.packId, pack.version), pack);
-      for (const certificate of runtime.list<MarketplaceCertificate>("marketplace-certificates")) this.marketplaceCertificates.set(certificate.certificateDigest, certificate);
-      for (const listing of runtime.list<MarketplaceListing>("marketplace-listings")) this.marketplaceListings.set(listing.listingId, listing);
+      for (const certificate of runtime.list<MarketplaceCertificate>("marketplace-certificates")) {
+        const tokenId = certificate.erc8004TokenId || this.agents.get(certificate.agentId)?.erc8004Identity?.tokenId;
+        if (tokenId) { certificate.erc8004TokenId = tokenId; runtime.put("marketplace-certificates", certificate.certificateDigest, certificate); }
+        this.marketplaceCertificates.set(certificate.certificateDigest, certificate);
+      }
+      for (const listing of runtime.list<MarketplaceListing>("marketplace-listings")) {
+        const tokenId = listing.erc8004TokenId || this.agents.get(listing.agentId)?.erc8004Identity?.tokenId;
+        if (tokenId) { listing.erc8004TokenId = tokenId; runtime.put("marketplace-listings", listing.listingId, listing); }
+        this.marketplaceListings.set(listing.listingId, listing);
+      }
       for (const intent of runtime.list<MarketplaceListingIntent>("marketplace-listing-intents")) this.marketplaceListingIntents.set(intent.certificateDigest, intent);
       this.nonce = runtime.counter("api-counters", "agent-sequence");
     }
@@ -505,6 +513,7 @@ export class ArenaApiService {
 
   createMarketplaceEligibility(caller: string, input: { agentId: Digest; agentsVersion: Digest; campaignIds: Digest[]; issuedAt: number; expiresAt: number; network: string; chainId: number; judgeAddress: string }): MarketplaceCertificate {
     const owner = this.principal(caller); const agent = this.requireOwner(owner, input.agentId);
+    if (!agent.erc8004Identity || !/^[1-9][0-9]*$/.test(agent.erc8004Identity.tokenId)) throw new Error("ERC-8004 identity is required for Marketplace eligibility");
     const version = agent.versions.find((row) => row.agentsVersion === input.agentsVersion); if (!version) throw new Error("agent version not found");
     if (!Array.isArray(input.campaignIds) || input.campaignIds.length !== 2 || new Set(input.campaignIds).size !== 2) throw new Error("exactly two evaluation campaigns are required");
     const campaigns = input.campaignIds.map((id) => this.evaluationCampaign(id));
@@ -524,17 +533,22 @@ export class ArenaApiService {
     }));
     const result = evaluateMarketplaceEligibility({ agentId: agent.agentId, agentVersionId: version.agentsVersion, agentsCommitment: version.agentsCommitment, testPackId: first.testPack.packId, testPackVersion: first.testPack.version, rubricVersion: first.rubricVersion, network: input.network, chainId: input.chainId, judgeAddress: input.judgeAddress, issuedAt: input.issuedAt, expiresAt: input.expiresAt, requiredScenarioIds: first.testPack.scenarios.map((s) => s.scenarioId), runs });
     if (!result.eligible) throw new Error(`Agent version is not marketplace eligible: ${result.reasons.join(",")}`);
-    const certificateDigest = sha(JSON.stringify(result.certificate)); const existing = this.marketplaceCertificates.get(certificateDigest); if (existing) return structuredClone(existing);
-    const record: MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1", certificateDigest, evidenceDigest: result.certificate.evidenceDigest, owner, agentId: agent.agentId, agentVersionId: version.agentsVersion, agentsCommitment: version.agentsCommitment, packId: first.testPack.packId, packVersion: first.testPack.version, rubricVersion: first.rubricVersion, executionModels: result.certificate.executionModels, coverageBps: result.certificate.coverageBps, overallScore: result.certificate.overallScore, dimensionScores: result.certificate.dimensionScores, maxSpread: result.certificate.maxSpread, issuedAt: input.issuedAt, expiresAt: input.expiresAt, state: "ELIGIBLE" };
+    const certificateDigest = sha(JSON.stringify(result.certificate)); const existing = this.marketplaceCertificates.get(certificateDigest);
+    if (existing) {
+      if (!existing.erc8004TokenId) { existing.erc8004TokenId = agent.erc8004Identity.tokenId; this.runtime?.put("marketplace-certificates", certificateDigest, existing); }
+      return structuredClone(existing);
+    }
+    const record: MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1", certificateDigest, evidenceDigest: result.certificate.evidenceDigest, owner, agentId: agent.agentId, agentVersionId: version.agentsVersion, agentsCommitment: version.agentsCommitment, erc8004TokenId: agent.erc8004Identity.tokenId, packId: first.testPack.packId, packVersion: first.testPack.version, rubricVersion: first.rubricVersion, executionModels: result.certificate.executionModels, coverageBps: result.certificate.coverageBps, overallScore: result.certificate.overallScore, dimensionScores: result.certificate.dimensionScores, maxSpread: result.certificate.maxSpread, issuedAt: input.issuedAt, expiresAt: input.expiresAt, state: "ELIGIBLE" };
     this.marketplaceCertificates.set(certificateDigest, record); this.runtime?.put("marketplace-certificates", certificateDigest, record); return structuredClone(record);
   }
-  approveMarketplaceEligibility(caller: string, digest: Digest, transaction: MarketplaceTransaction): MarketplaceCertificate { this.requireOperator(caller); const record = this.marketplaceCertificates.get(digest); if (!record) throw new Error("marketplace certificate not found"); if (record.state === "APPROVED") return structuredClone(record); record.state = "APPROVED"; record.authorization = structuredClone(transaction); this.runtime?.put("marketplace-certificates", digest, record); return structuredClone(record); }
+  approveMarketplaceEligibility(caller: string, digest: Digest, transaction: MarketplaceTransaction): MarketplaceCertificate { this.requireOperator(caller); const record = this.marketplaceCertificates.get(digest); if (!record) throw new Error("marketplace certificate not found"); record.state = "APPROVED"; record.authorization = structuredClone(transaction); this.runtime?.put("marketplace-certificates", digest, record); return structuredClone(record); }
   listOwnedMarketplaceCertificates(caller: string): MarketplaceCertificate[] { const owner = this.principal(caller); return [...this.marketplaceCertificates.values()].filter((row) => row.owner === owner).map((row) => structuredClone(row)); }
   listMarketplaceCertificatesForOperator(caller: string): MarketplaceCertificate[] { this.requireOperator(caller); return [...this.marketplaceCertificates.values()].map((row) => structuredClone(row)).sort((a, b) => b.issuedAt - a.issuedAt); }
-  beginMarketplaceListing(caller: string, input: { certificateDigest: Digest; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; sellerAddress: string; price: string; expiresAt: number; idempotencyKey: string }): MarketplaceListingIntent {
+  beginMarketplaceListing(caller: string, input: { certificateDigest: Digest; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; sellerAddress: string; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string }): MarketplaceListingIntent {
     const owner = this.principal(caller);
     const certificate = this.marketplaceCertificates.get(input.certificateDigest);
     if (!certificate || certificate.owner !== owner || certificate.state !== "APPROVED") throw new Error("approved marketplace certificate is required");
+    if (!/^[1-9][0-9]*$/.test(certificate.erc8004TokenId || "")) throw new Error("ERC-8004 identity is required for Marketplace listing");
     if (certificate.agentId !== input.agentId || certificate.agentVersionId !== input.agentsVersion || certificate.agentsCommitment !== input.agentsCommitment) throw new Error("marketplace certificate binding mismatch");
     if (!ADDRESS.test(input.sellerAddress) || !/^[1-9][0-9]*$/.test(input.price) || BigInt(input.price) > (2n ** 128n - 1n)
       || !Number.isSafeInteger(input.expiresAt) || input.expiresAt <= Math.floor(Date.now() / 1000)
@@ -542,7 +556,7 @@ export class ArenaApiService {
     this.requireOwner(owner, certificate.agentId);
     const prepare = () => {
       const existing = this.runtime?.get<MarketplaceListingIntent>("marketplace-listing-intents", input.certificateDigest) ?? this.marketplaceListingIntents.get(input.certificateDigest);
-      if (existing) {
+      if (existing?.protocol === "ERC8004_V2") {
         if (existing.owner !== owner || existing.sellerAddress !== input.sellerAddress.toLowerCase() || existing.agentId !== input.agentId
           || existing.agentsVersion !== input.agentsVersion || existing.agentsCommitment !== input.agentsCommitment
           || existing.price !== input.price || existing.expiresAt !== input.expiresAt) throw new Error("conflicting marketplace listing intent");
@@ -550,8 +564,9 @@ export class ArenaApiService {
         return structuredClone(existing);
       }
       if ([...this.marketplaceListings.values()].some((row) => row.certificateDigest === input.certificateDigest && !["CANCELLED", "EXPIRED"].includes(row.state))) throw new Error("certificate already has a listing");
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.idempotencyKey)) throw new Error("invalid marketplace listing identity");
-      const intent: MarketplaceListingIntent = { ...input, owner, sellerAddress: input.sellerAddress.toLowerCase() };
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuid.test(input.nftApprovalIdempotencyKey) || !uuid.test(input.listingIdempotencyKey) || input.nftApprovalIdempotencyKey === input.listingIdempotencyKey) throw new Error("invalid marketplace listing identity");
+      const intent: MarketplaceListingIntent = { ...input, protocol: "ERC8004_V2", tokenId: certificate.erc8004TokenId, owner, sellerAddress: input.sellerAddress.toLowerCase() };
       this.runtime?.put("marketplace-listing-intents", input.certificateDigest, intent);
       this.marketplaceListingIntents.set(input.certificateDigest, intent);
       return structuredClone(intent);
@@ -583,11 +598,11 @@ export class ArenaApiService {
     const owner = this.principal(caller); const certificate = this.marketplaceCertificates.get(input.certificateDigest); if (!certificate || certificate.owner !== owner || certificate.state !== "APPROVED") throw new Error("approved marketplace certificate is required");
     if (!/^[1-9][0-9]*$/.test(input.listingId) || !/^[1-9][0-9]*$/.test(input.price) || !Number.isSafeInteger(input.expiresAt) || input.expiresAt > certificate.expiresAt || !ADDRESS.test(input.sellerAddress)) throw new Error("invalid marketplace listing");
     if ([...this.marketplaceListings.values()].some((row) => row.certificateDigest === input.certificateDigest && !["CANCELLED", "EXPIRED"].includes(row.state))) throw new Error("certificate already has a listing");
-    const agent = this.requireOwner(owner, certificate.agentId); const record: MarketplaceListing = { schema: "arena-marketplace-listing-v1", listingId: input.listingId, certificateDigest: input.certificateDigest, agentId: certificate.agentId, agentVersionId: certificate.agentVersionId, agentsCommitment: certificate.agentsCommitment, name: agent.name, seller: owner, sellerAddress: input.sellerAddress.toLowerCase(), price: input.price, expiresAt: input.expiresAt, state: "SUBMITTED", transaction: structuredClone(input.transaction) };
+    const agent = this.requireOwner(owner, certificate.agentId); const record: MarketplaceListing = { schema: "arena-marketplace-listing-v1", listingId: input.listingId, certificateDigest: input.certificateDigest, agentId: certificate.agentId, agentVersionId: certificate.agentVersionId, agentsCommitment: certificate.agentsCommitment, erc8004TokenId: certificate.erc8004TokenId, name: agent.name, seller: owner, sellerAddress: input.sellerAddress.toLowerCase(), price: input.price, expiresAt: input.expiresAt, state: "SUBMITTED", transaction: structuredClone(input.transaction) };
     this.marketplaceListings.set(record.listingId, record); this.runtime?.put("marketplace-listings", record.listingId, record); return this.publicMarketplaceListing(record);
   }
   publishMarketplaceListing(caller: string, snapshot: MarketplaceArcSnapshot): PublicMarketplaceListing { this.requireOperator(caller); const row = this.marketplaceListings.get(snapshot.listingId); if (!row) throw new Error("marketplace listing not found");
-    if (snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment || snapshot.sellerAddress.toLowerCase() !== row.sellerAddress
+    if (snapshot.tokenId !== row.erc8004TokenId || snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment || snapshot.sellerAddress.toLowerCase() !== row.sellerAddress
       || snapshot.price !== row.price || snapshot.expiresAt !== row.expiresAt || !snapshot.registryActive) throw new Error("Arc listing binding mismatch");
     if (snapshot.state === "SOLD") { if (!row.buyer || !row.buyerAddress || row.buyerAddress !== snapshot.buyerAddress?.toLowerCase() || snapshot.registryOwner.toLowerCase() !== row.buyerAddress) throw new Error("canonical buyer mismatch"); }
     else if (snapshot.state === "ACTIVE" && snapshot.registryOwner.toLowerCase() !== row.sellerAddress) throw new Error("canonical seller mismatch");

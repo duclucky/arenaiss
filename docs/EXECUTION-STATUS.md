@@ -1,5 +1,25 @@
 # Implementation execution status
 
+## 2026-09-24 ERC-8004 Marketplace V2 — Arc Testnet deployed
+
+`AgentMarketplaceV2` replaces the legacy Arena registry as Marketplace
+ownership authority with the official ERC-8004 Identity Registry. Eligibility
+is exact-bound to the ERC-8004 token ID, Agent ID, version and commitment. The
+seller flow uses the managed Circle wallet to approve that NFT before creating
+the listing. Purchase atomically collects six-decimal Arc USDC, transfers the
+complete ERC-8004 identity NFT, credits the seller, and credits the fixed 1%
+platform fee. A failed NFT transfer reverts the USDC movement and all listing
+state changes.
+
+The contract is deployed on Arc Testnet at
+`0x2763dF7a2f4e29EeA87Cc6f79aA09caE30a94819` in transaction
+`0xa2dd5c63a411b147258a06ae4ab1ba15361baf930deaf1fc65f428be30b2fdff`.
+Arc Studio reported no Critical, High or Medium finding, and the project-owned
+Foundry regression suite passed. Deployment evidence is recorded in
+`docs/evidence/arc-testnet/marketplace-v2-deployment-2026-09-24.json`. This is
+testnet implementation evidence only and does not advance evidence-authenticity
+or trustlessness gates.
+
 ## 2026-09-21 no-consensus scenario retry — local only
 
 Tournament and Pair Match orchestration now treat a finalized GenLayer

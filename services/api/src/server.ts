@@ -193,6 +193,7 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
     runtime,
     identityPepper: values.ARENA_IDENTITY_PEPPER,
     agentRegistryAddress: environment.ARC_AGENT_REGISTRY_ADDRESS?.trim(),
+    erc8004IdentityRegistryAddress: environment.ARC_ERC8004_IDENTITY_REGISTRY_ADDRESS?.trim(),
     marketplaceAddress: environment.ARC_MARKETPLACE_ADDRESS?.trim(),
     evaluationEscrowAddress: environment.ARC_EVO_FEE_ESCROW_ADDRESS?.trim(),
     tournamentEscrowAddress: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim(),
@@ -210,12 +211,12 @@ function agentRegistryFromEnvironment(environment: NodeJS.ProcessEnv): ViemAgent
 
 function marketplaceChainFromEnvironment(environment: NodeJS.ProcessEnv): ViemMarketplaceChainPort | undefined {
   const rpcUrl = environment.ARC_TESTNET_RPC_URL?.trim() || ARC_TESTNET_RPC_URL;
-  const registry = environment.ARC_AGENT_REGISTRY_V2_ADDRESS?.trim();
+  const identityRegistry = environment.ARC_ERC8004_IDENTITY_REGISTRY_ADDRESS?.trim();
   const marketplace = environment.ARC_MARKETPLACE_ADDRESS?.trim();
-  if (!registry && !marketplace) return undefined;
-  if (!registry || !marketplace) throw new Error('marketplace configuration is incomplete');
+  if (!identityRegistry && !marketplace) return undefined;
+  if (!identityRegistry || !marketplace) throw new Error('marketplace configuration is incomplete');
   const privateKey = environment.GENLAYER_OWNER_PRIVATE_KEY?.trim() || environment.STUDIONET_PRIVATE_KEY?.trim();
-  return new ViemMarketplaceChainPort({ rpcUrl, registryAddress: registry, marketplaceAddress: marketplace, privateKey });
+  return new ViemMarketplaceChainPort({ rpcUrl, identityRegistryAddress: identityRegistry, marketplaceAddress: marketplace, privateKey });
 }
 
 class FixedWindowRateLimiter {

@@ -185,8 +185,10 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeComplete(input.walletId, input.escrowAddress, 'register(bytes32,bytes32,bytes32,bytes32,bytes32)', [input.tournamentId, input.entrantId, input.agentId, input.agentsVersion, input.agentsCommitment].map(requireBytes32), input.registrationIdempotencyKey, 'arena-iss-tournament-register');
   }
 
-  async marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; idempotencyKey: string }): Promise<WalletTransactionResult> {
-    return this.executeRegistry(input.walletId, input.marketplaceAddress, 'createListing(bytes32,bytes32,bytes32,bytes32,uint128,uint64)', [digestBytes32(input.agentId), digestBytes32(input.version), digestBytes32(input.commitment), digestBytes32(input.certificateDigest), input.price, String(input.expiresAt)], input.idempotencyKey, 'arena-iss-marketplace-listing');
+  async marketplaceCreateListing(input: { walletId: string; marketplaceAddress: string; identityRegistryAddress: string; tokenId: string; agentId: string; version: string; commitment: string; certificateDigest: string; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string }): Promise<WalletTransactionResult> {
+    if (!/^[1-9][0-9]*$/.test(input.tokenId)) throw new Error('invalid ERC-8004 token ID');
+    await this.executeRegistry(input.walletId, input.identityRegistryAddress, 'approve(address,uint256)', [input.marketplaceAddress, input.tokenId], input.nftApprovalIdempotencyKey, 'arena-iss-marketplace-erc8004-approve');
+    return this.executeRegistry(input.walletId, input.marketplaceAddress, 'createListing(uint256,bytes32,bytes32,bytes32,bytes32,uint128,uint64)', [input.tokenId, digestBytes32(input.agentId), digestBytes32(input.version), digestBytes32(input.commitment), digestBytes32(input.certificateDigest), input.price, String(input.expiresAt)], input.listingIdempotencyKey, 'arena-iss-marketplace-listing');
   }
 
   async marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult> {
