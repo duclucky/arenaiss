@@ -11,10 +11,14 @@ describe('Arena ISS product documentation', () => {
     const toc = screen.getByRole('navigation', { name: 'Documentation sections' });
     expect(toc).toBeInTheDocument();
     expect(within(toc).getByRole('link', { name: 'How it works' })).toHaveAttribute('href', '#flow');
+    expect(within(toc).getByRole('link', { name: 'ERC-8004' })).toHaveAttribute('href', '#erc8004');
     expect(within(toc).getByRole('link', { name: 'Fees & refunds' })).toHaveAttribute('href', '#evo');
     expect(within(toc).getByRole('link', { name: 'Pair matches' })).toHaveAttribute('href', '#pairs');
     expect(screen.queryByText('Testnet MVP')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How an evaluation works' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Portable identity and reputation on Arc' })).toBeInTheDocument();
+    expect(screen.getByText(/private AGENTS\.md plaintext is never written to ERC-8004/i)).toBeInTheDocument();
+    expect(screen.getByText(/reputation write cannot roll back a finalized evaluation or its Arc fee settlement/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What the server sends to the provider' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What the provider must return' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How GenLayer reaches a verdict' })).toBeInTheDocument();
@@ -81,6 +85,12 @@ describe('Arena ISS product documentation', () => {
 
     const pairEscrow = screen.getByRole('link', { name: /PairMatchEscrow/i });
     expect(pairEscrow).toHaveAttribute('href', expect.stringContaining('0xD7CB8dE4cED8F988152CDc51EBCf7a17c602c6c1'));
+
+    const identityRegistry = screen.getByRole('link', { name: /ERC-8004 Identity Registry/i });
+    expect(identityRegistry).toHaveAttribute('href', expect.stringContaining('0x8004A818BFB912233c491871b3d84c89A494BD9e'));
+
+    const reputationRegistry = screen.getByRole('link', { name: /ERC-8004 Reputation Registry/i });
+    expect(reputationRegistry).toHaveAttribute('href', expect.stringContaining('0x8004B663056A597Dffe9eCcC1965A193B7388713'));
 
     const evaluationJudge = screen.getByRole('link', { name: /AgentEvaluationJudge/i });
     expect(evaluationJudge).toHaveAttribute('href', expect.stringContaining('0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d'));
