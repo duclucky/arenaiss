@@ -7,6 +7,7 @@ import type { EvaluationExecutionService } from './evaluation-execution.ts';
 import type { TournamentOperationAction, TournamentOperationsPort } from './tournament-operations.ts';
 import type { AgentRegistryPort } from './agent-registry-arc.ts';
 import type { PairRoomCoordinator } from './pair-rooms.ts';
+import type { Erc8004IdentityCoordinator, Erc8004ReputationService } from './erc8004.ts';
 
 type Headers = Record<string, string>;
 export type ApiRequest = { method: string; path: string; headers?: Headers; body?: Record<string, unknown> };
@@ -39,8 +40,10 @@ export class ArenaHttpApi {
   private tournamentsPaused: boolean;
   private degraded: () => boolean;
   private enforceCapabilities: boolean;
+  private erc8004?: Erc8004IdentityCoordinator;
+  private erc8004Reputation?: Erc8004ReputationService;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator, capabilityOptions: { tournamentsPaused?: boolean; degraded?: boolean | (() => boolean) } = {}) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator, capabilityOptions: { tournamentsPaused?: boolean; degraded?: boolean | (() => boolean) } = {}, integrations: { erc8004?: Erc8004IdentityCoordinator; erc8004Reputation?: Erc8004ReputationService } = {}) {
     this.service = service;
     this.verifySignature = verifySignature;
     this.marketplaceChain = marketplaceChain;
@@ -51,6 +54,8 @@ export class ArenaHttpApi {
     this.tournamentsPaused = capabilityOptions.tournamentsPaused ?? process.env.ARENA_TOURNAMENTS_PAUSED === '1';
     this.degraded = typeof capabilityOptions.degraded === 'function' ? capabilityOptions.degraded : () => capabilityOptions.degraded ?? false;
     this.enforceCapabilities = Object.keys(capabilityOptions).length > 0;
+    this.erc8004 = integrations.erc8004;
+    this.erc8004Reputation = integrations.erc8004Reputation;
     this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
     void this.managedIdentity?.resumeUsdcTransfers().catch(() => undefined);
@@ -58,6 +63,16 @@ export class ArenaHttpApi {
 
   async handle(request: ApiRequest): Promise<ApiResponse> {
     try {
+      const erc8004Registration = request.path.match(/^\/api\/agents\/(sha256:[0-9a-fA-F]{64})\/erc8004\.json$/);
+      if (request.method === 'GET' && erc8004Registration) {
+        if (!this.erc8004) throw new Error('ERC-8004 identity unavailable');
+        return this.json(200, this.service.getErc8004RegistrationFile(erc8004Registration[1] as `sha256:${string}`, this.erc8004.applicationUrl));
+      }
+      const erc8004Feedback = request.path.match(/^\/api\/evaluations\/(sha256:[0-9a-fA-F]{64})\/erc8004-feedback\.json$/);
+      if (request.method === 'GET' && erc8004Feedback) {
+        if (!this.erc8004Reputation) throw new Error('ERC-8004 reputation unavailable');
+        return this.json(200, this.erc8004Reputation.getFeedbackDocument(erc8004Feedback[1]));
+      }
       if (request.method === 'POST' && request.path === '/api/auth/challenge') return this.challenge(request.body);
       if (request.method === 'GET' && request.path === '/api/capabilities') return this.json(200, this.capabilities());
       if (request.method === 'GET' && request.path === '/api/auth/capabilities') return this.json(200, { wallet: true, email: Boolean(this.managedIdentity), managedWallet: Boolean(this.managedIdentity) });
@@ -374,6 +389,10 @@ export class ArenaHttpApi {
         const run = this.service.getPublicEvaluationRun(publicEvaluationRun[1] as `sha256:${string}`);
         return run ? this.json(200, run) : this.json(404, { error: 'not found' });
       }
+      if (request.method === 'GET' && request.path === '/api/public/agents') {
+        await this.reconcileMarketplaceListings();
+        return this.json(200, this.service.listPublicAgents());
+      }
       if (request.method === 'GET' && request.path === '/api/agents') {
         const owner = this.requireSession(request.headers);
         return this.json(200, this.service.listOwnedAgents(owner));
@@ -388,8 +407,9 @@ export class ArenaHttpApi {
         const agentId = agentMatch[1] as `sha256:${string}`;
         const exactName = requireString(request.body?.name);
         const idempotencyKey = this.service.prepareAgentDeactivation(session.principal, agentId, exactName);
+        const agent = this.service.getAgentDetail(session.principal, agentId);
         let transaction;
-        if (this.managedIdentity) {
+        if (this.managedIdentity && !agent.erc8004Identity) {
           const record = this.agentRegistry ? await this.agentRegistry.readAgent(agentId) : undefined;
           transaction = record && (record.owner === '0x0000000000000000000000000000000000000000' || !record.active)
             ? { transactionId: `arc-readback:${agentId}`, state: 'COMPLETE' }
@@ -405,10 +425,17 @@ export class ArenaHttpApi {
         const session = this.requireSessionRecord(request.headers);
         const body = request.body || {};
         const draft = this.service.prepareAgentCreation(session.principal, requireString(body.name), requireString(body.agentsMd));
-        const transaction = this.managedIdentity
-          ? await this.managedIdentity.registerAgent(this.requireManagedSession(request.headers).userId!, draft)
-          : undefined;
-        const created = this.service.commitAgentCreation(session.principal, draft, transaction);
+        let transaction;
+        let binding;
+        if (this.erc8004) {
+          const managedSession = this.requireManagedSession(request.headers);
+          const registered = await this.erc8004.register({ userId: managedSession.userId!, identityKind: managedSession.identityKind!, draft });
+          transaction = registered.transaction;
+          binding = registered.binding;
+        } else if (this.managedIdentity) {
+          transaction = await this.managedIdentity.registerAgent(this.requireManagedSession(request.headers).userId!, draft);
+        }
+        const created = this.service.commitAgentCreation(session.principal, draft, transaction, binding);
         return this.json(201, created);
       }
       const registrationMatch = request.path.match(/^\/api\/tournaments\/(sha256:[0-9a-fA-F]{64})\/registrations$/);

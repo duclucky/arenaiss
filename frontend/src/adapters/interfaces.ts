@@ -149,9 +149,24 @@ export type AgentProfile = {
   agentsVersion: string;
   agentsCommitment: string;
   active?: boolean;
+  marketplaceListed?: boolean;
+  activity?: {
+    evaluations: Array<{ campaignId: string; state: string; createdAt?: number; overallScore: number | null; scenarioCount: number }>;
+    pairMatches: Array<{ roomId: string; state: string; role: 'CREATOR' | 'CHALLENGER'; createdAt: number }>;
+    tournaments: Array<{ id: string; name: string; status: string }>;
+  };
   stats?: { latestEvaluationScore: number | null; tournamentCount: number; adversarialMatchCount: number | null };
   registration?: ManagedWalletTransaction;
   deactivation?: ManagedWalletTransaction;
+  erc8004Identity?: {
+    schema: 'arena-erc8004-identity-v1'; network: 'Arc Testnet'; chainId: 5042002;
+    registryAddress: string; tokenId: string; ownerAddress: string; agentUri: string;
+    transaction: ManagedWalletTransaction;
+  };
+  erc8004Reputation?: {
+    state: 'PENDING' | 'FAILED' | 'COMPLETE'; value: number; feedbackIndex?: number;
+    transaction?: ManagedWalletTransaction;
+  };
 };
 
 export type AgentDetail = AgentProfile & {
@@ -232,6 +247,7 @@ export interface MarketplaceApiAdapter {
 }
 
 export interface AgentApiAdapter {
+  listPublicAgents?(): Promise<AgentProfile[]>;
   listOwnedAgents(): Promise<AgentProfile[]>;
   listOwnedRegistrations(): Promise<OwnedRegistration[]>;
   createAgent(name: string, agentsMd: string): Promise<AgentProfile>;

@@ -9,15 +9,22 @@ import type { SoloCampaignRecord } from "../../../packages/evaluation/src/solo-r
 import { VersionComparisonRegistry, type RegressionPolicy, type VersionComparisonRecord } from "../../../packages/evaluation/src/comparison.ts";
 import { evaluateMarketplaceEligibility } from "../../../packages/marketplace/src/eligibility.ts";
 import { EVO_CORE_SCENARIOS, EVO_CORE_VERSION, selectEvoCoreScenarios } from "../../../packages/evaluation/src/evo-core.ts";
+import { buildErc8004RegistrationFile, type Erc8004FeedbackRecord, type Erc8004IdentityBinding, type Erc8004RegistrationFile } from './erc8004.ts';
+import type { PairRoom, PairRoomState } from './pair-rooms.ts';
 
 type Digest = `sha256:${string}`;
 type AgentVersion = { agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; agentsMd: string; createdAt: number };
 export type TournamentOperatorEntrant = PreparedRegistration & { agentsMd: string };
 export type AgentChainTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string; registryAddress?: string };
-type Agent = { agentId: Digest; owner: string; name: string; versions: AgentVersion[]; active?: boolean; registrationPending?: boolean; registrationIdempotencyKey?: string; deactivationIdempotencyKey?: string; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction };
+type Agent = { agentId: Digest; owner: string; name: string; versions: AgentVersion[]; active?: boolean; registrationPending?: boolean; registrationIdempotencyKey?: string; deactivationIdempotencyKey?: string; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction; erc8004Identity?: Erc8004IdentityBinding };
 export type AgentDraft = AgentVersion & { owner: string; name: string; idempotencyKey: string };
 export type AgentStats = { latestEvaluationScore: number | null; tournamentCount: number; adversarialMatchCount: number | null };
-export type PublicAgent = Omit<AgentVersion, "agentsMd"> & { owner: string; name: string; active: boolean; stats?: AgentStats; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction };
+export type PublicAgentActivity = {
+  evaluations: Array<{ campaignId: string; state: string; createdAt?: number; overallScore: number | null; scenarioCount: number }>;
+  pairMatches: Array<{ roomId: string; state: PairRoomState; role: 'CREATOR' | 'CHALLENGER'; createdAt: number }>;
+  tournaments: Array<{ id: string; name: string; status: PublicTournamentStatus }>;
+};
+export type PublicAgent = Omit<AgentVersion, "agentsMd"> & { owner: string; name: string; active: boolean; marketplaceListed?: boolean; activity?: PublicAgentActivity; stats?: AgentStats; registration?: AgentChainTransaction; deactivation?: AgentChainTransaction; erc8004Identity?: Erc8004IdentityBinding; erc8004Reputation?: Pick<Erc8004FeedbackRecord, 'state' | 'value' | 'feedbackIndex' | 'transaction'> };
 export type AgentDetail = PublicAgent & {
   agentsMd: string;
   versions: Array<Pick<AgentVersion, "agentsVersion" | "agentsCommitment" | "createdAt">>;
@@ -140,7 +147,7 @@ export class ArenaApiService {
     return { ...version, owner, name: normalizedName, idempotencyKey };
   }
 
-  commitAgentCreation(caller: string, draft: AgentDraft, registration?: AgentChainTransaction): PublicAgent {
+  commitAgentCreation(caller: string, draft: AgentDraft, registration?: AgentChainTransaction, erc8004Identity?: Erc8004IdentityBinding): PublicAgent {
     const owner = this.principal(caller);
     const pending = this.agents.get(draft.agentId);
     if (draft.owner !== owner || !pending || pending.owner !== owner || pending.registrationPending !== true || pending.registrationIdempotencyKey !== draft.idempotencyKey
@@ -149,6 +156,9 @@ export class ArenaApiService {
     pending.active = true;
     pending.registrationPending = false;
     if (registration) pending.registration = structuredClone(registration);
+    if (erc8004Identity) {
+      pending.erc8004Identity = structuredClone(erc8004Identity);
+    }
     this.runtime?.put("api-agents", draft.agentId, pending);
     return this.publicView(pending);
   }
@@ -171,9 +181,35 @@ export class ArenaApiService {
   }
 
   getPublicAgent(agentId: Digest): PublicAgent { const agent = this.agents.get(agentId); if (!agent) throw new Error("agent not found"); return this.publicView(agent); }
+  getErc8004RegistrationFile(agentId: Digest, applicationUrl: string): Erc8004RegistrationFile {
+    const agent = this.agents.get(agentId);
+    if (!agent?.erc8004Identity) throw new Error('ERC-8004 identity not found');
+    const latest = agent.versions.at(-1)!;
+    return buildErc8004RegistrationFile({
+      name: agent.name, active: agent.active !== false, arenaAgentId: agent.agentId,
+      agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment,
+      identityRegistry: agent.erc8004Identity.registryAddress, tokenId: agent.erc8004Identity.tokenId,
+      chainId: agent.erc8004Identity.chainId, applicationUrl,
+    });
+  }
+  findErc8004IdentityByVersion(agentVersionId: string): Erc8004IdentityBinding | undefined {
+    for (const agent of this.agents.values()) {
+      if (agent.erc8004Identity && agent.versions.some((version) => version.agentsVersion === agentVersionId)) return structuredClone(agent.erc8004Identity);
+    }
+    return undefined;
+  }
   listOwnedAgents(caller: string): PublicAgent[] {
     const owner = this.principal(caller);
     return [...this.agents.values()].filter((agent) => agent.owner === owner && agent.active !== false).map((agent) => ({ ...this.publicView(agent), stats: this.agentStats(agent) }));
+  }
+  listPublicAgents(): PublicAgent[] {
+    const listedAgentIds = new Set([...this.marketplaceListings.values()]
+      .filter((listing) => listing.state === "ACTIVE")
+      .map((listing) => listing.agentId));
+    return [...this.agents.values()]
+      .filter((agent) => Boolean(agent.erc8004Identity))
+      .map((agent) => ({ ...this.publicView(agent), marketplaceListed: listedAgentIds.has(agent.agentId), activity: this.publicAgentActivity(agent), stats: this.agentStats(agent) }))
+      .sort((left, right) => right.createdAt - left.createdAt || left.agentId.localeCompare(right.agentId));
   }
   getAgentDetail(caller: string, agentId: Digest): AgentDetail {
     const agent = this.requireOwner(caller, agentId);
@@ -628,7 +664,13 @@ export class ArenaApiService {
     this.runtime?.put("api-tournaments", tournamentId, updated);
   }
 
-  private publicView(agent: Agent): PublicAgent { const latest = agent.versions.at(-1)!; return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}) }; }
+  private publicView(agent: Agent): PublicAgent {
+    const latest = agent.versions.at(-1)!;
+    const reputation = this.runtime?.list<Erc8004FeedbackRecord>('erc8004-feedbacks')
+      .filter((record) => record.agentVersionId === latest.agentsVersion)
+      .sort((left, right) => right.createdAt - left.createdAt)[0];
+    return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}), ...(agent.erc8004Identity ? { erc8004Identity: structuredClone(agent.erc8004Identity) } : {}), ...(reputation ? { erc8004Reputation: { state: reputation.state, value: reputation.value, ...(reputation.feedbackIndex !== undefined ? { feedbackIndex: reputation.feedbackIndex } : {}), ...(reputation.transaction ? { transaction: structuredClone(reputation.transaction) } : {}) } } : {}) };
+  }
   private agentStats(agent: Agent): AgentStats {
     const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
     const evaluations = (this.runtime ? this.runtime.listNewest<SoloCampaignRecord>("evaluation-campaigns") : [...this.evaluationCampaigns.values()].reverse())
@@ -643,6 +685,32 @@ export class ArenaApiService {
     const relevantMatches = [...this.matches.values()].filter((match) => tournamentIds.has(match.tournamentId));
     const hasUnboundMatch = relevantMatches.some((match) => !match.agentIdA || !match.agentIdB);
     return { latestEvaluationScore, tournamentCount: registrations.length, adversarialMatchCount: hasUnboundMatch ? null : relevantMatches.filter((match) => match.agentIdA === agent.agentId || match.agentIdB === agent.agentId).length };
+  }
+  private publicAgentActivity(agent: Agent): PublicAgentActivity {
+    const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
+    const evaluations = this.allEvaluationCampaigns()
+      .filter((campaign) => versionIds.has(campaign.agent.versionId as Digest))
+      .map((campaign) => {
+        const scores = campaign.items.flatMap((item) => item.scorecard ? [effectiveEvaluationScore(item.scorecard)] : []);
+        return {
+          campaignId: campaign.campaignId,
+          state: campaign.state,
+          ...(campaign.createdAt !== undefined ? { createdAt: campaign.createdAt } : {}),
+          overallScore: scores.length ? Math.floor(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null,
+          scenarioCount: campaign.items.length,
+        };
+      })
+      .sort((left, right) => (right.createdAt ?? 0) - (left.createdAt ?? 0));
+    const pairMatches = (this.runtime?.list<PairRoom>('pair-rooms-v1') ?? [])
+      .filter((room) => room.state !== 'PENDING' && (room.creatorAgentId === agent.agentId || room.challengerAgentId === agent.agentId))
+      .map((room) => ({ roomId: room.roomId, state: room.state, role: room.creatorAgentId === agent.agentId ? 'CREATOR' as const : 'CHALLENGER' as const, createdAt: room.createdAt }))
+      .sort((left, right) => right.createdAt - left.createdAt);
+    const tournaments = [...this.registrations.values()]
+      .filter((registration) => registration.agentId === digestBytes32(agent.agentId))
+      .map((registration) => this.tournaments.get(`sha256:${registration.tournamentId.slice(2)}`))
+      .filter((tournament): tournament is PublicTournament => Boolean(tournament))
+      .map(({ id, name, status }) => ({ id, name, status }));
+    return { evaluations, pairMatches, tournaments };
   }
   private packKey(packId: string, version: string): string { return `${packId}|${version}`; }
   private evaluationCampaign(campaignId: string): SoloCampaignRecord | undefined {

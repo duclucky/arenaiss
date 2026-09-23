@@ -183,8 +183,14 @@ test('managed identity configuration is optional but rejects every partial secre
     assert.equal(managedIdentityFromEnvironment(database, {}), undefined);
     assert.throws(
       () => managedIdentityFromEnvironment(database, { CIRCLE_API_KEY: 'secret-value' }),
-      /configuration is incomplete: CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_SET_ID, ARC_AGENT_REGISTRY_ADDRESS, ARENA_IDENTITY_PEPPER, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM/,
+      /configuration is incomplete: CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_SET_ID, ARENA_IDENTITY_PEPPER, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM/,
     );
+    const configured = managedIdentityFromEnvironment(database, {
+      CIRCLE_API_KEY: 'secret-value', CIRCLE_ENTITY_SECRET: 'entity-secret', CIRCLE_WALLET_SET_ID: 'wallet-set',
+      ARENA_IDENTITY_PEPPER: 'x'.repeat(32), SMTP_HOST: 'localhost', SMTP_PORT: '25', SMTP_USER: 'user',
+      SMTP_PASS: 'pass', SMTP_FROM: 'arena@example.com', ARC_ERC8004_IDENTITY_REGISTRY_ADDRESS: `0x${'8'.repeat(40)}`,
+    });
+    assert.equal(configured?.agentRegistryAddress, undefined);
   } finally { database.close(); }
 });
 

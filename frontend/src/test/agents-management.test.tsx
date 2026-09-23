@@ -13,6 +13,28 @@ const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, ident
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
 
 describe('Agent management', () => {
+  it('shows the canonical ERC-8004 identity and finalized reputation evidence', async () => {
+    const portable = {
+      ...detail,
+      erc8004Identity: {
+        schema: 'arena-erc8004-identity-v1' as const, network: 'Arc Testnet' as const, chainId: 5_042_002 as const,
+        registryAddress: '0x8004A818BFB912233c491871b3d84c89A494BD9e', tokenId: '42',
+        ownerAddress: '0x4444444444444444444444444444444444444444', agentUri: 'https://arenaiss.xyz/api/agents/a/erc8004.json',
+        transaction: { transactionId: 'identity', state: 'COMPLETE', explorerUrl: 'https://testnet.arcscan.app/tx/0x1' },
+      },
+      erc8004Reputation: { state: 'COMPLETE' as const, value: 88, feedbackIndex: 1, transaction: { transactionId: 'feedback', state: 'COMPLETE', explorerUrl: 'https://testnet.arcscan.app/tx/0x2' } },
+    };
+    const api: AgentApiAdapter = {
+      async listOwnedAgents() { return [portable]; }, async listOwnedRegistrations() { return []; }, async createAgent() { return portable; }, async prepareRegistration() { throw new Error('unused'); }, async getAgent() { return portable; },
+    };
+    render(<MemoryRouter><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet' }} identityAdapter={identity} agentApiAdapter={api}><Agents /></AppProvider></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Safety Scout details' }));
+    expect(await screen.findByText('ERC-8004 #42')).toBeInTheDocument();
+    expect(screen.getByText('Reputation 88 / 100')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View identity transaction' })).toHaveAttribute('href', 'https://testnet.arcscan.app/tx/0x1');
+    expect(screen.getByRole('link', { name: 'View reputation transaction' })).toHaveAttribute('href', 'https://testnet.arcscan.app/tx/0x2');
+  });
+
   it('shows real stats, private detail and exact-name deactivation', async () => {
     const deactivateAgent = vi.fn(async () => ({ ...agent, active: false, deactivation: { transactionId: 'tx-2', state: 'SENT', explorerUrl: 'https://testnet.arcscan.app/tx/0x2' } }));
     const api: AgentApiAdapter = {

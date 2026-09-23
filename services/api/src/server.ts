@@ -28,6 +28,7 @@ import { ArcPairChainPort } from './pair-arc.ts';
 import { pairSettlementFromEnvironment } from './pair-settlement-live.ts';
 import { ARC_TESTNET_RPC_URL } from './arc-rpc.ts';
 import { OperationalHealthRegistry } from './operational-health.ts';
+import { Erc8004IdentityService, Erc8004ReputationService, ViemErc8004ReadPort, ViemErc8004ReputationReadPort } from './erc8004.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const ARCHIVED_TOURNAMENT_IDENTIFIERS = [
@@ -70,7 +71,9 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   const service = new ArenaApiService(operator, runtime);
   const managedIdentity = runtime ? managedIdentityFromEnvironment(runtime) : undefined;
   const managedIdentityService = runtime && managedIdentity ? new ManagedIdentityService(managedIdentity) : undefined;
-  const evaluationExecution = runtime && managedIdentityService ? evaluationExecutionFromEnvironment(runtime, managedIdentityService, operator) : undefined;
+  const erc8004 = managedIdentityService ? erc8004FromEnvironment(managedIdentityService, process.env) : undefined;
+  const erc8004Reputation = runtime && managedIdentityService ? erc8004ReputationFromEnvironment(runtime, service, managedIdentityService, process.env) : undefined;
+  const evaluationExecution = runtime && managedIdentityService ? evaluationExecutionFromEnvironment(runtime, managedIdentityService, operator, erc8004Reputation) : undefined;
   const evaluationIntervalMs = envPositiveInteger('EVALUATION_WORKER_INTERVAL_MS', 5_000);
   if (evaluationExecution) health.register('evaluation-worker', evaluationIntervalMs);
   const evaluationWorker = evaluationExecution ? new EvaluationExecutionWorker(evaluationExecution, evaluationIntervalMs, { success: () => health.success('evaluation-worker'), failure: () => health.failure('evaluation-worker') }) : undefined;
@@ -104,7 +107,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
     else if (result.event === 'daily_tournament_tick') health.success('daily-tournament-worker');
   }) : undefined;
   options.onTournamentOperationsReady?.(tournamentOperations);
-  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms, { tournamentsPaused: process.env.ARENA_TOURNAMENTS_PAUSED === '1', degraded: () => !health.readiness().ready });
+  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms, { tournamentsPaused: process.env.ARENA_TOURNAMENTS_PAUSED === '1', degraded: () => !health.readiness().ready }, { erc8004, erc8004Reputation });
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
     maxRequests: envPositiveInteger('ARENA_RATE_LIMIT_MAX', 60),
@@ -163,7 +166,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
   return server;
 }
 
-function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: ManagedIdentityService, operator: string): EvaluationExecutionService | undefined {
+function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: ManagedIdentityService, operator: string, reputation?: Erc8004ReputationService): EvaluationExecutionService | undefined {
   const privateKey = process.env.GENLAYER_OWNER_PRIVATE_KEY?.trim() || process.env.STUDIONET_PRIVATE_KEY?.trim();
   const judgeAddress = process.env.GENLAYER_EVALUATION_JUDGE_ADDRESS?.trim();
   const routing = providerConfigurationFromEnvironment(process.env);
@@ -175,20 +178,21 @@ function evaluationExecutionFromEnvironment(runtime: SqliteRuntimeStore, fees: M
   const judge = createStudioNextAgentEvaluationPort(privateKey!);
   const runner = new SoloEvaluationRunner(provider, new EvaluationRunTracker(judge, new PersistentEvaluationRunStore(runtime), judgeAddress!), new PersistentSoloCampaignStore(runtime));
   const settlement = new ViemEvoFeeSettlement({ privateKey: privateKey!, escrowAddress: escrowAddress!, rpcUrl: process.env.ARC_TESTNET_RPC_URL?.trim() });
-  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model: routing.model, workerConcurrency: envBoundedInteger('EVALUATION_WORKER_CONCURRENCY', 8, 1, 30) });
+  return new EvaluationExecutionService({ runtime, fees, settlement, runner, operatorAddress: operator, escrowAddress: escrowAddress!, feeUsdc: feeUsdc!, model: routing.model, workerConcurrency: envBoundedInteger('EVALUATION_WORKER_CONCURRENCY', 8, 1, 30), reputation });
 }
 
 export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, environment: NodeJS.ProcessEnv = process.env): ManagedIdentityOptions | undefined {
-  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARC_AGENT_REGISTRY_ADDRESS', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'] as const;
+  const names = ['CIRCLE_API_KEY', 'CIRCLE_ENTITY_SECRET', 'CIRCLE_WALLET_SET_ID', 'ARENA_IDENTITY_PEPPER', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'] as const;
   const values = Object.fromEntries(names.map((name) => [name, environment[name]?.trim() || ''])) as Record<typeof names[number], string>;
-  if (names.every((name) => !values[name])) return undefined;
+  const registryConfigured = Boolean(environment.ARC_AGENT_REGISTRY_ADDRESS?.trim() || environment.ARC_ERC8004_IDENTITY_REGISTRY_ADDRESS?.trim());
+  if (names.every((name) => !values[name]) && !registryConfigured) return undefined;
   const missing = names.filter((name) => !values[name]);
   if (missing.length) throw new Error(`managed identity configuration is incomplete: ${missing.join(', ')}`);
   const smtpPort = Number(values.SMTP_PORT);
   return {
     runtime,
     identityPepper: values.ARENA_IDENTITY_PEPPER,
-    agentRegistryAddress: values.ARC_AGENT_REGISTRY_ADDRESS,
+    agentRegistryAddress: environment.ARC_AGENT_REGISTRY_ADDRESS?.trim(),
     marketplaceAddress: environment.ARC_MARKETPLACE_ADDRESS?.trim(),
     evaluationEscrowAddress: environment.ARC_EVO_FEE_ESCROW_ADDRESS?.trim(),
     tournamentEscrowAddress: environment.ARC_TOURNAMENT_ESCROW_ADDRESS?.trim(),
@@ -253,6 +257,35 @@ function clientIdentifier(request: IncomingMessage, trustProxy: boolean): string
   const trusted = request.headers['x-arena-client-ip'];
   if (trustProxy && typeof trusted === 'string' && isIP(trusted.trim())) return trusted.trim();
   return request.socket.remoteAddress || 'unknown';
+}
+
+function erc8004FromEnvironment(managedIdentity: ManagedIdentityService, environment: NodeJS.ProcessEnv): Erc8004IdentityService | undefined {
+  const registryAddress = environment.ARC_ERC8004_IDENTITY_REGISTRY_ADDRESS?.trim();
+  const publicBaseUrl = environment.ARENA_PUBLIC_URL?.trim();
+  if (!registryAddress && !publicBaseUrl) return undefined;
+  if (!registryAddress || !publicBaseUrl) throw new Error('ERC-8004 identity configuration is incomplete');
+  const rpcUrl = environment.ARC_TESTNET_RPC_URL?.trim() || ARC_TESTNET_RPC_URL;
+  return new Erc8004IdentityService({
+    publicBaseUrl, registryAddress, managedIdentity,
+    chain: new ViemErc8004ReadPort({ rpcUrl, registryAddress }),
+  });
+}
+
+function erc8004ReputationFromEnvironment(runtime: SqliteRuntimeStore, service: ArenaApiService, managedIdentity: ManagedIdentityService, environment: NodeJS.ProcessEnv): Erc8004ReputationService | undefined {
+  const registryAddress = environment.ARC_ERC8004_REPUTATION_REGISTRY_ADDRESS?.trim();
+  const evaluatorWalletId = environment.CIRCLE_ERC8004_EVALUATOR_WALLET_ID?.trim();
+  const evaluatorAddress = environment.ARC_ERC8004_EVALUATOR_ADDRESS?.trim();
+  const publicBaseUrl = environment.ARENA_PUBLIC_URL?.trim();
+  const configured = [registryAddress, evaluatorWalletId, evaluatorAddress].filter(Boolean).length;
+  if (configured === 0) return undefined;
+  if (configured !== 3 || !publicBaseUrl) throw new Error('ERC-8004 reputation configuration is incomplete');
+  const rpcUrl = environment.ARC_TESTNET_RPC_URL?.trim() || ARC_TESTNET_RPC_URL;
+  return new Erc8004ReputationService({
+    runtime, publicBaseUrl, registryAddress: registryAddress!, evaluatorAddress: evaluatorAddress!,
+    resolveIdentity: (agentVersionId) => service.findErc8004IdentityByVersion(agentVersionId),
+    writer: { giveFeedback: (input) => managedIdentity.giveErc8004Feedback(evaluatorWalletId!, input) },
+    chain: new ViemErc8004ReputationReadPort({ rpcUrl, registryAddress: registryAddress! }),
+  });
 }
 
 function envPositiveInteger(name: string, fallback: number): number {

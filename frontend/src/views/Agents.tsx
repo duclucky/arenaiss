@@ -96,7 +96,16 @@ export function Agents() {
           </button>
         </li>)}</ul>}
     {detail && <Modal title={detail.name} closeLabel="Close Agent details" onClose={() => setDetail(null)}>
-      {detail.registration?.explorerUrl && <a href={detail.registration.explorerUrl} target="_blank" rel="noreferrer" className="mb-5 inline-block font-semibold underline">Registered on Arc <ExternalLink className="inline" size={14}/></a>}
+      {detail.erc8004Identity && <section className="retro-inset mb-5 p-4" aria-label="ERC-8004 identity">
+        <div className="flex flex-wrap items-center justify-between gap-2"><strong>ERC-8004 #{detail.erc8004Identity.tokenId}</strong><span className="text-xs uppercase tracking-wide">{detail.erc8004Identity.network}</span></div>
+        <p className="mt-2 break-all font-mono text-xs">Registry {detail.erc8004Identity.registryAddress}</p>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold underline">
+          {detail.erc8004Identity.transaction.explorerUrl && <a href={detail.erc8004Identity.transaction.explorerUrl} target="_blank" rel="noreferrer">View identity transaction <ExternalLink className="inline" size={14}/></a>}
+          <a href={detail.erc8004Identity.agentUri} target="_blank" rel="noreferrer">View registration file <ExternalLink className="inline" size={14}/></a>
+        </div>
+        {detail.erc8004Reputation && <div className="mt-4 border-t border-black/20 pt-3"><p className="font-semibold">Reputation {detail.erc8004Reputation.value} / 100</p><p className="mt-1 text-xs uppercase tracking-wide">{displayLabel(detail.erc8004Reputation.state)}{detail.erc8004Reputation.feedbackIndex ? ` · Feedback #${detail.erc8004Reputation.feedbackIndex}` : ''}</p>{detail.erc8004Reputation.transaction?.explorerUrl && <a href={detail.erc8004Reputation.transaction.explorerUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-semibold underline">View reputation transaction <ExternalLink className="inline" size={14}/></a>}</div>}
+      </section>}
+      {!detail.erc8004Identity && detail.registration?.explorerUrl && <a href={detail.registration.explorerUrl} target="_blank" rel="noreferrer" className="mb-5 inline-block font-semibold underline">Registered on Arc <ExternalLink className="inline" size={14}/></a>}
       <div className="flex items-center justify-between gap-3"><h3 className="font-bold">AGENTS.md</h3><button type="button" className="metal-button-ghost" onClick={() => navigator.clipboard.writeText(detail.agentsMd)}><Copy size={15}/> Copy</button></div>
       <pre className="retro-inset mt-3 max-h-64 overflow-auto whitespace-pre-wrap p-4 text-sm">{detail.agentsMd}</pre>
       <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${displayLabel(item.status)}`)}/><History title="Evaluations" rows={detail.evaluations.map((item) => `Agent evaluation · ${displayLabel(item.state)}`)}/></div>

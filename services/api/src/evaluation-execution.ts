@@ -20,6 +20,10 @@ export interface EvaluationSettlementPort {
   release(campaignId: string, idempotencyKey?: string): Promise<WalletTransactionResult>;
   refund(campaignId: string, idempotencyKey?: string): Promise<WalletTransactionResult>;
 }
+export interface EvaluationReputationPort {
+  recordFinalizedCampaign(campaign: SoloCampaignRecord): Promise<unknown>;
+  resumePending(): Promise<{ attempted: number; succeeded: number; failed: number }>;
+}
 
 export class EvaluationExecutionService {
   private readonly runtime: SqliteRuntimeStore;
@@ -30,9 +34,10 @@ export class EvaluationExecutionService {
   private readonly feeUsdc: string;
   private readonly settlementOperations = new Map<string, { target: 'RELEASED' | 'REFUNDED'; operation: Promise<void> }>();
   private readonly recoveryScheduler: BoundedExecutionScheduler;
+  private readonly reputation?: EvaluationReputationPort;
   readonly model: string;
 
-  constructor(options: { runtime: SqliteRuntimeStore; fees: EvaluationFeePort; settlement: EvaluationSettlementPort; runner: SoloEvaluationRunner; operatorAddress: string; escrowAddress: string; feeUsdc: string; model?: string; workerConcurrency?: number }) {
+  constructor(options: { runtime: SqliteRuntimeStore; fees: EvaluationFeePort; settlement: EvaluationSettlementPort; runner: SoloEvaluationRunner; operatorAddress: string; escrowAddress: string; feeUsdc: string; model?: string; workerConcurrency?: number; reputation?: EvaluationReputationPort }) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(options.operatorAddress)) throw new TypeError('evaluation operator address is invalid');
     if (!/^0x[0-9a-fA-F]{40}$/.test(options.escrowAddress)) throw new TypeError('evaluation escrow address is invalid');
     if (!/^\d+(?:\.\d{1,6})?$/.test(options.feeUsdc) || Number(options.feeUsdc) <= 0) throw new TypeError('evaluation fee is invalid');
@@ -40,6 +45,7 @@ export class EvaluationExecutionService {
     this.runtime = options.runtime; this.fees = options.fees; this.settlement = options.settlement; this.runner = options.runner;
     this.escrowAddress = options.escrowAddress.toLowerCase(); this.feeUsdc = options.feeUsdc; this.model = options.model.trim();
     this.recoveryScheduler = new BoundedExecutionScheduler(options.workerConcurrency ?? 8);
+    this.reputation = options.reputation;
   }
 
   async start(userId: string, owner: string, campaignId: string, options: { queueOnly?: boolean } = {}): Promise<SoloCampaignRecord> {
@@ -85,6 +91,7 @@ export class EvaluationExecutionService {
     const results = await Promise.allSettled(candidates.map((fee) => this.recoveryScheduler.run(() => this.advance(fee.owner, fee.campaignId))));
     const succeeded = results.filter((result) => result.status === 'fulfilled').length;
     const failed = results.length - succeeded;
+    if (this.reputation) await this.reputation.resumePending().catch(() => undefined);
     return { attempted: candidates.length, succeeded, failed };
   }
 
@@ -113,6 +120,7 @@ export class EvaluationExecutionService {
     if (campaign.state === 'FINALIZED') {
       if (current.state === 'REFUNDED') throw new Error('evaluation fee was already refunded');
       if (current.state !== 'RELEASED') await this.settleOnce(current, 'RELEASED');
+      if (this.reputation) await this.reputation.recordFinalizedCampaign(campaign).catch(() => undefined);
     }
     if (campaign.state === 'FAILED') {
       if (current.state === 'RELEASED') throw new Error('evaluation fee was already released');

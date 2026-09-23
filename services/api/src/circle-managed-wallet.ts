@@ -18,6 +18,12 @@ const CHAINS = [
 ] as const;
 
 type CircleClient = {
+  listWallets(input: {
+    blockchain: 'ARC-TESTNET'; walletSetId: string; refId: string;
+  }): Promise<{ data?: { wallets?: Array<{
+    id?: string; address?: string; blockchain?: string; accountType?: string; state?: string;
+    walletSetId?: string; refId?: string;
+  }> } }>;
   createWallets(input: {
     accountType: 'SCA'; blockchains: ['ARC-TESTNET']; count: 1; walletSetId: string;
     idempotencyKey: string; metadata: [{ name: string; refId: string }];
@@ -40,6 +46,24 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
   }
 
   async createWallet(input: { userId: string; idempotencyKey: string }) {
+    const existingResponse = await this.client.listWallets({
+      blockchain: 'ARC-TESTNET',
+      walletSetId: this.walletSetId,
+      refId: input.userId,
+    });
+    const recoveryCandidates = existingResponse.data?.wallets ?? [];
+    const existing = recoveryCandidates.filter((wallet) =>
+      wallet.id
+      && wallet.address
+      && wallet.blockchain === 'ARC-TESTNET'
+      && wallet.accountType === 'SCA'
+      && wallet.state === 'LIVE'
+      && wallet.walletSetId === this.walletSetId
+      && wallet.refId === input.userId);
+    if (existing.length > 1) throw new Error('Circle returned an ambiguous managed wallet recovery');
+    if (existing.length === 1) return { walletId: existing[0].id!, address: existing[0].address! };
+    if (recoveryCandidates.length > 0) throw new Error('Circle returned an invalid managed wallet recovery');
+
     const response = await this.client.createWallets({
       accountType: 'SCA',
       blockchains: ['ARC-TESTNET'],
@@ -108,6 +132,20 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
 
   async registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
     return this.executeRegistry(input.walletId, input.registryAddress, 'registerAgent(bytes32,bytes32,bytes32)', [digestBytes32(input.agentId), digestBytes32(input.agentsVersion), digestBytes32(input.agentsCommitment)], input.idempotencyKey, 'arena-iss-agent-register');
+  }
+
+  async registerErc8004Agent(input: { walletId: string; registryAddress: string; agentUri: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    if (!/^https?:\/\//.test(input.agentUri) || input.agentUri.length > 2_048) throw new Error('invalid ERC-8004 Agent URI');
+    return this.executeRegistry(input.walletId, input.registryAddress, 'register(string)', [input.agentUri], input.idempotencyKey, 'arena-iss-erc8004-register');
+  }
+
+  async giveErc8004Feedback(input: { walletId: string; registryAddress: string; agentId: string; value: number; valueDecimals: number; tag1: string; tag2: string; endpoint: string; feedbackUri: string; feedbackHash: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    if (!/^(0|[1-9][0-9]*)$/.test(input.agentId) || !Number.isSafeInteger(input.value) || input.value < -100 || input.value > 100
+      || !Number.isInteger(input.valueDecimals) || input.valueDecimals < 0 || input.valueDecimals > 18
+      || !/^0x[0-9a-fA-F]{64}$/.test(input.feedbackHash)) throw new Error('invalid ERC-8004 feedback');
+    return this.executeRegistry(input.walletId, input.registryAddress, 'giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32)', [
+      input.agentId, String(input.value), String(input.valueDecimals), input.tag1, input.tag2, input.endpoint, input.feedbackUri, input.feedbackHash,
+    ], input.idempotencyKey, 'arena-iss-erc8004-feedback');
   }
 
   async deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult> {

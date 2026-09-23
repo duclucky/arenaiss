@@ -101,6 +101,29 @@ test("an interrupted onchain creation retry reuses the persisted Agent identity 
   assert.equal(api.listOwnedAgents(ALICE).length, 1);
 });
 
+test('ERC-8004 identity binding survives restart and registration file tracks the latest public version', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const api = new ArenaApiService(ALICE, runtime);
+    const draft = api.prepareAgentCreation(ALICE, 'Portable Agent', 'private v1');
+    const binding = {
+      schema: 'arena-erc8004-identity-v1' as const, network: 'Arc Testnet' as const, chainId: 5_042_002,
+      registryAddress: `0x${'8'.repeat(40)}`, tokenId: '17', ownerAddress: ALICE,
+      agentUri: `https://arenaiss.xyz/api/agents/${draft.agentId}/erc8004.json`,
+      transaction: { transactionId: 'circle-id', state: 'COMPLETE', txHash: `0x${'1'.repeat(64)}`, explorerUrl: `https://testnet.arcscan.app/tx/0x${'1'.repeat(64)}` },
+    };
+    api.commitAgentCreation(ALICE, draft, binding.transaction, binding);
+    const updated = api.updateAgent(ALICE, draft.agentId, 'private v2');
+
+    const restarted = new ArenaApiService(ALICE, runtime);
+    assert.equal(restarted.getPublicAgent(draft.agentId).erc8004Identity?.tokenId, '17');
+    const file = restarted.getErc8004RegistrationFile(draft.agentId, 'https://arenaiss.xyz/agents');
+    assert.equal(file.arena.agentsVersion, updated.agentsVersion);
+    assert.equal(file.arena.agentsCommitment, updated.agentsCommitment);
+    assert.equal(JSON.stringify(file).includes('private v2'), false);
+  } finally { runtime.close(); }
+});
+
 test("another wallet cannot read or mutate AGENTS.md", () => {
   const api = new ArenaApiService(ALICE); const created = api.createAgent(ALICE, "Alice", "secret prompt");
   assert.throws(() => api.getPrivateAgent(BOB, created.agentId), /unauthorized/i);

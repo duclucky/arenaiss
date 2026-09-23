@@ -4,8 +4,13 @@ import test from 'node:test';
 import { CircleManagedWalletAdapter } from '../src/circle-managed-wallet.ts';
 
 test('Circle adapter creates exactly one Arc Testnet SCA for automatic Gas Station sponsorship', async () => {
+  const lookups: any[] = [];
   const calls: any[] = [];
   const adapter = new CircleManagedWalletAdapter({
+    async listWallets(input: any) {
+      lookups.push(input);
+      return { data: { wallets: [] } };
+    },
     async createWallets(input: any) {
       calls.push(input);
       return { data: { wallets: [{ id: 'wallet-id', address: '0x1111111111111111111111111111111111111111' }] } };
@@ -17,6 +22,11 @@ test('Circle adapter creates exactly one Arc Testnet SCA for automatic Gas Stati
     idempotencyKey: '11111111-1111-4111-8111-111111111111',
   });
 
+  assert.deepEqual(lookups, [{
+    blockchain: 'ARC-TESTNET',
+    walletSetId: 'wallet-set-id',
+    refId: `usr_${'a'.repeat(64)}`,
+  }]);
   assert.deepEqual(calls, [{
     accountType: 'SCA',
     blockchains: ['ARC-TESTNET'],
@@ -28,8 +38,84 @@ test('Circle adapter creates exactly one Arc Testnet SCA for automatic Gas Stati
   assert.deepEqual(result, { walletId: 'wallet-id', address: '0x1111111111111111111111111111111111111111' });
 });
 
+test('Circle adapter restores the existing live Arc Testnet SCA by stable Arena user refId', async () => {
+  let creates = 0;
+  const adapter = new CircleManagedWalletAdapter({
+    async listWallets() {
+      return { data: { wallets: [{
+        id: 'existing-wallet-id', address: '0x2222222222222222222222222222222222222222',
+        blockchain: 'ARC-TESTNET', accountType: 'SCA', state: 'LIVE',
+        walletSetId: 'wallet-set-id', refId: `usr_${'c'.repeat(64)}`,
+      }] } };
+    },
+    async createWallets() {
+      creates += 1;
+      return { data: { wallets: [] } };
+    },
+  } as any, 'wallet-set-id');
+
+  const result = await adapter.createWallet({
+    userId: `usr_${'c'.repeat(64)}`,
+    idempotencyKey: '22222222-2222-4222-8222-222222222222',
+  });
+
+  assert.equal(creates, 0);
+  assert.deepEqual(result, {
+    walletId: 'existing-wallet-id',
+    address: '0x2222222222222222222222222222222222222222',
+  });
+});
+
+test('Circle adapter fails closed when managed wallet recovery is ambiguous', async () => {
+  let creates = 0;
+  const userId = `usr_${'d'.repeat(64)}`;
+  const adapter = new CircleManagedWalletAdapter({
+    async listWallets() {
+      return { data: { wallets: [
+        { id: 'old-wallet', address: '0x3333333333333333333333333333333333333333', blockchain: 'ARC-TESTNET', accountType: 'SCA', state: 'LIVE', walletSetId: 'wallet-set-id', refId: userId },
+        { id: 'new-wallet', address: '0x4444444444444444444444444444444444444444', blockchain: 'ARC-TESTNET', accountType: 'SCA', state: 'LIVE', walletSetId: 'wallet-set-id', refId: userId },
+      ] } };
+    },
+    async createWallets() {
+      creates += 1;
+      return { data: { wallets: [] } };
+    },
+  } as any, 'wallet-set-id');
+
+  await assert.rejects(
+    adapter.createWallet({ userId, idempotencyKey: '33333333-3333-4333-8333-333333333333' }),
+    /ambiguous managed wallet recovery/,
+  );
+  assert.equal(creates, 0);
+});
+
+test('Circle adapter fails closed when Circle returns a non-canonical recovery candidate', async () => {
+  let creates = 0;
+  const userId = `usr_${'e'.repeat(64)}`;
+  const adapter = new CircleManagedWalletAdapter({
+    async listWallets() {
+      return { data: { wallets: [{
+        id: 'frozen-wallet', address: '0x5555555555555555555555555555555555555555',
+        blockchain: 'ARC-TESTNET', accountType: 'SCA', state: 'FROZEN',
+        walletSetId: 'wallet-set-id', refId: userId,
+      }] } };
+    },
+    async createWallets() {
+      creates += 1;
+      return { data: { wallets: [] } };
+    },
+  } as any, 'wallet-set-id');
+
+  await assert.rejects(
+    adapter.createWallet({ userId, idempotencyKey: '44444444-4444-4444-8444-444444444444' }),
+    /invalid managed wallet recovery/,
+  );
+  assert.equal(creates, 0);
+});
+
 test('Circle adapter rejects incomplete or multiple-wallet responses', async () => {
   const adapter = new CircleManagedWalletAdapter({
+    async listWallets() { return { data: { wallets: [] } }; },
     async createWallets() { return { data: { wallets: [] } }; },
   } as any, 'wallet-set-id');
   await assert.rejects(
@@ -60,6 +146,32 @@ test('Circle adapter registers and deactivates an Agent through the Arc registry
   assert.match(registered.explorerUrl!, /^https:\/\/testnet\.arcscan\.app\/tx\//);
   assert.match(deactivated.explorerUrl!, /^https:\/\/testnet\.arcscan\.app\/tx\//);
   assert.deepEqual(waits.map((row) => row.waitForState), ['COMPLETE', 'COMPLETE']);
+});
+
+test('Circle adapter registers ERC-8004 identity and writes reputation with exact official ABI', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `erc8004-${executions.length}`, state: 'INITIATED' } }; },
+    async getTransaction({ id }: any) { return { data: { transaction: { id, state: 'COMPLETE', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+
+  const identity = await adapter.registerErc8004Agent({
+    walletId: 'agent-wallet', registryAddress: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
+    agentUri: 'https://arenaiss.xyz/api/agents/agent/erc8004.json', idempotencyKey: 'identity-key',
+  });
+  const reputation = await adapter.giveErc8004Feedback({
+    walletId: 'evaluator-wallet', registryAddress: '0x8004B663056A597Dffe9eCcC1965A193B7388713',
+    agentId: '17', value: 88, valueDecimals: 0, tag1: 'arena-evo', tag2: 'AgentEvaluationV5', endpoint: '',
+    feedbackUri: 'https://arenaiss.xyz/api/evaluations/campaign/erc8004-feedback.json', feedbackHash: `0x${'a'.repeat(64)}`,
+    idempotencyKey: 'feedback-key',
+  });
+
+  assert.deepEqual(executions.map(({ walletId, contractAddress, abiFunctionSignature, abiParameters, idempotencyKey }) => ({ walletId, contractAddress, abiFunctionSignature, abiParameters, idempotencyKey })), [
+    { walletId: 'agent-wallet', contractAddress: '0x8004A818BFB912233c491871b3d84c89A494BD9e', abiFunctionSignature: 'register(string)', abiParameters: ['https://arenaiss.xyz/api/agents/agent/erc8004.json'], idempotencyKey: 'identity-key' },
+    { walletId: 'evaluator-wallet', contractAddress: '0x8004B663056A597Dffe9eCcC1965A193B7388713', abiFunctionSignature: 'giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32)', abiParameters: ['17', '88', '0', 'arena-evo', 'AgentEvaluationV5', '', 'https://arenaiss.xyz/api/evaluations/campaign/erc8004-feedback.json', `0x${'a'.repeat(64)}`], idempotencyKey: 'feedback-key' },
+  ]);
+  assert.equal(identity.state, 'COMPLETE');
+  assert.equal(reputation.state, 'COMPLETE');
 });
 
 test('Circle adapter withdraws a Tournament credit through the beneficiary SCA', async () => {

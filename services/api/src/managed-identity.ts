@@ -46,6 +46,8 @@ export type CircleWalletPort = {
   claimEvaluationTimeoutRefund(input: { walletId: string; escrowAddress: string; campaignId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  registerErc8004Agent?(input: { walletId: string; registryAddress: string; agentUri: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
+  giveErc8004Feedback?(input: { walletId: string; registryAddress: string; agentId: string; value: number; valueDecimals: number; tag1: string; tag2: string; endpoint: string; feedbackUri: string; feedbackHash: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   deactivateAgent(input: { walletId: string; registryAddress: string; agentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   withdrawTournamentCredit(input: { walletId: string; escrowAddress: string; tournamentId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   claimTournamentRefund(input: { walletId: string; escrowAddress: string; tournamentId: string; entrantId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -336,6 +338,17 @@ export class ManagedIdentityService {
     const wallet = this.requireReadyWallet(userId);
     if (!this.agentRegistryAddress) throw new Error('agent registry unavailable');
     return this.circleWallets.registerAgent({ walletId: wallet.walletId, registryAddress: this.agentRegistryAddress, ...input });
+  }
+
+  async registerErc8004Agent(userId: string, input: { registryAddress: string; agentUri: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    const wallet = this.requireReadyWallet(userId);
+    if (!this.circleWallets.registerErc8004Agent) throw new Error('ERC-8004 identity unavailable');
+    return this.circleWallets.registerErc8004Agent({ walletId: wallet.walletId, ...input });
+  }
+
+  async giveErc8004Feedback(evaluatorWalletId: string, input: { registryAddress: string; agentId: string; value: number; valueDecimals: number; tag1: string; tag2: string; endpoint: string; feedbackUri: string; feedbackHash: string; idempotencyKey: string }): Promise<WalletTransactionResult> {
+    if (!this.circleWallets.giveErc8004Feedback) throw new Error('ERC-8004 reputation unavailable');
+    return this.circleWallets.giveErc8004Feedback({ walletId: requireIdentifier(evaluatorWalletId, 'ERC-8004 evaluator wallet ID'), ...input });
   }
 
   async deactivateAgent(userId: string, agentId: string, idempotencyKey: string): Promise<WalletTransactionResult> {

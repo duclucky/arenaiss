@@ -56,6 +56,30 @@ test('Evo holds one fixed USDC fee then releases it only after all tests finaliz
   } finally { runtime.close(); }
 });
 
+test('ERC-8004 reputation failure is durable but never blocks finalized Evo settlement', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const finalized: any = { campaignId, owner, state: 'FINALIZED', items: [{ state: 'FINALIZED' }] };
+    let reputationAttempts = 0;
+    const service = new EvaluationExecutionService({
+      runtime, operatorAddress: operator, escrowAddress: escrow, feeUsdc: '1', model: 'primary-model',
+      fees: { async holdEvaluationFee() { return { approval: tx('1'), deposit: tx('2') }; } },
+      settlement: { async release() { return tx('3'); }, async refund() { throw new Error('unexpected refund'); } },
+      runner: { get: () => finalized, async advance() { return finalized; }, failInfrastructure() { return finalized; } } as any,
+      reputation: {
+        async recordFinalizedCampaign() { reputationAttempts += 1; throw new Error('reputation unavailable'); },
+        async resumePending() { return { attempted: 1, succeeded: 0, failed: 1 }; },
+      },
+    });
+
+    const result = await service.start('usr_owner', owner, campaignId);
+    assert.equal(result.state, 'FINALIZED');
+    assert.equal(service.getFee(campaignId)?.state, 'RELEASED');
+    assert.equal(reputationAttempts, 1);
+    assert.deepEqual(await service.resumePending(), { attempted: 0, succeeded: 0, failed: 0 });
+  } finally { runtime.close(); }
+});
+
 test('Evo refunds held USDC when the runner returns an infrastructure failure', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

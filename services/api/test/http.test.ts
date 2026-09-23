@@ -422,6 +422,102 @@ test('authenticated owner can prepare an exact Arc registration payload', async 
   assert.equal((await api.handle({ method: 'GET', path: '/api/registrations' })).status, 401);
 });
 
+test('ERC-8004 creation stores canonical token binding and serves a redacted registration document', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ArenaApiService(operator, runtime);
+    const managed = {
+      runtime, identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      agentRegistryAddress: '0x3333333333333333333333333333333333333333',
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address: '0x4444444444444444444444444444444444444444' }),
+        registerAgent: async () => { throw new Error('legacy registry must not be used'); },
+      },
+      emailSender: { sendLoginCode: async () => undefined },
+    };
+    const registrations: any[] = [];
+    let legacyDeactivations = 0;
+    managed.circleWallets.deactivateAgent = async () => {
+      legacyDeactivations += 1;
+      throw new Error('ERC-8004 identity must not use the legacy deactivation call');
+    };
+    const erc8004 = {
+      applicationUrl: 'http://localhost:5173/agents',
+      async register(input: any) {
+        registrations.push(input);
+        const transaction = { transactionId: 'circle-8004', state: 'COMPLETE', txHash: `0x${'8'.repeat(64)}`, explorerUrl: `https://testnet.arcscan.app/tx/0x${'8'.repeat(64)}` };
+        return { transaction, binding: { schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5_042_002, registryAddress: '0x8004A818BFB912233c491871b3d84c89A494BD9e', tokenId: '42', ownerAddress: '0x4444444444444444444444444444444444444444', agentUri: `http://localhost:3000/api/agents/${input.draft.agentId}/erc8004.json`, transaction } };
+      },
+    };
+    const api = new ArenaHttpApi(service, async () => true, managed as any, undefined, undefined, undefined, undefined, undefined, undefined, {}, { erc8004: erc8004 as any });
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const cookie = auth.headers['set-cookie'].split(';')[0];
+    const created = await api.handle({ method: 'POST', path: '/api/agents', headers: { cookie }, body: { name: 'Portable', agentsMd: 'private instructions' } });
+
+    assert.equal(created.status, 201);
+    assert.equal(created.body.erc8004Identity.tokenId, '42');
+    assert.equal(registrations.length, 1);
+    const document = await api.handle({ method: 'GET', path: `/api/agents/${created.body.agentId}/erc8004.json` });
+    assert.equal(document.status, 200);
+    assert.equal(document.body.registrations[0].agentId, 42);
+    assert.equal(JSON.stringify(document.body).includes('private instructions'), false);
+    const deleted = await api.handle({ method: 'DELETE', path: `/api/agents/${created.body.agentId}`, headers: { cookie }, body: { name: 'Portable' } });
+    assert.equal(deleted.status, 202);
+    assert.equal(deleted.body.active, false);
+    assert.equal(deleted.body.deactivation, undefined);
+    assert.equal(legacyDeactivations, 0);
+    const inactiveDocument = await api.handle({ method: 'GET', path: `/api/agents/${created.body.agentId}/erc8004.json` });
+    assert.equal(inactiveDocument.body.active, false);
+  } finally { runtime.close(); }
+});
+
+test('public Agent directory lists registered ERC-8004 identities without exposing AGENTS.md and marks active Marketplace listings', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ArenaApiService(operator, runtime);
+    const draft = service.prepareAgentCreation(alice, 'Public Sentinel', 'private operating instructions');
+    const transaction = { transactionId: 'circle-identity', state: 'COMPLETE', txHash: `0x${'8'.repeat(64)}`, explorerUrl: `https://explorer.testnet.arc.io/tx/0x${'8'.repeat(64)}` };
+    const identity = {
+      schema: 'arena-erc8004-identity-v1' as const, network: 'Arc Testnet' as const, chainId: 5_042_002 as const,
+      registryAddress: '0x8004A818BFB912233c491871b3d84c89A494BD9e', tokenId: '42', ownerAddress: alice,
+      agentUri: `https://arenaiss.xyz/api/agents/${draft.agentId}/erc8004.json`, transaction,
+    };
+    service.commitAgentCreation(alice, draft, transaction, identity);
+    const packId = `sha256:${'5'.repeat(64)}` as const;
+    const campaignId = `sha256:${'6'.repeat(64)}` as const;
+    service.createEvaluationPack(alice, { packId, version: '1', name: 'Public history pack', scenarios: [{ schema: 'arena-test-scenario-v1', scenarioId: 'history_case', version: '1', level: 'RESPONSE', objective: 'Answer.', context: '', constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }] });
+    service.createSoloCampaign(alice, { campaignId, agentId: draft.agentId, agentsVersion: draft.agentsVersion, packId, packVersion: '1', runtimePolicy: { model: 'fixture', maxOutputTokens: 100, temperature: 0, maxProviderAttempts: 1 } });
+    const tournamentId = `sha256:${'7'.repeat(64)}` as const;
+    service.publishTournament(operator, { id: tournamentId, name: 'Public Tour', status: 'UPCOMING', entrantIds: [], stakeAmount: '1000000', prizePool: '0' });
+    service.prepareRegistration(alice, tournamentId, draft.agentId, alice);
+    runtime.put('pair-rooms-v1', `sha256:${'9'.repeat(64)}`, {
+      roomId: `sha256:${'9'.repeat(64)}`, creator: alice, creatorWallet: alice, creatorAgentId: draft.agentId,
+      creatorVersion: draft.agentsVersion, stake: '1000000', joinDeadline: 2_000_000_000, resolutionDeadline: 2_000_086_400,
+      state: 'OPEN', createdAt: 1_900_000_000,
+    });
+    runtime.put('marketplace-listings', '7', {
+      schema: 'arena-marketplace-listing-v1', listingId: '7', certificateDigest: `sha256:${'4'.repeat(64)}`,
+      agentId: draft.agentId, agentVersionId: draft.agentsVersion, agentsCommitment: draft.agentsCommitment,
+      name: draft.name, seller: alice, sellerAddress: alice, price: '1000000', expiresAt: 2_000_000_000, state: 'ACTIVE',
+    });
+
+    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true);
+    const response = await api.handle({ method: 'GET', path: '/api/public/agents' });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.length, 1);
+    assert.equal(response.body[0].agentId, draft.agentId);
+    assert.equal(response.body[0].erc8004Identity.tokenId, '42');
+    assert.equal(response.body[0].marketplaceListed, true);
+    assert.equal(response.body[0].activity.evaluations[0].campaignId, campaignId);
+    assert.equal(response.body[0].activity.pairMatches[0].role, 'CREATOR');
+    assert.equal(response.body[0].activity.tournaments[0].name, 'Public Tour');
+    assert.equal(JSON.stringify(response.body).includes('private operating instructions'), false);
+    assert.equal(JSON.stringify(response.body).includes('agentsMd'), false);
+  } finally { runtime.close(); }
+});
+
 test('managed account can approve and register a prepared Tournament entry through Circle', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
