@@ -56,6 +56,7 @@ export function Marketplace() {
   const [operatorCertificates, setOperatorCertificates] = useState<MarketplaceCertificate[]>([]);
   const [operatorCredit, setOperatorCredit] = useState<string | null>(null);
   const [operatorNotice, setOperatorNotice] = useState('');
+  const [eligibilityNotice, setEligibilityNotice] = useState('');
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [campaigns, setCampaigns] = useState<EvaluationCampaign[]>([]);
   const [error, setError] = useState(''); const [busy, setBusy] = useState('');
@@ -100,10 +101,14 @@ export function Marketplace() {
   async function issueEligibility(event: React.FormEvent) {
     event.preventDefault();
     if (!marketplaceApi || !selectedAgent || finalized.length < 2 || !networkConfig?.genLayer) return;
-    setBusy('eligibility'); setError('');
+    setBusy('eligibility'); setError(''); setEligibilityNotice('');
     try {
-      await marketplaceApi.createEligibility({ agentId: selectedAgent.agentId, agentsVersion: selectedAgent.agentsVersion, campaignIds: finalized.slice(0, 2).map((row) => row.campaignId), issuedAt: nowSeconds(), expiresAt: nowSeconds() + 30 * 86400, network: 'studio-next', chainId: networkConfig.genLayer.chainId, judgeAddress: networkConfig.genLayer.evaluationJudgeAddress });
-      await refresh();
+      const certificate = await marketplaceApi.createEligibility({ agentId: selectedAgent.agentId, agentsVersion: selectedAgent.agentsVersion, campaignIds: finalized.slice(0, 2).map((row) => row.campaignId), issuedAt: nowSeconds(), expiresAt: nowSeconds() + 30 * 86400, network: 'studio-next', chainId: networkConfig.genLayer.chainId, judgeAddress: networkConfig.genLayer.evaluationJudgeAddress });
+      setCertificates((current) => [...current.filter((row) => row.certificateDigest !== certificate.certificateDigest), certificate]);
+      if (certificate.state === 'APPROVED') {
+        setListing((current) => ({ ...current, certificateDigest: certificate.certificateDigest }));
+        setEligibilityNotice('Eligibility approved on Arc. Enter a price to list this Agent.');
+      }
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Eligibility failed. Check the evaluation score and try again.'); }
     finally { setBusy(''); }
   }
@@ -209,6 +214,7 @@ export function Marketplace() {
       {selectedAgent && <p className="mt-3 text-sm" role="status">{finalized.length} finalized evaluation{finalized.length === 1 ? '' : 's'} available for this version. {finalized.length < 2 && <Link className="underline" to="/evaluations">Run another evaluation</Link>}</p>}
       {!networkConfig?.genLayer && <p className="mt-3 text-sm text-red-900">Studio Next judge is not configured. Eligibility is unavailable.</p>}
       <button type="submit" className="metal-button-solid mt-6" disabled={busy !== '' || !selectedAgent || finalized.length < 2 || !networkConfig?.genLayer}>{busy === 'eligibility' ? 'Checking…' : 'Check eligibility'}</button>
+      {eligibilityNotice && <p className="mt-3 text-sm font-semibold" role="status">{eligibilityNotice}</p>}
     </form><form className="glass-panel p-6" onSubmit={createListing}><h2 className="text-xl font-bold">List an approved version</h2><p className="mt-2 text-sm text-neutral-600">Listing registers only the profile commitment on Arc. The full profile was submitted to the model provider and GenLayer validators during Agent evaluation; sale delivery gives the buyer access through Arena ISS.</p>
       <label className="mt-5 block text-sm font-semibold" htmlFor="marketplace-certificate">Approved certificate</label><select id="marketplace-certificate" className="field-control mt-2 w-full" value={listing.certificateDigest} onChange={(event) => setListing((current) => ({ ...current, certificateDigest: event.target.value }))} required><option value="">Select certificate</option>{certificates.filter((row) => row.state === 'APPROVED').map((row) => <option key={row.certificateDigest} value={row.certificateDigest}>Approved Agent · {row.overallScore}/100</option>)}</select>
       {certificates.some((row) => row.state === 'ELIGIBLE') && <p className="mt-3 text-sm text-neutral-700">Eligible certificate awaiting operator approval.</p>}

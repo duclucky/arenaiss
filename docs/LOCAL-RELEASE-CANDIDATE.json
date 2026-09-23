@@ -3,7 +3,7 @@
   "createdAt": "2026-09-23",
   "scope": "LOCAL_ONLY",
   "fileCount": 312,
-  "sourceBundleSha256": "3b5dfe20a2e8da696bfdf759a099641ebc90e3f3071f572d1faaf062c39630f9",
+  "sourceBundleSha256": "dee63a3c9b190d0c1f7512eaf01d5012eca7ba457f650bf0f4e433d1446ae4b9",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -68,7 +68,7 @@
     "packages/evaluation/src/provider.ts": "75d08f487a0ba7a2d1255eb1ceefb1b0751b67ebc101a68439b3ac88feff3014",
     "packages/evaluation/src/solo-runner.ts": "10ecf46e1101915247a26200e45a3aae56808e6328025e87fc240869ada7775e",
     "packages/evaluation/test/solo-runner.test.ts": "0293fb6216a41a5e4f0efca8a5b884df1e69513b2e675611c6ff97f3ec63f2a8",
-    "services/api/src/http.ts": "fe6f4d5b4eca8044a7ae0603a0896ad2191e80a1a1a0e56d47941a6e85772fb9",
+    "services/api/src/http.ts": "894c1bcb5e37bac34c4c2389a1cf1f0135cc1b4c32bcf8e7f08b45284fed978c",
     "services/api/src/service.ts": "f5ff15af2493d21f85c2101f374e4d4e7f3f3470abedb0844da0d729fcdd2cf1",
     "services/api/src/server.ts": "8b321782dcaceea0f855a98be1208422ccd36ff74d37fc89e35c321f315e52fd",
     "services/api/src/managed-identity.ts": "f1c5eb28b416e80baaef32ff7d51017e4c1f8d2573b1bb2ae132ad43ff94a87a",
@@ -86,7 +86,7 @@
     "services/api/test/evaluation-execution.test.ts": "c95aafd44e329c5914265eda1121e8ca54388eaefa632dcbfa6fc931a5866ac2",
     "frontend/src/App.tsx": "f11476f6f95ed7a401f3f25bcdee4ee620f4b11014809f0125dfcd352eb269a1",
     "frontend/index.html": "4ab5f38fb06fdeeb72ced686a117007ea0630ba73e968506003b0cad70f207fc",
-    "frontend/src/index.css": "160d99efc7f6167ac7dc4811fcb68b7187cd3a16d40bf68df5cee0cc3ca65192",
+    "frontend/src/index.css": "422daf9788caa19ad69df15fe7e0f834cccbbd76cf4677e4e8ed80af3be1eb5a",
     "frontend/src/views/Home.tsx": "5c7090b1fe65bf9144ecbf55958446703549736dd83d6842ef812c1ec0e222a7",
     "frontend/src/views/Docs.tsx": "b585eae5f2b4aff34c01ff8f96ac67db17d6fb192ca8247c3b5b925265c905af",
     "frontend/src/views/NewAgent.tsx": "b2fb161ceda38ff8cea4affb67587514fc47a8446022f7b65e000f99333b39f7",
@@ -114,12 +114,12 @@
     "frontend/src/adapters/agent-api.ts": "fa7ec987ccff1d754e49b1dfe96dfc17dc19d5a323b4cf2aeb35868404a1e397",
     "frontend/src/views/Agents.tsx": "52413f63cfa775bcd7cd872f1beb0d243feef2eb8babd2ebb29aaa2399922d69",
     "frontend/src/views/Tournaments.tsx": "d2da604edd91fba34cf081df58098c3b23b933e5269c2bd97fff55cd7338dec1",
-    "frontend/src/views/Marketplace.tsx": "eeb038f01ea7048a542e9ca98bd16c73e6d65e56289cc2b95d47a1222149e861",
+    "frontend/src/views/Marketplace.tsx": "70515e604efb9879384f4fc0c57b080b5eed1b109404783ba8658bf372328e2d",
     "frontend/src/test/account-credits.test.tsx": "aea6a552b417b70589d746ec682bece35193192f8f501990dc8a729eeed22381",
     "frontend/src/test/tournament-operations-ux.test.tsx": "9d6707f7dfc6476e1d8beade1561e0470a1c6bfe4318cc031f86560657563a6f",
     "packages/persistence/src/sqlite-runtime.ts": "4ea8baa865e8b740df3773100301a6699ec433efece29d6ced5843357c7891f8",
     "packages/persistence/test/sqlite-runtime.test.ts": "b42d872aac06e0304d635e15838c87958fc24ec0a035f3cba004fca25ca0a4da",
-    "frontend/src/test/marketplace-ux.test.tsx": "7d6a33015a7973e17afde03ecf39250bf7b8d65b7e842ab82d9c0e92cf623cef",
+    "frontend/src/test/marketplace-ux.test.tsx": "12d2f6f9a18473e7b76a61a881c184fb0be1273358f78543682962fd42045b7e",
     "frontend/src/test/http-agent.test.ts": "8e9376d70982e4a4003fee24674ed148709393da59bd63eae702c0211d82da10",
     "frontend/src/test/agents-management.test.tsx": "8c496a8ecf27febb38003ffe611f164d9ff67dec84e16f3233ef90e0ca05f890",
     "scripts/run-studionet-agent-evaluation.mjs": "85f80a0dedf8db2e0064e0c4a551584b38e9c985b009b38e887ed30c387ca5ef",
@@ -153,9 +153,9 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 369,
+    "typescriptTests": 370,
     "foundryTests": 33,
-    "frontendTests": 141
+    "frontendTests": 142
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

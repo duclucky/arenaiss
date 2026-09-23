@@ -475,7 +475,7 @@ button:disabled { cursor: not-allowed; }
 .pair-outcome--lost { background: #f2d4d0; color: #711e18; }
 
 @media (max-width: 1023px) {
-  .site-header { grid-template-columns: 1fr auto; padding: 16px 20px; }
+  .site-header { grid-template-columns: 1fr auto; padding: 16px 20px; backdrop-filter: none; }
   .site-header .header-actions { grid-column: 2; grid-row: 1; }
   .header-cta, .header-account { padding: 0 12px; font-size: 14px; }
   .header-cta { padding: 0 9px; }
@@ -485,6 +485,9 @@ button:disabled { cursor: not-allowed; }
     position: fixed;
     inset: 0;
     z-index: 60;
+    min-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     visibility: hidden;
     display: flex;
     flex-direction: column;

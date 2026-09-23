@@ -38,6 +38,50 @@ test('Marketplace operator approval is executed by the configured Arc signer and
   } finally { runtime.close(); }
 });
 
+test('Marketplace eligibility is approved automatically by the configured system operator', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const certificateDigest = `sha256:${'4'.repeat(64)}`;
+    const certificate = { schema: 'arena-marketplace-certificate-v1', certificateDigest,
+      evidenceDigest: `sha256:${'5'.repeat(64)}`, owner: alice, agentId: `sha256:${'1'.repeat(64)}`,
+      agentVersionId: `sha256:${'2'.repeat(64)}`, agentsCommitment: `sha256:${'3'.repeat(64)}`,
+      packId: `sha256:${'6'.repeat(64)}`, packVersion: '1.0.0', rubricVersion: 'v1',
+      coverageBps: 10000, overallScore: 90, dimensionScores: {}, maxSpread: 0,
+      issuedAt: 1, expiresAt: 9999999999, state: 'ELIGIBLE' as const };
+    runtime.put('marketplace-certificates', certificateDigest, certificate);
+    const service = new ArenaApiService(operator, runtime);
+    service.createMarketplaceEligibility = (() => structuredClone(certificate)) as typeof service.createMarketplaceEligibility;
+    let approved = '';
+    let approvalCalls = 0;
+    const chain = { async snapshot() { throw new Error('not used'); }, async approveEligibility(input: { digest: string }) {
+      approvalCalls += 1;
+      approved = input.digest;
+      return { transactionId: 'automatic-approval', state: 'COMPLETE', txHash: `0x${'7'.repeat(64)}` };
+    } };
+    const api = new ArenaHttpApi(service, async () => true, undefined, chain as any);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const login = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const headers = { cookie: login.headers['set-cookie'].split(';')[0] };
+    const result = await api.handle({ method: 'POST', path: '/api/marketplace/eligibility', headers, body: {
+      agentId: certificate.agentId, agentsVersion: certificate.agentVersionId,
+      campaignIds: [`sha256:${'8'.repeat(64)}`, `sha256:${'9'.repeat(64)}`],
+      issuedAt: certificate.issuedAt, expiresAt: certificate.expiresAt,
+      network: 'studio-next', chainId: 61997, judgeAddress: operator,
+    } });
+    assert.equal(result.status, 201);
+    assert.equal(result.body.state, 'APPROVED');
+    assert.equal(approved, certificateDigest);
+    const replay = await api.handle({ method: 'POST', path: '/api/marketplace/eligibility', headers, body: {
+      agentId: certificate.agentId, agentsVersion: certificate.agentVersionId,
+      campaignIds: [`sha256:${'8'.repeat(64)}`, `sha256:${'9'.repeat(64)}`],
+      issuedAt: 2, expiresAt: certificate.expiresAt + 1,
+      network: 'studio-next', chainId: 61997, judgeAddress: operator,
+    } });
+    assert.equal(replay.body.certificateDigest, certificateDigest);
+    assert.equal(approvalCalls, 1);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace reconciles a submitted listing from Arc after service restart', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

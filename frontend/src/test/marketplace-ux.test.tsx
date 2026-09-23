@@ -59,6 +59,22 @@ describe('Marketplace website UX', () => {
     expect(screen.getByText('SCORE SPREAD ABOVE THRESHOLD')).toBeInTheDocument();
   });
 
+  it('immediately selects an automatically approved certificate without reloading certificate data', async () => {
+    const listCertificates = vi.fn().mockResolvedValue([]);
+    const automaticEligibility = vi.fn().mockResolvedValue(certificate);
+    mount({ ...marketplaceApi, listCertificates, createEligibility: automaticEligibility,
+      async listOperatorCertificates() { return []; } });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
+    fireEvent.change(await screen.findByLabelText('Agent to certify'), { target: { value: agentId } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check eligibility' }));
+
+    const approved = await screen.findByRole('option', { name: 'Approved Agent · 90/100' });
+    expect(approved).toBeInTheDocument();
+    expect(screen.getByLabelText('Approved certificate')).toHaveValue(certificateDigest);
+    expect(screen.getByRole('button', { name: 'List on Arc' })).toBeEnabled();
+    expect(listCertificates).toHaveBeenCalledTimes(1);
+  });
+
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
     expect(await screen.findByText('1.000000 USDC')).toBeInTheDocument();
