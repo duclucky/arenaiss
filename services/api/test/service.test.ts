@@ -453,6 +453,8 @@ test("Test Pack versions are immutable and SOLO campaign creation binds the sele
     assert.equal(api.getPublicEvaluationCampaign(campaign.campaignId)?.state, "PENDING");
     assert.equal(api.getPublicEvaluationCampaign(campaign.campaignId)?.agentName, "Pack Agent");
     assert.equal(new ArenaApiService(ALICE, runtime).listOwnedEvaluationCampaigns(ALICE)[0]?.agentName, "Pack Agent");
+    runtime.put('evaluation-fees-v2', campaignId, { campaignId, owner: ALICE.toLowerCase(), state: 'PAYMENT_FAILED' });
+    assert.equal(api.listOwnedEvaluationCampaigns(ALICE)[0]?.state, 'PAYMENT_FAILED');
     assert.equal(api.listOwnedEvaluationCampaigns(ALICE).length, 1);
     assert.throws(() => api.createSoloCampaign(BOB, { campaignId: sha256Text("bob-campaign"), agentId: agent.agentId, agentsVersion: agent.agentsVersion, packId: pack.packId, packVersion: pack.version, runtimePolicy: { model: "fixture", maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 } }), /unauthorized/i);
   } finally {

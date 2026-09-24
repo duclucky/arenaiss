@@ -677,6 +677,47 @@ test('an owned legacy evaluation without an Evo fee keeps its campaign while una
   } finally { runtime.close(); }
 });
 
+test('Evo rejects an unfunded Arc wallet before creating a campaign or charging it', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    let chargeCalls = 0;
+    let balanceAmount = '0';
+    let available = true;
+    const managed = {
+      runtime,
+      identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+      circleWallets: {
+        createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' }),
+        listUsdcBalances: async () => [{ chain: 'ARC-TESTNET', label: 'Arc Testnet', amount: balanceAmount, isArc: true, available }],
+      },
+      emailSender: { sendLoginCode: async () => undefined },
+    };
+    const service = new ArenaApiService(operator, runtime);
+    const execution = { model: 'fixture-model', config: () => ({ enabled: true, feeUsdc: '1' }), async start() { chargeCalls += 1; } };
+    const api = new ArenaHttpApi(service, async () => true, managed as any, undefined, execution as any);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const headers = { cookie: auth.headers['set-cookie'].split(';')[0] };
+    const agent = service.createAgent(alice, 'Unfunded Agent', 'Follow the test policy.');
+    const response = await api.handle({ method: 'POST', path: '/api/evaluation-campaigns/evo', headers, body: { agentId: agent.agentId, agentsVersion: agent.agentsVersion } });
+    assert.equal(response.status, 400);
+    assert.match(response.body.error, /insufficient Arc Testnet USDC/i);
+    assert.equal(service.listOwnedEvaluationCampaigns(alice).length, 0);
+    assert.equal(chargeCalls, 0);
+    available = false;
+    const unavailable = await api.handle({ method: 'POST', path: '/api/evaluation-campaigns/evo', headers, body: { agentId: agent.agentId, agentsVersion: agent.agentsVersion } });
+    assert.equal(unavailable.status, 503);
+    assert.match(unavailable.body.error, /balance unavailable/i);
+    assert.equal(service.listOwnedEvaluationCampaigns(alice).length, 0);
+    available = true;
+    balanceAmount = '1';
+    const funded = await api.handle({ method: 'POST', path: '/api/evaluation-campaigns/evo', headers, body: { agentId: agent.agentId, agentsVersion: agent.agentsVersion } });
+    assert.equal(funded.status, 202);
+    assert.equal(service.listOwnedEvaluationCampaigns(alice).length, 1);
+    assert.equal(chargeCalls, 1);
+  } finally { runtime.close(); }
+});
+
 test('version comparison routes require the owner session and preserve cohort arrays and regression policy', async () => {
   const service = new ArenaApiService(operator);
   let captured: any;

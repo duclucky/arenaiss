@@ -83,6 +83,28 @@ describe('evaluation product UX', () => {
     expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();
   });
 
+  it('reports insufficient USDC inline without adding a pending evaluation', async () => {
+    const api = { ...evaluationApi, async listCampaigns() { return []; }, startEvo: vi.fn().mockRejectedValue(new Error('Insufficient Arc Testnet USDC. At least 1 USDC is required to start evaluation.')) };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    const button = await screen.findByRole('button', { name: 'Start evaluation' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Insufficient Arc Testnet USDC');
+    expect(screen.getByText('No evaluation records yet.')).toBeInTheDocument();
+  });
+
+  it('refreshes a failed payment immediately so the new campaign is not left looking pending', async () => {
+    const listCampaigns = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([{ ...campaign, state: 'PAYMENT_FAILED' }]);
+    const api = { ...evaluationApi, listCampaigns, startEvo: vi.fn().mockRejectedValue(new Error('Fee payment failed.')) };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    const button = await screen.findByRole('button', { name: 'Start evaluation' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Fee payment failed.');
+    expect(await screen.findByText(/Payment failed/)).toBeInTheDocument();
+    expect(listCampaigns).toHaveBeenCalledTimes(2);
+  });
+
   it('refreshes My evaluations immediately after a successful submission', async () => {
     const submitted = { ...campaign, campaignId: 'campaign_new', state: 'RUNNING', createdAt: Date.UTC(2026, 8, 17, 13, 0) };
     const listCampaigns = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([submitted]);
@@ -157,6 +179,13 @@ describe('evaluation product UX', () => {
     const rows = screen.getAllByRole('listitem').filter((row) => row.querySelector('a[href^="/evaluations/"]'));
     expect(within(rows[0]).getByText('Safety Scout')).toBeInTheDocument();
     expect(within(rows[1]).getByText('Sentinel Operator')).toBeInTheDocument();
+  });
+
+  it('shows failed fee collection as payment failed instead of a pending evaluation', async () => {
+    const api = { ...evaluationApi, async listCampaigns() { return [{ ...campaign, state: 'PAYMENT_FAILED' }]; } };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    expect(await screen.findByText(/Payment failed/)).toBeInTheDocument();
+    expect(screen.queryByText('Pending →')).not.toBeInTheDocument();
   });
 
   it('sorts My evaluations by creation time even when an older campaign is running', async () => {

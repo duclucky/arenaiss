@@ -32,7 +32,7 @@ export function Evaluations() {
   }, [account, agentApi, evaluationApi]);
 
   useEffect(() => {
-    if (!account || !evaluationApi || !campaigns.some((campaign) => !['FINALIZED', 'FAILED'].includes(campaign.state))) return;
+    if (!account || !evaluationApi || !campaigns.some((campaign) => !['FINALIZED', 'FAILED', 'PAYMENT_FAILED'].includes(campaign.state))) return;
     const timer = window.setInterval(() => {
       evaluationApi.listCampaigns().then((next) => setCampaigns((current) => mergeCampaigns(current, next))).catch(() => undefined);
     }, 5_000);
@@ -50,8 +50,11 @@ export function Evaluations() {
         const refreshed = await evaluationApi.listCampaigns();
         setCampaigns((current) => mergeCampaigns(current, refreshed));
       } catch { /* Keep the accepted campaign visible while the next background refresh retries. */ }
-      if (!['FINALIZED', 'FAILED'].includes(campaign.state)) setWorkerNotice('Evaluation accepted. Processing continues on the server, so you may close this page.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not start evaluation.'); }
+      if (!['FINALIZED', 'FAILED', 'PAYMENT_FAILED'].includes(campaign.state)) setWorkerNotice('Evaluation accepted. Processing continues on the server, so you may close this page.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not start evaluation.');
+      try { setCampaigns(await evaluationApi.listCampaigns()); } catch { /* Preserve the payment error; the next page load can refresh history. */ }
+    }
     finally { setRunning(false); }
   };
 
@@ -77,5 +80,5 @@ function CampaignList({ campaigns }: { campaigns: EvaluationCampaign[] }) {
   const timestamp = (campaign: EvaluationCampaign) => campaign.startedAt ?? campaign.createdAt;
   const ordered = campaigns.slice().sort((a, b) => (timestamp(b) ?? 0) - (timestamp(a) ?? 0));
   const utcDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
-  return <section aria-labelledby="campaigns-heading"><h2 id="campaigns-heading" className="mb-4 text-2xl font-bold">My evaluations</h2>{campaigns.length === 0 ? <div className="glass-panel p-7 text-neutral-700">No evaluation records yet.</div> : <ul className="space-y-3">{ordered.map((campaign) => { const time = timestamp(campaign); return <li key={campaign.campaignId} className="glass-panel flex flex-wrap items-center justify-between gap-4 p-5"><div className="min-w-0"><p className="break-words font-semibold">{campaign.agentName || 'Agent name unavailable'}</p><p className="mt-1 text-sm text-neutral-600">{time && Number.isFinite(time) ? <time dateTime={new Date(time).toISOString()}>{utcDate.format(time)} UTC</time> : 'Time not recorded'}</p></div><Link aria-label="Open evaluation results" className="metal-button-ghost" to={`/evaluations/${campaign.campaignId}`}>{displayLabel(campaign.state)} →</Link></li>; })}</ul>}</section>;
+  return <section aria-labelledby="campaigns-heading"><h2 id="campaigns-heading" className="mb-4 text-2xl font-bold">My evaluations</h2>{campaigns.length === 0 ? <div className="glass-panel p-7 text-neutral-700">No evaluation records yet.</div> : <ul className="space-y-3">{ordered.map((campaign) => { const time = timestamp(campaign); return <li key={campaign.campaignId} className="glass-panel flex flex-wrap items-center justify-between gap-4 p-5"><div className="min-w-0"><p className="break-words font-semibold">{campaign.agentName || 'Agent name unavailable'}</p><p className="mt-1 text-sm text-neutral-600">{time && Number.isFinite(time) ? <time dateTime={new Date(time).toISOString()}>{utcDate.format(time)} UTC</time> : 'Time not recorded'}</p></div><Link aria-label="Open evaluation results" className="metal-button-ghost" to={`/evaluations/${campaign.campaignId}`}>{campaign.state === 'PAYMENT_FAILED' ? 'Payment failed' : displayLabel(campaign.state)} →</Link></li>; })}</ul>}</section>;
 }

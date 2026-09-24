@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { parseUnits } from 'viem';
 
 import type { ArenaApiService } from './service.ts';
 import { ManagedIdentityService, type LoginIdentityKind, type ManagedIdentityOptions } from './managed-identity.ts';
@@ -299,9 +300,14 @@ export class ArenaHttpApi {
       }
       if (request.method === 'POST' && request.path === '/api/evaluation-campaigns/evo') {
         const session = this.requireManagedSession(request.headers);
-        if (!this.evaluationExecution) throw new Error('evaluation execution unavailable');
+        if (!this.evaluationExecution || !this.managedIdentity) throw new Error('evaluation execution unavailable');
         const body = request.body || {};
-        const created = this.service.createEvoCampaign(session.principal, { agentId: requireDigest(body.agentId), agentsVersion: requireDigest(body.agentsVersion), model: this.evaluationExecution.model });
+        const agentId = requireDigest(body.agentId);
+        const agentsVersion = requireDigest(body.agentsVersion);
+        const balance = (await this.managedIdentity.listUsdcBalances(session.userId!)).find((row) => row.chain === 'ARC-TESTNET');
+        if (!balance?.available) throw new Error('Arc Testnet USDC balance unavailable');
+        if (parseUnits(balance.amount, 6) < parseUnits(this.evaluationExecution.config().feeUsdc, 6)) throw new Error(`Insufficient Arc Testnet USDC. At least ${this.evaluationExecution.config().feeUsdc} USDC is required to start evaluation.`);
+        const created = this.service.createEvoCampaign(session.principal, { agentId, agentsVersion, model: this.evaluationExecution.model });
         await this.evaluationExecution.start(session.userId!, session.principal, created.campaignId, { queueOnly: true });
         return this.json(202, this.service.getPublicEvaluationCampaign(created.campaignId));
       }
