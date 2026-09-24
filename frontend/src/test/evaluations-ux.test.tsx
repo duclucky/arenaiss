@@ -147,6 +147,18 @@ describe('evaluation product UX', () => {
     expect(screen.getByRole('link', { name: 'Open evaluation results' })).toHaveAttribute('href', `/evaluations/${campaignId}`);
   });
 
+  it('labels each evaluation with its Agent name from the campaign, including historical Agents', async () => {
+    const api = { ...evaluationApi, async listCampaigns() { return [
+      { ...campaign, campaignId: 'campaign_scout', agentName: 'Safety Scout' },
+      { ...campaign, campaignId: 'campaign_sentinel', agentName: 'Sentinel Operator' },
+    ]; } };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    expect(await screen.findByText('Sentinel Operator')).toBeInTheDocument();
+    const rows = screen.getAllByRole('listitem').filter((row) => row.querySelector('a[href^="/evaluations/"]'));
+    expect(within(rows[0]).getByText('Safety Scout')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Sentinel Operator')).toBeInTheDocument();
+  });
+
   it('sorts My evaluations by creation time even when an older campaign is running', async () => {
     const recent = { ...campaign, campaignId: 'campaign_recent', createdAt: Date.UTC(2026, 8, 17, 12, 30), state: 'FAILED' };
     const older = { ...campaign, campaignId: 'campaign_older', createdAt: Date.UTC(2026, 8, 16, 11, 0), state: 'RUNNING' };
