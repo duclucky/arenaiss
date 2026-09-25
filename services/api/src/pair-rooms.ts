@@ -7,11 +7,13 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const TX = /^0x[0-9a-fA-F]{64}$/;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STORE = 'pair-rooms-v1';
+const SEQUENCE_STORE = 'pair-room-sequences-v1';
+const GLOBAL_SEQUENCE = 'global';
 
 export type PairRoomState = 'PENDING' | 'OPEN' | 'JOINING' | 'JOINED' | 'REFUNDABLE' | 'SETTLED';
 export type PairEvaluationFailureCode = 'PROVIDER_ERROR' | 'GENLAYER_BUSY' | 'GENLAYER_ERROR' | 'GENLAYER_NO_CONSENSUS' | 'VERDICT_PENDING' | 'ARC_ERROR';
 export type PairRoom = {
-  roomId: string; creator: string; creatorWallet: string; creatorAgentId: string; creatorVersion: string;
+  roomId: string; roomNumber: number; creator: string; creatorWallet: string; creatorAgentId: string; creatorVersion: string;
   challenger?: string; challengerWallet?: string; challengerAgentId?: string; challengerVersion?: string;
   stake: string; joinDeadline: number; resolutionDeadline: number; state: PairRoomState;
   createTx?: string; joinTx?: string; cancelTx?: string; refundTx?: string; verdictTx?: string; settleTx?: string;
@@ -73,9 +75,11 @@ export class PairRoomCoordinator {
     this.wallet = wallet;
     this.chain = chain;
     this.now = now;
+    this.ensureRoomNumbers();
   }
 
   list(): PairRoom[] {
+    this.ensureRoomNumbers();
     return this.runtime.list<PairRoom>(STORE).filter((row) => row.state !== 'PENDING')
       .sort((a, b) => b.createdAt - a.createdAt).map((row) => this.withProviderRoute(row));
   }
@@ -89,6 +93,7 @@ export class PairRoomCoordinator {
 
   get(roomId: string): PairRoom | null {
     if (!DIGEST.test(roomId)) throw new Error('invalid room ID');
+    this.ensureRoomNumbers();
     const row = this.runtime.get<PairRoom>(STORE, roomId);
     return row && row.state !== 'PENDING' ? this.withProviderRoute(row) : null;
   }
@@ -169,6 +174,7 @@ export class PairRoomCoordinator {
     const roomId = sha(`arena-pair-room-v1|5042002|${this.chain.escrowAddress.toLowerCase()}|${principal}|${input.idempotencyKey.toLowerCase()}`);
     const account = await this.wallet.account(userId);
     if (!ADDRESS.test(account.address)) throw new Error('pair room wallet is invalid');
+    this.ensureRoomNumbers();
     const prior = this.runtime.get<PairRoom>(STORE, roomId);
     if (prior && (prior.creator !== principal || prior.creatorAgentId !== input.agentId || prior.creatorVersion !== input.version
       || prior.stake !== input.stake || !sameAddress(prior.creatorWallet, account.address))) throw new Error('conflicting pair room request');
@@ -177,7 +183,7 @@ export class PairRoomCoordinator {
     if (!prior && await this.chain.balanceOf(account.address) < stake) throw new Error('insufficient Arc USDC balance');
     const now = this.now();
     let intent: PairRoom = prior ?? {
-      roomId, creator: principal, creatorWallet: account.address, creatorAgentId: input.agentId, creatorVersion: input.version,
+      roomId, roomNumber: this.runtime.increment(SEQUENCE_STORE, GLOBAL_SEQUENCE, 1), creator: principal, creatorWallet: account.address, creatorAgentId: input.agentId, creatorVersion: input.version,
       stake: input.stake, joinDeadline: now + 86_400, resolutionDeadline: now + 7 * 86_400,
       state: 'PENDING', createdAt: now,
     };
@@ -281,6 +287,28 @@ export class PairRoomCoordinator {
     if (!room) throw new Error('pair room not found');
     return room;
   }
+
+  private ensureRoomNumbers(): void {
+    const rooms = this.runtime.list<PairRoom>(STORE)
+      .sort((a, b) => a.createdAt - b.createdAt || a.roomId.localeCompare(b.roomId));
+    const numberedRoomIds = new Set<string>();
+    const usedNumbers = new Set<number>();
+    let highestNumber = 0;
+    for (const room of rooms) {
+      if (!Number.isSafeInteger(room.roomNumber) || room.roomNumber <= 0 || usedNumbers.has(room.roomNumber)) continue;
+      numberedRoomIds.add(room.roomId);
+      usedNumbers.add(room.roomNumber);
+      highestNumber = Math.max(highestNumber, room.roomNumber);
+    }
+    const currentSequence = this.runtime.counter(SEQUENCE_STORE, GLOBAL_SEQUENCE);
+    if (currentSequence < highestNumber) this.runtime.increment(SEQUENCE_STORE, GLOBAL_SEQUENCE, highestNumber - currentSequence);
+    for (const room of rooms) {
+      if (numberedRoomIds.has(room.roomId)) continue;
+      const roomNumber = this.runtime.increment(SEQUENCE_STORE, GLOBAL_SEQUENCE, 1);
+      this.runtime.put(STORE, room.roomId, { ...room, roomNumber });
+    }
+  }
+
   private keys(key: string): IntentKeys {
     this.runtime.putIfAbsent('pair-room-keys', key, { approvalKey: randomUUID(), executionKey: randomUUID() });
     return this.runtime.get<IntentKeys>('pair-room-keys', key)!;

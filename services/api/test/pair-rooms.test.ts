@@ -185,6 +185,39 @@ test('public listing exposes only joinable rooms while private listing is partic
   } finally { f.runtime.close(); }
 });
 
+test('room numbers remain globally sequential when earlier rooms leave the open list', async () => {
+  const f = fixture();
+  try {
+    const first = await f.coordinator.create('creator', 'creator-principal', { agentId: AGENT, version: VERSION_A, stake: '1000000', idempotencyKey: '88888888-8888-4888-8888-888888888888' });
+    assert.equal(first.roomNumber, 1);
+    await f.coordinator.action('creator', 'creator-principal', first.roomId, 'CANCEL');
+
+    const second = await f.coordinator.create('creator', 'creator-principal', { agentId: AGENT, version: VERSION_A, stake: '1000000', idempotencyKey: '99999999-9999-4999-8999-999999999999' });
+    assert.equal(second.roomNumber, 2);
+    assert.deepEqual(f.coordinator.listOpen().map((room) => room.roomNumber), [2]);
+    assert.equal(f.coordinator.get(first.roomId)?.roomNumber, 1);
+  } finally { f.runtime.close(); }
+});
+
+test('legacy rooms receive stable creation-order numbers before the next room is allocated', async () => {
+  const f = fixture();
+  try {
+    const olderId = `sha256:${'1'.repeat(64)}`;
+    const newerId = `sha256:${'2'.repeat(64)}`;
+    const base = { creator: 'creator-principal', creatorWallet: CREATOR, creatorAgentId: AGENT, creatorVersion: VERSION_A,
+      stake: '1000000', joinDeadline: 1000, resolutionDeadline: 2000, state: 'SETTLED' as const };
+    f.runtime.put('pair-rooms-v1', newerId, { ...base, roomId: newerId, createdAt: 20 });
+    f.runtime.put('pair-rooms-v1', olderId, { ...base, roomId: olderId, createdAt: 10 });
+
+    const legacy = f.coordinator.list();
+    assert.deepEqual(legacy.map((room) => [room.roomId, room.roomNumber]), [[newerId, 2], [olderId, 1]]);
+    assert.deepEqual(f.coordinator.list().map((room) => room.roomNumber), [2, 1]);
+
+    const next = await f.coordinator.create('creator', 'creator-principal', { agentId: AGENT, version: VERSION_A, stake: '1000000', idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+    assert.equal(next.roomNumber, 3);
+  } finally { f.runtime.close(); }
+});
+
 test('mutual cancellation is rejected after evaluation starts', async () => {
   const f = fixture();
   try {

@@ -12,7 +12,7 @@ import type { PairRoom, ChainRoom } from '../src/pair-rooms.ts';
 const digest = (character: string) => `sha256:${character.repeat(64)}`;
 const address = (character: string) => `0x${character.repeat(40)}`;
 const room: PairRoom = {
-  roomId: digest('a'), creator: 'creator', creatorWallet: address('1'), creatorAgentId: digest('b'), creatorVersion: digest('c'),
+  roomId: digest('a'), roomNumber: 1, creator: 'creator', creatorWallet: address('1'), creatorAgentId: digest('b'), creatorVersion: digest('c'),
   challenger: 'challenger', challengerWallet: address('2'), challengerAgentId: digest('d'), challengerVersion: digest('e'),
   stake: '1000000', joinDeadline: 100, resolutionDeadline: 1000, state: 'JOINED',
   createTx: `0x${'1'.repeat(64)}`, joinTx: `0x${'2'.repeat(64)}`, createdAt: 1,

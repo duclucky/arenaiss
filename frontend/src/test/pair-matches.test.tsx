@@ -111,10 +111,10 @@ it.each([
   { view: 'completed', shown: ['c', 'd'], hidden: ['a', 'b'] },
 ] as const)('shows the $view room subpage with its own room list', async ({ view, shown, hidden }) => {
   const rooms = [
-    { roomId: `sha256:${'a'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, state: 'OPEN' },
-    { roomId: `sha256:${'b'.repeat(64)}`, creatorWallet: wallet, state: 'JOINED' },
-    { roomId: `sha256:${'c'.repeat(64)}`, creatorWallet: wallet, state: 'SETTLED' },
-    { roomId: `sha256:${'d'.repeat(64)}`, creatorWallet: `0x${'1'.repeat(40)}`, challengerWallet: wallet, state: 'REFUNDABLE' },
+    { roomId: `sha256:${'a'.repeat(64)}`, roomNumber: 41, creatorWallet: `0x${'1'.repeat(40)}`, state: 'OPEN' },
+    { roomId: `sha256:${'b'.repeat(64)}`, roomNumber: 42, creatorWallet: wallet, state: 'JOINED' },
+    { roomId: `sha256:${'c'.repeat(64)}`, roomNumber: 43, creatorWallet: wallet, state: 'SETTLED' },
+    { roomId: `sha256:${'d'.repeat(64)}`, roomNumber: 44, creatorWallet: `0x${'1'.repeat(40)}`, challengerWallet: wallet, state: 'REFUNDABLE' },
   ].map((item) => ({ ...item, stake: '10000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000 }));
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };
@@ -126,7 +126,8 @@ it.each([
   const title = view === 'open' ? 'Open rooms' : view === 'mine' ? 'My rooms' : 'Completed';
   const roomList = await screen.findByRole('list', { name: `${title} list` });
   expect(roomList).toHaveClass('grid', 'md:grid-cols-2', 'xl:grid-cols-3');
-  expect(screen.getAllByText(/^Room #[1-9][0-9]*$/).map((row) => row.textContent)).toEqual(shown.map((_, index) => `Room #${index + 1}`));
+  const expectedNumbers = { a: 41, b: 42, c: 43, d: 44 } as const;
+  expect(screen.getAllByText(/^Room #[1-9][0-9]*$/).map((row) => row.textContent)).toEqual(shown.map((digit) => `Room #${expectedNumbers[digit]}`));
   for (const digit of [...shown, ...hidden]) expect(screen.queryByText(new RegExp(`Room sha256:${digit.repeat(64)}`))).not.toBeInTheDocument();
   expect(roomList).not.toHaveTextContent('sha256:');
 });
