@@ -16,6 +16,23 @@ const bytes32 = (suffix: string) => `0x${suffix.padStart(64, '0')}`;
 describe('live Arc wallet adapter', () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
+  it('keeps safe EIP-6963 image data and rejects remote provider icons', async () => {
+    const provider = { request: async () => [] };
+    const adapter = new BrowserArcWalletAdapter();
+    const safeIcon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: { info: { uuid: 'safe-wallet', name: 'Safe Wallet', icon: safeIcon, rdns: 'io.safe' }, provider },
+    }));
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: { info: { uuid: 'remote-icon', name: 'Remote Icon Wallet', icon: 'https://example.com/wallet.svg' }, provider },
+    }));
+
+    const providers = await adapter.getProviders();
+    expect(providers.find(({ uuid }) => uuid === 'safe-wallet')).toMatchObject({ icon: safeIcon, rdns: 'io.safe' });
+    expect(providers.find(({ uuid }) => uuid === 'remote-icon')).toMatchObject({ icon: '' });
+    adapter.removeListener();
+  });
+
   it('adds Arc Testnet with native USDC details and switches a MetaMask wallet without the network', async () => {
     const requests: Array<{ method: string; params?: unknown[] }> = [];
     let chainId = '0x1';

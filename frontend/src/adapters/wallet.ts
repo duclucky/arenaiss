@@ -1,5 +1,6 @@
 import { BaseError, ContractFunctionRevertedError, createPublicClient, createWalletClient, custom, defineChain, getAddress, http } from 'viem';
 import { ArcWalletAdapter, WalletProvider, ArcNetworkConfig, EntrantRegistration, WalletTransaction, CanonicalEntrant } from './interfaces';
+import { sanitizeWalletIcon } from '../wallet-logo';
 
 const usdcAbi = [{
   type: 'function', name: 'approve', stateMutability: 'nonpayable',
@@ -67,7 +68,8 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
       if (detail && detail.info && detail.provider) {
         this.providers.set(detail.info.uuid, {
           name: detail.info.name,
-          icon: detail.info.icon || '',
+          icon: sanitizeWalletIcon(detail.info.icon),
+          rdns: typeof detail.info.rdns === 'string' ? detail.info.rdns.slice(0, 253) : undefined,
           uuid: detail.info.uuid,
           isInstalled: true,
           request: detail.provider.request.bind(detail.provider),
@@ -100,18 +102,13 @@ export class BrowserArcWalletAdapter implements ArcWalletAdapter {
 
     for (const f of fallbacks) {
       if (w[f.key] && typeof w[f.key].request === 'function') {
-        // Simple deduplication, if a specific uuid is already present from 6963, we don't need the fallback
-        // But for ethereum fallback, we just check if it's already there
-        let alreadyHas = false;
-        for (const p of this.providers.values()) {
-          if (p.name === f.name || p.name === 'MetaMask' || p.name === 'Brave Wallet') {
-            alreadyHas = true;
-          }
-        }
+        const alreadyHas = Array.from(this.providers.values()).some(
+          (provider) => provider.name.toLowerCase() === f.name.toLowerCase(),
+        );
         if (!alreadyHas && !this.providers.has(f.uuid)) {
           this.providers.set(f.uuid, {
             name: f.name,
-            icon: '', // Empty or default SVG
+            icon: '',
             uuid: f.uuid,
             isInstalled: true,
             request: w[f.key].request.bind(w[f.key]),

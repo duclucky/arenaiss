@@ -14,6 +14,7 @@
   "dependencies": {
     "@genlayer/transaction-kit": "0.1.0-rc.2",
     "@genlayer/transaction-kit-react": "0.1.0-rc.2",
+    "@web3icons/react": "4.1.22",
     "clsx": "^2.1.1",
     "genlayer-js": "2.0.0-rc.1",
     "lucide-react": "^1.45.0",

@@ -71,6 +71,27 @@ describe('App Tests', () => {
     expect(testAdapter.connectCalls).toHaveLength(0);
   });
 
+  it('shows the icon announced by an EIP-6963 wallet beside its name', async () => {
+    const icon = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
+    const testAdapter = new TestWalletAdapter();
+    testAdapter.getProviders = async () => [{ name: 'Detected Wallet', icon, uuid: 'detected-wallet', isInstalled: true, request: async () => [] }];
+    render(<AppProvider walletAdapter={testAdapter}><LoginModal onClose={() => {}} /></AppProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+
+    const providerButton = await screen.findByRole('button', { name: 'Detected Wallet' });
+    expect(providerButton.querySelector('img')).toHaveAttribute('src', icon);
+  });
+
+  it('uses the bundled MetaMask logo when a legacy provider announces no icon', async () => {
+    const testAdapter = new TestWalletAdapter();
+    testAdapter.getProviders = async () => [{ name: 'MetaMask', icon: '', uuid: 'legacy-metamask', isInstalled: true, request: async () => [] }];
+    render(<AppProvider walletAdapter={testAdapter}><LoginModal onClose={() => {}} /></AppProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with wallet' }));
+
+    const providerButton = await screen.findByRole('button', { name: 'MetaMask' });
+    expect(providerButton.querySelector('[data-wallet-logo="metamask"]')).toBeInTheDocument();
+  });
+
   it('explains a failed Arc Testnet switch in the wallet login dialog', async () => {
     const testAdapter = new TestWalletAdapter();
     testAdapter.switchChain = async () => { throw new Error('WRONG_CHAIN'); };

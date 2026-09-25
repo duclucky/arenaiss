@@ -345,6 +345,7 @@ export type CanonicalEntrant = EntrantRegistration & {
 export type WalletProvider = {
   name: string;
   icon: string;
+  rdns?: string;
   uuid: string;
   isInstalled: boolean;
   request: (args: { method: string; params?: any[] }) => Promise<any>;

@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, WalletCards, X } from 'lucide-react';
 import { WalletProvider } from '../adapters/interfaces';
 import { useAppContext } from '../context';
 import { displayLabel } from '../display-label';
+import { WalletLogo } from './WalletLogo';
 
 type LoginMethod = 'choice' | 'wallet' | 'email';
 
@@ -156,7 +157,7 @@ export function LoginModal({ onClose, onAuthenticated }: { onClose: () => void; 
 
       {method === 'wallet' && <div className="mt-6 space-y-3">
         {walletStatus === 'loading' && <p role="status" className="py-4 text-center text-muted-foreground">Loading providers…</p>}
-        {walletStatus === 'idle' && (providers.length > 0 ? providers.map((provider) => <button key={provider.uuid} type="button" onClick={() => connect(provider.uuid)} className="retro-control flex min-h-14 w-full items-center justify-between p-4 focus:outline-none focus:ring-2 focus:ring-black"><span className="font-medium">{provider.name}</span><span className="h-6 w-6 rounded-full bg-secondary" aria-hidden="true" /></button>) : <p className="py-4 text-center text-muted-foreground">No providers detected.</p>)}
+        {walletStatus === 'idle' && (providers.length > 0 ? providers.map((provider) => <button key={provider.uuid} type="button" onClick={() => connect(provider.uuid)} className="retro-control flex min-h-14 w-full items-center gap-3 p-4 text-left focus:outline-none focus:ring-2 focus:ring-black"><WalletLogo provider={provider} /><span className="min-w-0 flex-1 truncate font-medium">{provider.name}</span></button>) : <p className="py-4 text-center text-muted-foreground">No providers detected.</p>)}
       </div>}
 
       {method === 'email' && <div className="mt-5">
