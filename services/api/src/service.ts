@@ -70,8 +70,8 @@ export type PublicEvaluationPack = { schema: "arena-public-evaluation-pack-v1"; 
 export type PublicEvaluationCampaign = { schema: "arena-public-evaluation-campaign-v1"; campaignId: string; agentVersionId: string; agentName?: string; packId: string; packVersion: string; rubricVersion: string; state: string; createdAt?: number; startedAt?: number; items: Array<{ scenarioId: string; state: string; attempt: number; runIds: string[]; score?: string; overallScore?: number; providerModel?: string; providerRoute?: 'PRIMARY' | 'FALLBACK'; failureStage?: string; failureCode?: string }> };
 export type MarketplaceTransaction = { transactionId: string; state: string; txHash?: string; explorerUrl?: string };
 export type MarketplaceCertificate = { schema: "arena-marketplace-certificate-v1"; certificateDigest: Digest; evidenceDigest: string; owner: string; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; erc8004TokenId: string; packId: Digest; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: "ELIGIBLE" | "APPROVED"; authorization?: MarketplaceTransaction };
-export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; erc8004TokenId: string; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "CANCEL_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; purchaseApprovalIdempotencyKey?: string; purchaseIdempotencyKey?: string; cancellationIdempotencyKey?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
-export type PublicMarketplaceListing = Omit<MarketplaceListing, "seller" | "buyer" | "purchaseApprovalIdempotencyKey" | "purchaseIdempotencyKey" | "cancellationIdempotencyKey">;
+export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listingId: string; certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; erc8004TokenId: string; name: string; seller: string; sellerAddress: string; price: string; expiresAt: number; state: "SUBMITTED" | "ACTIVE" | "BUY_SUBMITTED" | "CANCEL_SUBMITTED" | "SOLD" | "CANCELLED" | "EXPIRED"; buyer?: string; buyerAddress?: string; purchaseApprovalIdempotencyKey?: string; purchaseIdempotencyKey?: string; purchaseStartedAt?: number; cancellationIdempotencyKey?: string; transaction?: MarketplaceTransaction; purchase?: MarketplaceTransaction };
+export type PublicMarketplaceListing = Omit<MarketplaceListing, "seller" | "buyer" | "purchaseApprovalIdempotencyKey" | "purchaseIdempotencyKey" | "purchaseStartedAt" | "cancellationIdempotencyKey">;
 export type MarketplaceArcSnapshot = { listingId: string; tokenId: string; agentId: Digest; version: Digest; commitment: Digest; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: "ACTIVE" | "SOLD" | "CANCELLED" | "EXPIRED"; registryOwner: string; registryActive: boolean };
 export type MarketplaceListingIntent = { protocol: "ERC8004_V2"; certificateDigest: Digest; owner: string; sellerAddress: string; tokenId: string; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string; transaction?: MarketplaceTransaction; listingId?: string };
 
@@ -80,6 +80,7 @@ const USER_PRINCIPAL = /^usr_[0-9a-f]{64}$/;
 const PUBLIC_TOURNAMENT_STATES = new Set<PublicTournamentStatus>(["UPCOMING", "ACTIVE", "COMPLETED", "CANCELLED"]);
 const PUBLIC_MATCH_STATES = new Set<PublicMatchState>(["SCHEDULED", "WAITING_FOR_OUTPUTS", "JUDGING", "ACCEPTED", "FAILED", "RETRYABLE", "FINALIZED", "TIE", "RETRY", "WINNER_ADVANCED"]);
 const TERMINAL_PUBLIC_MATCH_STATES = new Set<PublicMatchState>(["FINALIZED", "WINNER_ADVANCED", "TIE"]);
+const MARKETPLACE_PURCHASE_GRACE_SECONDS = 300;
 const sha = (value: string): Digest => `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
 
 export class ArenaApiService {
@@ -607,7 +608,15 @@ export class ArenaApiService {
     if (snapshot.state === "SOLD") { if (!row.buyer || !row.buyerAddress || row.buyerAddress !== snapshot.buyerAddress?.toLowerCase() || snapshot.registryOwner.toLowerCase() !== row.buyerAddress) throw new Error("canonical buyer mismatch"); }
     else if (snapshot.state === "ACTIVE" && snapshot.registryOwner.toLowerCase() !== row.sellerAddress) throw new Error("canonical seller mismatch");
     if (row.state === "SOLD" && snapshot.state !== "SOLD") throw new Error("marketplace state cannot regress");
-    if ((row.state === "BUY_SUBMITTED" || row.state === "CANCEL_SUBMITTED") && snapshot.state === "ACTIVE") return this.publicMarketplaceListing(row);
+    if (row.state === "BUY_SUBMITTED" && snapshot.state === "ACTIVE") {
+      const purchaseStillInFlight = row.purchaseStartedAt !== undefined && this.nowSeconds() - row.purchaseStartedAt < MARKETPLACE_PURCHASE_GRACE_SECONDS;
+      if (purchaseStillInFlight) return this.publicMarketplaceListing(row);
+      row.state = "ACTIVE";
+      delete row.buyer; delete row.buyerAddress; delete row.purchaseApprovalIdempotencyKey; delete row.purchaseIdempotencyKey; delete row.purchaseStartedAt; delete row.purchase;
+      this.runtime?.put("marketplace-listings", row.listingId, row);
+      return this.publicMarketplaceListing(row);
+    }
+    if (row.state === "CANCEL_SUBMITTED" && snapshot.state === "ACTIVE") return this.publicMarketplaceListing(row);
     row.state = snapshot.state; this.runtime?.put("marketplace-listings", row.listingId, row);
     if (row.state === "SOLD") this.transferMarketplaceAgentOwnership(row);
     return this.publicMarketplaceListing(row); }
@@ -619,7 +628,7 @@ export class ArenaApiService {
     if (row.state !== "ACTIVE") throw new Error("marketplace listing is unavailable");
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuid.test(keys.approvalIdempotencyKey) || !uuid.test(keys.buyIdempotencyKey) || keys.approvalIdempotencyKey === keys.buyIdempotencyKey) throw new Error("invalid marketplace purchase identity");
-    row.state = "BUY_SUBMITTED"; row.buyer = buyer; row.buyerAddress = buyerAddress.toLowerCase();
+    row.state = "BUY_SUBMITTED"; row.buyer = buyer; row.buyerAddress = buyerAddress.toLowerCase(); row.purchaseStartedAt = this.nowSeconds();
     row.purchaseApprovalIdempotencyKey = keys.approvalIdempotencyKey; row.purchaseIdempotencyKey = keys.buyIdempotencyKey;
     this.runtime?.put("marketplace-listings", row.listingId, row);
     return { approvalIdempotencyKey: row.purchaseApprovalIdempotencyKey, buyIdempotencyKey: row.purchaseIdempotencyKey };
@@ -824,7 +833,7 @@ export class ArenaApiService {
     });
     return { resultClass, overallScore: effectiveEvaluationScore(scorecard), dimensions, actionsExecuted: false };
   }
-  private publicMarketplaceListing(row: MarketplaceListing): PublicMarketplaceListing { const { seller: _seller, buyer: _buyer, purchaseApprovalIdempotencyKey: _approvalKey, purchaseIdempotencyKey: _buyKey, cancellationIdempotencyKey: _cancelKey, ...publicRow } = structuredClone(row); return publicRow; }
+  private publicMarketplaceListing(row: MarketplaceListing): PublicMarketplaceListing { const { seller: _seller, buyer: _buyer, purchaseApprovalIdempotencyKey: _approvalKey, purchaseIdempotencyKey: _buyKey, purchaseStartedAt: _purchaseStartedAt, cancellationIdempotencyKey: _cancelKey, ...publicRow } = structuredClone(row); return publicRow; }
   private requireOperator(caller: string): void { if (this.address(caller) !== this.operator) throw new Error("unauthorized operator"); }
   private requireOwner(caller: string, agentId: Digest): Agent { const agent = this.agents.get(agentId); if (!agent || agent.owner !== this.principal(caller)) throw new Error("unauthorized agent access"); return agent; }
   private principal(value: string): string { if (ADDRESS.test(value)) return value.toLowerCase(); if (USER_PRINCIPAL.test(value)) return value; throw new Error("invalid principal"); }

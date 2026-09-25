@@ -120,6 +120,38 @@ test('Marketplace purchase binds buyer and replay keys before Circle and recover
   } finally { runtime.close(); }
 });
 
+test('Arc-active listing recovers an abandoned purchase lock without reopening an in-flight purchase', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    seedAgent(runtime);
+    runtime.put('marketplace-listings', '5', { schema: 'arena-marketplace-listing-v1', listingId: '5',
+      certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId,
+      name: 'Agent', seller, sellerAddress: seller, price: '5000000', expiresAt: 2_000,
+      state: 'BUY_SUBMITTED', buyer, buyerAddress: buyer,
+      purchaseApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+      purchaseIdempotencyKey: '22222222-2222-4222-8222-222222222222' });
+    const activeSnapshot = { listingId: '5', tokenId, agentId, version, commitment, sellerAddress: seller,
+      price: '5000000', expiresAt: 2_000, state: 'ACTIVE' as const,
+      registryOwner: seller, registryActive: true };
+    const recovered = new ArenaApiService(operator, runtime, () => 1_000);
+    assert.equal(recovered.publishMarketplaceListing(operator, activeSnapshot).state, 'ACTIVE');
+    assert.deepEqual(recovered.listMarketplaceListings().map((row) => row.listingId), ['5']);
+    assert.equal(recovered.listOwnedMarketplacePurchases(buyer).length, 0);
+
+    const keys = { approvalIdempotencyKey: '33333333-3333-4333-8333-333333333333',
+      buyIdempotencyKey: '44444444-4444-4444-8444-444444444444' };
+    recovered.beginMarketplacePurchase(buyer, '5', buyer, keys);
+    const inFlight = recovered.publishMarketplaceListing(operator, activeSnapshot);
+    assert.equal(inFlight.state, 'BUY_SUBMITTED');
+    assert.equal('purchaseStartedAt' in inFlight, false);
+    assert.equal(recovered.listMarketplaceListings().length, 0);
+
+    const afterGrace = new ArenaApiService(operator, runtime, () => 1_301);
+    assert.equal(afterGrace.publishMarketplaceListing(operator, activeSnapshot).state, 'ACTIVE');
+    assert.deepEqual(afterGrace.listMarketplaceListings().map((row) => row.listingId), ['5']);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace listing validates and persists a reusable Circle intent before an Arc write', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
