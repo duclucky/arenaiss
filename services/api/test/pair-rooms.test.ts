@@ -210,8 +210,8 @@ test('legacy rooms receive stable creation-order numbers before the next room is
     f.runtime.put('pair-rooms-v1', olderId, { ...base, roomId: olderId, createdAt: 10 });
 
     const legacy = f.coordinator.list();
-    assert.deepEqual(legacy.map((room) => [room.roomId, room.roomNumber]), [[newerId, 2], [olderId, 1]]);
-    assert.deepEqual(f.coordinator.list().map((room) => room.roomNumber), [2, 1]);
+    assert.deepEqual(legacy.map((room) => [room.roomId, room.roomNumber]), [[olderId, 1], [newerId, 2]]);
+    assert.deepEqual(f.coordinator.list().map((room) => room.roomNumber), [1, 2]);
 
     const next = await f.coordinator.create('creator', 'creator-principal', { agentId: AGENT, version: VERSION_A, stake: '1000000', idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
     assert.equal(next.roomNumber, 3);

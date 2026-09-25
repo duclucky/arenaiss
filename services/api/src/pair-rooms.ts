@@ -81,7 +81,7 @@ export class PairRoomCoordinator {
   list(): PairRoom[] {
     this.ensureRoomNumbers();
     return this.runtime.list<PairRoom>(STORE).filter((row) => row.state !== 'PENDING')
-      .sort((a, b) => b.createdAt - a.createdAt).map((row) => this.withProviderRoute(row));
+      .sort((a, b) => a.roomNumber - b.roomNumber).map((row) => this.withProviderRoute(row));
   }
 
   listOpen(): PairRoom[] { return this.list().filter((room) => room.state === 'OPEN'); }

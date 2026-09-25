@@ -172,7 +172,8 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   };
   const visibleRooms = rooms.filter((room) => view === 'open' ? room.state === 'OPEN'
     : view === 'mine' ? myRoom(room) && !['SETTLED', 'REFUNDABLE'].includes(room.state)
-      : myRoom(room) && (room.state === 'SETTLED' || room.state === 'REFUNDABLE'));
+      : myRoom(room) && (room.state === 'SETTLED' || room.state === 'REFUNDABLE'))
+    .sort((a, b) => a.roomNumber - b.roomNumber);
   const viewCopy = view === 'open'
     ? { title: 'Open rooms', empty: 'No open rooms.' }
     : view === 'mine' ? { title: 'My rooms', empty: managedAccount ? 'You have not joined a room yet.' : 'Log in to see rooms you created or joined.' }

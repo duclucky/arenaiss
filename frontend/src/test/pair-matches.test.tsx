@@ -111,10 +111,10 @@ it.each([
   { view: 'completed', shown: ['c', 'd'], hidden: ['a', 'b'] },
 ] as const)('shows the $view room subpage with its own room list', async ({ view, shown, hidden }) => {
   const rooms = [
-    { roomId: `sha256:${'a'.repeat(64)}`, roomNumber: 41, creatorWallet: `0x${'1'.repeat(40)}`, state: 'OPEN' },
-    { roomId: `sha256:${'b'.repeat(64)}`, roomNumber: 42, creatorWallet: wallet, state: 'JOINED' },
-    { roomId: `sha256:${'c'.repeat(64)}`, roomNumber: 43, creatorWallet: wallet, state: 'SETTLED' },
     { roomId: `sha256:${'d'.repeat(64)}`, roomNumber: 44, creatorWallet: `0x${'1'.repeat(40)}`, challengerWallet: wallet, state: 'REFUNDABLE' },
+    { roomId: `sha256:${'c'.repeat(64)}`, roomNumber: 43, creatorWallet: wallet, state: 'SETTLED' },
+    { roomId: `sha256:${'b'.repeat(64)}`, roomNumber: 42, creatorWallet: wallet, state: 'JOINED' },
+    { roomId: `sha256:${'a'.repeat(64)}`, roomNumber: 41, creatorWallet: `0x${'1'.repeat(40)}`, state: 'OPEN' },
   ].map((item) => ({ ...item, stake: '10000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000 }));
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
     if (url.endsWith('/config')) return { enabled: true };
