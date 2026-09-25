@@ -1,9 +1,9 @@
 {
   "schema": "arena-local-release-candidate-v1",
-  "createdAt": "2026-09-24",
+  "createdAt": "2026-09-25",
   "scope": "LOCAL_ONLY",
   "fileCount": 315,
-  "sourceBundleSha256": "1b4e7df479c364809b28a1e9543d8d77fa9447d852f0b2a0c5258c894d0c7b54",
+  "sourceBundleSha256": "03492e33a3d15997e45daa2c7f54cb583d86e2283f31d76722794d8c06d1967a",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -47,7 +47,7 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 374,
+    "typescriptTests": 375,
     "foundryTests": 39,
     "frontendTests": 146
   },

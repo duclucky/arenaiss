@@ -4,6 +4,7 @@ type Fetcher = typeof fetch;
 export class HttpMarketplaceAdapter implements MarketplaceApiAdapter {
   constructor(private readonly baseUrl: string, private readonly fetcher: Fetcher = fetch) {}
   listListings() { return this.request<MarketplaceListing[]>('/api/marketplace/listings'); }
+  listOwnedListings() { return this.request<MarketplaceListing[]>('/api/marketplace/my-listings'); }
   listPurchases() { return this.request<MarketplaceListing[]>('/api/marketplace/my-purchases'); }
   listCertificates() { return this.request<MarketplaceCertificate[]>('/api/marketplace/certificates'); }
   createEligibility(input: Parameters<MarketplaceApiAdapter['createEligibility']>[0]) { return this.request<MarketplaceCertificate>('/api/marketplace/eligibility', { method: 'POST', body: JSON.stringify(input) }); }

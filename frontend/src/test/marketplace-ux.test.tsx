@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentApiAdapter, EvaluationApiAdapter, ManagedIdentityAdapter, MarketplaceApiAdapter } from '../adapters/interfaces';
@@ -15,8 +15,8 @@ const campaigns = ['5', '6'].map((char) => ({ schema: 'arena-evaluation-campaign
 const evaluationApi = { async listCampaigns() { return campaigns; } } as unknown as EvaluationApiAdapter;
 const certificate = { schema: 'arena-marketplace-certificate-v1', certificateDigest, evidenceDigest: digest('8'), owner: address, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: '42', packId: digest('7'), packVersion: '1.0.0', rubricVersion: 'v1', coverageBps: 10000, overallScore: 90, dimensionScores: {}, maxSpread: 0, issuedAt: 1, expiresAt: Math.floor(Date.now() / 1000) + 30 * 86400, state: 'APPROVED' as const };
 const eligible = { ...certificate, certificateDigest: digest('9'), state: 'ELIGIBLE' as const };
-const sold = { schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: '42', name: 'Safety Scout', sellerAddress: '0x5555555555555555555555555555555555555555', price: '1000000', expiresAt: certificate.expiresAt, state: 'SOLD' as const };
-const ownedActive = { ...sold, listingId: '2', sellerAddress: address, price: '2000000', state: 'ACTIVE' as const };
+const sold = { schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: '42', name: 'Purchased Scout', sellerAddress: '0x5555555555555555555555555555555555555555', price: '1000000', expiresAt: certificate.expiresAt, state: 'SOLD' as const };
+const ownedActive = { ...sold, name: 'Safety Scout', listingId: '2', sellerAddress: address, price: '2000000', state: 'ACTIVE' as const };
 const createEligibility = vi.fn().mockResolvedValue(certificate);
 const createListing = vi.fn().mockResolvedValue(sold);
 const getDelivery = vi.fn().mockResolvedValue({ agentId, agentVersionId: version, agentsCommitment: commitment, agentsMd: '# Private Agent' });
@@ -24,7 +24,7 @@ const withdrawCredit = vi.fn().mockResolvedValue({ transactionId: 'withdraw', st
 const approveCertificate = vi.fn().mockResolvedValue({ ...eligible, state: 'APPROVED' });
 const withdrawOperatorCredit = vi.fn().mockResolvedValue({ transactionId: 'platform-withdraw', state: 'COMPLETE' });
 const cancelListing = vi.fn().mockResolvedValue({ ...ownedActive, state: 'CANCELLED' });
-const marketplaceApi: MarketplaceApiAdapter = { async listListings() { return [sold, ownedActive]; }, async listCertificates() { return [certificate]; }, async listPurchases() { return [sold]; }, async getCredit() { return { amount: '990000' }; }, withdrawCredit, async listOperatorCertificates() { return [eligible]; }, approveCertificate, async getOperatorCredit() { return { amount: '10000' }; }, withdrawOperatorCredit, cancelListing, createEligibility, createListing, async buy() { return sold; }, getDelivery };
+const marketplaceApi: MarketplaceApiAdapter = { async listListings() { return [sold, ownedActive]; }, async listOwnedListings() { return [ownedActive]; }, async listCertificates() { return [certificate]; }, async listPurchases() { return [sold]; }, async getCredit() { return { amount: '990000' }; }, withdrawCredit, async listOperatorCertificates() { return [eligible]; }, approveCertificate, async getOperatorCredit() { return { amount: '10000' }; }, withdrawOperatorCredit, cancelListing, createEligibility, createListing, async buy() { return sold; }, getDelivery };
 const config = { chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', genLayer: { chainId: 61997 as const, rpcUrl: 'https://studio-next.genlayer.com/api', name: 'Studio Next', explorerUrl: 'https://explorer-studio-dev.genlayer.com', evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d' as const, comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB' as const } };
 function mount(api: MarketplaceApiAdapter = marketplaceApi) { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
 
@@ -77,7 +77,13 @@ describe('Marketplace website UX', () => {
 
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
-    expect(await screen.findByText('1.000000 USDC')).toBeInTheDocument();
+    const publicListings = await screen.findByRole('region', { name: 'Agents for sale' });
+    expect(within(publicListings).getByText('2.000000 USDC')).toBeInTheDocument();
+    expect(within(publicListings).getByRole('heading', { name: 'Safety Scout' })).toBeInTheDocument();
+    expect(within(publicListings).queryByRole('heading', { name: 'Purchased Scout' })).not.toBeInTheDocument();
+    expect(within(publicListings).queryByText('SOLD')).not.toBeInTheDocument();
+    const purchases = screen.getByRole('region', { name: 'My purchased Agents' });
+    expect(within(purchases).getByRole('heading', { name: 'Purchased Scout' })).toBeInTheDocument();
     expect(screen.queryByText('Listing #1')).not.toBeInTheDocument();
     expect(screen.queryByText(certificateDigest)).not.toBeInTheDocument();
     expect(screen.queryByText(new RegExp(certificateDigest.slice(0, 20)))).not.toBeInTheDocument();
@@ -91,7 +97,7 @@ describe('Marketplace website UX', () => {
 
   it('shows private delivery only for a canonical purchase returned by the buyer-private endpoint', async () => {
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Open purchased Agent Safety Scout' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open purchased Agent Purchased Scout' }));
     expect(await screen.findByRole('heading', { name: 'Purchased Agent' })).toBeInTheDocument();
     expect(screen.getByText('# Private Agent')).toBeInTheDocument();
     expect(screen.queryByText(/Listing #/)).not.toBeInTheDocument();
@@ -127,12 +133,14 @@ describe('Marketplace website UX', () => {
 
   it('offers a safe retry for the original buyer or seller while an Arc write is unresolved', async () => {
     const buy = vi.fn().mockResolvedValue({ ...sold, state: 'BUY_SUBMITTED' });
-    mount({ ...marketplaceApi, async listListings() { return [
-      { ...sold, listingId: '3', state: 'BUY_SUBMITTED', buyerAddress: address },
-      { ...ownedActive, state: 'CANCEL_SUBMITTED' },
-    ]; }, buy });
-    fireEvent.click(await screen.findByRole('button', { name: 'Resume Safety Scout purchase' }));
+    mount({ ...marketplaceApi,
+      async listListings() { return []; },
+      async listPurchases() { return [{ ...sold, listingId: '3', state: 'BUY_SUBMITTED', buyerAddress: address }]; },
+      async listOwnedListings() { return [{ ...ownedActive, state: 'CANCEL_SUBMITTED' }]; },
+      buy });
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume Purchased Scout purchase' }));
     await waitFor(() => expect(buy).toHaveBeenCalledWith('3', expect.any(String), expect.any(String)));
+    fireEvent.click(screen.getByRole('tab', { name: 'Sell my Agent' }));
     fireEvent.click(screen.getByRole('button', { name: 'Retry Safety Scout cancellation' }));
     await waitFor(() => expect(cancelListing).toHaveBeenCalledWith('2', expect.any(String)));
   });

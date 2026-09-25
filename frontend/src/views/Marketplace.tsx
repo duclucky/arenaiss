@@ -51,6 +51,7 @@ export function Marketplace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeView = searchParams.get('view') === 'sell' ? 'sell' : 'browse';
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  const [ownedListings, setOwnedListings] = useState<MarketplaceListing[]>([]);
   const [purchases, setPurchases] = useState<MarketplaceListing[]>([]);
   const [certificates, setCertificates] = useState<MarketplaceCertificate[]>([]);
   const [operatorCertificates, setOperatorCertificates] = useState<MarketplaceCertificate[]>([]);
@@ -67,27 +68,29 @@ export function Marketplace() {
 
   async function refresh() {
     if (!marketplaceApi) return;
-    const [next, owned, bought, reviewQueue, platformCredit] = await Promise.all([
+    const [next, owned, sellerRows, bought, reviewQueue, platformCredit] = await Promise.all([
       marketplaceApi.listListings(), account ? marketplaceApi.listCertificates() : Promise.resolve([]),
+      account && marketplaceApi.listOwnedListings ? marketplaceApi.listOwnedListings() : Promise.resolve([]),
       account && marketplaceApi.listPurchases ? marketplaceApi.listPurchases() : Promise.resolve([]),
       account && marketplaceApi.listOperatorCertificates ? marketplaceApi.listOperatorCertificates().catch(() => []) : Promise.resolve([]),
       account && marketplaceApi.getOperatorCredit ? marketplaceApi.getOperatorCredit().catch(() => null) : Promise.resolve(null),
     ]);
-    setListings(next); setCertificates(owned); setPurchases(bought); setOperatorCertificates(reviewQueue); setOperatorCredit(platformCredit?.amount ?? null);
+    setListings(next); setOwnedListings(sellerRows); setCertificates(owned); setPurchases(bought); setOperatorCertificates(reviewQueue); setOperatorCredit(platformCredit?.amount ?? null);
   }
   useEffect(() => {
     let active = true;
     if (!marketplaceApi) return;
     Promise.all([
       marketplaceApi.listListings(), account ? marketplaceApi.listCertificates() : Promise.resolve([]),
+      account && marketplaceApi.listOwnedListings ? marketplaceApi.listOwnedListings() : Promise.resolve([]),
       account && marketplaceApi.listPurchases ? marketplaceApi.listPurchases() : Promise.resolve([]),
       account && agentApi ? agentApi.listOwnedAgents() : Promise.resolve([]),
       account && evaluationApi ? evaluationApi.listCampaigns() : Promise.resolve([]),
       account && marketplaceApi.listOperatorCertificates ? marketplaceApi.listOperatorCertificates().catch(() => []) : Promise.resolve([]),
       account && marketplaceApi.getOperatorCredit ? marketplaceApi.getOperatorCredit().catch(() => null) : Promise.resolve(null),
-    ]).then(([next, owned, bought, profiles, records, reviewQueue, platformCredit]) => {
+    ]).then(([next, owned, sellerRows, bought, profiles, records, reviewQueue, platformCredit]) => {
       if (!active) return;
-      setListings(next); setCertificates(owned); setPurchases(bought);
+      setListings(next); setOwnedListings(sellerRows); setCertificates(owned); setPurchases(bought);
       setAgents(profiles); setCampaigns(records); setOperatorCertificates(reviewQueue); setOperatorCredit(platformCredit?.amount ?? null);
     }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Could not load Marketplace.'); });
     return () => { active = false; };
@@ -96,7 +99,9 @@ export function Marketplace() {
   const selectedAgent = agents.find((row) => row.agentId === agentId);
   const finalized = useMemo(() => campaigns.filter((row) => row.state === 'FINALIZED' && row.agentVersionId === selectedAgent?.agentsVersion), [campaigns, selectedAgent?.agentsVersion]);
   const selectedCertificate = certificates.find((row) => row.certificateDigest === listing.certificateDigest && row.state === 'APPROVED');
-  const purchasedIds = new Set(purchases.map((row) => row.listingId));
+  const activeListings = listings.filter((row) => row.state === 'ACTIVE');
+  const privatePurchases = purchases.filter((row) => row.state === 'BUY_SUBMITTED' || row.state === 'SOLD');
+  const sellerRecovery = ownedListings.filter((row) => row.state === 'CANCEL_SUBMITTED');
 
   async function issueEligibility(event: React.FormEvent) {
     event.preventDefault();
@@ -173,7 +178,7 @@ export function Marketplace() {
     finally { setBusy(''); }
   }
 
-  function listingAction(row: MarketplaceListing) {
+  function listingAction(row: MarketplaceListing, privateRecord = false) {
     const owned = Boolean(account && row.sellerAddress.toLowerCase() === account.toLowerCase());
     if (owned && (row.state === 'ACTIVE' || row.state === 'CANCEL_SUBMITTED')) {
       const retry = row.state === 'CANCEL_SUBMITTED';
@@ -188,7 +193,7 @@ export function Marketplace() {
         {busy === `buy-${row.listingId}` ? 'Purchase submitting…' : row.state === 'BUY_SUBMITTED' ? 'Resume purchase' : `Buy for ${usdc(row.price)}`}
       </button>;
     }
-    if (row.state === 'SOLD' && purchasedIds.has(row.listingId)) {
+    if (privateRecord && row.state === 'SOLD') {
       return <button type="button" className="metal-button-ghost w-full" disabled={busy !== ''}
         onClick={() => openDelivery(row)} aria-label={`Open purchased Agent ${row.name}`}>
         {busy === `delivery-${row.listingId}` ? 'Loading delivery…' : 'Open purchased Agent'}
@@ -197,17 +202,25 @@ export function Marketplace() {
     return <p className="text-xs text-neutral-600">{row.state === 'ACTIVE' ? 'Sign in to purchase.' : row.state === 'SOLD' ? 'Sold on Arc.' : 'Awaiting Arc confirmation. Reload to check status.'}</p>;
   }
 
+  function listingCard(row: MarketplaceListing, privateRecord = false) {
+    return <article className="glass-panel flex min-h-64 flex-col p-5" key={`${privateRecord ? 'private' : 'public'}-${row.listingId}`}>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">{privateRecord ? 'Private account record' : 'Agent listing'}</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
+      <dl className="mt-8 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
+      <div className="mt-auto pt-6">{listingAction(row, privateRecord)}</div>
+    </article>;
+  }
+
   return <section aria-labelledby="marketplace-heading" className="mx-auto max-w-6xl">
     <p className="page-kicker">Agent Exchange · Arc Testnet</p>
     <div className="flex flex-wrap items-end justify-between gap-6"><div><h1 id="marketplace-heading" className="page-title">Marketplace</h1><p className="page-lede">Buy exact Agent versions that passed Arena ISS evaluation. Every sale settles in USDC with a fixed 1% platform fee.</p></div><span className="retro-chip px-3 py-2 text-xs">Platform fee · 1%</span></div>
     <div role="tablist" aria-label="Marketplace sections" className="mt-8 grid gap-2 sm:grid-cols-2"><button role="tab" aria-selected={activeView === 'browse'} className={activeView === 'browse' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({}, { replace: true })}><ShoppingBag size={17} aria-hidden="true" /> Agents for sale</button><button role="tab" aria-selected={activeView === 'sell'} className={activeView === 'sell' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ view: 'sell' }, { replace: true })}><Tag size={17} aria-hidden="true" /> Sell my Agent</button></div>
     {error && <MarketplaceError message={error} onRefresh={() => refresh().catch((cause) => setError(cause instanceof Error ? cause.message : 'Refresh failed.'))}/>}
-    {activeView === 'browse' && <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{listings.map((row) => <article className="glass-panel flex min-h-64 flex-col p-5" key={row.listingId}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">Agent listing</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
-      <dl className="mt-8 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
-      <div className="mt-auto pt-6">{listingAction(row)}</div>
-    </article>)}</div>}
-    {activeView === 'browse' && listings.length === 0 && <div className="glass-panel mt-12 p-6 text-neutral-700">No live listings yet. An Agent needs two finalized evaluations and an approved certificate before it can be listed.</div>}
+    {activeView === 'browse' && <section className="mt-12" role="region" aria-label="Agents for sale">
+      {activeListings.length > 0 ? <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{activeListings.map((row) => listingCard(row))}</div>
+        : <div className="glass-panel p-6 text-neutral-700">No live listings yet. An Agent needs two finalized evaluations and an approved certificate before it can be listed.</div>}
+    </section>}
+    {activeView === 'browse' && account && privatePurchases.length > 0 && <section className="mt-14" role="region" aria-label="My purchased Agents"><p className="page-kicker">Private account records</p><h2 className="mt-1 text-2xl font-bold">My purchased Agents</h2><p className="mt-2 text-sm text-neutral-700">Completed purchases and purchases still awaiting Arc confirmation are visible only to this account.</p><div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{privatePurchases.map((row) => listingCard(row, true))}</div></section>}
+    {activeView === 'sell' && account && sellerRecovery.length > 0 && <section className="glass-panel mt-12 p-6" role="region" aria-label="Seller recovery"><p className="page-kicker">Private seller recovery</p><h2 className="mt-1 text-2xl font-bold">Listings awaiting Arc confirmation</h2><p className="mt-2 text-sm text-neutral-700">These listings are hidden from public search while cancellation is unresolved.</p><div className="mt-5 grid gap-5 md:grid-cols-2">{sellerRecovery.map((row) => listingCard(row, true))}</div></section>}
     {activeView === 'sell' && (operatorCertificates.some((row) => row.state === 'ELIGIBLE') || operatorCredit !== null) && <section className="glass-panel mt-12 p-6" aria-labelledby="operator-review-heading"><p className="page-kicker">Restricted operator action</p><div className="flex flex-wrap items-start justify-between gap-5"><div><h2 id="operator-review-heading" className="mt-1 text-2xl font-bold">Operator review</h2><p className="mt-2 text-sm text-neutral-700">Approve only after checking the bound Agent version, score, coverage and expiry. Approval writes the immutable eligibility record to Arc.</p></div>{operatorCredit !== null && <div className="text-right"><p className="font-mono font-bold">{usdc(operatorCredit)} platform credit</p><button type="button" className="metal-button-ghost mt-2" disabled={busy !== '' || BigInt(operatorCredit) === 0n || !marketplaceApi?.withdrawOperatorCredit} onClick={withdrawOperatorCredit}>{busy === 'platform-withdraw' ? 'Withdrawing…' : 'Withdraw platform fee'}</button>{operatorNotice && <p role="status" className="mt-2 text-sm font-semibold">{operatorNotice}</p>}</div>}</div><ul className="mt-5 space-y-3">{operatorCertificates.filter((row) => row.state === 'ELIGIBLE').map((row) => <li key={row.certificateDigest} className="retro-inset flex flex-wrap items-center justify-between gap-4 p-4"><div><p className="text-sm font-semibold">Eligible Agent certificate</p><p className="mt-2 font-semibold">{row.overallScore}/100 · {(row.coverageBps / 100).toFixed(0)}% coverage</p><p className="mt-1 text-xs text-neutral-700">Expires {new Date(row.expiresAt * 1000).toLocaleString()}</p></div><button type="button" className="metal-button-solid" disabled={busy !== ''} onClick={() => approveCertificate(row.certificateDigest)}>{busy === `approve-${row.certificateDigest}` ? 'Approving on Arc…' : 'Approve certificate on Arc'}</button></li>)}</ul></section>}
     {activeView === 'sell' && account && <div className="mt-14 grid gap-6 lg:grid-cols-2"><form className="glass-panel p-6" onSubmit={issueEligibility}><h2 className="text-xl font-bold">Certify an evaluated version</h2><p className="mt-2 text-sm text-neutral-600">Arena ISS checks two completed evaluations for the same version. Digests and Studio Next contract details are filled from verified records.</p>
       <label className="mt-5 block text-sm font-semibold" htmlFor="marketplace-agent">Agent to certify</label><select id="marketplace-agent" className="field-control mt-2 w-full" value={agentId} onChange={(event) => setAgentId(event.target.value)} required><option value="">Select your Agent</option>{agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.name}</option>)}</select>

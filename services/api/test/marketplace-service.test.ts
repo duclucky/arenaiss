@@ -50,6 +50,27 @@ test('Marketplace projection requires exact Arc bindings and delivery requires c
   } finally { runtime.close(); }
 });
 
+test('public Marketplace exposes only active listings while owner and buyer records remain private', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const rows = [
+      { listingId: '1', state: 'ACTIVE', seller, price: '1000000' },
+      { listingId: '2', state: 'SOLD', seller, buyer, buyerAddress: buyer, price: '2000000' },
+      { listingId: '3', state: 'BUY_SUBMITTED', seller, buyer, buyerAddress: buyer, price: '3000000' },
+      { listingId: '4', state: 'CANCEL_SUBMITTED', seller, price: '4000000' },
+    ];
+    for (const row of rows) runtime.put('marketplace-listings', row.listingId, {
+      schema: 'arena-marketplace-listing-v1', certificateDigest, agentId, agentVersionId: version,
+      agentsCommitment: commitment, erc8004TokenId: tokenId, name: `Agent ${row.listingId}`,
+      sellerAddress: seller, expiresAt: 2000, ...row,
+    });
+    const service = new ArenaApiService(operator, runtime);
+    assert.deepEqual(service.listMarketplaceListings().map((row) => row.listingId), ['1']);
+    assert.deepEqual(service.listOwnedMarketplaceListings(seller).map((row) => row.listingId), ['4', '3', '2', '1']);
+    assert.deepEqual(service.listOwnedMarketplacePurchases(buyer).map((row) => row.listingId), ['3', '2']);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace reconciliation repairs a previously finalized sale with stale Arena ownership', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

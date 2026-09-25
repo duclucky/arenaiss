@@ -123,8 +123,12 @@ it.each([
   } })));
   render(<MemoryRouter initialEntries={[`/pairs/${view}`]}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view={view} /></AppProvider></MemoryRouter>);
   for (const name of ['Open rooms', 'My rooms', 'Completed']) expect(screen.getByRole('link', { name })).toHaveAttribute('href', `/pairs/${name === 'Open rooms' ? 'open' : name === 'My rooms' ? 'mine' : 'completed'}`);
-  for (const digit of shown) expect(await screen.findByText(new RegExp(`Room sha256:${digit.repeat(64)}`))).toBeInTheDocument();
-  for (const digit of hidden) expect(screen.queryByText(new RegExp(`Room sha256:${digit.repeat(64)}`))).not.toBeInTheDocument();
+  const title = view === 'open' ? 'Open rooms' : view === 'mine' ? 'My rooms' : 'Completed';
+  const roomList = await screen.findByRole('list', { name: `${title} list` });
+  expect(roomList).toHaveClass('grid', 'md:grid-cols-2', 'xl:grid-cols-3');
+  expect(screen.getAllByText(/^Room #[1-9][0-9]*$/).map((row) => row.textContent)).toEqual(shown.map((_, index) => `Room #${index + 1}`));
+  for (const digit of [...shown, ...hidden]) expect(screen.queryByText(new RegExp(`Room sha256:${digit.repeat(64)}`))).not.toBeInTheDocument();
+  expect(roomList).not.toHaveTextContent('sha256:');
 });
 
 it('shows that a joined room started automatically and exposes its current stage', async () => {
