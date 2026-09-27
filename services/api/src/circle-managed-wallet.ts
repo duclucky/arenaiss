@@ -216,13 +216,23 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     const amount = BigInt(decimalToBaseUnits(input.amount));
     const feeResponse = await fetch(`https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${config.domain}/26?forward=true`, { headers: { accept: 'application/json' } });
     if (!feeResponse.ok) throw new Error('CCTP fee quote unavailable');
-    const quotes = await feeResponse.json() as Array<{ finalityThreshold?: number; minimumFee?: number; forwardFee?: { med?: number | string } }>;
-    const quote = quotes.find((item) => item.finalityThreshold === 1000);
-    if (!quote || quote.forwardFee?.med === undefined || quote.minimumFee === undefined) throw new Error('CCTP fast forwarding unavailable');
-    const forwardFee = BigInt(quote.forwardFee.med);
+    const quotes = await feeResponse.json() as Array<{ finalityThreshold?: number; minimumFee?: number; forwardFee?: { med?: number | string; medium?: number | string } }>;
+    const quote = Array.isArray(quotes) ? quotes.find((item) => item.finalityThreshold === 1000) : undefined;
+    const forwardFeeValue = quote?.forwardFee?.med ?? quote?.forwardFee?.medium;
+    if (!quote || forwardFeeValue === undefined || !Number.isFinite(quote.minimumFee) || quote.minimumFee! < 0) throw new Error('CCTP fast forwarding unavailable');
+    if (!/^(0|[1-9][0-9]*)$/.test(String(forwardFeeValue))) throw new Error('CCTP fast forwarding unavailable');
+    const forwardFee = BigInt(forwardFeeValue);
     const protocolFee = (amount * BigInt(Math.round(quote.minimumFee * 100))) / 1_000_000n;
     const maxFee = forwardFee + protocolFee;
     const totalAmount = amount + maxFee;
+    const balanceResponse = await this.client.getWalletTokenBalance({ id: sourceWalletId });
+    const sourceUsdc = balanceResponse.data?.tokenBalances?.find((balance) => !balance.token?.isNative
+      && balance.token?.blockchain === config.chain
+      && balance.token?.tokenAddress?.toLowerCase() === config.usdc.toLowerCase());
+    if (BigInt(decimalToBaseUnits(normalizeCircleAmount(sourceUsdc?.amount))) < totalAmount) {
+      throw new Error('source chain USDC balance is insufficient for CCTP fees');
+    }
+    input.onProgress?.('APPROVING');
     const approval = await this.client.createContractExecutionTransaction({
       walletId: sourceWalletId, contractAddress: config.usdc,
       abiFunctionSignature: 'approve(address,uint256)', abiParameters: [TOKEN_MESSENGER_V2, totalAmount.toString()],
@@ -230,8 +240,10 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     });
     const approvalId = approval.data?.id;
     if (!approvalId) throw new Error('Circle did not create CCTP approval');
-    input.onProgress?.('APPROVING');
-    await this.client.getTransaction({ id: approvalId, waitForState: 'COMPLETE', pollingInterval: 1500 });
+    const approved = await this.client.getTransaction({ id: approvalId, waitForState: 'COMPLETE', pollingInterval: 1500 });
+    if (approved.data?.transaction?.id !== approvalId || approved.data.transaction.state !== 'COMPLETE') {
+      throw new Error('CCTP approval did not complete');
+    }
     input.onProgress?.('BURNING');
     const recipient = `0x${'0'.repeat(24)}${input.address.slice(2).toLowerCase()}`;
     const burn = await this.client.createContractExecutionTransaction({
@@ -242,9 +254,9 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     });
     const burnId = burn.data?.id;
     if (!burnId) throw new Error('Circle did not create CCTP burn');
-    const submitted = await this.client.getTransaction({ id: burnId, waitForTxHash: true, pollingInterval: 1000 });
+    const submitted = await this.client.getTransaction({ id: burnId, waitForState: 'COMPLETE', pollingInterval: 1000 });
     const result = this.transactionResult(submitted.data?.transaction, sourceExplorer(config.chain));
-    if (!result.txHash) throw new Error('Circle did not return a CCTP burn transaction hash');
+    if (result.transactionId !== burnId || result.state !== 'COMPLETE' || !result.txHash) throw new Error('CCTP burn did not complete');
     return result;
   }
 

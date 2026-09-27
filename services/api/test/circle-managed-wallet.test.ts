@@ -313,12 +313,15 @@ test('Circle adapter reuses separately persisted approval and burn idempotency k
       async deriveWallet({ blockchain }: any) {
         return { data: { wallet: { id: blockchain, address: '0x1111111111111111111111111111111111111111' } } };
       },
+      async getWalletTokenBalance() {
+        return { data: { tokenBalances: [{ amount: '2', token: { blockchain: 'BASE-SEPOLIA', tokenAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', isNative: false } }] } };
+      },
       async createContractExecutionTransaction(input: any) {
         executions.push(input);
         return { data: { id: executions.length === 1 ? 'approval-id' : 'burn-id' } };
       },
       async getTransaction({ id }: any) {
-        return { data: { transaction: { id, state: id === 'approval-id' ? 'COMPLETE' : 'SENT', txHash: id === 'burn-id' ? `0x${'4'.repeat(64)}` : undefined } } };
+        return { data: { transaction: { id, state: 'COMPLETE', txHash: id === 'burn-id' ? `0x${'4'.repeat(64)}` : undefined } } };
       },
     } as any, 'wallet-set-id');
 
@@ -339,4 +342,50 @@ test('Circle adapter reuses separately persisted approval and burn idempotency k
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('Circle CCTP does not submit a burn when approval did not complete', async () => {
+  const executions: any[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([{ finalityThreshold: 1000, minimumFee: 0, forwardFee: { med: '1' } }]), { status: 200 });
+  try {
+    const adapter = new CircleManagedWalletAdapter({
+      async deriveWallet() { return { data: { wallet: { id: 'source-wallet', address: '0x1111111111111111111111111111111111111111' } } }; },
+      async getWalletTokenBalance() { return { data: { tokenBalances: [{ amount: '2', token: { blockchain: 'BASE-SEPOLIA', tokenAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', isNative: false } }] } }; },
+      async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: executions.length === 1 ? 'approval-id' : 'burn-id' } }; },
+      async getTransaction({ id }: any) { return { data: { transaction: { id, state: id === 'approval-id' ? 'FAILED' : 'COMPLETE', txHash: id === 'burn-id' ? `0x${'4'.repeat(64)}` : undefined } } }; },
+    } as any, 'wallet-set-id');
+    await assert.rejects(() => adapter.bridgeUsdcToArc({ walletId: 'wallet-id', address: '0x1111111111111111111111111111111111111111', sourceChain: 'BASE-SEPOLIA', amount: '1', approvalIdempotencyKey: 'approval-key', burnIdempotencyKey: 'burn-key' }), /approval did not complete/);
+    assert.equal(executions.length, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Circle CCTP rejects a failed burn even when Circle returned a transaction hash', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([{ finalityThreshold: 1000, minimumFee: 0, forwardFee: { med: '1' } }]), { status: 200 });
+  try {
+    let executions = 0;
+    const adapter = new CircleManagedWalletAdapter({
+      async deriveWallet() { return { data: { wallet: { id: 'source-wallet', address: '0x1111111111111111111111111111111111111111' } } }; },
+      async getWalletTokenBalance() { return { data: { tokenBalances: [{ amount: '2', token: { blockchain: 'BASE-SEPOLIA', tokenAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', isNative: false } }] } }; },
+      async createContractExecutionTransaction() { executions += 1; return { data: { id: executions === 1 ? 'approval-id' : 'burn-id' } }; },
+      async getTransaction({ id }: any) { return { data: { transaction: { id, state: id === 'approval-id' ? 'COMPLETE' : 'FAILED', txHash: id === 'burn-id' ? `0x${'4'.repeat(64)}` : undefined } } }; },
+    } as any, 'wallet-set-id');
+    await assert.rejects(() => adapter.bridgeUsdcToArc({ walletId: 'wallet-id', address: '0x1111111111111111111111111111111111111111', sourceChain: 'BASE-SEPOLIA', amount: '1', approvalIdempotencyKey: 'approval-key', burnIdempotencyKey: 'burn-key' }), /burn did not complete/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Circle CCTP checks the source USDC balance including quoted fees before approval', async () => {
+  const executions: any[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([{ finalityThreshold: 1000, minimumFee: 0, forwardFee: { med: '1' } }]), { status: 200 });
+  try {
+    const adapter = new CircleManagedWalletAdapter({
+      async deriveWallet() { return { data: { wallet: { id: 'source-wallet', address: '0x1111111111111111111111111111111111111111' } } }; },
+      async getWalletTokenBalance() { return { data: { tokenBalances: [{ amount: '1', token: { blockchain: 'BASE-SEPOLIA', tokenAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', isNative: false } }] } }; },
+      async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: 'unexpected' } }; },
+    } as any, 'wallet-set-id');
+    await assert.rejects(() => adapter.bridgeUsdcToArc({ walletId: 'wallet-id', address: '0x1111111111111111111111111111111111111111', sourceChain: 'BASE-SEPOLIA', amount: '1', approvalIdempotencyKey: 'approval-key', burnIdempotencyKey: 'burn-key' }), /insufficient for CCTP fees/);
+    assert.equal(executions.length, 0);
+  } finally { globalThis.fetch = originalFetch; }
 });

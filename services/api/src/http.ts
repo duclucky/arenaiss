@@ -207,6 +207,9 @@ export class ArenaHttpApi {
       }
       if (request.method === 'POST' && request.path === '/api/account/cctp-transfers') {
         const session = this.requireManagedSession(request.headers);
+        if (this.service.listOwnedRegistrations(session.principal).length === 0) {
+          throw new Error('CCTP access requires a previous Tournament registration');
+        }
         return this.json(202, await this.managedIdentity!.startBridgeUsdcToArc(session.userId!, requireString(request.body?.sourceChain), requireString(request.body?.amount)));
       }
       if (request.method === 'GET' && request.path === '/api/account/cctp-transfers') {

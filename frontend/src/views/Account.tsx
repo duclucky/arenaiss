@@ -10,6 +10,14 @@ type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
 type WalletAction = { state: 'submitting' | 'error'; message?: string };
 type LegacyBridgeAction = { state: 'submitting' | 'done' | 'error'; operation: ManagedCctpTransfer; message?: string };
 type EvoRefundRow = { campaignId: string; amountUsdc: string; refundAvailableAt?: number };
+type CctpEligibility = 'loading' | 'allowed' | 'denied' | 'error';
+
+const CCTP_CHAINS = [
+  { chain: 'BASE-SEPOLIA', label: 'Base Sepolia' },
+  { chain: 'ARB-SEPOLIA', label: 'Arbitrum Sepolia' },
+  { chain: 'ETH-SEPOLIA', label: 'Ethereum Sepolia' },
+  { chain: 'OP-SEPOLIA', label: 'Optimism Sepolia' },
+] as const;
 
 export function Account() {
   const { account, managedAccount, agentApi, evaluationApi, marketplaceApi, networkConfig, disconnectWallet, wallet } = useAppContext();
@@ -38,6 +46,12 @@ export function Account() {
   const [walletAction, setWalletAction] = useState<WalletAction | null>(null);
   const [usdcTransfer, setUsdcTransfer] = useState<ManagedUsdcTransfer | null>(null);
   const [legacyBridgeAction, setLegacyBridgeAction] = useState<LegacyBridgeAction | null>(null);
+  const [cctpEligibility, setCctpEligibility] = useState<CctpEligibility>('loading');
+  const [cctpHistoryState, setCctpHistoryState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [bridgeChain, setBridgeChain] = useState('BASE-SEPOLIA');
+  const [bridgeAmount, setBridgeAmount] = useState('');
+  const [bridgeSubmitting, setBridgeSubmitting] = useState(false);
+  const [bridgeError, setBridgeError] = useState('');
 
   useEffect(() => {
     if (managedAccount && managedIdentity?.listUsdcBalances) {
@@ -85,10 +99,13 @@ export function Account() {
   }, [managedIdentity, usdcTransfer]);
 
   useEffect(() => {
-    if (!managedAccount || !managedIdentity?.listCctpTransfers) return;
+    if (!managedAccount || !managedIdentity?.listCctpTransfers) { setCctpHistoryState('error'); return; }
     let cancelled = false;
+    setCctpHistoryState('loading');
     managedIdentity.listCctpTransfers().then((operations) => {
-      if (cancelled || operations.length === 0) return;
+      if (cancelled) return;
+      setCctpHistoryState('ready');
+      if (operations.length === 0) return;
       const operation = operations[0];
       setLegacyBridgeAction((current) => {
         if (current) return current;
@@ -97,9 +114,19 @@ export function Account() {
         }
         return { state: operation.state === 'SUBMITTED' ? 'done' : 'submitting', operation };
       });
-    }).catch(() => undefined);
+    }).catch(() => { if (!cancelled) setCctpHistoryState('error'); });
     return () => { cancelled = true; };
   }, [managedAccount, managedIdentity]);
+
+  useEffect(() => {
+    if (!managedAccount || !agentApi) { setCctpEligibility('loading'); return; }
+    let cancelled = false;
+    setCctpEligibility('loading');
+    agentApi.listOwnedRegistrations()
+      .then((registrations) => { if (!cancelled) setCctpEligibility(registrations.length > 0 ? 'allowed' : 'denied'); })
+      .catch(() => { if (!cancelled) setCctpEligibility('error'); });
+    return () => { cancelled = true; };
+  }, [agentApi, managedAccount]);
 
   useEffect(() => {
     if (legacyBridgeAction?.state !== 'submitting' || !managedIdentity?.getCctpTransfer) return;
@@ -300,6 +327,28 @@ export function Account() {
     }
   }
 
+  const selectedBridgeBalance = managedBalances.find((row) => row.chain === bridgeChain && row.available);
+  const bridgeAmountValid = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(bridgeAmount) && Number(bridgeAmount) > 0;
+  const bridgeHasRoomForFees = bridgeAmountValid && selectedBridgeBalance !== undefined && Number(selectedBridgeBalance.amount) > Number(bridgeAmount);
+  const bridgeInProgress = legacyBridgeAction?.state === 'submitting' || legacyBridgeAction?.operation.state === 'RECOVERY_REQUIRED';
+  const bridgeBlocked = cctpHistoryState !== 'ready' || bridgeSubmitting || bridgeInProgress || !bridgeHasRoomForFees;
+
+  async function submitBridge(event: React.FormEvent) {
+    event.preventDefault();
+    if (cctpEligibility !== 'allowed' || bridgeBlocked || !managedIdentity?.bridgeUsdcToArc) return;
+    setBridgeSubmitting(true);
+    setBridgeError('');
+    try {
+      const operation = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
+      setLegacyBridgeAction({ state: operation.state === 'SUBMITTED' ? 'done' : 'submitting', operation });
+      setBridgeAmount('');
+    } catch (reason) {
+      setBridgeError(reason instanceof Error ? reason.message : 'CCTP transfer could not be started.');
+    } finally {
+      setBridgeSubmitting(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-7">
       <div><p className="page-kicker">Wallet</p><h1 className="sr-only">Arena ISS wallet</h1></div>
@@ -376,6 +425,27 @@ export function Account() {
               </form>
             </div>}
 
+            {managedAccount && <div className="border-t border-border pt-6">
+              {cctpEligibility === 'loading' && <p role="status" className="text-sm text-muted-foreground">Checking CCTP access from your Tournament history…</p>}
+              {cctpEligibility === 'error' && <p role="alert" className="text-sm font-semibold text-destructive">CCTP access could not be verified. Try again after refreshing the account.</p>}
+              {cctpEligibility === 'denied' && <p className="text-sm text-muted-foreground">CCTP access is available to accounts that previously registered for a Tournament.</p>}
+              {cctpEligibility === 'allowed' && <form className="wallet-action-form" onSubmit={submitBridge}>
+                <div className="wallet-action-form__intro">
+                  <h2 className="text-xl font-bold">Bridge USDC to Arc Testnet</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">CCTP burns testnet USDC on the selected source network. This release tracks the source burn; Arc mint verification is not yet automated.</p>
+                </div>
+                <label className="block text-sm font-bold" htmlFor="bridge-source">Source network</label>
+                <select id="bridge-source" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
+                  {CCTP_CHAINS.map((row) => <option key={row.chain} value={row.chain}>{row.label}</option>)}
+                </select>
+                <label className="block text-sm font-bold" htmlFor="bridge-amount">Bridge amount (USDC)</label>
+                <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
+                <p className="wallet-action-form__hint text-xs text-muted-foreground">Available on {CCTP_CHAINS.find((row) => row.chain === bridgeChain)?.label}: {selectedBridgeBalance ? `${formatDisplayAmount(selectedBridgeBalance.amount)} USDC` : 'unavailable'}. Keep extra USDC for CCTP fees.</p>
+                <button className="metal-button-solid w-full" disabled={bridgeBlocked}>{bridgeSubmitting ? 'Starting CCTP transfer…' : 'Bridge to Arc Testnet'}</button>
+              </form>}
+              {bridgeError && <p role="alert" className="mt-3 text-sm font-semibold text-destructive">{displayLabel(bridgeError)}</p>}
+            </div>}
+
             {walletAction && <div role={walletAction.state === 'error' ? 'alert' : 'status'} className={walletAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
               {walletAction.state === 'submitting' && 'Submitting securely through Circle…'}
               {walletAction.state === 'error' && walletAction.message && displayLabel(walletAction.message)}
@@ -394,7 +464,7 @@ export function Account() {
             {legacyBridgeAction && <div role={legacyBridgeAction.state === 'error' ? 'alert' : 'status'} className={legacyBridgeAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
               {legacyBridgeAction.state === 'submitting' && cctpStatusText(legacyBridgeAction.operation)}
               {legacyBridgeAction.state === 'error' && legacyBridgeAction.message && displayLabel(legacyBridgeAction.message)}
-              {legacyBridgeAction.state === 'done' && <>CCTP source burn submitted · {legacyBridgeAction.operation.explorerUrl
+              {legacyBridgeAction.state === 'done' && <>CCTP source burn complete. Arc mint not yet verified · {legacyBridgeAction.operation.explorerUrl
                 ? <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
                 : legacyBridgeAction.operation.transactionId}</>}
             </div>}

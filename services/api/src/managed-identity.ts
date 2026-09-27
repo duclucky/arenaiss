@@ -538,11 +538,13 @@ export class ManagedIdentityService {
         onProgress: (state) => this.updateCctpTransfer(operationId, { state }),
       });
       this.updateCctpTransfer(operationId, { ...result, state: 'SUBMITTED' });
-    } catch {
-      this.updateCctpTransfer(operationId, {
-        state: 'RECOVERY_REQUIRED',
-        message: 'CCTP transfer failed. Check the source transaction and try again only after reconciliation.',
-      });
+    } catch (error) {
+      const preflightBalanceFailure = error instanceof Error
+        && error.message === 'source chain USDC balance is insufficient for CCTP fees'
+        && this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId)?.state === 'PENDING';
+      this.updateCctpTransfer(operationId, preflightBalanceFailure
+        ? { state: 'FAILED', message: 'Source wallet needs enough USDC for the transfer plus CCTP fees.' }
+        : { state: 'RECOVERY_REQUIRED', message: 'CCTP transfer failed. Check the source transaction and try again only after reconciliation.' });
     }
   }
 

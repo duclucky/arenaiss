@@ -6,7 +6,7 @@ import { AppProvider } from '../context';
 import { Layout } from '../components/Layout';
 import { Account } from '../views/Account';
 import { Home } from '../views/Home';
-import type { ManagedAccount, ManagedIdentityAdapter } from '../adapters/interfaces';
+import type { AgentApiAdapter, EntrantRegistration, ManagedAccount, ManagedIdentityAdapter } from '../adapters/interfaces';
 
 const address = '0xe6dbe479ecbb295bdd955d672fd5076dc34e2513';
 const account: ManagedAccount = {
@@ -28,8 +28,18 @@ function identity(): ManagedIdentityAdapter {
     getUsdcTransfer: async () => ({ operationId: '22222222-2222-4222-8222-222222222222', destinationAddress: address,
       amount: '0.25', transactionId: 'transfer-1', state: 'SUBMITTED', updatedAt: 1 }),
     bridgeUsdcToArc: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'PENDING', sourceChain: 'BASE-SEPOLIA', amount: '1', updatedAt: 1 }),
+    listCctpTransfers: async () => [],
     getCctpTransfer: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED', sourceChain: 'BASE-SEPOLIA', amount: '1', transactionId: 'bridge-1', txHash: `0x${'1'.repeat(64)}`, explorerUrl: `https://sepolia.basescan.org/tx/0x${'1'.repeat(64)}`, updatedAt: 2 }),
   };
+}
+
+function tournamentAccess(eligible: boolean): AgentApiAdapter {
+  return {
+    listOwnedAgents: async () => [],
+    listOwnedRegistrations: async () => eligible ? [{ tournamentId: `sha256:${'a'.repeat(64)}`, entrantId: `sha256:${'b'.repeat(64)}`, agentId: `sha256:${'c'.repeat(64)}` }] : [],
+    createAgent: async () => { throw new Error('unused'); },
+    prepareRegistration: async (): Promise<EntrantRegistration & { stakeAmount: string }> => { throw new Error('unused'); },
+  } as AgentApiAdapter;
 }
 
 describe('managed Arena ISS wallet account', () => {
@@ -47,8 +57,9 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.queryByRole('region', { name: 'Arena ISS technology ticker' })).not.toBeInTheDocument();
   });
 
-  it('keeps Arc wallet withdrawal available while CCTP initiation is hidden', async () => {
-    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={identity()} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+  it('opens CCTP initiation for an account with a previous Tournament registration', async () => {
+    const bridgeUsdcToArc = vi.fn().mockResolvedValue({ operationId: '11111111-1111-4111-8111-111111111111', state: 'PENDING', sourceChain: 'BASE-SEPOLIA', amount: '0.5', updatedAt: 1 });
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={{ ...identity(), bridgeUsdcToArc }} agentApiAdapter={tournamentAccess(true)} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
 
     expect(await screen.findByText('Arena ISS wallet', { selector: 'label' })).toBeInTheDocument();
     const primaryNavigation = screen.getByRole('navigation', { name: 'Primary' });
@@ -72,9 +83,14 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.queryByRole('list', { name: 'USDC balances by network' })).not.toBeInTheDocument();
     expect(screen.getByText(/Arena ISS is live on Arc Testnet/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Faucet USDC on Arc' })).toHaveAttribute('href', 'https://faucet.circle.com/');
-    expect(screen.queryByRole('heading', { name: 'Bridge USDC to Arc Testnet' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Bridge to Arc Testnet' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/CCTP deposits burn USDC/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Bridge USDC to Arc Testnet' })).toBeInTheDocument();
+    expect(screen.getByText(/CCTP burns testnet USDC on the selected source network/)).toBeInTheDocument();
+    const bridgeButton = screen.getByRole('button', { name: 'Bridge to Arc Testnet' });
+    expect(bridgeButton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Bridge amount (USDC)'), { target: { value: '0.5' } });
+    expect(bridgeButton).toBeEnabled();
+    fireEvent.click(bridgeButton);
+    await waitFor(() => expect(bridgeUsdcToArc).toHaveBeenCalledWith('BASE-SEPOLIA', '0.5'));
     fireEvent.click(balancesToggle);
     expect(balancesToggle).toHaveAttribute('aria-expanded', 'true');
     const balancesList = screen.getByRole('list', { name: 'USDC balances by network' });
@@ -82,10 +98,19 @@ describe('managed Arena ISS wallet account', () => {
     expect(within(balancesList).getByText('Base Sepolia')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Copy wallet address' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(address));
-    expect(screen.queryByLabelText('Source network')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Source network')).toHaveValue('BASE-SEPOLIA');
     expect(screen.getByRole('heading', { name: 'Withdraw' })).toBeInTheDocument();
     expect(screen.getByLabelText('Recipient wallet').closest('form')).toHaveClass('wallet-action-form');
     expect(screen.getByRole('button', { name: 'Withdraw USDC' })).toBeInTheDocument();
+  });
+
+  it('keeps CCTP initiation closed for an account without Tournament history', async () => {
+    const bridgeUsdcToArc = vi.fn();
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={{ ...identity(), bridgeUsdcToArc }} agentApiAdapter={tournamentAccess(false)} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+
+    expect(await screen.findByText(/available to accounts that previously registered for a Tournament/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bridge to Arc Testnet' })).not.toBeInTheDocument();
+    expect(bridgeUsdcToArc).not.toHaveBeenCalled();
   });
 
   it('restores a pending CCTP operation after page reload', async () => {

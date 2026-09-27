@@ -208,6 +208,10 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: 'bad', amount: '1' } })).status, 400);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.0000001' } })).status, 400);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/usdc-transfers', headers: { cookie }, body: { destinationAddress: '0x5555555555555555555555555555555555555555', amount: '1.25' } })).status, 202);
+    const deniedBridge = await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ARB-SEPOLIA', amount: '2' } });
+    assert.equal(deniedBridge.status, 400);
+    assert.match(String(deniedBridge.body?.error), /previous Tournament registration/);
+    assert.equal(calls.filter(([kind]) => kind === 'bridge').length, 0);
     const tournamentId = `sha256:${'a'.repeat(64)}`;
     assert.equal((await api.handle({ method: 'POST', path: `/api/account/tournament-credits/${tournamentId}/withdraw`, headers: { cookie }, body: { idempotencyKey: '11111111-1111-4111-8111-111111111111' } })).status, 202);
     const refundBody = { tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, idempotencyKey: '11111111-1111-4111-8111-111111111111' };

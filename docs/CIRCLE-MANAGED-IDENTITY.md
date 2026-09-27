@@ -1,8 +1,8 @@
 # Circle-managed identity and wallet boundary
 
-Status: the SCA account flow is published on the owner VPS. Restart-safe CCTP
-operation recovery is implemented and tested locally in the current change, but
-has not yet been published or exercised through a live Circle/Arc Testnet write.
+Status: the SCA account flow is published on the owner VPS. CCTP initiation is
+enabled only for authenticated accounts with at least one persisted Tournament
+registration. The backend enforces that allowlist and the Account UI mirrors it.
 
 ## Decision
 
@@ -65,10 +65,14 @@ operations with those same keys. Concurrent recovery within one server process
 shares one active call, and callback replay cannot move the stored lifecycle
 backward. A legacy `BURNING` record without a persisted burn key becomes
 `RECOVERY_REQUIRED`; the server never guesses a new key or risks a duplicate burn.
-An uncertain upstream failure also becomes `RECOVERY_REQUIRED` with a safe
-public message. It does not invite another transfer until the source transaction
-has been reconciled. `SUBMITTED` means the source burn has a transaction hash;
-it does not prove that the destination mint on Arc has completed.
+Before approval, the adapter verifies that the source wallet has enough USDC for
+the requested amount plus quoted CCTP fees. An insufficient preflight balance is
+a retryable `FAILED` operation. Approval and burn must each reach Circle's
+`COMPLETE` state, and the completed burn must have the expected transaction ID
+and hash. Other uncertain upstream failures become `RECOVERY_REQUIRED` with a
+safe public message and cannot be retried until reconciled. `SUBMITTED` means the
+source burn completed; it does not prove that the destination mint on Arc has
+completed.
 
 ## API
 
@@ -82,6 +86,9 @@ it does not prove that the destination mint on Arc has completed.
 - `GET /api/account/usdc-balances`: return available Circle-issued USDC balances.
 - `POST /api/account/usdc-transfers`: submit an Arc Testnet USDC withdrawal.
 - `POST /api/account/cctp-transfers`: persist and start a CCTP transfer to Arc.
+  The authenticated principal must have at least one persisted Tournament
+  registration. This is enforced server-side and cannot be bypassed by calling
+  the API directly.
 - `GET /api/account/cctp-transfers`: return up to 20 recent operations belonging
   to the authenticated owner, newest first, without replay keys.
 - `GET /api/account/cctp-transfers/:operationId`: return the authenticated

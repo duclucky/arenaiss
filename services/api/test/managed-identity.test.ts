@@ -206,6 +206,26 @@ test('CCTP failure returns a safe message without upstream request data', async 
   } finally { runtime.close(); }
 });
 
+test('CCTP fee preflight failure is retryable and does not require reconciliation', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address }),
+        listUsdcBalances: async () => [{ chain: 'BASE-SEPOLIA', label: 'Base Sepolia', amount: '2', isArc: false, available: true }],
+        bridgeUsdcToArc: async () => { throw new Error('source chain USDC balance is insufficient for CCTP fees'); },
+      },
+    } as any);
+    const account = await service.loginWallet(address);
+    const started = await service.startBridgeUsdcToArc(account.userId, 'BASE-SEPOLIA', '1');
+    await service.resumeCctpTransfers();
+    const result = service.getCctpTransfer(account.userId, started.operationId);
+    assert.equal(result.state, 'FAILED');
+    assert.equal(result.message, 'Source wallet needs enough USDC for the transfer plus CCTP fees.');
+  } finally { runtime.close(); }
+});
+
 test('Arc USDC transfer persists one intent before Circle and survives duplicate requests', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
