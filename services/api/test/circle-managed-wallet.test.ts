@@ -303,7 +303,7 @@ test('Circle adapter approves the ERC-8004 identity before creating a V2 listing
 
 test('Circle adapter reuses separately persisted approval and burn idempotency keys', async () => {
   const executions: any[] = [];
-  const progress: string[] = [];
+  const progress: any[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify([
     { finalityThreshold: 1000, minimumFee: 0, forwardFee: { med: '1' } },
@@ -321,7 +321,7 @@ test('Circle adapter reuses separately persisted approval and burn idempotency k
         return { data: { id: executions.length === 1 ? 'approval-id' : 'burn-id' } };
       },
       async getTransaction({ id }: any) {
-        return { data: { transaction: { id, state: 'COMPLETE', txHash: id === 'burn-id' ? `0x${'4'.repeat(64)}` : undefined } } };
+        return { data: { transaction: { id, state: 'CONFIRMED', txHash: `0x${(id === 'burn-id' ? '4' : '3').repeat(64)}` } } };
       },
     } as any, 'wallet-set-id');
 
@@ -332,12 +332,20 @@ test('Circle adapter reuses separately persisted approval and burn idempotency k
       amount: '1',
       approvalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
       burnIdempotencyKey: '22222222-2222-4222-8222-222222222222',
-      onProgress: (state: string) => progress.push(state),
+      onProgress: (state: any) => progress.push(state),
     } as any);
 
     assert.equal(executions[0].idempotencyKey, '11111111-1111-4111-8111-111111111111');
     assert.equal(executions[1].idempotencyKey, '22222222-2222-4222-8222-222222222222');
-    assert.deepEqual(progress, ['APPROVING', 'BURNING']);
+    assert.deepEqual(progress.map(({ state, transactionId }) => ({ state, transactionId })), [
+      { state: 'APPROVING', transactionId: undefined },
+      { state: 'APPROVING', transactionId: 'approval-id' },
+      { state: 'APPROVING', transactionId: 'approval-id' },
+      { state: 'BURNING', transactionId: undefined },
+      { state: 'BURNING', transactionId: 'burn-id' },
+      { state: 'BURNING', transactionId: 'burn-id' },
+    ]);
+    assert.equal(progress[2].txHash, `0x${'3'.repeat(64)}`);
     assert.equal(result.txHash, `0x${'4'.repeat(64)}`);
   } finally {
     globalThis.fetch = originalFetch;

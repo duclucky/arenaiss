@@ -462,7 +462,8 @@ export function Account() {
             </div>}
 
             {legacyBridgeAction && <div role={legacyBridgeAction.state === 'error' ? 'alert' : 'status'} className={legacyBridgeAction.state === 'error' ? 'text-sm font-semibold text-destructive' : 'text-sm font-semibold text-emerald-800'}>
-              {legacyBridgeAction.state === 'submitting' && cctpStatusText(legacyBridgeAction.operation)}
+              {legacyBridgeAction.state === 'submitting' && <>{cctpStatusText(legacyBridgeAction.operation)}{legacyBridgeAction.operation.explorerUrl
+                && <> · <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a></>}</>}
               {legacyBridgeAction.state === 'error' && legacyBridgeAction.message && displayLabel(legacyBridgeAction.message)}
               {legacyBridgeAction.state === 'done' && <>CCTP source burn complete. Arc mint not yet verified · {legacyBridgeAction.operation.explorerUrl
                 ? <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
@@ -559,6 +560,7 @@ function formatDisplayAmount(value: string): string {
 }
 
 function cctpStatusText(operation: ManagedCctpTransfer): string {
+  if (operation.message) return operation.message;
   if (operation.state === 'PENDING') return 'CCTP transfer queued. Preparing Circle operation...';
   if (operation.state === 'APPROVING') return 'Approving USDC spend on the source network...';
   if (operation.state === 'BURNING') return 'Burning source USDC and forwarding to Arc Testnet...';

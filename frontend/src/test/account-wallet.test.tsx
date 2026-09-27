@@ -122,6 +122,17 @@ describe('managed Arena ISS wallet account', () => {
     expect(restoredIdentity.listCctpTransfers).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the persisted source transaction while Circle confirmation is pending', async () => {
+    const explorerUrl = `https://sepolia.arbiscan.io/tx/0x${'3'.repeat(64)}`;
+    const operation = { operationId: '11111111-1111-4111-8111-111111111111', state: 'APPROVING' as const,
+      sourceChain: 'ARB-SEPOLIA', amount: '5', transactionId: 'approval-id', txHash: `0x${'3'.repeat(64)}`,
+      explorerUrl, message: 'Approval submitted. Circle is still confirming the source transaction.', updatedAt: 2 };
+    const restoredIdentity = { ...identity(), listCctpTransfers: vi.fn().mockResolvedValue([operation]) };
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={restoredIdentity} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('status').some((status) => status.textContent?.includes(operation.message))).toBe(true));
+    expect(screen.getByRole('link', { name: 'View source transaction' })).toHaveAttribute('href', explorerUrl);
+  });
+
   it('restores a submitted Arc withdrawal and blocks a duplicate after reload', async () => {
     const operation = { operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED' as const,
       destinationAddress: '0x2222222222222222222222222222222222222222', amount: '1.25',

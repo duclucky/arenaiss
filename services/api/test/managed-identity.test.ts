@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
-import { ManagedIdentityService } from '../src/managed-identity.ts';
+import { CctpTransactionPendingError, ManagedIdentityService } from '../src/managed-identity.ts';
 
 const address = '0x1111111111111111111111111111111111111111';
 
@@ -140,6 +140,53 @@ test('concurrent CCTP recovery shares one call and reuses both persisted operati
     release();
     await Promise.all([first, second]);
     assert.equal((runtime.get<any>('circle-cctp-transfers', operationId)).state, 'SUBMITTED');
+  } finally { runtime.close(); }
+});
+
+test('a bounded Circle wait keeps CCTP resumable and reuses the persisted transaction identity', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const userId = `usr_${'c'.repeat(64)}`;
+    const operationId = '55555555-5555-4555-8555-555555555555';
+    runtime.put('circle-cctp-transfers', operationId, {
+      operationId, state: 'PENDING', userId, walletId: 'wallet-id', address,
+      sourceChain: 'ARB-SEPOLIA', amount: '5',
+      approvalIdempotencyKey: '66666666-6666-4666-8666-666666666666',
+      burnIdempotencyKey: '77777777-7777-4777-8777-777777777777', updatedAt: 1,
+    });
+    const inputs: any[] = [];
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address }),
+        bridgeUsdcToArc: async (input: any) => {
+          inputs.push(input);
+          if (inputs.length === 1) {
+            input.onProgress({ state: 'APPROVING', transactionId: 'approval-id', txHash: `0x${'3'.repeat(64)}`, totalAmountBaseUnits: '5021827', maxFeeBaseUnits: '21827' });
+            throw new CctpTransactionPendingError('approval-id');
+          }
+          assert.equal(input.approvalTransactionId, 'approval-id');
+          assert.equal(input.totalAmountBaseUnits, '5021827');
+          assert.equal(input.maxFeeBaseUnits, '21827');
+          input.onProgress({ state: 'BURNING', transactionId: 'burn-id', txHash: `0x${'4'.repeat(64)}` });
+          return { transactionId: 'burn-id', state: 'CONFIRMED', txHash: `0x${'4'.repeat(64)}` };
+        },
+      },
+    } as any);
+
+    await service.resumeCctpTransfers();
+    const pending = runtime.get<any>('circle-cctp-transfers', operationId);
+    assert.equal(pending.state, 'APPROVING');
+    assert.equal(pending.approvalTransactionId, 'approval-id');
+    assert.equal(pending.transactionId, 'approval-id');
+    assert.match(pending.message, /still confirming/i);
+
+    service.getCctpTransfer(userId, operationId);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const submitted = runtime.get<any>('circle-cctp-transfers', operationId);
+    assert.equal(inputs.length, 2);
+    assert.equal(submitted.state, 'SUBMITTED');
+    assert.equal(submitted.burnTransactionId, 'burn-id');
   } finally { runtime.close(); }
 });
 

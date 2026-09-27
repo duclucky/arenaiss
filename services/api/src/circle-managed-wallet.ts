@@ -1,5 +1,5 @@
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets';
-import type { CircleWalletPort, UsdcBalance, WalletTransactionResult } from './managed-identity.ts';
+import { CctpTransactionPendingError, type CircleWalletPort, type CctpTransferProgress, type UsdcBalance, type WalletTransactionResult } from './managed-identity.ts';
 
 const ARC_USDC = '0x3600000000000000000000000000000000000000';
 const TOKEN_MESSENGER_V2 = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -32,7 +32,7 @@ type CircleClient = {
   getWalletTokenBalance(input: { id: string }): Promise<{ data?: { tokenBalances?: Array<{ amount?: string; token?: { id?: string; blockchain?: string; symbol?: string; tokenAddress?: string; isNative?: boolean } }> } }>;
   createTransaction(input: Record<string, unknown>): Promise<{ data?: { id?: string; state?: string } }>;
   createContractExecutionTransaction(input: Record<string, unknown>): Promise<{ data?: { id?: string; state?: string } }>;
-  getTransaction(input: { id: string; waitForState?: string; waitForTxHash?: boolean; pollingInterval?: number }): Promise<{ data?: { transaction?: { id?: string; state?: string; txHash?: string } } }>;
+  getTransaction(input: { id: string; waitForState?: string; waitForTxHash?: boolean; pollingInterval?: number; signal?: AbortSignal }): Promise<{ data?: { transaction?: { id?: string; state?: string; txHash?: string } } }>;
 };
 
 export class CircleManagedWalletAdapter implements CircleWalletPort {
@@ -209,55 +209,92 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     return this.executeRegistry(input.walletId, input.marketplaceAddress, 'cancel(uint256)', [input.listingId], input.idempotencyKey, 'arena-iss-marketplace-cancel');
   }
 
-  async bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: 'APPROVING' | 'BURNING') => void }): Promise<WalletTransactionResult> {
+  async bridgeUsdcToArc(input: {
+    walletId: string; address: string; sourceChain: string; amount: string;
+    approvalIdempotencyKey: string; burnIdempotencyKey: string;
+    approvalTransactionId?: string; burnTransactionId?: string;
+    totalAmountBaseUnits?: string; maxFeeBaseUnits?: string;
+    onProgress?: (progress: CctpTransferProgress) => void;
+  }): Promise<WalletTransactionResult> {
     const config = CHAINS.find((chain) => chain.chain === input.sourceChain && chain.fast);
     if (!config) throw new Error('unsupported CCTP source chain');
     const sourceWalletId = await this.derivedWalletId(input.walletId, input.address, config.chain);
     const amount = BigInt(decimalToBaseUnits(input.amount));
-    const feeResponse = await fetch(`https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${config.domain}/26?forward=true`, { headers: { accept: 'application/json' } });
-    if (!feeResponse.ok) throw new Error('CCTP fee quote unavailable');
-    const quotes = await feeResponse.json() as Array<{ finalityThreshold?: number; minimumFee?: number; forwardFee?: { med?: number | string; medium?: number | string } }>;
-    const quote = Array.isArray(quotes) ? quotes.find((item) => item.finalityThreshold === 1000) : undefined;
-    const forwardFeeValue = quote?.forwardFee?.med ?? quote?.forwardFee?.medium;
-    if (!quote || forwardFeeValue === undefined || !Number.isFinite(quote.minimumFee) || quote.minimumFee! < 0) throw new Error('CCTP fast forwarding unavailable');
-    if (!/^(0|[1-9][0-9]*)$/.test(String(forwardFeeValue))) throw new Error('CCTP fast forwarding unavailable');
-    const forwardFee = BigInt(forwardFeeValue);
-    const protocolFee = (amount * BigInt(Math.round(quote.minimumFee * 100))) / 1_000_000n;
-    const maxFee = forwardFee + protocolFee;
-    const totalAmount = amount + maxFee;
-    const balanceResponse = await this.client.getWalletTokenBalance({ id: sourceWalletId });
-    const sourceUsdc = balanceResponse.data?.tokenBalances?.find((balance) => !balance.token?.isNative
-      && balance.token?.blockchain === config.chain
-      && balance.token?.tokenAddress?.toLowerCase() === config.usdc.toLowerCase());
-    if (BigInt(decimalToBaseUnits(normalizeCircleAmount(sourceUsdc?.amount))) < totalAmount) {
-      throw new Error('source chain USDC balance is insufficient for CCTP fees');
+    if ((input.totalAmountBaseUnits === undefined) !== (input.maxFeeBaseUnits === undefined)) throw new Error('incomplete persisted CCTP fee plan');
+    let maxFee: bigint;
+    let totalAmount: bigint;
+    if (input.totalAmountBaseUnits !== undefined && input.maxFeeBaseUnits !== undefined) {
+      maxFee = requireBaseUnits(input.maxFeeBaseUnits, 'persisted CCTP fee');
+      totalAmount = requireBaseUnits(input.totalAmountBaseUnits, 'persisted CCTP total');
+      if (totalAmount !== amount + maxFee) throw new Error('persisted CCTP fee plan mismatch');
+    } else {
+      const feeResponse = await fetch(`https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${config.domain}/26?forward=true`, { headers: { accept: 'application/json' } });
+      if (!feeResponse.ok) throw new Error('CCTP fee quote unavailable');
+      const quotes = await feeResponse.json() as Array<{ finalityThreshold?: number; minimumFee?: number; forwardFee?: { med?: number | string; medium?: number | string } }>;
+      const quote = Array.isArray(quotes) ? quotes.find((item) => item.finalityThreshold === 1000) : undefined;
+      const forwardFeeValue = quote?.forwardFee?.med ?? quote?.forwardFee?.medium;
+      if (!quote || forwardFeeValue === undefined || !Number.isFinite(quote.minimumFee) || quote.minimumFee! < 0) throw new Error('CCTP fast forwarding unavailable');
+      if (!/^(0|[1-9][0-9]*)$/.test(String(forwardFeeValue))) throw new Error('CCTP fast forwarding unavailable');
+      const forwardFee = BigInt(forwardFeeValue);
+      const protocolFee = (amount * BigInt(Math.round(quote.minimumFee * 100))) / 1_000_000n;
+      maxFee = forwardFee + protocolFee;
+      totalAmount = amount + maxFee;
+      const balanceResponse = await this.client.getWalletTokenBalance({ id: sourceWalletId });
+      const sourceUsdc = balanceResponse.data?.tokenBalances?.find((balance) => !balance.token?.isNative
+        && balance.token?.blockchain === config.chain
+        && balance.token?.tokenAddress?.toLowerCase() === config.usdc.toLowerCase());
+      if (BigInt(decimalToBaseUnits(normalizeCircleAmount(sourceUsdc?.amount))) < totalAmount) {
+        throw new Error('source chain USDC balance is insufficient for CCTP fees');
+      }
     }
-    input.onProgress?.('APPROVING');
-    const approval = await this.client.createContractExecutionTransaction({
-      walletId: sourceWalletId, contractAddress: config.usdc,
-      abiFunctionSignature: 'approve(address,uint256)', abiParameters: [TOKEN_MESSENGER_V2, totalAmount.toString()],
-      fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey: input.approvalIdempotencyKey, refId: 'arena-iss-cctp-approve',
-    });
-    const approvalId = approval.data?.id;
-    if (!approvalId) throw new Error('Circle did not create CCTP approval');
-    const approved = await this.client.getTransaction({ id: approvalId, waitForState: 'COMPLETE', pollingInterval: 1500 });
-    if (approved.data?.transaction?.id !== approvalId || approved.data.transaction.state !== 'COMPLETE') {
+    const feePlan = { totalAmountBaseUnits: totalAmount.toString(), maxFeeBaseUnits: maxFee.toString() };
+    input.onProgress?.({ state: 'APPROVING', ...feePlan });
+    let approvalId = input.approvalTransactionId;
+    if (!approvalId) {
+      const approval = await this.client.createContractExecutionTransaction({
+        walletId: sourceWalletId, contractAddress: config.usdc,
+        abiFunctionSignature: 'approve(address,uint256)', abiParameters: [TOKEN_MESSENGER_V2, totalAmount.toString()],
+        fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey: input.approvalIdempotencyKey, refId: 'arena-iss-cctp-approve',
+      });
+      approvalId = approval.data?.id;
+      if (!approvalId) throw new Error('Circle did not create CCTP approval');
+      input.onProgress?.({ state: 'APPROVING', transactionId: approvalId, ...feePlan });
+    }
+    const approved = await this.waitForCctpTransaction(approvalId, 1500);
+    if (approved.data?.transaction?.id !== approvalId || !isConfirmedCircleState(approved.data.transaction.state)) {
       throw new Error('CCTP approval did not complete');
     }
-    input.onProgress?.('BURNING');
+    input.onProgress?.({ state: 'APPROVING', transactionId: approvalId, txHash: approved.data.transaction.txHash,
+      explorerUrl: approved.data.transaction.txHash ? `${sourceExplorer(config.chain)}${approved.data.transaction.txHash}` : undefined, ...feePlan });
+    input.onProgress?.({ state: 'BURNING', ...feePlan });
     const recipient = `0x${'0'.repeat(24)}${input.address.slice(2).toLowerCase()}`;
-    const burn = await this.client.createContractExecutionTransaction({
-      walletId: sourceWalletId, contractAddress: TOKEN_MESSENGER_V2,
-      abiFunctionSignature: 'depositForBurnWithHook(uint256,uint32,bytes32,address,bytes32,uint256,uint32,bytes)',
-      abiParameters: [totalAmount.toString(), 26, recipient, config.usdc, ZERO_BYTES32, maxFee.toString(), 1000, FORWARD_HOOK],
-      fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey: input.burnIdempotencyKey, refId: 'arena-iss-cctp-to-arc',
-    });
-    const burnId = burn.data?.id;
-    if (!burnId) throw new Error('Circle did not create CCTP burn');
-    const submitted = await this.client.getTransaction({ id: burnId, waitForState: 'COMPLETE', pollingInterval: 1000 });
+    let burnId = input.burnTransactionId;
+    if (!burnId) {
+      const burn = await this.client.createContractExecutionTransaction({
+        walletId: sourceWalletId, contractAddress: TOKEN_MESSENGER_V2,
+        abiFunctionSignature: 'depositForBurnWithHook(uint256,uint32,bytes32,address,bytes32,uint256,uint32,bytes)',
+        abiParameters: [totalAmount.toString(), 26, recipient, config.usdc, ZERO_BYTES32, maxFee.toString(), 1000, FORWARD_HOOK],
+        fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey: input.burnIdempotencyKey, refId: 'arena-iss-cctp-to-arc',
+      });
+      burnId = burn.data?.id;
+      if (!burnId) throw new Error('Circle did not create CCTP burn');
+      input.onProgress?.({ state: 'BURNING', transactionId: burnId, ...feePlan });
+    }
+    const submitted = await this.waitForCctpTransaction(burnId, 1000);
     const result = this.transactionResult(submitted.data?.transaction, sourceExplorer(config.chain));
-    if (result.transactionId !== burnId || result.state !== 'COMPLETE' || !result.txHash) throw new Error('CCTP burn did not complete');
+    if (result.transactionId !== burnId || !isConfirmedCircleState(result.state) || !result.txHash) throw new Error('CCTP burn did not complete');
+    input.onProgress?.({ state: 'BURNING', transactionId: burnId, txHash: result.txHash, explorerUrl: result.explorerUrl, ...feePlan });
     return result;
+  }
+
+  private async waitForCctpTransaction(id: string, pollingInterval: number) {
+    const signal = AbortSignal.timeout(120_000);
+    try {
+      return await this.client.getTransaction({ id, waitForState: 'CONFIRMED', pollingInterval, signal });
+    } catch (error) {
+      if (signal.aborted) throw new CctpTransactionPendingError(id);
+      throw error;
+    }
   }
 
   private async derivedWalletId(walletId: string, expectedAddress: string, blockchain: string): Promise<string> {
@@ -301,6 +338,15 @@ function normalizeCircleAmount(value: string | undefined): string {
 function decimalToBaseUnits(value: string): string {
   const [whole, fraction = ''] = value.split('.');
   return (BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0')).toString();
+}
+
+function requireBaseUnits(value: string, label: string): bigint {
+  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw new Error(`${label} is invalid`);
+  return BigInt(value);
+}
+
+function isConfirmedCircleState(state: string | undefined): boolean {
+  return state === 'CONFIRMED' || state === 'COMPLETE';
 }
 
 function digestBytes32(value: string): string {

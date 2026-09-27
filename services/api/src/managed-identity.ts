@@ -32,6 +32,23 @@ export type CctpTransferOperation = {
   message?: string;
   updatedAt: number;
 };
+export type CctpTransferProgress = {
+  state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>;
+  transactionId?: string;
+  txHash?: string;
+  explorerUrl?: string;
+  totalAmountBaseUnits?: string;
+  maxFeeBaseUnits?: string;
+};
+export class CctpTransactionPendingError extends Error {
+  readonly transactionId: string;
+
+  constructor(transactionId: string) {
+    super('Circle transaction is still confirming');
+    this.name = 'CctpTransactionPendingError';
+    this.transactionId = transactionId;
+  }
+}
 export type UsdcTransferState = 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED' | 'RECOVERY_REQUIRED';
 export type UsdcTransferOperation = {
   operationId: string; state: UsdcTransferState; destinationAddress: string; amount: string;
@@ -44,7 +61,13 @@ export type CircleWalletPort = {
   getTransfer(transactionId: string): Promise<WalletTransactionResult>;
   holdEvaluationFee(input: { walletId: string; escrowAddress: string; campaignId: string; amountUsdc: string; approvalIdempotencyKey: string; depositIdempotencyKey: string }): Promise<{ approval: WalletTransactionResult; deposit: WalletTransactionResult }>;
   claimEvaluationTimeoutRefund(input: { walletId: string; escrowAddress: string; campaignId: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
-  bridgeUsdcToArc(input: { walletId: string; address: string; sourceChain: string; amount: string; approvalIdempotencyKey: string; burnIdempotencyKey: string; onProgress?: (state: Extract<CctpTransferState, 'APPROVING' | 'BURNING'>) => void }): Promise<WalletTransactionResult>;
+  bridgeUsdcToArc(input: {
+    walletId: string; address: string; sourceChain: string; amount: string;
+    approvalIdempotencyKey: string; burnIdempotencyKey: string;
+    approvalTransactionId?: string; burnTransactionId?: string;
+    totalAmountBaseUnits?: string; maxFeeBaseUnits?: string;
+    onProgress?: (progress: CctpTransferProgress) => void;
+  }): Promise<WalletTransactionResult>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   registerErc8004Agent?(input: { walletId: string; registryAddress: string; agentUri: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   giveErc8004Feedback?(input: { walletId: string; registryAddress: string; agentId: string; value: number; valueDecimals: number; tag1: string; tag2: string; endpoint: string; feedbackUri: string; feedbackHash: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -76,6 +99,10 @@ type CctpTransferRecord = CctpTransferOperation & {
   approvalIdempotencyKey?: string;
   burnIdempotencyKey?: string;
   idempotencyKey?: string;
+  approvalTransactionId?: string;
+  burnTransactionId?: string;
+  totalAmountBaseUnits?: string;
+  maxFeeBaseUnits?: string;
 };
 type UsdcTransferRecord = UsdcTransferOperation & { userId: string; walletId: string; idempotencyKey: string };
 type EmailChallenge = { digest: Buffer; expiresAt: number; attempts: number };
@@ -320,6 +347,7 @@ export class ManagedIdentityService {
   getCctpTransfer(userId: string, operationId: string): CctpTransferOperation {
     const operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', requireIdentifier(operationId, 'operation ID'));
     if (!operation || operation.userId !== userId) throw new Error('CCTP transfer not found');
+    if (['PENDING', 'APPROVING', 'BURNING'].includes(operation.state)) void this.runCctpTransfer(operation.operationId).catch(() => undefined);
     return this.publicCctpOperation(operation);
   }
 
@@ -535,10 +563,40 @@ export class ManagedIdentityService {
         amount: operation.amount,
         approvalIdempotencyKey,
         burnIdempotencyKey,
-        onProgress: (state) => this.updateCctpTransfer(operationId, { state }),
+        approvalTransactionId: operation.approvalTransactionId,
+        burnTransactionId: operation.burnTransactionId,
+        totalAmountBaseUnits: operation.totalAmountBaseUnits,
+        maxFeeBaseUnits: operation.maxFeeBaseUnits,
+        onProgress: (progress) => {
+          const isApproval = progress.state === 'APPROVING';
+          this.updateCctpTransfer(operationId, {
+            state: progress.state,
+            ...(progress.transactionId ? { transactionId: progress.transactionId } : {}),
+            ...(progress.txHash ? { txHash: progress.txHash } : {}),
+            ...(progress.explorerUrl ? { explorerUrl: progress.explorerUrl } : {}),
+            ...(progress.totalAmountBaseUnits ? { totalAmountBaseUnits: progress.totalAmountBaseUnits } : {}),
+            ...(progress.maxFeeBaseUnits ? { maxFeeBaseUnits: progress.maxFeeBaseUnits } : {}),
+            ...(progress.transactionId ? isApproval
+              ? { approvalTransactionId: progress.transactionId }
+              : { burnTransactionId: progress.transactionId } : {}),
+            ...(progress.transactionId ? { message: isApproval
+                ? 'Approval submitted. Waiting for Circle and the source network to confirm it.'
+                : 'CCTP burn submitted. Waiting for source confirmation and forwarding.'
+            } : {}),
+          });
+        },
       });
-      this.updateCctpTransfer(operationId, { ...result, state: 'SUBMITTED' });
+      this.updateCctpTransfer(operationId, { ...result, state: 'SUBMITTED', burnTransactionId: result.transactionId, message: undefined });
     } catch (error) {
+      if (error instanceof CctpTransactionPendingError) {
+        const current = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
+        if (current && ['APPROVING', 'BURNING'].includes(current.state)) {
+          this.updateCctpTransfer(operationId, { message: current.state === 'APPROVING'
+            ? 'Approval submitted. Circle is still confirming the source transaction.'
+            : 'CCTP burn submitted. Circle is still confirming the source transaction.' });
+        }
+        return;
+      }
       const preflightBalanceFailure = error instanceof Error
         && error.message === 'source chain USDC balance is insufficient for CCTP fees'
         && this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId)?.state === 'PENDING';

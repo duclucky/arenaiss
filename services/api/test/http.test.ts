@@ -189,9 +189,9 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
         claimTournamentRefund: async (input: any) => { calls.push(['refund', input]); return { transactionId: 'refund-1', state: 'COMPLETE' }; },
         bridgeUsdcToArc: async (input: any) => {
           calls.push(['bridge', input]);
-          input.onProgress?.('APPROVING');
+          input.onProgress?.({ state: 'APPROVING' });
           await bridgeGate;
-          input.onProgress?.('BURNING');
+          input.onProgress?.({ state: 'BURNING' });
           return { transactionId: 'tx-2', state: 'SENT', txHash: `0x${'2'.repeat(64)}`, explorerUrl: `https://sepolia.arbiscan.io/tx/0x${'2'.repeat(64)}` };
         },
       },

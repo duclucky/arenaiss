@@ -68,12 +68,16 @@ backward. A legacy `BURNING` record without a persisted burn key becomes
 `RECOVERY_REQUIRED`; the server never guesses a new key or risks a duplicate burn.
 Before approval, the adapter verifies that the source wallet has enough USDC for
 the requested amount plus quoted CCTP fees. An insufficient preflight balance is
-a retryable `FAILED` operation. Approval and burn must each reach Circle's
-`COMPLETE` state, and the completed burn must have the expected transaction ID
-and hash. Other uncertain upstream failures become `RECOVERY_REQUIRED` with a
-safe public message and cannot be retried until reconciled. `SUBMITTED` means the
-source burn completed; it does not prove that the destination mint on Arc has
-completed.
+a retryable `FAILED` operation. The quoted fee plan and each Circle transaction
+ID are persisted as soon as they are known. Approval and burn may advance after
+Circle reports `CONFIRMED` or `COMPLETE`; the burn must also have the expected
+transaction ID and hash. Each Circle confirmation wait is bounded to 120 seconds.
+A timeout keeps the operation in its current active state, exposes the persisted
+source transaction link, and lets a later status read resume polling with the
+same transaction identity instead of submitting another transaction. Other
+uncertain upstream failures become `RECOVERY_REQUIRED` with a safe public message
+and cannot be retried until reconciled. `SUBMITTED` means the source burn was
+confirmed; it does not prove that the destination mint on Arc has completed.
 
 ## API
 
