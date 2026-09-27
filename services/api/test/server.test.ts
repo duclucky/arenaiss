@@ -3,7 +3,7 @@ import test from 'node:test';
 import { once } from 'node:events';
 import { privateKeyToAccount } from 'viem/accounts';
 
-import { createArenaServer, createPairWorkerTick, cctpWalletAllowlistFromEnvironment, managedIdentityFromEnvironment, purgeArchivedTournamentLogs } from '../src/server.ts';
+import { createArenaServer, createPairWorkerTick, managedIdentityFromEnvironment, purgeArchivedTournamentLogs } from '../src/server.ts';
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
 
 test('Pair worker ticks overlap so a slow room batch cannot block the next scan', async () => {
@@ -192,12 +192,6 @@ test('managed identity configuration is optional but rejects every partial secre
     });
     assert.equal(configured?.agentRegistryAddress, undefined);
   } finally { database.close(); }
-});
-
-test('CCTP wallet allowlist normalizes unique EVM addresses and rejects malformed configuration', () => {
-  assert.deepEqual(cctpWalletAllowlistFromEnvironment({ ARENA_CCTP_WALLET_ALLOWLIST: ' 0xF7c1378e6CB297B570D570A35EAc4Ad1e2fD0d61,0xf7c1378e6cb297b570d570a35eac4ad1e2fd0d61 ' }), ['0xf7c1378e6cb297b570d570a35eac4ad1e2fd0d61']);
-  assert.deepEqual(cctpWalletAllowlistFromEnvironment({}), []);
-  assert.throws(() => cctpWalletAllowlistFromEnvironment({ ARENA_CCTP_WALLET_ALLOWLIST: 'not-a-wallet' }), /invalid CCTP wallet allowlist/);
 });
 
 test('partial Evo configuration disables execution without crashing the API', () => {

@@ -10,7 +10,6 @@ type CreditsState = 'idle' | 'loading' | 'ready' | 'error';
 type WalletAction = { state: 'submitting' | 'error'; message?: string };
 type LegacyBridgeAction = { state: 'submitting' | 'done' | 'error'; operation: ManagedCctpTransfer; message?: string };
 type EvoRefundRow = { campaignId: string; amountUsdc: string; refundAvailableAt?: number };
-type CctpEligibility = 'loading' | 'allowed' | 'denied' | 'error';
 
 const CCTP_CHAINS = [
   { chain: 'BASE-SEPOLIA', label: 'Base Sepolia' },
@@ -46,7 +45,6 @@ export function Account() {
   const [walletAction, setWalletAction] = useState<WalletAction | null>(null);
   const [usdcTransfer, setUsdcTransfer] = useState<ManagedUsdcTransfer | null>(null);
   const [legacyBridgeAction, setLegacyBridgeAction] = useState<LegacyBridgeAction | null>(null);
-  const [cctpEligibility, setCctpEligibility] = useState<CctpEligibility>('loading');
   const [cctpHistoryState, setCctpHistoryState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [bridgeChain, setBridgeChain] = useState('BASE-SEPOLIA');
   const [bridgeAmount, setBridgeAmount] = useState('');
@@ -115,16 +113,6 @@ export function Account() {
         return { state: operation.state === 'SUBMITTED' ? 'done' : 'submitting', operation };
       });
     }).catch(() => { if (!cancelled) setCctpHistoryState('error'); });
-    return () => { cancelled = true; };
-  }, [managedAccount, managedIdentity]);
-
-  useEffect(() => {
-    if (!managedAccount || !managedIdentity?.getCctpEligibility) { setCctpEligibility('loading'); return; }
-    let cancelled = false;
-    setCctpEligibility('loading');
-    managedIdentity.getCctpEligibility()
-      .then(({ eligible }) => { if (!cancelled) setCctpEligibility(eligible ? 'allowed' : 'denied'); })
-      .catch(() => { if (!cancelled) setCctpEligibility('error'); });
     return () => { cancelled = true; };
   }, [managedAccount, managedIdentity]);
 
@@ -335,7 +323,7 @@ export function Account() {
 
   async function submitBridge(event: React.FormEvent) {
     event.preventDefault();
-    if (cctpEligibility !== 'allowed' || bridgeBlocked || !managedIdentity?.bridgeUsdcToArc) return;
+    if (bridgeBlocked || !managedIdentity?.bridgeUsdcToArc) return;
     setBridgeSubmitting(true);
     setBridgeError('');
     try {
@@ -426,10 +414,7 @@ export function Account() {
             </div>}
 
             {managedAccount && <div className="border-t border-border pt-6">
-              {cctpEligibility === 'loading' && <p role="status" className="text-sm text-muted-foreground">Checking CCTP access from your Tournament history…</p>}
-              {cctpEligibility === 'error' && <p role="alert" className="text-sm font-semibold text-destructive">CCTP access could not be verified. Try again after refreshing the account.</p>}
-              {cctpEligibility === 'denied' && <p className="text-sm text-muted-foreground">CCTP access is available to accounts that previously registered for a Tournament.</p>}
-              {cctpEligibility === 'allowed' && <form className="wallet-action-form" onSubmit={submitBridge}>
+              <form className="wallet-action-form" onSubmit={submitBridge}>
                 <div className="wallet-action-form__intro">
                   <h2 className="text-xl font-bold">Bridge USDC to Arc Testnet</h2>
                   <p className="mt-1 text-sm text-muted-foreground">CCTP burns testnet USDC on the selected source network. This release tracks the source burn; Arc mint verification is not yet automated.</p>
@@ -442,7 +427,7 @@ export function Account() {
                 <input id="bridge-amount" className="retro-inset w-full p-3" inputMode="decimal" placeholder="1.00" required pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" value={bridgeAmount} onChange={(event) => setBridgeAmount(event.target.value)} />
                 <p className="wallet-action-form__hint text-xs text-muted-foreground">Available on {CCTP_CHAINS.find((row) => row.chain === bridgeChain)?.label}: {selectedBridgeBalance ? `${formatDisplayAmount(selectedBridgeBalance.amount)} USDC` : 'unavailable'}. Keep extra USDC for CCTP fees.</p>
                 <button className="metal-button-solid w-full" disabled={bridgeBlocked}>{bridgeSubmitting ? 'Starting CCTP transfer…' : 'Bridge to Arc Testnet'}</button>
-              </form>}
+              </form>
               {bridgeError && <p role="alert" className="mt-3 text-sm font-semibold text-destructive">{displayLabel(bridgeError)}</p>}
             </div>}
 

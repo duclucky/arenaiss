@@ -480,16 +480,11 @@ Tournament lifecycle evidence remain open. No new network transaction or
 deployment was performed in this local hardening batch.
 
 The owner reprioritized the live acceptance work on 2026-09-16: Tournament,
-Evo and Marketplace take precedence over CCTP. On 2026-09-28 the owner approved
-a bounded production CCTP release for accounts with at least one persisted
-Tournament registration. Both the Account UI and the server API apply this
-allowlist; API enforcement is authoritative. CCTP status remains separate from
-Arc withdrawal state, so an old pending operation cannot disable or erase a new
-direct Arc transfer status.
-On 2026-09-28 the CCTP gate was extended with an explicit, independently
-configured wallet-address allowlist. A match against either the authenticated
-login wallet or its Circle-managed wallet grants only CCTP initiation and does
-not synthesize Tournament registration data or expand any other permission.
+Evo and Marketplace take precedence over CCTP. On 2026-09-28 the owner opened
+CCTP initiation to every authenticated managed-wallet account. Tournament
+history and wallet-address allowlists no longer gate either the Account UI or
+the server API. CCTP status remains separate from Arc withdrawal state, so an
+old pending operation cannot disable or erase a new direct Arc transfer status.
 CCTP destination-mint verification is deferred, not passed. Direct Arc USDC
 deposit and withdrawal remain in the core acceptance plan.
 

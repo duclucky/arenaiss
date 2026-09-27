@@ -107,7 +107,7 @@ export function createArenaServer(operator: string, runtime?: SqliteRuntimeStore
     else if (result.event === 'daily_tournament_tick') health.success('daily-tournament-worker');
   }) : undefined;
   options.onTournamentOperationsReady?.(tournamentOperations);
-  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms, { tournamentsPaused: process.env.ARENA_TOURNAMENTS_PAUSED === '1', degraded: () => !health.readiness().ready, cctpWalletAllowlist: cctpWalletAllowlistFromEnvironment(process.env) }, { erc8004, erc8004Reputation });
+  const api = new ArenaHttpApi(service, viemSignatureVerifier, managedIdentity, marketplaceChain, evaluationExecution, managedIdentityService, tournamentOperations, agentRegistry, pairRooms, { tournamentsPaused: process.env.ARENA_TOURNAMENTS_PAUSED === '1', degraded: () => !health.readiness().ready }, { erc8004, erc8004Reputation });
   const logger = options.logger ?? ((entry: RequestLog) => process.stdout.write(`${JSON.stringify(entry)}\n`));
   const limiter = new FixedWindowRateLimiter(options.rateLimit ?? {
     maxRequests: envPositiveInteger('ARENA_RATE_LIMIT_MAX', 60),
@@ -201,14 +201,6 @@ export function managedIdentityFromEnvironment(runtime: SqliteRuntimeStore, envi
     circleWallets: circleManagedWalletFromSecrets({ apiKey: values.CIRCLE_API_KEY, entitySecret: values.CIRCLE_ENTITY_SECRET, walletSetId: values.CIRCLE_WALLET_SET_ID }),
     emailSender: new SmtpEmailLoginSender({ host: values.SMTP_HOST, port: smtpPort, secure: smtpPort === 465, user: values.SMTP_USER, pass: values.SMTP_PASS, from: values.SMTP_FROM }),
   };
-}
-
-export function cctpWalletAllowlistFromEnvironment(environment: NodeJS.ProcessEnv = process.env): string[] {
-  const raw = environment.ARENA_CCTP_WALLET_ALLOWLIST?.trim();
-  if (!raw) return [];
-  const addresses = raw.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-  if (addresses.some((address) => !/^0x[0-9a-f]{40}$/.test(address))) throw new Error('invalid CCTP wallet allowlist');
-  return [...new Set(addresses)];
 }
 
 function agentRegistryFromEnvironment(environment: NodeJS.ProcessEnv): ViemAgentRegistryPort | undefined {

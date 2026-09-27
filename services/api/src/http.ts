@@ -20,8 +20,6 @@ export type ArenaCapabilities = {
   pair: { enabled: boolean };
   evaluation: { enabled: boolean };
 };
-type CctpEligibilityResult = { eligible: boolean; source: 'WALLET_ALLOWLIST' | 'TOURNAMENT' | 'NONE' };
-
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const CHALLENGE_TTL_MS = 15 * 60_000;
 const SESSION_TTL_MS = 12 * 60 * 60_000;
@@ -44,9 +42,8 @@ export class ArenaHttpApi {
   private enforceCapabilities: boolean;
   private erc8004?: Erc8004IdentityCoordinator;
   private erc8004Reputation?: Erc8004ReputationService;
-  private cctpWalletAllowlist: Set<string>;
 
-  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator, capabilityOptions: { tournamentsPaused?: boolean; degraded?: boolean | (() => boolean); cctpWalletAllowlist?: readonly string[] } = {}, integrations: { erc8004?: Erc8004IdentityCoordinator; erc8004Reputation?: Erc8004ReputationService } = {}) {
+  constructor(service: ArenaApiService, verifySignature: SignatureVerifier, managedIdentityOptions?: ManagedIdentityOptions, marketplaceChain?: MarketplaceChainPort, evaluationExecution?: EvaluationExecutionService, managedIdentityService?: ManagedIdentityService, tournamentOperations?: TournamentOperationsPort, agentRegistry?: AgentRegistryPort, pairRooms?: PairRoomCoordinator, capabilityOptions: { tournamentsPaused?: boolean; degraded?: boolean | (() => boolean) } = {}, integrations: { erc8004?: Erc8004IdentityCoordinator; erc8004Reputation?: Erc8004ReputationService } = {}) {
     this.service = service;
     this.verifySignature = verifySignature;
     this.marketplaceChain = marketplaceChain;
@@ -59,7 +56,6 @@ export class ArenaHttpApi {
     this.enforceCapabilities = Object.keys(capabilityOptions).length > 0;
     this.erc8004 = integrations.erc8004;
     this.erc8004Reputation = integrations.erc8004Reputation;
-    this.cctpWalletAllowlist = new Set((capabilityOptions.cctpWalletAllowlist ?? []).map((address) => requireAddress(address)));
     this.managedIdentity = managedIdentityService ?? (managedIdentityOptions ? new ManagedIdentityService(managedIdentityOptions) : undefined);
     void this.managedIdentity?.resumeCctpTransfers().catch(() => undefined);
     void this.managedIdentity?.resumeUsdcTransfers().catch(() => undefined);
@@ -210,13 +206,7 @@ export class ArenaHttpApi {
       }
       if (request.method === 'POST' && request.path === '/api/account/cctp-transfers') {
         const session = this.requireManagedSession(request.headers);
-        if (!(await this.cctpEligibility(session)).eligible) {
-          throw new Error('CCTP access requires an allowlisted wallet or previous Tournament registration');
-        }
         return this.json(202, await this.managedIdentity!.startBridgeUsdcToArc(session.userId!, requireString(request.body?.sourceChain), requireString(request.body?.amount)));
-      }
-      if (request.method === 'GET' && request.path === '/api/account/cctp-eligibility') {
-        return this.json(200, await this.cctpEligibility(this.requireManagedSession(request.headers)));
       }
       if (request.method === 'GET' && request.path === '/api/account/cctp-transfers') {
         const session = this.requireManagedSession(request.headers);
@@ -538,16 +528,6 @@ export class ArenaHttpApi {
 
   private requireSession(headers: Headers | undefined): string {
     return this.requireSessionRecord(headers).principal;
-  }
-
-  private async cctpEligibility(session: { principal: string; userId?: string; identityKind?: LoginIdentityKind }): Promise<CctpEligibilityResult> {
-    if (!session.userId || !session.identityKind || !this.managedIdentity) throw new Error('managed wallet authentication required');
-    const account = await this.managedIdentity.getAccount(session.userId, session.identityKind);
-    if (this.cctpWalletAllowlist.has(session.principal.toLowerCase()) || this.cctpWalletAllowlist.has(account.managedWallet.address.toLowerCase())) {
-      return { eligible: true, source: 'WALLET_ALLOWLIST' };
-    }
-    if (this.service.listOwnedRegistrations(session.principal).length > 0) return { eligible: true, source: 'TOURNAMENT' };
-    return { eligible: false, source: 'NONE' };
   }
 
   private requireSessionRecord(headers: Headers | undefined) {

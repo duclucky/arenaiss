@@ -91,12 +91,8 @@ confirmed; it does not prove that the destination mint on Arc has completed.
 - `GET /api/account/usdc-balances`: return available Circle-issued USDC balances.
 - `POST /api/account/usdc-transfers`: submit an Arc Testnet USDC withdrawal.
 - `POST /api/account/cctp-transfers`: persist and start a CCTP transfer to Arc.
-  The authenticated principal must have at least one persisted Tournament
-  registration, or its login/managed wallet must appear in the explicit CCTP
-  allowlist. This is enforced server-side and cannot be bypassed by calling the
-  API directly.
-- `GET /api/account/cctp-eligibility`: return the authenticated account's
-  backend eligibility decision without exposing the complete allowlist.
+  Every authenticated managed-wallet account may use this route. Balance,
+  network, amount, fee and single-active-operation checks remain enforced.
 - `GET /api/account/cctp-transfers`: return up to 20 recent operations belonging
   to the authenticated owner, newest first, without replay keys.
 - `GET /api/account/cctp-transfers/:operationId`: return the authenticated
@@ -123,11 +119,6 @@ SMTP_USER
 SMTP_PASS
 SMTP_FROM
 ```
-
-The optional `ARENA_CCTP_WALLET_ALLOWLIST` variable is a comma-separated list of EVM addresses. Every
-entry is normalized to lowercase and malformed entries fail startup. It is an
-optional CCTP-only exception and does not create Tournament history or grant any
-other product permission.
 
 `ARENA_IDENTITY_PEPPER` must be at least 32 bytes. The Circle entity secret is a
 32-byte value created and registered by the operator. Its recovery file must be
