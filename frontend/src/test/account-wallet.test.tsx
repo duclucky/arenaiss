@@ -28,6 +28,7 @@ function identity(): ManagedIdentityAdapter {
     getUsdcTransfer: async () => ({ operationId: '22222222-2222-4222-8222-222222222222', destinationAddress: address,
       amount: '0.25', transactionId: 'transfer-1', state: 'SUBMITTED', updatedAt: 1 }),
     bridgeUsdcToArc: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'PENDING', sourceChain: 'BASE-SEPOLIA', amount: '1', updatedAt: 1 }),
+    getCctpEligibility: async () => ({ eligible: false, source: 'NONE' }),
     listCctpTransfers: async () => [],
     getCctpTransfer: async () => ({ operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED', sourceChain: 'BASE-SEPOLIA', amount: '1', transactionId: 'bridge-1', txHash: `0x${'1'.repeat(64)}`, explorerUrl: `https://sepolia.basescan.org/tx/0x${'1'.repeat(64)}`, updatedAt: 2 }),
   };
@@ -59,7 +60,7 @@ describe('managed Arena ISS wallet account', () => {
 
   it('opens CCTP initiation for an account with a previous Tournament registration', async () => {
     const bridgeUsdcToArc = vi.fn().mockResolvedValue({ operationId: '11111111-1111-4111-8111-111111111111', state: 'PENDING', sourceChain: 'BASE-SEPOLIA', amount: '0.5', updatedAt: 1 });
-    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={{ ...identity(), bridgeUsdcToArc }} agentApiAdapter={tournamentAccess(true)} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={{ ...identity(), bridgeUsdcToArc, getCctpEligibility: async () => ({ eligible: true, source: 'TOURNAMENT' }) }} agentApiAdapter={tournamentAccess(true)} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
 
     expect(await screen.findByText('Arena ISS wallet', { selector: 'label' })).toBeInTheDocument();
     const primaryNavigation = screen.getByRole('navigation', { name: 'Primary' });

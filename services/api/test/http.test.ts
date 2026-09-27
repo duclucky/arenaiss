@@ -212,12 +212,14 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.equal(deniedBridge.status, 400);
     assert.match(String(deniedBridge.body?.error), /previous Tournament registration/);
     assert.equal(calls.filter(([kind]) => kind === 'bridge').length, 0);
+    assert.deepEqual((await api.handle({ method: 'GET', path: '/api/account/cctp-eligibility', headers: { cookie } })).body, { eligible: false, source: 'NONE' });
     const tournamentId = `sha256:${'a'.repeat(64)}`;
     assert.equal((await api.handle({ method: 'POST', path: `/api/account/tournament-credits/${tournamentId}/withdraw`, headers: { cookie }, body: { idempotencyKey: '11111111-1111-4111-8111-111111111111' } })).status, 202);
     const refundBody = { tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, idempotencyKey: '11111111-1111-4111-8111-111111111111' };
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/tournament-refunds/claim', headers: { cookie }, body: refundBody })).status, 400);
     assert.equal(calls.filter(([kind]) => kind === 'refund').length, 0);
     service.listOwnedRegistrations = () => [{ tournamentId: refundBody.tournamentId, entrantId: refundBody.entrantId, agentId: `0x${'c'.repeat(64)}` }];
+    assert.deepEqual((await api.handle({ method: 'GET', path: '/api/account/cctp-eligibility', headers: { cookie } })).body, { eligible: true, source: 'TOURNAMENT' });
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/tournament-refunds/claim', headers: { cookie }, body: refundBody })).status, 202);
     assert.equal(calls.filter(([kind]) => kind === 'refund').length, 1);
     assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'ETH-SEPOLIA', amount: '2' } })).status, 400);
@@ -255,6 +257,33 @@ test('managed wallet balance, Arc withdrawal and CCTP routes require the authent
     assert.deepEqual((await api.handle({ method: 'GET', path: '/api/account/cctp-transfers', headers: { cookie: bobCookie } })).body, []);
     assert.deepEqual(calls.map(([kind]) => kind), ['transfer', 'claim', 'refund', 'bridge']);
   } finally { runtime.close(); }
+});
+
+test('explicit CCTP wallet allowlist accepts a login or managed wallet address without creating Tournament history', async () => {
+  for (const allowlisted of [alice, '0x3333333333333333333333333333333333333333']) {
+    const runtime = new SqliteRuntimeStore(':memory:');
+    try {
+      let bridgeCalls = 0;
+      const managed = {
+        runtime, identityPepper: 'test-only-pepper-with-at-least-32-bytes',
+        circleWallets: {
+          createWallet: async () => ({ walletId: '11111111-1111-4111-8111-111111111111', address: '0x3333333333333333333333333333333333333333' }),
+          listUsdcBalances: async () => [{ chain: 'BASE-SEPOLIA', label: 'Base Sepolia', amount: '3', isArc: false, available: true }],
+          bridgeUsdcToArc: async () => { bridgeCalls += 1; return { transactionId: 'burn-id', state: 'COMPLETE', txHash: `0x${'1'.repeat(64)}` }; },
+        },
+        emailSender: { sendLoginCode: async () => undefined },
+      };
+      const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, managed as any, undefined, undefined, undefined, undefined, undefined, undefined, { cctpWalletAllowlist: [allowlisted] });
+      await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+      const auth = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+      const cookie = auth.headers['set-cookie'].split(';')[0];
+      assert.deepEqual((await api.handle({ method: 'GET', path: '/api/account/cctp-eligibility', headers: { cookie } })).body, { eligible: true, source: 'WALLET_ALLOWLIST' });
+      assert.equal((await api.handle({ method: 'POST', path: '/api/account/cctp-transfers', headers: { cookie }, body: { sourceChain: 'BASE-SEPOLIA', amount: '1' } })).status, 202);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert.equal(bridgeCalls, 1);
+      assert.deepEqual(new ArenaApiService(operator, runtime).listOwnedRegistrations(alice), []);
+    } finally { runtime.close(); }
+  }
 });
 
 test('CCTP operation resumes after API restart with the persisted approval and burn keys', async () => {

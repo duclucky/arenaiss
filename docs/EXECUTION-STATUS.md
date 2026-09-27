@@ -486,6 +486,10 @@ Tournament registration. Both the Account UI and the server API apply this
 allowlist; API enforcement is authoritative. CCTP status remains separate from
 Arc withdrawal state, so an old pending operation cannot disable or erase a new
 direct Arc transfer status.
+On 2026-09-28 the CCTP gate was extended with an explicit, independently
+configured wallet-address allowlist. A match against either the authenticated
+login wallet or its Circle-managed wallet grants only CCTP initiation and does
+not synthesize Tournament registration data or expand any other permission.
 CCTP destination-mint verification is deferred, not passed. Direct Arc USDC
 deposit and withdrawal remain in the core acceptance plan.
 

@@ -45,4 +45,11 @@ describe('managed identity HTTP adapter', () => {
     expect(fetcher.mock.calls[1][0]).toContain('/api/account/tournament-refunds/claim');
     expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ tournamentId: `0x${'a'.repeat(64)}`, entrantId: `0x${'b'.repeat(64)}`, idempotencyKey: 'refund-key' });
   });
+
+  it('reads CCTP eligibility from the authenticated backend session', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ eligible: true, source: 'WALLET_ALLOWLIST' }), { status: 200 }));
+    const adapter = new HttpManagedIdentityAdapter('', fetcher);
+    await expect(adapter.getCctpEligibility()).resolves.toEqual({ eligible: true, source: 'WALLET_ALLOWLIST' });
+    expect(fetcher).toHaveBeenCalledWith('/api/account/cctp-eligibility', expect.objectContaining({ method: 'GET', credentials: 'include' }));
+  });
 });

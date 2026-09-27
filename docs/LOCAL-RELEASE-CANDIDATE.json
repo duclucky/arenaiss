@@ -3,7 +3,7 @@
   "createdAt": "2026-09-25",
   "scope": "LOCAL_ONLY",
   "fileCount": 317,
-  "sourceBundleSha256": "b1be7247d3b6d547234e52d07e296f29d7a18b923ec002cfb7d2f68f8c4d31fa",
+  "sourceBundleSha256": "919213dc0eb2bde06b92171572f7717058f361988726fb045d7c0facd205bb57",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -40,16 +40,16 @@
     "requirements-dev.txt": "43641e48e6c1e7e5c1f2c3cbc42cc7574f7df7ce73f3ec518f1c30949285eaf1",
     "gltest.config.yaml": "de9ffbb6bd5722186b1148337ed5e54d1297923d9357373d294418859fe41cc8",
     "Dockerfile": "bc7f5727a00874408d73e31d3063f469a284a7e09338e6ac644fbdd651b8fd47",
-    "compose.yaml": "bffb9fc97cff8a7e6e980837fbb174539324ae8511e3e2e3e24e541928b15d3d",
+    "compose.yaml": "e4e82745537140afd496d9ac55d40c6fb89617dc9ac58d6c9e13ae6658b2ce61",
     "contracts/arc/AgentMarketplaceV2.sol": "3f6fadda3fbf6499e2cfd6ad55ee575d99b4a9e416a030543bac8f9b5a0d3b7b",
     "contracts/arc/test/AgentMarketplaceV2.t.sol": "df63990ddcb7c94dd5480c56ce245ca917f027b32d78f1d3940e3b45cba48e91",
     "scripts/deploy-agent-marketplace-v2.mjs": "ad8b472baa696bbd8bb28579f92f42f71c3571110752f874c46eb607976b34e9"
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 382,
+    "typescriptTests": 384,
     "foundryTests": 39,
-    "frontendTests": 150
+    "frontendTests": 151
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",

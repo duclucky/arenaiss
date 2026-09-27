@@ -219,6 +219,7 @@ export interface ManagedIdentityAdapter {
   listUsdcTransfers?(): Promise<ManagedUsdcTransfer[]>;
   getUsdcTransfer?(operationId: string): Promise<ManagedUsdcTransfer>;
   bridgeUsdcToArc?(sourceChain: string, amount: string): Promise<ManagedCctpTransfer>;
+  getCctpEligibility?(): Promise<{ eligible: boolean; source: 'WALLET_ALLOWLIST' | 'TOURNAMENT' | 'NONE' }>;
   listCctpTransfers?(): Promise<ManagedCctpTransfer[]>;
   getCctpTransfer?(operationId: string): Promise<ManagedCctpTransfer>;
   claimTournamentCredit?(tournamentId: string, idempotencyKey: string): Promise<ManagedWalletTransaction>;

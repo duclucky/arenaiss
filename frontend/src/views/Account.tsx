@@ -119,14 +119,14 @@ export function Account() {
   }, [managedAccount, managedIdentity]);
 
   useEffect(() => {
-    if (!managedAccount || !agentApi) { setCctpEligibility('loading'); return; }
+    if (!managedAccount || !managedIdentity?.getCctpEligibility) { setCctpEligibility('loading'); return; }
     let cancelled = false;
     setCctpEligibility('loading');
-    agentApi.listOwnedRegistrations()
-      .then((registrations) => { if (!cancelled) setCctpEligibility(registrations.length > 0 ? 'allowed' : 'denied'); })
+    managedIdentity.getCctpEligibility()
+      .then(({ eligible }) => { if (!cancelled) setCctpEligibility(eligible ? 'allowed' : 'denied'); })
       .catch(() => { if (!cancelled) setCctpEligibility('error'); });
     return () => { cancelled = true; };
-  }, [agentApi, managedAccount]);
+  }, [managedAccount, managedIdentity]);
 
   useEffect(() => {
     if (legacyBridgeAction?.state !== 'submitting' || !managedIdentity?.getCctpTransfer) return;
