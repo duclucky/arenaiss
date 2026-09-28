@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,8 @@ import { EvaluationDetail } from '../views/EvaluationDetail';
 import { Account } from '../views/Account';
 import { EvaluationRunDetail } from '../views/EvaluationRunDetail';
 import { Evaluations } from '../views/Evaluations';
+
+const progressStyles = readFileSync('src/index.css', 'utf8');
 
 const account = {
   userId: 'usr_owner', principal: 'owner@example.com', identity: { kind: 'EMAIL' as const },
@@ -98,6 +101,19 @@ describe('evaluation product UX', () => {
     expect(screen.getByText('Agent runtime')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /Stage .* of/i })).not.toBeInTheDocument();
     expect(progressPanel.querySelectorAll('.evaluation-progress__signal-dot')).toHaveLength(9);
+    const progressVisual = progressPanel.querySelector('.evaluation-progress__visual');
+    expect(progressVisual?.firstElementChild?.tagName).toBe('P');
+    expect(progressVisual?.lastElementChild).toHaveClass('evaluation-progress__signal');
+  });
+
+  it('keeps the live signal animated and gives every dot the raised frame treatment', () => {
+    expect(progressStyles).toMatch(/\.evaluation-progress__signal\s*\{[^}]*width:\s*100%[^}]*grid-template-columns:\s*repeat\(9,\s*minmax\(0,\s*1fr\)\)/s);
+    expect(progressStyles).toMatch(/\.evaluation-progress__signal-dot\s*\{[^}]*background:\s*var\(--retro-face\)/s);
+    expect(progressStyles).toMatch(/\.evaluation-progress__signal-dot\s*\{[^}]*box-shadow:\s*var\(--retro-raised\)/s);
+    expect(progressStyles).toMatch(/@keyframes evaluation-signal\s*\{[^}]*background:\s*var\(--retro-accent\)/s);
+    expect(progressStyles).not.toMatch(/\.evaluation-progress__signal::before/);
+    expect(progressStyles).not.toMatch(/prefers-reduced-motion:[^)]+\)[^{]*\{[^}]*evaluation-progress__signal-dot[^}]*animation:\s*none/s);
+    expect(progressStyles).toMatch(/\.evaluation-progress__signal-dot\s*\{[^}]*animation-duration:\s*4\.05s\s*!important[^}]*animation-iteration-count:\s*infinite\s*!important/s);
   });
 
   it('restores a running evaluation progress panel after a page reload', async () => {

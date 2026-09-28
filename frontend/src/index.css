@@ -44,19 +44,18 @@ button:disabled { cursor: not-allowed; }
 .app-shell { min-height: 100dvh; background: var(--paper); color: var(--ink); }
 .evaluation-progress { margin-top: 24px; border: 1px solid var(--retro-frame); background: rgba(254, 254, 254, .48); padding: 16px; box-shadow: var(--retro-raised); }
 .evaluation-progress__refresh { border: 1px solid var(--retro-frame); padding: 6px 8px; font-family: var(--retro-control-font); font-size: 10px; text-transform: uppercase; }
-.evaluation-progress__visual { display: flex; align-items: center; gap: 16px; margin-top: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
+.evaluation-progress__visual { display: grid; min-width: 0; gap: 14px; margin-top: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
 .evaluation-progress__visual p { margin: 0; font-size: 14px; line-height: 1.5; }
-.evaluation-progress__signal { position: relative; display: grid; width: 126px; min-width: 126px; grid-template-columns: repeat(9, 9px); align-items: center; justify-content: space-between; padding: 10px 0; }
-.evaluation-progress__signal::before { position: absolute; right: 5px; left: 5px; height: 1px; background: var(--line); content: ''; }
-.evaluation-progress__signal-dot { position: relative; z-index: 1; width: 9px; height: 9px; border: 1px solid var(--retro-frame); background: var(--retro-accent); opacity: .22; animation: evaluation-signal 3.2s ease-in-out infinite; }
-.evaluation-progress__signal-dot:nth-child(2) { animation-delay: .24s; }
-.evaluation-progress__signal-dot:nth-child(3) { animation-delay: .48s; }
-.evaluation-progress__signal-dot:nth-child(4) { animation-delay: .72s; }
-.evaluation-progress__signal-dot:nth-child(5) { animation-delay: .96s; }
-.evaluation-progress__signal-dot:nth-child(6) { animation-delay: 1.2s; }
-.evaluation-progress__signal-dot:nth-child(7) { animation-delay: 1.44s; }
-.evaluation-progress__signal-dot:nth-child(8) { animation-delay: 1.68s; }
-.evaluation-progress__signal-dot:nth-child(9) { animation-delay: 1.92s; }
+.evaluation-progress__signal { display: grid; width: 100%; max-width: 100%; min-width: 0; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: clamp(4px, 1.5vw, 8px); padding: 3px 2px 5px; overflow: hidden; }
+.evaluation-progress__signal-dot { width: 100%; min-width: 0; height: clamp(14px, 2.4vw, 18px); border: 1px solid var(--retro-frame); border-radius: 2px; background: var(--retro-face); box-shadow: var(--retro-raised); opacity: .72; animation: evaluation-signal 4.05s ease-in-out infinite; will-change: background-color, opacity; }
+.evaluation-progress__signal-dot:nth-child(2) { animation-delay: .45s; }
+.evaluation-progress__signal-dot:nth-child(3) { animation-delay: .9s; }
+.evaluation-progress__signal-dot:nth-child(4) { animation-delay: 1.35s; }
+.evaluation-progress__signal-dot:nth-child(5) { animation-delay: 1.8s; }
+.evaluation-progress__signal-dot:nth-child(6) { animation-delay: 2.25s; }
+.evaluation-progress__signal-dot:nth-child(7) { animation-delay: 2.7s; }
+.evaluation-progress__signal-dot:nth-child(8) { animation-delay: 3.15s; }
+.evaluation-progress__signal-dot:nth-child(9) { animation-delay: 3.6s; }
 .evaluation-progress__steps { display: grid; gap: 0; margin: 16px 0 0; padding: 0; list-style: none; }
 .evaluation-progress__steps li { position: relative; display: flex; min-width: 0; min-height: 38px; align-items: center; gap: 10px; color: #666; font-family: var(--retro-control-font); font-size: 10px; line-height: 1.35; }
 .evaluation-progress__steps li:not(:last-child)::after { position: absolute; top: 27px; bottom: -11px; left: 13px; width: 1px; background: var(--line); content: ''; }
@@ -64,9 +63,8 @@ button:disabled { cursor: not-allowed; }
 .evaluation-progress__marker { position: relative; z-index: 1; display: grid; width: 27px; height: 27px; flex: 0 0 auto; place-items: center; border: 1px solid var(--retro-frame); border-radius: 50%; background: var(--paper); }
 .evaluation-progress__steps li.is-complete .evaluation-progress__marker { background: #34734b; color: #fff; }
 .evaluation-progress__steps li.is-active .evaluation-progress__marker { background: var(--retro-accent); color: #fff; box-shadow: 0 0 0 5px rgba(80, 91, 191, .18); }
-.evaluation-progress__reduced { display: none; margin: 14px 0 0; color: #555; font-size: 10px; }
-@keyframes evaluation-signal { 0%, 55%, 100% { opacity: .22; transform: scale(.86); } 20%, 35% { opacity: .82; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .evaluation-progress__signal-dot { animation: none; opacity: .55; transform: none; } .evaluation-progress__reduced { display: block; } }
+@keyframes evaluation-signal { 0%, 11% { background: var(--retro-accent); opacity: 1; } 24%, 100% { background: var(--retro-face); opacity: .72; } }
+@media (prefers-reduced-motion: reduce) { .evaluation-progress__signal-dot { animation-duration: 4.05s !important; animation-iteration-count: infinite !important; } }
 .app-shell--hero { background: #d9d4c9; }
 .site-grain {
   position: fixed;

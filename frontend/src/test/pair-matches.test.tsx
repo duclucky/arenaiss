@@ -141,8 +141,12 @@ it('shows that a joined room started automatically and exposes its current stage
   } })));
   render(<MemoryRouter initialEntries={['/pairs/mine']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="mine" /></AppProvider></MemoryRouter>);
   expect(await screen.findByText('Match started automatically. Both Agents are producing responses.')).toBeInTheDocument();
-  expect(screen.getByRole('status', { name: 'Pair Match progress' })).toHaveTextContent('Pair Match in progress');
+  const progressPanel = screen.getByRole('status', { name: 'Pair Match progress' });
+  expect(progressPanel).toHaveTextContent('Pair Match in progress');
   expect(screen.getByText('Auto-refreshing')).toBeInTheDocument();
+  const progressVisual = progressPanel.querySelector('.evaluation-progress__visual');
+  expect(progressVisual?.firstElementChild?.tagName).toBe('P');
+  expect(progressVisual?.lastElementChild).toHaveClass('evaluation-progress__signal');
   expect(screen.queryByRole('button', { name: 'Request mutual cancellation' })).not.toBeInTheDocument();
 });
 

@@ -121,9 +121,8 @@ function EvaluationProgress({ campaign, submitting = false }: { campaign?: Evalu
   const steps = ['Payment secured', 'Agent runtime', 'GenLayer judging', 'Scorecards', 'ERC-8004 record'];
   return <section className="evaluation-progress" aria-label="Evaluation progress" role="status" aria-live="polite">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="page-kicker">Live evaluation</p><h3 className="text-lg font-bold">Evaluation in progress</h3></div><span className="evaluation-progress__refresh">Auto-refreshing</span></div>
-    <div className="evaluation-progress__visual"><LiveActivitySignal /><p>{status}</p></div>
+    <div className="evaluation-progress__visual"><p>{status}</p><LiveActivitySignal /></div>
     <ol className="evaluation-progress__steps">{steps.map((step, index) => <li key={step} className={index < activeStep ? 'is-complete' : index === activeStep ? 'is-active' : ''}><span className="evaluation-progress__marker" aria-hidden="true">{index < activeStep ? '✓' : index + 1}</span><span>{step}</span></li>)}</ol>
-    <p className="evaluation-progress__reduced">Reduced motion: static progress marker</p>
   </section>;
 }
 function CampaignList({ campaigns }: { campaigns: EvaluationCampaign[] }) {
