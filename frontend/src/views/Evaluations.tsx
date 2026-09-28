@@ -66,7 +66,9 @@ export function Evaluations() {
     }
     finally { setRunning(false); }
   };
-  const activeCampaign = campaigns.find((campaign) => campaign.campaignId === activeCampaignId && isEvaluationInProgress(campaign));
+  const activeCampaign = activeCampaignId
+    ? campaigns.find((campaign) => campaign.campaignId === activeCampaignId && isEvaluationInProgress(campaign))
+    : running ? undefined : latestActiveCampaign(campaigns);
 
   return <section className="mx-auto max-w-5xl space-y-10">
     <header><p className="page-kicker">Arena ISS / SOLO</p><h1 className="page-title">Evaluations</h1><h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-tight sm:text-4xl">Hidden tests. Independent verdicts.</h2><p className="page-lede">Arena ISS designs, versions and randomizes every scenario. You choose the Agent; the test prompts stay hidden before and during execution.</p></header>
@@ -87,23 +89,38 @@ export function Evaluations() {
 
 function ProtocolStep({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) { return <div className="retro-inset p-4"><span className="mb-4 flex h-10 w-10 items-center justify-center border border-black bg-neutral-100" aria-hidden="true">{icon}</span><h3 className="font-semibold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">{copy}</p></div>; }
 function isEvaluationInProgress(campaign: EvaluationCampaign): boolean { return !['FINALIZED', 'FAILED', 'PAYMENT_FAILED', 'REFUNDED'].includes(campaign.state); }
+function latestActiveCampaign(campaigns: EvaluationCampaign[]): EvaluationCampaign | undefined {
+  return campaigns.filter(isEvaluationInProgress).reduce<EvaluationCampaign | undefined>((latest, campaign) => {
+    if (!latest) return campaign;
+    return (campaign.startedAt ?? campaign.createdAt ?? 0) > (latest.startedAt ?? latest.createdAt ?? 0) ? campaign : latest;
+  }, undefined);
+}
 function EvaluationProgress({ campaign, submitting = false }: { campaign?: EvaluationCampaign; submitting?: boolean }) {
   const total = campaign?.items.length || 6;
   const finalized = campaign?.items.filter((item) => item.state === 'FINALIZED').length || 0;
-  const activeStep = submitting || campaign?.state === 'PENDING' ? 0 : finalized === total ? 3 : finalized > 0 ? 2 : 1;
+  const activeItem = campaign?.items.find((item) => item.state !== 'FINALIZED');
+  const activeStep = submitting || campaign?.state === 'PENDING'
+    ? 0
+    : activeItem?.state === 'JUDGING' || activeItem?.state === 'RECOVERY_REQUIRED'
+      ? 2
+      : finalized === total
+        ? 3
+        : 1;
   const status = submitting
     ? 'Submitting the evaluation and securing its Arc fee.'
     : campaign?.state === 'PENDING'
     ? 'Securing the evaluation fee on Arc Testnet.'
     : campaign?.state === 'RECOVERY_REQUIRED'
       ? 'Reconciling the GenLayer submission automatically.'
-      : finalized > 0
-        ? `${finalized} of ${total} hidden scenarios finalized.`
-        : 'Validators are comparing the hidden scenarios.';
-  const steps = ['Payment secured', 'GenLayer judging', 'Scorecard', 'ERC-8004 record'];
+      : activeItem?.state === 'JUDGING'
+        ? `GenLayer validators are judging the hidden scenarios. ${finalized} of ${total} scorecards are final.`
+        : finalized === total
+          ? 'The final scorecard is being prepared for the Agent reputation record.'
+          : `The Agent is producing responses for the hidden scenarios. ${finalized} of ${total} are complete.`;
+  const steps = ['Payment secured', 'Agent runtime', 'GenLayer judging', 'Scorecards', 'ERC-8004 record'];
   return <section className="evaluation-progress" aria-label="Evaluation progress" role="status" aria-live="polite">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="page-kicker">Live evaluation</p><h3 className="text-lg font-bold">Evaluation in progress</h3></div><span className="evaluation-progress__refresh">Auto-refreshing</span></div>
-    <div className="evaluation-progress__visual"><div className="evaluation-progress__orbit" aria-hidden="true"><span>{activeStep + 1}<small>/4</small></span></div><p>{status}</p></div>
+    <div className="evaluation-progress__visual"><div className="evaluation-progress__orbit" role="img" aria-label={`Stage ${activeStep + 1} of ${steps.length}`}><span className="evaluation-progress__runner" aria-hidden="true" /><span className="evaluation-progress__counter"><strong>{activeStep + 1}</strong><small>of {steps.length}</small></span></div><p>{status}</p></div>
     <ol className="evaluation-progress__steps">{steps.map((step, index) => <li key={step} className={index < activeStep ? 'is-complete' : index === activeStep ? 'is-active' : ''}><span className="evaluation-progress__marker" aria-hidden="true">{index < activeStep ? '✓' : index + 1}</span><span>{step}</span></li>)}</ol>
     <p className="evaluation-progress__reduced">Reduced motion: static progress marker</p>
   </section>;

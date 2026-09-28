@@ -94,6 +94,22 @@ describe('evaluation product UX', () => {
     expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Evaluation progress' })).toHaveTextContent('Evaluation in progress');
     expect(screen.getByText('Auto-refreshing')).toBeInTheDocument();
+    expect(screen.getByText('Agent runtime')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Stage 3 of 5/i })).toBeInTheDocument();
+  });
+
+  it('restores a running evaluation progress panel after a page reload', async () => {
+    const runningCampaign = {
+      ...campaign,
+      state: 'RUNNING',
+      createdAt: Date.UTC(2026, 8, 28, 10, 0),
+      items: [{ ...campaign.items[0], state: 'GENERATING', score: undefined, overallScore: undefined }],
+    };
+    const api = { ...evaluationApi, async listCampaigns() { return [runningCampaign]; } };
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
+    const progressPanel = await screen.findByRole('status', { name: 'Evaluation progress' });
+    expect(progressPanel).toHaveTextContent('Agent runtime');
+    expect(progressPanel).toHaveTextContent(/Agent is producing responses/i);
   });
 
   it('keeps the evaluation progress area empty until the user starts a run', async () => {
