@@ -149,6 +149,7 @@ describe('Marketplace website UX', () => {
     const closeButton = within(dialog).getByRole('button', { name: 'Close dialog' });
     expect(closeButton.parentElement).toHaveClass('marketplace-modal-header');
     expect(dialog).toHaveClass('max-w-3xl', 'overflow-hidden');
+    expect(dialog.parentElement).toHaveClass('z-[110]');
     expect(within(dialog).getByText('Safety Finals')).toBeInTheDocument();
     expect(within(dialog).queryByText('# Private Agent')).not.toBeInTheDocument();
     expect(listPublicAgents).toHaveBeenCalledTimes(1);

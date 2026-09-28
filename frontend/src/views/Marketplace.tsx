@@ -65,7 +65,7 @@ function MarketplaceModal({ titleId, onClose, children, width = 'max-w-3xl' }: {
       if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, []);
-  return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-3 sm:p-6" role="presentation"
+  return <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/60 p-3 sm:p-6" role="presentation"
     onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}
       className={`glass-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${width} flex-col overflow-hidden bg-[#f8f5ee] p-0 sm:max-h-[calc(100dvh-3rem)]`}>
