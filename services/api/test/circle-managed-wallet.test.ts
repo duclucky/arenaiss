@@ -397,3 +397,41 @@ test('Circle CCTP checks the source USDC balance including quoted fees before ap
     assert.equal(executions.length, 0);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('Circle CCTP verifies a completed Arc mint through Iris and the Arc receipt', async () => {
+  const sourceTxHash = `0x${'4'.repeat(64)}`;
+  const destinationTxHash = `0x${'5'.repeat(64)}`;
+  const address = '0x1111111111111111111111111111111111111111';
+  const requestedUrls: string[] = [];
+  const adapter = new CircleManagedWalletAdapter({} as any, 'wallet-set-id', {
+    fetcher: async (input: string | URL | Request) => {
+      requestedUrls.push(String(input));
+      return new Response(JSON.stringify({ messages: [{
+        status: 'complete',
+        forwardState: 'COMPLETE',
+        forwardTxHash: destinationTxHash,
+        destinationMintTxHash: destinationTxHash,
+        decodedMessage: {
+          sourceDomain: '3',
+          destinationDomain: '26',
+          decodedMessageBody: { mintRecipient: address },
+        },
+      }] }), { status: 200 });
+    },
+    arcReceiptReader: {
+      async getTransactionReceipt({ hash }: { hash: `0x${string}` }) {
+        assert.equal(hash, destinationTxHash);
+        return { status: 'success' as const, transactionHash: destinationTxHash };
+      },
+    },
+  });
+
+  const result = await adapter.getCctpMintStatus({ sourceChain: 'ARB-SEPOLIA', sourceTxHash, destinationAddress: address });
+
+  assert.deepEqual(result, {
+    state: 'COMPLETE',
+    destinationTxHash,
+    destinationExplorerUrl: `https://testnet.arcscan.app/tx/${destinationTxHash}`,
+  });
+  assert.deepEqual(requestedUrls, [`https://iris-api-sandbox.circle.com/v2/messages/3?transactionHash=${sourceTxHash}`]);
+});

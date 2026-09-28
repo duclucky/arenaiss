@@ -1,5 +1,8 @@
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets';
+import { createPublicClient, type Hash } from 'viem';
+import { arcTestnet } from 'viem/chains';
 import { CctpTransactionPendingError, type CircleWalletPort, type CctpTransferProgress, type UsdcBalance, type WalletTransactionResult } from './managed-identity.ts';
+import { arcReadTransport } from './arc-rpc.ts';
 
 const ARC_USDC = '0x3600000000000000000000000000000000000000';
 const TOKEN_MESSENGER_V2 = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -35,14 +38,23 @@ type CircleClient = {
   getTransaction(input: { id: string; waitForState?: string; waitForTxHash?: boolean; pollingInterval?: number; signal?: AbortSignal }): Promise<{ data?: { transaction?: { id?: string; state?: string; txHash?: string } } }>;
 };
 
+type CctpVerificationOptions = {
+  fetcher?: typeof fetch;
+  arcReceiptReader?: { getTransactionReceipt(input: { hash: Hash }): Promise<{ status: 'success' | 'reverted'; transactionHash: Hash }> };
+};
+
 export class CircleManagedWalletAdapter implements CircleWalletPort {
   private readonly client: CircleClient;
   private readonly walletSetId: string;
+  private readonly fetcher: typeof fetch;
+  private readonly arcReceiptReader: NonNullable<CctpVerificationOptions['arcReceiptReader']>;
 
-  constructor(client: CircleClient, walletSetId: string) {
+  constructor(client: CircleClient, walletSetId: string, verification: CctpVerificationOptions = {}) {
     if (!walletSetId || walletSetId.length > 160) throw new Error('CIRCLE_WALLET_SET_ID is invalid');
     this.client = client;
     this.walletSetId = walletSetId;
+    this.fetcher = verification.fetcher ?? fetch;
+    this.arcReceiptReader = verification.arcReceiptReader ?? createPublicClient({ chain: arcTestnet, transport: arcReadTransport() });
   }
 
   async createWallet(input: { userId: string; idempotencyKey: string }) {
@@ -285,6 +297,31 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
     if (result.transactionId !== burnId || !isConfirmedCircleState(result.state) || !result.txHash) throw new Error('CCTP burn did not complete');
     input.onProgress?.({ state: 'BURNING', transactionId: burnId, txHash: result.txHash, explorerUrl: result.explorerUrl, ...feePlan });
     return result;
+  }
+
+  async getCctpMintStatus(input: { sourceChain: string; sourceTxHash: string; destinationAddress: string }) {
+    const config = CHAINS.find((chain) => chain.chain === input.sourceChain);
+    if (!config || config.isArc || !/^0x[0-9a-fA-F]{64}$/.test(input.sourceTxHash)) throw new Error('invalid CCTP source transaction');
+    const response = await this.fetcher(`https://iris-api-sandbox.circle.com/v2/messages/${config.domain}?transactionHash=${input.sourceTxHash}`, { headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error('CCTP mint status unavailable');
+    const payload = await response.json() as { messages?: Array<{
+      status?: string; forwardState?: string; forwardTxHash?: string; destinationMintTxHash?: string;
+      decodedMessage?: { sourceDomain?: string | number; destinationDomain?: string | number; decodedMessageBody?: { mintRecipient?: string } };
+    }> };
+    const expectedRecipient = input.destinationAddress.toLowerCase();
+    const message = payload.messages?.find((candidate) =>
+      String(candidate.decodedMessage?.sourceDomain) === String(config.domain)
+      && String(candidate.decodedMessage?.destinationDomain) === '26'
+      && candidate.decodedMessage?.decodedMessageBody?.mintRecipient?.toLowerCase() === expectedRecipient);
+    if (!message || message.status !== 'complete' || message.forwardState !== 'COMPLETE') return { state: 'PENDING' as const };
+    const destinationTxHash = message.destinationMintTxHash ?? message.forwardTxHash;
+    if (!destinationTxHash || !/^0x[0-9a-fA-F]{64}$/.test(destinationTxHash)
+      || (message.destinationMintTxHash && message.forwardTxHash && message.destinationMintTxHash.toLowerCase() !== message.forwardTxHash.toLowerCase())) {
+      throw new Error('CCTP destination transaction is invalid');
+    }
+    const receipt = await this.arcReceiptReader.getTransactionReceipt({ hash: destinationTxHash as Hash });
+    if (receipt.status !== 'success' || receipt.transactionHash.toLowerCase() !== destinationTxHash.toLowerCase()) throw new Error('CCTP Arc mint did not succeed');
+    return { state: 'COMPLETE' as const, destinationTxHash, destinationExplorerUrl: `https://testnet.arcscan.app/tx/${destinationTxHash}` };
   }
 
   private async waitForCctpTransaction(id: string, pollingInterval: number) {

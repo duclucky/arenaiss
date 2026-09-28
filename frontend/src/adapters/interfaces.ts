@@ -198,12 +198,14 @@ export type ManagedUsdcTransfer = {
 };
 export type ManagedCctpTransfer = {
   operationId: string;
-  state: 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED' | 'RECOVERY_REQUIRED';
+  state: 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'COMPLETE' | 'FAILED' | 'RECOVERY_REQUIRED';
   sourceChain: string;
   amount: string;
   transactionId?: string;
   txHash?: string;
   explorerUrl?: string;
+  destinationTxHash?: string;
+  destinationExplorerUrl?: string;
   message?: string;
   updatedAt: number;
 };

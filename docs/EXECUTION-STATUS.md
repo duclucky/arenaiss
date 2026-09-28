@@ -474,10 +474,10 @@ automatically refunded; a transient receipt read retries the same transaction.
 Managed CCTP operations can be listed by their authenticated owner and restored
 in the Account UI after reload. Replay keys are not returned. Uncertain Circle
 errors expose only a safe reconciliation message. A source burn marked
-`SUBMITTED` still does not prove the destination mint on Arc. Destination
-finality verification, live payment receipts, Marketplace `MKT-5` and live
-Tournament lifecycle evidence remain open. No new network transaction or
-deployment was performed in this local hardening batch.
+`SUBMITTED` still does not by itself prove the destination mint on Arc. The
+implementation now requires a bound Iris message and successful Arc receipt to
+advance to `COMPLETE`; independent live acceptance evidence remains open.
+Marketplace `MKT-5` and live Tournament lifecycle evidence also remain open.
 
 The owner reprioritized the live acceptance work on 2026-09-16: Tournament,
 Evo and Marketplace take precedence over CCTP. On 2026-09-28 the owner opened
@@ -485,8 +485,11 @@ CCTP initiation to every authenticated managed-wallet account. Tournament
 history and wallet-address allowlists no longer gate either the Account UI or
 the server API. CCTP status remains separate from Arc withdrawal state, so an
 old pending operation cannot disable or erase a new direct Arc transfer status.
-CCTP destination-mint verification is deferred, not passed. Direct Arc USDC
-deposit and withdrawal remain in the core acceptance plan.
+On 2026-09-28 CCTP destination verification was connected to the persisted
+operation lifecycle. A source burn remains `SUBMITTED` while Arena ISS checks
+the Circle Iris message binding and the Arc transaction receipt; only a
+successful receipt advances it to `COMPLETE` and produces an Arc explorer link.
+Direct Arc USDC deposit and withdrawal remain in the core acceptance plan.
 
 The executable API now requires an explicit local database path. Agent
 `AGENTS.md` version history, published tournament metadata and immutable

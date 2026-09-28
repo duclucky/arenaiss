@@ -188,13 +188,13 @@ unreconciled liabilities without repairing them during the test phase.
 Stop all financial cases on any lost, duplicate, misdirected or unreconciled
 funds, wrong network, wrong spender, ownership mismatch or private-data leak.
 
-## Deferred: CCTP
+## CCTP acceptance
 
-CCTP initiation and destination-mint acceptance are outside the current core
-release. Resume this lane only after Tour, Evo and Marketplace pass their live
-website cases. Before exposing it again, verify an actual source burn,
-attestation, destination mint, cross-chain balance reconciliation and recovery
-after reload. A source `SUBMITTED` status alone is not destination completion.
+CCTP initiation is released, but destination-mint acceptance still requires a
+live website case covering the actual source burn, Iris message binding,
+successful Arc receipt, cross-chain balance reconciliation and recovery after
+reload. A source `SUBMITTED` status alone is not destination completion; the
+product may report success only after the operation reaches `COMPLETE`.
 
 ## Exit criteria
 

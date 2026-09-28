@@ -133,6 +133,23 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.getByRole('link', { name: 'View source transaction' })).toHaveAttribute('href', explorerUrl);
   });
 
+  it('keeps polling after the source burn and shows the verified Arc mint transaction', async () => {
+    const sourceTxHash = `0x${'3'.repeat(64)}`;
+    const destinationTxHash = `0x${'4'.repeat(64)}`;
+    const submitted = { operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED' as const,
+      sourceChain: 'ARB-SEPOLIA', amount: '5', transactionId: 'burn-id', txHash: sourceTxHash,
+      explorerUrl: `https://sepolia.arbiscan.io/tx/${sourceTxHash}`, updatedAt: 2 };
+    const completed = { ...submitted, state: 'COMPLETE' as const, destinationTxHash,
+      destinationExplorerUrl: `https://testnet.arcscan.app/tx/${destinationTxHash}`, updatedAt: 3 };
+    const restoredIdentity = { ...identity(), listCctpTransfers: vi.fn().mockResolvedValue([submitted]), getCctpTransfer: vi.fn().mockResolvedValue(completed) };
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={restoredIdentity} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+
+    expect(await screen.findByText(/Source burn confirmed. Verifying Arc mint/i)).toBeInTheDocument();
+    expect(await screen.findByText(/CCTP transfer complete on Arc Testnet/i, {}, { timeout: 4_000 })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Arc mint transaction' })).toHaveAttribute('href', completed.destinationExplorerUrl);
+    expect(screen.queryByText(/Arc mint not yet verified/i)).not.toBeInTheDocument();
+  });
+
   it('restores a submitted Arc withdrawal and blocks a duplicate after reload', async () => {
     const operation = { operationId: '11111111-1111-4111-8111-111111111111', state: 'SUBMITTED' as const,
       destinationAddress: '0x2222222222222222222222222222222222222222', amount: '1.25',

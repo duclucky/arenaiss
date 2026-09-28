@@ -232,6 +232,41 @@ test('CCTP history restores only the owner operations without exposing replay ke
   } finally { runtime.close(); }
 });
 
+test('a submitted CCTP burn advances to complete only after the Arc mint is verified', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const userId = `usr_${'c'.repeat(64)}`;
+    const operationId = '88888888-8888-4888-8888-888888888888';
+    const sourceTxHash = `0x${'4'.repeat(64)}`;
+    const destinationTxHash = `0x${'5'.repeat(64)}`;
+    runtime.put('circle-cctp-transfers', operationId, {
+      operationId, state: 'SUBMITTED', userId, walletId: 'wallet-id', address,
+      sourceChain: 'ARB-SEPOLIA', amount: '5', transactionId: 'burn-id', burnTransactionId: 'burn-id',
+      txHash: sourceTxHash, explorerUrl: `https://sepolia.arbiscan.io/tx/${sourceTxHash}`, updatedAt: 1,
+    });
+    let checks = 0;
+    const service = new ManagedIdentityService({
+      ...options(runtime, async () => ({ walletId: 'wallet-id', address })),
+      circleWallets: {
+        createWallet: async () => ({ walletId: 'wallet-id', address }),
+        getCctpMintStatus: async (input: any) => {
+          checks += 1;
+          assert.deepEqual(input, { sourceChain: 'ARB-SEPOLIA', sourceTxHash, destinationAddress: address });
+          return { state: 'COMPLETE', destinationTxHash, destinationExplorerUrl: `https://testnet.arcscan.app/tx/${destinationTxHash}` };
+        },
+      },
+    } as any);
+
+    assert.equal(service.getCctpTransfer(userId, operationId).state, 'SUBMITTED');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const completed = service.getCctpTransfer(userId, operationId);
+    assert.equal(checks, 1);
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.destinationTxHash, destinationTxHash);
+    assert.equal(completed.destinationExplorerUrl, `https://testnet.arcscan.app/tx/${destinationTxHash}`);
+  } finally { runtime.close(); }
+});
+
 test('CCTP failure returns a safe message without upstream request data', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

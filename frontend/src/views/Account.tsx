@@ -110,7 +110,7 @@ export function Account() {
         if (operation.state === 'FAILED' || operation.state === 'RECOVERY_REQUIRED') {
           return { state: 'error', operation, message: operation.message || 'CCTP transfer failed.' };
         }
-        return { state: operation.state === 'SUBMITTED' ? 'done' : 'submitting', operation };
+        return { state: operation.state === 'COMPLETE' ? 'done' : 'submitting', operation };
       });
     }).catch(() => { if (!cancelled) setCctpHistoryState('error'); });
     return () => { cancelled = true; };
@@ -127,7 +127,7 @@ export function Account() {
           setLegacyBridgeAction({ state: 'error', operation, message: operation.message || 'CCTP transfer failed.' });
           return;
         }
-        if (operation.state === 'SUBMITTED') {
+        if (operation.state === 'COMPLETE') {
           setLegacyBridgeAction({ state: 'done', operation });
           setBalanceReload((value) => value + 1);
           return;
@@ -328,7 +328,7 @@ export function Account() {
     setBridgeError('');
     try {
       const operation = await managedIdentity.bridgeUsdcToArc(bridgeChain, bridgeAmount);
-      setLegacyBridgeAction({ state: operation.state === 'SUBMITTED' ? 'done' : 'submitting', operation });
+      setLegacyBridgeAction({ state: operation.state === 'COMPLETE' ? 'done' : 'submitting', operation });
       setBridgeAmount('');
     } catch (reason) {
       setBridgeError(reason instanceof Error ? reason.message : 'CCTP transfer could not be started.');
@@ -417,7 +417,7 @@ export function Account() {
               <form className="wallet-action-form" onSubmit={submitBridge}>
                 <div className="wallet-action-form__intro">
                   <h2 className="text-xl font-bold">Bridge USDC to Arc Testnet</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">CCTP burns testnet USDC on the selected source network. This release tracks the source burn; Arc mint verification is not yet automated.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">CCTP burns testnet USDC on the selected source network, then verifies the forwarded mint on Arc Testnet.</p>
                 </div>
                 <label className="block text-sm font-bold" htmlFor="bridge-source">Source network</label>
                 <select id="bridge-source" className="retro-inset w-full p-3" value={bridgeChain} onChange={(event) => setBridgeChain(event.target.value)}>
@@ -450,9 +450,8 @@ export function Account() {
               {legacyBridgeAction.state === 'submitting' && <>{cctpStatusText(legacyBridgeAction.operation)}{legacyBridgeAction.operation.explorerUrl
                 && <> · <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a></>}</>}
               {legacyBridgeAction.state === 'error' && legacyBridgeAction.message && displayLabel(legacyBridgeAction.message)}
-              {legacyBridgeAction.state === 'done' && <>CCTP source burn complete. Arc mint not yet verified · {legacyBridgeAction.operation.explorerUrl
-                ? <a className="underline" href={legacyBridgeAction.operation.explorerUrl} target="_blank" rel="noreferrer">View source transaction</a>
-                : legacyBridgeAction.operation.transactionId}</>}
+              {legacyBridgeAction.state === 'done' && <>CCTP transfer complete on Arc Testnet{legacyBridgeAction.operation.destinationExplorerUrl
+                && <> · <a className="underline" href={legacyBridgeAction.operation.destinationExplorerUrl} target="_blank" rel="noreferrer">View Arc mint transaction</a></>}</>}
             </div>}
 
             <div className="pt-4 border-t border-border flex justify-end">
@@ -549,5 +548,6 @@ function cctpStatusText(operation: ManagedCctpTransfer): string {
   if (operation.state === 'PENDING') return 'CCTP transfer queued. Preparing Circle operation...';
   if (operation.state === 'APPROVING') return 'Approving USDC spend on the source network...';
   if (operation.state === 'BURNING') return 'Burning source USDC and forwarding to Arc Testnet...';
+  if (operation.state === 'SUBMITTED') return 'Source burn confirmed. Verifying Arc mint...';
   return 'Refreshing CCTP transfer status...';
 }

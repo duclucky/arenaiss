@@ -20,7 +20,7 @@ export type ManagedAccount = {
   identity: { kind: LoginIdentityKind };
   managedWallet: ManagedWallet;
 };
-export type CctpTransferState = 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'FAILED' | 'RECOVERY_REQUIRED';
+export type CctpTransferState = 'PENDING' | 'APPROVING' | 'BURNING' | 'SUBMITTED' | 'COMPLETE' | 'FAILED' | 'RECOVERY_REQUIRED';
 export type CctpTransferOperation = {
   operationId: string;
   state: CctpTransferState;
@@ -29,6 +29,8 @@ export type CctpTransferOperation = {
   transactionId?: string;
   txHash?: string;
   explorerUrl?: string;
+  destinationTxHash?: string;
+  destinationExplorerUrl?: string;
   message?: string;
   updatedAt: number;
 };
@@ -68,6 +70,9 @@ export type CircleWalletPort = {
     totalAmountBaseUnits?: string; maxFeeBaseUnits?: string;
     onProgress?: (progress: CctpTransferProgress) => void;
   }): Promise<WalletTransactionResult>;
+  getCctpMintStatus?(input: { sourceChain: string; sourceTxHash: string; destinationAddress: string }): Promise<{
+    state: 'PENDING' | 'COMPLETE'; destinationTxHash?: string; destinationExplorerUrl?: string;
+  }>;
   registerAgent(input: { walletId: string; registryAddress: string; agentId: string; agentsVersion: string; agentsCommitment: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   registerErc8004Agent?(input: { walletId: string; registryAddress: string; agentUri: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
   giveErc8004Feedback?(input: { walletId: string; registryAddress: string; agentId: string; value: number; valueDecimals: number; tag1: string; tag2: string; endpoint: string; feedbackUri: string; feedbackHash: string; idempotencyKey: string }): Promise<WalletTransactionResult>;
@@ -347,7 +352,7 @@ export class ManagedIdentityService {
   getCctpTransfer(userId: string, operationId: string): CctpTransferOperation {
     const operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', requireIdentifier(operationId, 'operation ID'));
     if (!operation || operation.userId !== userId) throw new Error('CCTP transfer not found');
-    if (['PENDING', 'APPROVING', 'BURNING'].includes(operation.state)) void this.runCctpTransfer(operation.operationId).catch(() => undefined);
+    if (['PENDING', 'APPROVING', 'BURNING', 'SUBMITTED'].includes(operation.state)) void this.runCctpTransfer(operation.operationId).catch(() => undefined);
     return this.publicCctpOperation(operation);
   }
 
@@ -361,7 +366,7 @@ export class ManagedIdentityService {
 
   async resumeCctpTransfers(): Promise<void> {
     const resumable = this.runtime.list<CctpTransferRecord>('circle-cctp-transfers')
-      .filter((operation) => ['PENDING', 'APPROVING', 'BURNING'].includes(operation.state));
+      .filter((operation) => ['PENDING', 'APPROVING', 'BURNING', 'SUBMITTED'].includes(operation.state));
     await Promise.all(resumable.map((operation) => this.runCctpTransfer(operation.operationId)));
   }
 
@@ -524,7 +529,7 @@ export class ManagedIdentityService {
 
   private updateCctpTransfer(operationId: string, patch: Partial<CctpTransferRecord>): CctpTransferRecord | undefined {
     const current = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
-    if (!current || ['SUBMITTED', 'FAILED', 'RECOVERY_REQUIRED'].includes(current.state)) return current;
+    if (!current || ['COMPLETE', 'FAILED', 'RECOVERY_REQUIRED'].includes(current.state)) return current;
     const state = patch.state && cctpStateRank(patch.state) < cctpStateRank(current.state) ? current.state : patch.state;
     const next = { ...current, ...patch, ...(state ? { state } : {}), updatedAt: this.now() };
     this.runtime.put('circle-cctp-transfers', operationId, next);
@@ -543,7 +548,22 @@ export class ManagedIdentityService {
 
   private async performCctpTransfer(operationId: string): Promise<void> {
     let operation = this.runtime.get<CctpTransferRecord>('circle-cctp-transfers', operationId);
-    if (!operation || !['PENDING', 'APPROVING', 'BURNING'].includes(operation.state)) return;
+    if (!operation || !['PENDING', 'APPROVING', 'BURNING', 'SUBMITTED'].includes(operation.state)) return;
+    if (operation.state === 'SUBMITTED') {
+      if (!operation.txHash || !this.circleWallets.getCctpMintStatus) return;
+      const mint = await this.circleWallets.getCctpMintStatus({
+        sourceChain: operation.sourceChain,
+        sourceTxHash: operation.txHash,
+        destinationAddress: operation.address,
+      });
+      if (mint.state === 'COMPLETE') this.updateCctpTransfer(operationId, {
+        state: 'COMPLETE',
+        destinationTxHash: mint.destinationTxHash,
+        destinationExplorerUrl: mint.destinationExplorerUrl,
+        message: undefined,
+      });
+      return;
+    }
     const approvalIdempotencyKey = operation.approvalIdempotencyKey ?? operation.idempotencyKey;
     if (!approvalIdempotencyKey) {
       this.updateCctpTransfer(operationId, { state: 'RECOVERY_REQUIRED', message: 'CCTP approval identity is unavailable.' });
@@ -607,8 +627,8 @@ export class ManagedIdentityService {
   }
 
   private publicCctpOperation(operation: CctpTransferRecord): CctpTransferOperation {
-    const { operationId, state, sourceChain, amount, transactionId, txHash, explorerUrl, message, updatedAt } = operation;
-    return { operationId, state, sourceChain, amount, transactionId, txHash, explorerUrl, message, updatedAt };
+    const { operationId, state, sourceChain, amount, transactionId, txHash, explorerUrl, destinationTxHash, destinationExplorerUrl, message, updatedAt } = operation;
+    return { operationId, state, sourceChain, amount, transactionId, txHash, explorerUrl, destinationTxHash, destinationExplorerUrl, message, updatedAt };
   }
 
   private emailIdentityKey(email: string): string {
@@ -621,7 +641,7 @@ export class ManagedIdentityService {
 }
 
 function cctpStateRank(state: CctpTransferState): number {
-  return ({ PENDING: 0, APPROVING: 1, BURNING: 2, SUBMITTED: 3, FAILED: 3, RECOVERY_REQUIRED: 3 })[state];
+  return ({ PENDING: 0, APPROVING: 1, BURNING: 2, SUBMITTED: 3, COMPLETE: 4, FAILED: 4, RECOVERY_REQUIRED: 4 })[state];
 }
 
 function requireUsdcAmount(value: string): string {

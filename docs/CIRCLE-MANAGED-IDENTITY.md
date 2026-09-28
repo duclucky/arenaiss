@@ -77,7 +77,11 @@ source transaction link, and lets a later status read resume polling with the
 same transaction identity instead of submitting another transaction. Other
 uncertain upstream failures become `RECOVERY_REQUIRED` with a safe public message
 and cannot be retried until reconciled. `SUBMITTED` means the source burn was
-confirmed; it does not prove that the destination mint on Arc has completed.
+confirmed and destination verification is still pending. For every status read,
+Arena ISS queries the Circle Iris message by the persisted source transaction,
+checks the source and destination domains plus the mint recipient, and verifies
+the successful destination receipt on Arc. Only then does the operation advance
+to `COMPLETE` and expose the Arc mint transaction link.
 
 ## API
 
