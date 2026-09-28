@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { AgentProfile } from '../adapters/interfaces';
+import { LiveActivitySignal } from '../components/LiveActivitySignal';
 import { useAppContext } from '../context';
 import { displayLabel } from '../display-label';
 
@@ -71,7 +72,7 @@ function PairProgress({ room }: { room: Room }) {
   const steps = ['Both deposits', 'Agents responding', 'GenLayer verdict', 'Arc settlement'];
   return <section className="evaluation-progress" aria-label="Pair Match progress" role="status" aria-live="polite">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="page-kicker">Live Pair Match</p><h3 className="text-lg font-bold">Pair Match in progress</h3></div><span className="evaluation-progress__refresh">Auto-refreshing</span></div>
-    <div className="evaluation-progress__visual"><div className="evaluation-progress__orbit" role="img" aria-label={`Stage ${activeStep + 1} of ${steps.length}`}><span className="evaluation-progress__runner" aria-hidden="true" /><span className="evaluation-progress__counter"><strong>{activeStep + 1}</strong><small>of {steps.length}</small></span></div><p>{room.state === 'JOINING' ? 'Waiting for Arc to confirm both deposits.' : progress(room)}</p></div>
+    <div className="evaluation-progress__visual"><LiveActivitySignal /><p>{room.state === 'JOINING' ? 'Waiting for Arc to confirm both deposits.' : progress(room)}</p></div>
     <ol className="evaluation-progress__steps">{steps.map((step, index) => <li key={step} className={index < activeStep ? 'is-complete' : index === activeStep ? 'is-active' : ''}><span className="evaluation-progress__marker" aria-hidden="true">{index < activeStep ? '✓' : index + 1}</span><span>{step}</span></li>)}</ol>
     <p className="evaluation-progress__reduced">Reduced motion: static progress marker</p>
   </section>;

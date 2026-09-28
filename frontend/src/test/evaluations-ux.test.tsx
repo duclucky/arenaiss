@@ -92,10 +92,12 @@ describe('evaluation product UX', () => {
     await waitFor(() => expect(startEvo).toHaveBeenCalledTimes(1));
     expect(advanceCampaign).not.toHaveBeenCalled();
     expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Evaluation progress' })).toHaveTextContent('Evaluation in progress');
+    const progressPanel = screen.getByRole('status', { name: 'Evaluation progress' });
+    expect(progressPanel).toHaveTextContent('Evaluation in progress');
     expect(screen.getByText('Auto-refreshing')).toBeInTheDocument();
     expect(screen.getByText('Agent runtime')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /Stage 3 of 5/i })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /Stage .* of/i })).not.toBeInTheDocument();
+    expect(progressPanel.querySelectorAll('.evaluation-progress__signal-dot')).toHaveLength(9);
   });
 
   it('restores a running evaluation progress panel after a page reload', async () => {

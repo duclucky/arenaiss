@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, LockKeyhole, ReceiptText, Shuffle } from 'lucide-react';
 import type { AgentProfile, EvaluationCampaign } from '../adapters/interfaces';
+import { LiveActivitySignal } from '../components/LiveActivitySignal';
 import { useAppContext } from '../context';
 import { displayLabel } from '../display-label';
 
@@ -120,7 +121,7 @@ function EvaluationProgress({ campaign, submitting = false }: { campaign?: Evalu
   const steps = ['Payment secured', 'Agent runtime', 'GenLayer judging', 'Scorecards', 'ERC-8004 record'];
   return <section className="evaluation-progress" aria-label="Evaluation progress" role="status" aria-live="polite">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="page-kicker">Live evaluation</p><h3 className="text-lg font-bold">Evaluation in progress</h3></div><span className="evaluation-progress__refresh">Auto-refreshing</span></div>
-    <div className="evaluation-progress__visual"><div className="evaluation-progress__orbit" role="img" aria-label={`Stage ${activeStep + 1} of ${steps.length}`}><span className="evaluation-progress__runner" aria-hidden="true" /><span className="evaluation-progress__counter"><strong>{activeStep + 1}</strong><small>of {steps.length}</small></span></div><p>{status}</p></div>
+    <div className="evaluation-progress__visual"><LiveActivitySignal /><p>{status}</p></div>
     <ol className="evaluation-progress__steps">{steps.map((step, index) => <li key={step} className={index < activeStep ? 'is-complete' : index === activeStep ? 'is-active' : ''}><span className="evaluation-progress__marker" aria-hidden="true">{index < activeStep ? '✓' : index + 1}</span><span>{step}</span></li>)}</ol>
     <p className="evaluation-progress__reduced">Reduced motion: static progress marker</p>
   </section>;

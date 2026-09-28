@@ -2,8 +2,8 @@
   "schema": "arena-local-release-candidate-v1",
   "createdAt": "2026-09-28",
   "scope": "LOCAL_ONLY",
-  "fileCount": 317,
-  "sourceBundleSha256": "02791cdc777d215e15c9732efb1426b3eb2a2c3637ef5e6d349a3ccc4c674988",
+  "fileCount": 318,
+  "sourceBundleSha256": "9374c3e516a8c92283d83e6c7f5c4aa20a43f7a142ee250bd8463d65615730c2",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
