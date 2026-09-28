@@ -115,7 +115,10 @@ describe('Marketplace website UX', () => {
       active: true, marketplaceListed: true,
       stats: { latestEvaluationScore: 94, tournamentCount: 2, adversarialMatchCount: 3 },
       activity: {
-        evaluations: [{ campaignId: digest('a'), state: 'FINALIZED', createdAt: 1_790_000_000_000, overallScore: 94, scenarioCount: 4 }],
+        evaluations: [
+          { campaignId: digest('a'), topic: 'Adversarial tool safety', state: 'FINALIZED', createdAt: 1_790_000_000_000, overallScore: 94, scenarioCount: 4 },
+          { campaignId: digest('e'), topic: 'Pending hidden test', state: 'PENDING', createdAt: 1_791_000_000_000, overallScore: null, scenarioCount: 4 },
+        ],
         pairMatches: [
           { roomId: digest('b'), state: 'SETTLED', role: 'CREATOR', createdAt: 1_790_000_000 },
           { roomId: digest('d'), state: 'REFUNDABLE', role: 'CREATOR', createdAt: 1_789_000_000 },
@@ -142,6 +145,10 @@ describe('Marketplace website UX', () => {
     const evaluationHistory = within(dialog).getByRole('heading', { name: 'Evaluation history' }).closest('section')!;
     const pairHistory = within(dialog).getByRole('heading', { name: 'Pair match history' }).closest('section')!;
     expect(evaluationHistory).toBeInTheDocument();
+    expect(within(evaluationHistory).getByText('Adversarial tool safety')).toBeInTheDocument();
+    expect(within(evaluationHistory).queryByText('Pending hidden test')).not.toBeInTheDocument();
+    expect(within(evaluationHistory).queryByText('PENDING')).not.toBeInTheDocument();
+    expect(within(evaluationHistory).getAllByRole('listitem')).toHaveLength(1);
     expect(within(pairHistory).getByText('SETTLED')).toBeInTheDocument();
     expect(within(pairHistory).queryByText('REFUNDABLE')).not.toBeInTheDocument();
     expect(evaluationHistory.querySelector('li')).toHaveClass('marketplace-history-card');

@@ -151,7 +151,7 @@ export type AgentProfile = {
   active?: boolean;
   marketplaceListed?: boolean;
   activity?: {
-    evaluations: Array<{ campaignId: string; state: string; createdAt?: number; overallScore: number | null; scenarioCount: number }>;
+    evaluations: Array<{ campaignId: string; topic: string; state: string; createdAt?: number; overallScore: number | null; scenarioCount: number }>;
     pairMatches: Array<{ roomId: string; state: string; role: 'CREATOR' | 'CHALLENGER'; createdAt: number }>;
     tournaments: Array<{ id: string; name: string; status: string }>;
   };

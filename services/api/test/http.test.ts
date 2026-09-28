@@ -489,8 +489,14 @@ test('public Agent directory lists registered ERC-8004 identities without exposi
     service.commitAgentCreation(alice, draft, transaction, identity);
     const packId = `sha256:${'5'.repeat(64)}` as const;
     const campaignId = `sha256:${'6'.repeat(64)}` as const;
+    const pendingCampaignId = `sha256:${'b'.repeat(64)}` as const;
     service.createEvaluationPack(alice, { packId, version: '1', name: 'Public history pack', scenarios: [{ schema: 'arena-test-scenario-v1', scenarioId: 'history_case', version: '1', level: 'RESPONSE', objective: 'Answer.', context: '', constraints: [], availableActions: [], forbiddenActionIds: [], confirmationRequiredActionIds: [], maxProposedActions: 0 }] });
     service.createSoloCampaign(alice, { campaignId, agentId: draft.agentId, agentsVersion: draft.agentsVersion, packId, packVersion: '1', runtimePolicy: { model: 'fixture', maxOutputTokens: 100, temperature: 0, maxProviderAttempts: 1 } });
+    const finalizedCampaign = runtime.get<any>('evaluation-campaigns', campaignId)!;
+    finalizedCampaign.state = 'FINALIZED';
+    finalizedCampaign.items[0] = { ...finalizedCampaign.items[0], state: 'FINALIZED', scorecard: { result_class: 'PASS', overall_score: 94, policy_findings: [], dimensions: [] } };
+    runtime.put('evaluation-campaigns', campaignId, finalizedCampaign);
+    service.createSoloCampaign(alice, { campaignId: pendingCampaignId, agentId: draft.agentId, agentsVersion: draft.agentsVersion, packId, packVersion: '1', runtimePolicy: { model: 'fixture', maxOutputTokens: 100, temperature: 0, maxProviderAttempts: 1 } });
     const tournamentId = `sha256:${'7'.repeat(64)}` as const;
     service.publishTournament(operator, { id: tournamentId, name: 'Public Tour', status: 'UPCOMING', entrantIds: [], stakeAmount: '1000000', prizePool: '0' });
     service.prepareRegistration(alice, tournamentId, draft.agentId, alice);
@@ -518,7 +524,10 @@ test('public Agent directory lists registered ERC-8004 identities without exposi
     assert.equal(response.body[0].agentId, draft.agentId);
     assert.equal(response.body[0].erc8004Identity.tokenId, '42');
     assert.equal(response.body[0].marketplaceListed, true);
+    assert.equal(response.body[0].activity.evaluations.length, 1);
     assert.equal(response.body[0].activity.evaluations[0].campaignId, campaignId);
+    assert.equal(response.body[0].activity.evaluations[0].state, 'FINALIZED');
+    assert.equal(response.body[0].activity.evaluations[0].topic, 'Public history pack');
     assert.equal(response.body[0].activity.pairMatches.length, 1);
     assert.equal(response.body[0].activity.pairMatches[0].roomId, `sha256:${'a'.repeat(64)}`);
     assert.equal(response.body[0].activity.pairMatches[0].state, 'SETTLED');

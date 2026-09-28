@@ -12,7 +12,7 @@ const usdc = (amount: string) => `${Number(formatUnits(BigInt(amount), 6)).toFix
 const activityDate = (value?: number) => value
   ? new Date(value < 1_000_000_000_000 ? value * 1000 : value).toLocaleString()
   : 'Date unavailable';
-const historyCardClass = 'marketplace-history-card retro-inset flex min-h-24 flex-col justify-between p-4 text-sm';
+const historyCardClass = 'marketplace-history-card retro-inset flex min-h-28 flex-col justify-between p-4 text-sm';
 
 type PublicProfileModalState = {
   listing: MarketplaceListing;
@@ -83,6 +83,7 @@ function PublicAgentProfile({ state, onRetry }: { state: PublicProfileModalState
   const { listing, profile } = state;
   const activity = profile?.activity;
   const stats = profile?.stats;
+  const successfulEvaluations = activity?.evaluations.filter((row) => row.state === 'FINALIZED') ?? [];
   const successfulPairMatches = activity?.pairMatches.filter((row) => row.state === 'SETTLED') ?? [];
   return <>
     <div>
@@ -107,7 +108,7 @@ function PublicAgentProfile({ state, onRetry }: { state: PublicProfileModalState
       </section>
       <div className="mt-7 grid items-start gap-7 lg:grid-cols-2">
         <section className="min-w-0" aria-labelledby="marketplace-evaluation-history-heading"><h3 id="marketplace-evaluation-history-heading" className="text-xl font-bold">Evaluation history</h3>
-          {activity?.evaluations.length ? <ul className="mt-3 space-y-3">{activity.evaluations.map((row) => <li key={row.campaignId} className={historyCardClass}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="font-mono font-bold">{row.overallScore === null ? 'N/A' : `${row.overallScore}/100`}</span></div><p className="mt-2 text-neutral-700">{row.scenarioCount} scenario{row.scenarioCount === 1 ? '' : 's'} · {activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public evaluation history yet.</p>}
+          {successfulEvaluations.length ? <ul className="mt-3 space-y-3">{successfulEvaluations.map((row) => <li key={row.campaignId} className={historyCardClass}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="block text-[11px] uppercase tracking-wider text-neutral-600">Topic</span><span className="mt-1 block break-words font-semibold">{row.topic}</span></div><span className="shrink-0 font-mono font-bold">{row.overallScore === null ? 'N/A' : `${row.overallScore}/100`}</span></div><p className="mt-2 text-neutral-700">{row.scenarioCount} scenario{row.scenarioCount === 1 ? '' : 's'} · {activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No successful evaluation history yet.</p>}
         </section>
         <section className="min-w-0" aria-labelledby="marketplace-pair-history-heading"><h3 id="marketplace-pair-history-heading" className="text-xl font-bold">Pair match history</h3>
           {successfulPairMatches.length ? <ul className="mt-3 space-y-3">{successfulPairMatches.map((row) => <li key={row.roomId} className={historyCardClass}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.role)}</span></div><p className="mt-2 text-neutral-700">{activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No successful Pair match history yet.</p>}
