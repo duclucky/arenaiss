@@ -20,7 +20,7 @@ type Agent = { agentId: Digest; owner: string; name: string; versions: AgentVers
 export type AgentDraft = AgentVersion & { owner: string; name: string; idempotencyKey: string };
 export type AgentStats = { latestEvaluationScore: number | null; tournamentCount: number; adversarialMatchCount: number | null };
 export type PublicAgentActivity = {
-  evaluations: Array<{ campaignId: string; topic: string; state: "FINALIZED"; createdAt?: number; overallScore: number; scenarioCount: number }>;
+  evaluations: Array<{ campaignId: string; state: "FINALIZED"; createdAt?: number; overallScore: number; scenarioCount: number }>;
   pairMatches: Array<{ roomId: string; state: PairRoomState; role: 'CREATOR' | 'CHALLENGER'; createdAt: number }>;
   tournaments: Array<{ id: string; name: string; status: PublicTournamentStatus }>;
 };
@@ -738,11 +738,9 @@ export class ArenaApiService {
         && campaign.items.length > 0
         && campaign.items.every((item) => item.state === "FINALIZED" && item.scorecard))
       .map((campaign) => {
-        const pack = this.evaluationPacks.get(this.packKey(campaign.testPack.packId, campaign.testPack.version));
         const scores = campaign.items.map((item) => effectiveEvaluationScore(item.scorecard!));
         return {
           campaignId: campaign.campaignId,
-          topic: pack?.name ?? `Test Pack ${campaign.testPack.packId.slice(7, 15)}`,
           state: "FINALIZED" as const,
           ...(campaign.createdAt !== undefined ? { createdAt: campaign.createdAt } : {}),
           overallScore: Math.floor(scores.reduce((sum, score) => sum + score, 0) / scores.length),

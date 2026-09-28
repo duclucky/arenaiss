@@ -527,7 +527,7 @@ test('public Agent directory lists registered ERC-8004 identities without exposi
     assert.equal(response.body[0].activity.evaluations.length, 1);
     assert.equal(response.body[0].activity.evaluations[0].campaignId, campaignId);
     assert.equal(response.body[0].activity.evaluations[0].state, 'FINALIZED');
-    assert.equal(response.body[0].activity.evaluations[0].topic, 'Public history pack');
+    assert.equal(response.body[0].activity.evaluations[0].topic, undefined);
     assert.equal(response.body[0].activity.pairMatches.length, 1);
     assert.equal(response.body[0].activity.pairMatches[0].roomId, `sha256:${'a'.repeat(64)}`);
     assert.equal(response.body[0].activity.pairMatches[0].state, 'SETTLED');
