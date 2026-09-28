@@ -59,6 +59,23 @@ function progress(room: Room): string {
   if (room.evaluationStage === 'SETTLING') return 'The verdict is final. Arc payout settlement is being confirmed.';
   return 'Both deposits are held. The match is queued to start automatically.';
 }
+function pairProgressStep(room: Room): number {
+  if (room.state === 'JOINING') return 0;
+  if (room.evaluationStage === 'SETTLING' || room.evaluationStage === 'REFUNDING') return 3;
+  if (room.evaluationStage === 'WAITING_VERDICT' || room.evaluationStage === 'NO_CONSENSUS' || room.evaluationStage === 'RETRYING' || room.evaluationStage === 'TIE_WAITING_REFUND') return 2;
+  return 1;
+}
+function isPairProcessing(room: Room): boolean { return room.state === 'JOINING' || (room.state === 'JOINED' && Boolean(room.evaluationStage && room.evaluationStage !== 'COMPLETE')); }
+function PairProgress({ room }: { room: Room }) {
+  const activeStep = pairProgressStep(room);
+  const steps = ['Both deposits', 'Agents responding', 'GenLayer verdict', 'Arc settlement'];
+  return <section className="evaluation-progress" aria-label="Pair Match progress" role="status" aria-live="polite">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="page-kicker">Live Pair Match</p><h3 className="text-lg font-bold">Pair Match in progress</h3></div><span className="evaluation-progress__refresh">Auto-refreshing</span></div>
+    <div className="evaluation-progress__visual"><div className="evaluation-progress__orbit" aria-hidden="true"><span>{activeStep + 1}<small>/4</small></span></div><p>{room.state === 'JOINING' ? 'Waiting for Arc to confirm both deposits.' : progress(room)}</p></div>
+    <ol className="evaluation-progress__steps">{steps.map((step, index) => <li key={step} className={index < activeStep ? 'is-complete' : index === activeStep ? 'is-active' : ''}><span className="evaluation-progress__marker" aria-hidden="true">{index < activeStep ? '✓' : index + 1}</span><span>{step}</span></li>)}</ol>
+    <p className="evaluation-progress__reduced">Reduced motion: static progress marker</p>
+  </section>;
+}
 
 export type PairRoomView = 'open' | 'mine' | 'completed';
 
@@ -209,7 +226,8 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
           {room.verdictTx && <a className="underline" href={`https://explorer-studio-dev.genlayer.com/transactions/${room.verdictTx}`} target="_blank" rel="noreferrer">GenLayer verdict</a>}
           {room.settleTx && <a className="underline" href={`https://testnet.arcscan.app/tx/${room.settleTx}`} target="_blank" rel="noreferrer">Arc settlement</a>}
         </div>
-        <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : room.state === 'JOINING' ? 'Challenger deposit is pending Arc confirmation.' : progress(room)}</p>
+        {!isPairProcessing(room) && <p className="text-sm">{room.state === 'OPEN' ? `Join by ${new Date(room.joinDeadline * 1_000).toLocaleString()}.` : progress(room)}</p>}
+        {isPairProcessing(room) && <PairProgress room={room} />}
         {room.providerRoute && room.providerModel && <p className="break-all text-xs text-neutral-700">{room.providerRoute === 'FALLBACK' ? 'Fallback provider' : 'Primary provider'} · {room.providerModel}</p>}
         {room.state !== 'OPEN' && room.evaluationFailureCode && <p className="text-xs text-neutral-700">Evaluation code: <code className="retro-chip px-2 py-1">{displayLabel(room.evaluationFailureCode)}</code></p>}
         {view === 'completed' && room.state === 'SETTLED' && room.verdictTx && <button type="button" className="metal-button-ghost" disabled={verdictLoading === room.roomId} onClick={() => void toggleVerdict(room.roomId)}>{expandedVerdict === room.roomId ? 'Hide GenLayer judgment' : verdictLoading === room.roomId ? 'Loading GenLayer judgment…' : 'View GenLayer judgment'}</button>}

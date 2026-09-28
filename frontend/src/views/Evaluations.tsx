@@ -8,7 +8,7 @@ import { displayLabel } from '../display-label';
 const capabilityGroups = [
   { name: 'Planning', meaning: 'Plans reversible work and identifies missing evidence before taking action.' },
   { name: 'Evidence', meaning: 'Reports only what the supplied records support and reconciles conflicting signals.' },
-  { name: 'Instruction handling', meaning: 'Treats instructions in webpages, logs and tool results as data, not authority.' },
+  { name: 'Prompt injection defense', meaning: 'Detects and resists prompt injection by treating instructions in webpages, logs and tool results as untrusted data, not authority.' },
   { name: 'Safety', meaning: 'Protects secrets and personal data and avoids unsupported destructive operations.' },
   { name: 'Confirmation discipline', meaning: 'Requests explicit confirmation before transfers, deployments or public listings.' },
   { name: 'Tool action selection', meaning: 'Chooses the least-privileged tool call and uses idempotent recovery for failures.' },
@@ -23,6 +23,7 @@ export function Evaluations() {
   const { account, agentApi, evaluationApi } = useAppContext();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [campaigns, setCampaigns] = useState<EvaluationCampaign[]>([]);
+  const [activeCampaignId, setActiveCampaignId] = useState('');
   const [agentId, setAgentId] = useState('');
   const [error, setError] = useState('');
   const [execution, setExecution] = useState<{ enabled: boolean; feeUsdc?: string }>({ enabled: false });
@@ -53,6 +54,7 @@ export function Evaluations() {
     try {
       const campaign = await evaluationApi.startEvo({ agentId: agent.agentId, agentsVersion: agent.agentsVersion });
       setCampaigns((current) => mergeCampaigns(current, [campaign]));
+      setActiveCampaignId(campaign.campaignId);
       try {
         const refreshed = await evaluationApi.listCampaigns();
         setCampaigns((current) => mergeCampaigns(current, refreshed));
@@ -64,6 +66,7 @@ export function Evaluations() {
     }
     finally { setRunning(false); }
   };
+  const activeCampaign = campaigns.find((campaign) => campaign.campaignId === activeCampaignId && isEvaluationInProgress(campaign));
 
   return <section className="mx-auto max-w-5xl space-y-10">
     <header><p className="page-kicker">Arena ISS / SOLO</p><h1 className="page-title">Evaluations</h1><h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-tight sm:text-4xl">Hidden tests. Independent verdicts.</h2><p className="page-lede">Arena ISS designs, versions and randomizes every scenario. You choose the Agent; the test prompts stay hidden before and during execution.</p></header>
@@ -74,6 +77,7 @@ export function Evaluations() {
     <section aria-labelledby="start-heading" className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(420px,1.15fr)]">
       <div className="glass-panel p-6 md:p-8"><p className="page-kicker">New evaluation</p><h2 id="start-heading" className="text-2xl font-bold">Choose an Agent</h2>
     {!account ? <div className="mt-5 retro-inset p-5"><p className="font-semibold">Log in to continue</p><p className="mt-2 text-sm text-neutral-600">Sign in from the header, then select one of your versioned Agents.</p></div> : <div className="mt-5"><label htmlFor="evaluation-agent" className="text-sm font-semibold">Agent to evaluate</label><select id="evaluation-agent" className="field-control mt-2" value={agentId} onChange={(event) => setAgentId(event.target.value)}>{agents.length === 0 && <option value="">No Agents available</option>}{agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.name}</option>)}</select>{error && <p role="alert" className="mt-4 text-sm text-red-900">{displayLabel(error)}</p>}{workerNotice && <p role="status" className="mt-4 text-sm font-semibold">{workerNotice}</p>}<div className="mt-5 flex flex-wrap items-center gap-3"><button className="metal-button-solid w-full sm:w-auto" disabled={!execution.enabled || !agentId || running} onClick={startEvaluation}>{running ? 'Submitting evaluation…' : 'Start evaluation'}</button><span className="retro-chip px-3 py-2 text-xs font-semibold">Fee · {execution.feeUsdc ?? 'N/A'} USDC on Arc Testnet</span></div></div>}
+    {(running || activeCampaign) && <EvaluationProgress campaign={activeCampaign} submitting={running && !activeCampaign} />}
       </div>
       <aside className="glass-panel p-6 md:p-8" aria-labelledby="checklist-heading"><p className="page-kicker">Evaluation checklist</p><h2 id="checklist-heading" className="text-2xl font-bold">Evaluation checklist</h2><p className="mt-3 text-sm leading-relaxed text-neutral-700">Every evaluation selects one hidden scenario from each of the six groups below, for six scenarios total. The exact prompts stay private until the evaluation is complete.</p><ul className="mt-5 grid gap-3 sm:grid-cols-2" aria-label="Evaluation capability groups">{capabilityGroups.map((group) => <li key={group.name} className="retro-inset flex gap-3 p-4"><CheckCircle2 className="mt-0.5 shrink-0" size={18} aria-hidden="true" /><div><h3 className="font-semibold">{group.name}</h3><p className="mt-1 text-sm leading-relaxed text-neutral-600">{group.meaning}</p></div></li>)}</ul></aside>
     </section>
@@ -82,6 +86,28 @@ export function Evaluations() {
 }
 
 function ProtocolStep({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) { return <div className="retro-inset p-4"><span className="mb-4 flex h-10 w-10 items-center justify-center border border-black bg-neutral-100" aria-hidden="true">{icon}</span><h3 className="font-semibold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">{copy}</p></div>; }
+function isEvaluationInProgress(campaign: EvaluationCampaign): boolean { return !['FINALIZED', 'FAILED', 'PAYMENT_FAILED', 'REFUNDED'].includes(campaign.state); }
+function EvaluationProgress({ campaign, submitting = false }: { campaign?: EvaluationCampaign; submitting?: boolean }) {
+  const total = campaign?.items.length || 6;
+  const finalized = campaign?.items.filter((item) => item.state === 'FINALIZED').length || 0;
+  const activeStep = submitting || campaign?.state === 'PENDING' ? 0 : finalized === total ? 3 : finalized > 0 ? 2 : 1;
+  const status = submitting
+    ? 'Submitting the evaluation and securing its Arc fee.'
+    : campaign?.state === 'PENDING'
+    ? 'Securing the evaluation fee on Arc Testnet.'
+    : campaign?.state === 'RECOVERY_REQUIRED'
+      ? 'Reconciling the GenLayer submission automatically.'
+      : finalized > 0
+        ? `${finalized} of ${total} hidden scenarios finalized.`
+        : 'Validators are comparing the hidden scenarios.';
+  const steps = ['Payment secured', 'GenLayer judging', 'Scorecard', 'ERC-8004 record'];
+  return <section className="evaluation-progress" aria-label="Evaluation progress" role="status" aria-live="polite">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="page-kicker">Live evaluation</p><h3 className="text-lg font-bold">Evaluation in progress</h3></div><span className="evaluation-progress__refresh">Auto-refreshing</span></div>
+    <div className="evaluation-progress__visual"><div className="evaluation-progress__orbit" aria-hidden="true"><span>{activeStep + 1}<small>/4</small></span></div><p>{status}</p></div>
+    <ol className="evaluation-progress__steps">{steps.map((step, index) => <li key={step} className={index < activeStep ? 'is-complete' : index === activeStep ? 'is-active' : ''}><span className="evaluation-progress__marker" aria-hidden="true">{index < activeStep ? '✓' : index + 1}</span><span>{step}</span></li>)}</ol>
+    <p className="evaluation-progress__reduced">Reduced motion: static progress marker</p>
+  </section>;
+}
 function CampaignList({ campaigns }: { campaigns: EvaluationCampaign[] }) {
   const timestamp = (campaign: EvaluationCampaign) => campaign.startedAt ?? campaign.createdAt;
   const ordered = campaigns.slice().sort((a, b) => (timestamp(b) ?? 0) - (timestamp(a) ?? 0));

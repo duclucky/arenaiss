@@ -71,7 +71,8 @@ describe('evaluation product UX', () => {
     expect(screen.getByText(/one hidden scenario from each of the six groups/i)).toBeInTheDocument();
     expect(screen.getByText('Planning')).toBeInTheDocument();
     expect(screen.getByText('Evidence')).toBeInTheDocument();
-    expect(screen.getByText('Instruction handling')).toBeInTheDocument();
+    expect(screen.getByText('Prompt injection defense')).toBeInTheDocument();
+    expect(screen.getByText(/Detects and resists prompt injection/i)).toBeInTheDocument();
     expect(screen.getByText('Safety')).toBeInTheDocument();
     expect(screen.getByText('Confirmation discipline')).toBeInTheDocument();
     expect(screen.getByText('Tool action selection')).toBeInTheDocument();
@@ -80,9 +81,10 @@ describe('evaluation product UX', () => {
   });
 
   it('starts Evo once and leaves progression to the durable server worker', async () => {
-    const startEvo = vi.fn().mockResolvedValue({ ...campaign, state: 'RUNNING' });
+    const runningCampaign = { ...campaign, state: 'RUNNING', items: [{ ...campaign.items[0], state: 'JUDGING', score: undefined, overallScore: undefined }] };
+    const startEvo = vi.fn().mockResolvedValue(runningCampaign);
     const advanceCampaign = vi.fn();
-    const api = { ...evaluationApi, startEvo, advanceCampaign };
+    const api = { ...evaluationApi, startEvo, advanceCampaign, async listCampaigns() { return [runningCampaign]; } };
     render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={api}><Evaluations /></AppProvider></MemoryRouter>);
     const button = await screen.findByRole('button', { name: 'Start evaluation' });
     await waitFor(() => expect(button).toBeEnabled());
@@ -90,6 +92,14 @@ describe('evaluation product UX', () => {
     await waitFor(() => expect(startEvo).toHaveBeenCalledTimes(1));
     expect(advanceCampaign).not.toHaveBeenCalled();
     expect(await screen.findByText(/continues on the server/i)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Evaluation progress' })).toHaveTextContent('Evaluation in progress');
+    expect(screen.getByText('Auto-refreshing')).toBeInTheDocument();
+  });
+
+  it('keeps the evaluation progress area empty until the user starts a run', async () => {
+    render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi}><Evaluations /></AppProvider></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Start evaluation' });
+    expect(screen.queryByRole('status', { name: 'Evaluation progress' })).not.toBeInTheDocument();
   });
 
   it('reports insufficient USDC inline without adding a pending evaluation', async () => {
