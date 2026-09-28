@@ -28,6 +28,10 @@ export class HttpAgentAdapter implements AgentApiAdapter {
     return this.request<AgentProfile[]>('/api/agents', { method: 'GET' });
   }
 
+  async listPublicAgents(): Promise<AgentProfile[]> {
+    return this.request<AgentProfile[]>('/api/public/agents', { method: 'GET' });
+  }
+
   async listOwnedRegistrations(): Promise<OwnedRegistration[]> {
     await this.ensureAuthenticated();
     return this.request<OwnedRegistration[]>('/api/registrations', { method: 'GET' });

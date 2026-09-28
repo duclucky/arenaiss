@@ -26,7 +26,7 @@ const withdrawOperatorCredit = vi.fn().mockResolvedValue({ transactionId: 'platf
 const cancelListing = vi.fn().mockResolvedValue({ ...ownedActive, state: 'CANCELLED' });
 const marketplaceApi: MarketplaceApiAdapter = { async listListings() { return [sold, ownedActive]; }, async listOwnedListings() { return [ownedActive]; }, async listCertificates() { return [certificate]; }, async listPurchases() { return [sold]; }, async getCredit() { return { amount: '990000' }; }, withdrawCredit, async listOperatorCertificates() { return [eligible]; }, approveCertificate, async getOperatorCredit() { return { amount: '10000' }; }, withdrawOperatorCredit, cancelListing, createEligibility, createListing, async buy() { return sold; }, getDelivery };
 const config = { chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', genLayer: { chainId: 61997 as const, rpcUrl: 'https://studio-next.genlayer.com/api', name: 'Studio Next', explorerUrl: 'https://explorer-studio-dev.genlayer.com', evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d' as const, comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB' as const } };
-function mount(api: MarketplaceApiAdapter = marketplaceApi) { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agentApi} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
+function mount(api: MarketplaceApiAdapter = marketplaceApi, agents: AgentApiAdapter = agentApi) { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agents} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
 
 describe('Marketplace website UX', () => {
   it('explains evaluation eligibility and the platform fee without internal Evo terminology', async () => {
@@ -93,6 +93,45 @@ describe('Marketplace website UX', () => {
     fireEvent.change(screen.getByLabelText('Price (USDC)'), { target: { value: '2.50' } });
     fireEvent.click(screen.getByRole('button', { name: 'List on Arc' }));
     await waitFor(() => expect(createListing).toHaveBeenCalledWith(expect.objectContaining({ price: '2500000' })));
+  });
+
+  it('opens a public Agent profile with metrics and history without loading private AGENTS.md', async () => {
+    const getAgent = vi.fn();
+    const listPublicAgents = vi.fn().mockResolvedValue([{
+      agentId, name: 'Safety Scout', agentsVersion: version, agentsCommitment: commitment,
+      active: true, marketplaceListed: true,
+      stats: { latestEvaluationScore: 94, tournamentCount: 2, adversarialMatchCount: 3 },
+      activity: {
+        evaluations: [{ campaignId: digest('a'), state: 'FINALIZED', createdAt: 1_790_000_000_000, overallScore: 94, scenarioCount: 4 }],
+        pairMatches: [{ roomId: digest('b'), state: 'FINALIZED', role: 'CREATOR', createdAt: 1_790_000_000 }],
+        tournaments: [{ id: digest('c'), name: 'Safety Finals', status: 'COMPLETED' }],
+      },
+      erc8004Identity: {
+        schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5042002,
+        registryAddress: address, tokenId: '42', ownerAddress: address, agentUri: 'https://example.test/agent.json',
+        transaction: { transactionId: 'identity', state: 'COMPLETE' },
+      },
+      erc8004Reputation: { state: 'COMPLETE', value: 94 },
+    }]);
+    mount(marketplaceApi, { ...agentApi, listPublicAgents, getAgent });
+
+    const trigger = await screen.findByRole('button', { name: 'View Safety Scout public details' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Safety Scout' });
+    expect(within(dialog).getAllByText('94/100')).toHaveLength(3);
+    expect(within(dialog).getByText('2', { selector: 'dd' })).toBeInTheDocument();
+    expect(within(dialog).getByText('3', { selector: 'dd' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Evaluation history' })).toBeInTheDocument();
+    expect(within(dialog).getByText('Safety Finals')).toBeInTheDocument();
+    expect(within(dialog).queryByText('# Private Agent')).not.toBeInTheDocument();
+    expect(listPublicAgents).toHaveBeenCalledTimes(1);
+    expect(getAgent).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Safety Scout' })).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 
   it('shows private delivery only for a canonical purchase returned by the buyer-private endpoint', async () => {

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ShoppingBag, Tag } from 'lucide-react';
+import { AlertTriangle, ShoppingBag, Tag, X } from 'lucide-react';
 import { formatUnits, parseUnits } from 'viem';
 import { useAppContext } from '../context';
 import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, MarketplaceListing } from '../adapters/interfaces';
@@ -9,6 +9,113 @@ import { displayLabel } from '../display-label';
 const uuid = () => crypto.randomUUID();
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 const usdc = (amount: string) => `${Number(formatUnits(BigInt(amount), 6)).toFixed(6)} USDC`;
+const activityDate = (value?: number) => value
+  ? new Date(value < 1_000_000_000_000 ? value * 1000 : value).toLocaleString()
+  : 'Date unavailable';
+
+type PublicProfileModalState = {
+  listing: MarketplaceListing;
+  status: 'LOADING' | 'READY' | 'ERROR';
+  profile?: AgentProfile;
+  message?: string;
+};
+
+function MarketplaceModal({ titleId, onClose, children, width = 'max-w-4xl' }: {
+  titleId: string;
+  onClose: () => void;
+  children: ReactNode;
+  width?: string;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const focusable = [...panelRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => !element.hasAttribute('hidden'));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
+  return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-3 sm:p-6" role="presentation"
+    onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}
+      className={`glass-panel max-h-[calc(100dvh-1.5rem)] w-full ${width} overflow-y-auto bg-[#f8f5ee] p-5 sm:max-h-[calc(100dvh-3rem)] sm:p-7`}>
+      <button ref={closeRef} type="button" className="metal-button-ghost sticky top-0 z-10 ml-auto flex min-h-11 min-w-11 items-center justify-center bg-[#f8f5ee] p-2" onClick={onClose} aria-label="Close dialog">
+        <X size={22} aria-hidden="true"/>
+      </button>
+      {children}
+    </div>
+  </div>;
+}
+
+function PublicAgentProfile({ state, onRetry }: { state: PublicProfileModalState; onRetry: () => void }) {
+  const { listing, profile } = state;
+  const activity = profile?.activity;
+  const stats = profile?.stats;
+  return <>
+    <div className="-mt-11 pr-14">
+      <p className="page-kicker">Public verification profile</p>
+      <div className="mt-2 flex flex-wrap items-center gap-3"><h2 id="marketplace-agent-profile-heading" className="text-3xl font-bold">{listing.name}</h2><span className="retro-chip px-2 py-1 text-xs">{displayLabel(listing.state)}</span></div>
+      <p className="mt-3 text-sm text-neutral-700">Review verified performance and participation history before purchasing this exact Agent identity.</p>
+    </div>
+    {state.status === 'LOADING' && <div className="retro-inset mt-7 p-5 text-sm font-semibold" role="status">Loading public Agent evidence…</div>}
+    {state.status === 'ERROR' && <div className="mt-7 border border-red-700 bg-red-50 p-5 text-sm" role="alert"><p>{state.message}</p><button type="button" className="metal-button-ghost mt-4" onClick={onRetry}>Try again</button></div>}
+    {state.status === 'READY' && profile && <>
+      <dl className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="retro-inset p-4"><dt className="text-xs uppercase tracking-wider text-neutral-600">Latest evaluation</dt><dd className="mt-2 text-2xl font-bold">{stats?.latestEvaluationScore === null || stats?.latestEvaluationScore === undefined ? 'N/A' : `${stats.latestEvaluationScore}/100`}</dd></div>
+        <div className="retro-inset p-4"><dt className="text-xs uppercase tracking-wider text-neutral-600">Tournaments</dt><dd className="mt-2 text-2xl font-bold">{stats?.tournamentCount ?? 0}</dd></div>
+        <div className="retro-inset p-4"><dt className="text-xs uppercase tracking-wider text-neutral-600">Arena matches</dt><dd className="mt-2 text-2xl font-bold">{stats?.adversarialMatchCount ?? 'N/A'}</dd></div>
+      </dl>
+      <section className="mt-7 border-y border-black/25 py-5" aria-labelledby="marketplace-identity-heading">
+        <h3 id="marketplace-identity-heading" className="text-lg font-bold">Onchain identity</h3>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+          <div><dt className="text-neutral-600">ERC-8004 identity</dt><dd className="mt-1 font-mono font-bold">{profile.erc8004Identity ? `#${profile.erc8004Identity.tokenId}` : 'Not available'}</dd></div>
+          <div><dt className="text-neutral-600">Latest reputation</dt><dd className="mt-1 font-mono font-bold">{profile.erc8004Reputation?.state === 'COMPLETE' ? `${profile.erc8004Reputation.value}/100` : 'Not available'}</dd></div>
+        </dl>
+      </section>
+      <div className="mt-7 grid gap-7 lg:grid-cols-2">
+        <section aria-labelledby="marketplace-evaluation-history-heading"><h3 id="marketplace-evaluation-history-heading" className="text-xl font-bold">Evaluation history</h3>
+          {activity?.evaluations.length ? <ul className="mt-3 space-y-3">{activity.evaluations.map((row) => <li key={row.campaignId} className="retro-inset p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="font-mono font-bold">{row.overallScore === null ? 'N/A' : `${row.overallScore}/100`}</span></div><p className="mt-2 text-neutral-700">{row.scenarioCount} scenario{row.scenarioCount === 1 ? '' : 's'} · {activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public evaluation history yet.</p>}
+        </section>
+        <section aria-labelledby="marketplace-pair-history-heading"><h3 id="marketplace-pair-history-heading" className="text-xl font-bold">Pair match history</h3>
+          {activity?.pairMatches.length ? <ul className="mt-3 space-y-3">{activity.pairMatches.map((row) => <li key={row.roomId} className="retro-inset p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.role)}</span></div><p className="mt-2 text-neutral-700">{activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public Pair match history yet.</p>}
+        </section>
+      </div>
+      <section className="mt-7" aria-labelledby="marketplace-tournament-history-heading"><h3 id="marketplace-tournament-history-heading" className="text-xl font-bold">Tournament history</h3>
+        {activity?.tournaments.length ? <ul className="mt-3 grid gap-3 sm:grid-cols-2">{activity.tournaments.map((row) => <li key={row.id} className="retro-inset flex items-center justify-between gap-3 p-4 text-sm"><span className="font-semibold">{row.name}</span><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.status)}</span></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public Tournament history yet.</p>}
+      </section>
+      <p className="mt-7 border border-black/25 bg-white/35 p-4 text-sm text-neutral-700"><strong>Private by design:</strong> AGENTS.md is not included in this profile and is delivered only to the buyer after a completed purchase.</p>
+    </>}
+  </>;
+}
 
 const eligibilityExplanations: Record<string, string> = {
   CRITICAL_POLICY_FINDING: 'At least one evaluation run contains a blocking policy finding, such as a forbidden, unknown, duplicate, or unconfirmed action.',
@@ -64,6 +171,8 @@ export function Marketplace() {
   const [agentId, setAgentId] = useState('');
   const [listing, setListing] = useState({ certificateDigest: '', price: '', expiresAt: String(nowSeconds() + 7 * 86400) });
   const [delivery, setDelivery] = useState<{ listingId: string; name: string; agentsMd: string } | null>(null);
+  const [publicProfileModal, setPublicProfileModal] = useState<PublicProfileModalState | null>(null);
+  const publicProfileRequest = useRef(0);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   async function refresh() {
@@ -158,6 +267,30 @@ export function Marketplace() {
     finally { setBusy(''); }
   }
 
+  async function openPublicProfile(row: MarketplaceListing) {
+    const requestId = ++publicProfileRequest.current;
+    setPublicProfileModal({ listing: row, status: 'LOADING' });
+    if (!agentApi?.listPublicAgents) {
+      setPublicProfileModal({ listing: row, status: 'ERROR', message: 'Public Agent evidence is not available on this server.' });
+      return;
+    }
+    try {
+      const profiles = await agentApi.listPublicAgents();
+      if (publicProfileRequest.current !== requestId) return;
+      const profile = profiles.find((candidate) => candidate.agentId === row.agentId);
+      if (!profile) throw new Error('This Agent public profile could not be found.');
+      setPublicProfileModal({ listing: row, status: 'READY', profile });
+    } catch (cause) {
+      if (publicProfileRequest.current !== requestId) return;
+      setPublicProfileModal({ listing: row, status: 'ERROR', message: cause instanceof Error ? cause.message : 'Could not load public Agent evidence.' });
+    }
+  }
+
+  function closePublicProfile() {
+    publicProfileRequest.current += 1;
+    setPublicProfileModal(null);
+  }
+
   async function approveCertificate(certificateDigest: string) {
     if (!marketplaceApi?.approveCertificate) return;
     setBusy(`approve-${certificateDigest}`); setError('');
@@ -204,7 +337,7 @@ export function Marketplace() {
 
   function listingCard(row: MarketplaceListing, privateRecord = false) {
     return <article className="glass-panel flex min-h-64 flex-col p-5" key={`${privateRecord ? 'private' : 'public'}-${row.listingId}`}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">{privateRecord ? 'Private account record' : 'Agent listing'}</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
+      <div className="flex items-start justify-between gap-3">{privateRecord ? <div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">Private account record</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div> : <button type="button" className="min-w-0 text-left outline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4e59c7]" onClick={() => openPublicProfile(row)} aria-label={`View ${row.name} public details`}><span className="block text-xs uppercase tracking-widest text-neutral-600">Agent listing</span><span className="mt-2 block text-2xl font-bold" role="heading" aria-level={2}>{row.name}</span><span className="mt-2 block text-xs font-semibold text-[#343d9f]">View metrics and history</span></button>}<span className="retro-chip shrink-0 px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
       <dl className="mt-8 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
       <div className="mt-auto pt-6">{listingAction(row, privateRecord)}</div>
     </article>;
@@ -235,6 +368,9 @@ export function Marketplace() {
       <button type="submit" className="metal-button-solid mt-6" disabled={busy !== '' || !selectedCertificate}>{busy === 'listing' ? 'Approving ERC-8004 identity and listing…' : 'List on Arc'}</button>
     </form></div>}
     {activeView === 'sell' && !account && <p className="mt-10 text-sm text-neutral-600">Sign in to certify or list an Agent. <Link to="/agents" className="font-semibold underline">Manage Agents</Link>.</p>}
+    {publicProfileModal && <MarketplaceModal titleId="marketplace-agent-profile-heading" onClose={closePublicProfile}>
+      <PublicAgentProfile state={publicProfileModal} onRetry={() => openPublicProfile(publicProfileModal.listing)}/>
+    </MarketplaceModal>}
     {delivery && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDelivery(null); }}><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="marketplace-delivery-heading" className="glass-panel max-h-[85vh] w-full max-w-2xl overflow-auto bg-[#f8f5ee] p-6"><div className="flex items-start justify-between gap-4"><div><h2 id="marketplace-delivery-heading" className="text-2xl font-bold">Purchased Agent</h2><p className="mt-2 text-sm">{delivery.name}</p></div><button type="button" className="metal-button-ghost" onClick={() => setDelivery(null)}>Close</button></div><h3 className="mt-6 font-semibold">Private AGENTS.md</h3><pre className="retro-inset mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 text-sm">{delivery.agentsMd}</pre></div></div>}
   </section>;
 }

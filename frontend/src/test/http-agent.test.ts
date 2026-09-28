@@ -3,6 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { HttpAgentAdapter } from '../adapters/agent-api';
 
 describe('agent HTTP adapter', () => {
+  it('loads the public Agent directory without starting wallet authentication', async () => {
+    const publicAgents = [{ agentId: 'sha256:1', name: 'A', agentsVersion: 'sha256:2', agentsCommitment: 'sha256:3' }];
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(publicAgents), { status: 200 }));
+    const signMessage = vi.fn();
+    const adapter = new HttpAgentAdapter('https://arena.example', () => null, signMessage, fetcher);
+
+    await expect(adapter.listPublicAgents()).resolves.toEqual(publicAgents);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][0]).toBe('https://arena.example/api/public/agents');
+    expect(fetcher.mock.calls[0][1]).toEqual(expect.objectContaining({ method: 'GET', credentials: 'include' }));
+    expect(signMessage).not.toHaveBeenCalled();
+  });
+
   it('invokes the browser fetch function with its global receiver', async () => {
     let calls = 0;
     const fetcher = function (this: unknown) {
