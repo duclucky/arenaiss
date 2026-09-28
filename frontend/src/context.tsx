@@ -153,7 +153,7 @@ export function AppProvider({ children, config, env, walletAdapter, agentApiAdap
   const liveRead = useMemo(() => createArenaReadAdapter(networkConfig?.apiUrl, import.meta.env.DEV, fetch, networkConfig?.genLayerExplorerUrl), [networkConfig?.apiUrl, networkConfig?.genLayerExplorerUrl]);
   const agentApi = useMemo(() => {
     if (agentApiAdapter) return agentApiAdapter;
-    if (!account) return null;
+    if (networkConfig?.apiUrl === undefined) return null;
     return new HttpAgentAdapter(networkConfig?.apiUrl || '', () => account, (message) => wallet.signMessage(message), fetch, Boolean(managedAccount));
   }, [account, agentApiAdapter, managedAccount, networkConfig?.apiUrl, wallet]);
   const evaluationApi = useMemo(() => {

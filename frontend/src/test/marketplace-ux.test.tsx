@@ -134,6 +134,31 @@ describe('Marketplace website UX', () => {
     expect(trigger).toHaveFocus();
   });
 
+  it('loads public Agent evidence for an anonymous visitor without an injected Agent adapter', async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/api/capabilities')) return new Response(JSON.stringify({ schema: 'arena-capabilities-v1', tournament: { visible: true, operationEnabled: true, registrationEnabled: true }, pair: { enabled: true }, evaluation: { enabled: true } }), { status: 200 });
+      if (url.endsWith('/api/public/agents')) return new Response(JSON.stringify([{
+        agentId, name: 'Safety Scout', agentsVersion: version, agentsCommitment: commitment,
+        stats: { latestEvaluationScore: 91, tournamentCount: 1, adversarialMatchCount: 2 },
+        activity: { evaluations: [], pairMatches: [], tournaments: [] },
+      }]), { status: 200 });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      render(<MemoryRouter><AppProvider config={{ ...config, apiUrl: 'https://arena.example' }} marketplaceApiAdapter={marketplaceApi}><Marketplace /></AppProvider></MemoryRouter>);
+      fireEvent.click(await screen.findByRole('button', { name: 'View Safety Scout public details' }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Safety Scout' });
+      expect(within(dialog).getByText('91/100')).toBeInTheDocument();
+      expect(within(dialog).queryByText(/not available on this server/i)).not.toBeInTheDocument();
+      expect(fetcher).toHaveBeenCalledWith('https://arena.example/api/public/agents', expect.objectContaining({ method: 'GET' }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows private delivery only for a canonical purchase returned by the buyer-private endpoint', async () => {
     mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Open purchased Agent Purchased Scout' }));
