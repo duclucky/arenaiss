@@ -116,7 +116,10 @@ describe('Marketplace website UX', () => {
       stats: { latestEvaluationScore: 94, tournamentCount: 2, adversarialMatchCount: 3 },
       activity: {
         evaluations: [{ campaignId: digest('a'), state: 'FINALIZED', createdAt: 1_790_000_000_000, overallScore: 94, scenarioCount: 4 }],
-        pairMatches: [{ roomId: digest('b'), state: 'FINALIZED', role: 'CREATOR', createdAt: 1_790_000_000 }],
+        pairMatches: [
+          { roomId: digest('b'), state: 'SETTLED', role: 'CREATOR', createdAt: 1_790_000_000 },
+          { roomId: digest('d'), state: 'REFUNDABLE', role: 'CREATOR', createdAt: 1_789_000_000 },
+        ],
         tournaments: [{ id: digest('c'), name: 'Safety Finals', status: 'COMPLETED' }],
       },
       erc8004Identity: {
@@ -136,7 +139,16 @@ describe('Marketplace website UX', () => {
     expect(within(dialog).getAllByText('94/100')).toHaveLength(3);
     expect(within(dialog).getByText('2', { selector: 'dd' })).toBeInTheDocument();
     expect(within(dialog).getByText('3', { selector: 'dd' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('heading', { name: 'Evaluation history' })).toBeInTheDocument();
+    const evaluationHistory = within(dialog).getByRole('heading', { name: 'Evaluation history' }).closest('section')!;
+    const pairHistory = within(dialog).getByRole('heading', { name: 'Pair match history' }).closest('section')!;
+    expect(evaluationHistory).toBeInTheDocument();
+    expect(within(pairHistory).getByText('SETTLED')).toBeInTheDocument();
+    expect(within(pairHistory).queryByText('REFUNDABLE')).not.toBeInTheDocument();
+    expect(evaluationHistory.querySelector('li')).toHaveClass('marketplace-history-card');
+    expect(pairHistory.querySelector('li')).toHaveClass('marketplace-history-card');
+    const closeButton = within(dialog).getByRole('button', { name: 'Close dialog' });
+    expect(closeButton.parentElement).toHaveClass('marketplace-modal-header');
+    expect(dialog).toHaveClass('max-w-3xl', 'overflow-hidden');
     expect(within(dialog).getByText('Safety Finals')).toBeInTheDocument();
     expect(within(dialog).queryByText('# Private Agent')).not.toBeInTheDocument();
     expect(listPublicAgents).toHaveBeenCalledTimes(1);

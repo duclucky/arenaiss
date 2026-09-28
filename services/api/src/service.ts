@@ -746,7 +746,7 @@ export class ArenaApiService {
       })
       .sort((left, right) => (right.createdAt ?? 0) - (left.createdAt ?? 0));
     const pairMatches = (this.runtime?.list<PairRoom>('pair-rooms-v1') ?? [])
-      .filter((room) => room.state !== 'PENDING' && (room.creatorAgentId === agent.agentId || room.challengerAgentId === agent.agentId))
+      .filter((room) => room.state === 'SETTLED' && (room.creatorAgentId === agent.agentId || room.challengerAgentId === agent.agentId))
       .map((room) => ({ roomId: room.roomId, state: room.state, role: room.creatorAgentId === agent.agentId ? 'CREATOR' as const : 'CHALLENGER' as const, createdAt: room.createdAt }))
       .sort((left, right) => right.createdAt - left.createdAt);
     const tournaments = [...this.registrations.values()]

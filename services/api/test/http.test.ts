@@ -497,7 +497,12 @@ test('public Agent directory lists registered ERC-8004 identities without exposi
     runtime.put('pair-rooms-v1', `sha256:${'9'.repeat(64)}`, {
       roomId: `sha256:${'9'.repeat(64)}`, creator: alice, creatorWallet: alice, creatorAgentId: draft.agentId,
       creatorVersion: draft.agentsVersion, stake: '1000000', joinDeadline: 2_000_000_000, resolutionDeadline: 2_000_086_400,
-      state: 'OPEN', createdAt: 1_900_000_000,
+      state: 'REFUNDABLE', createdAt: 1_900_000_000,
+    });
+    runtime.put('pair-rooms-v1', `sha256:${'a'.repeat(64)}`, {
+      roomId: `sha256:${'a'.repeat(64)}`, creator: alice, creatorWallet: alice, creatorAgentId: draft.agentId,
+      creatorVersion: draft.agentsVersion, stake: '1000000', joinDeadline: 2_000_000_000, resolutionDeadline: 2_000_086_400,
+      state: 'SETTLED', createdAt: 1_900_000_100,
     });
     runtime.put('marketplace-listings', '7', {
       schema: 'arena-marketplace-listing-v1', listingId: '7', certificateDigest: `sha256:${'4'.repeat(64)}`,
@@ -514,6 +519,9 @@ test('public Agent directory lists registered ERC-8004 identities without exposi
     assert.equal(response.body[0].erc8004Identity.tokenId, '42');
     assert.equal(response.body[0].marketplaceListed, true);
     assert.equal(response.body[0].activity.evaluations[0].campaignId, campaignId);
+    assert.equal(response.body[0].activity.pairMatches.length, 1);
+    assert.equal(response.body[0].activity.pairMatches[0].roomId, `sha256:${'a'.repeat(64)}`);
+    assert.equal(response.body[0].activity.pairMatches[0].state, 'SETTLED');
     assert.equal(response.body[0].activity.pairMatches[0].role, 'CREATOR');
     assert.equal(response.body[0].activity.tournaments[0].name, 'Public Tour');
     assert.equal(JSON.stringify(response.body).includes('private operating instructions'), false);

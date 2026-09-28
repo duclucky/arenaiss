@@ -12,6 +12,7 @@ const usdc = (amount: string) => `${Number(formatUnits(BigInt(amount), 6)).toFix
 const activityDate = (value?: number) => value
   ? new Date(value < 1_000_000_000_000 ? value * 1000 : value).toLocaleString()
   : 'Date unavailable';
+const historyCardClass = 'marketplace-history-card retro-inset flex min-h-24 flex-col justify-between p-4 text-sm';
 
 type PublicProfileModalState = {
   listing: MarketplaceListing;
@@ -20,7 +21,7 @@ type PublicProfileModalState = {
   message?: string;
 };
 
-function MarketplaceModal({ titleId, onClose, children, width = 'max-w-4xl' }: {
+function MarketplaceModal({ titleId, onClose, children, width = 'max-w-3xl' }: {
   titleId: string;
   onClose: () => void;
   children: ReactNode;
@@ -67,11 +68,13 @@ function MarketplaceModal({ titleId, onClose, children, width = 'max-w-4xl' }: {
   return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-3 sm:p-6" role="presentation"
     onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}
-      className={`glass-panel max-h-[calc(100dvh-1.5rem)] w-full ${width} overflow-y-auto bg-[#f8f5ee] p-5 sm:max-h-[calc(100dvh-3rem)] sm:p-7`}>
-      <button ref={closeRef} type="button" className="metal-button-ghost sticky top-0 z-10 ml-auto flex min-h-11 min-w-11 items-center justify-center bg-[#f8f5ee] p-2" onClick={onClose} aria-label="Close dialog">
-        <X size={22} aria-hidden="true"/>
-      </button>
-      {children}
+      className={`glass-panel flex max-h-[calc(100dvh-1.5rem)] w-full ${width} flex-col overflow-hidden bg-[#f8f5ee] p-0 sm:max-h-[calc(100dvh-3rem)]`}>
+      <div className="marketplace-modal-header flex shrink-0 justify-end border-b border-black/20 bg-[#f8f5ee] p-3">
+        <button ref={closeRef} type="button" className="metal-button-ghost flex min-h-11 min-w-11 items-center justify-center p-2" onClick={onClose} aria-label="Close dialog">
+          <X size={22} aria-hidden="true"/>
+        </button>
+      </div>
+      <div className="min-h-0 overflow-y-auto p-5 pt-4 sm:p-7 sm:pt-5">{children}</div>
     </div>
   </div>;
 }
@@ -80,8 +83,9 @@ function PublicAgentProfile({ state, onRetry }: { state: PublicProfileModalState
   const { listing, profile } = state;
   const activity = profile?.activity;
   const stats = profile?.stats;
+  const successfulPairMatches = activity?.pairMatches.filter((row) => row.state === 'SETTLED') ?? [];
   return <>
-    <div className="-mt-11 pr-14">
+    <div>
       <p className="page-kicker">Public verification profile</p>
       <div className="mt-2 flex flex-wrap items-center gap-3"><h2 id="marketplace-agent-profile-heading" className="text-3xl font-bold">{listing.name}</h2><span className="retro-chip px-2 py-1 text-xs">{displayLabel(listing.state)}</span></div>
       <p className="mt-3 text-sm text-neutral-700">Review verified performance and participation history before purchasing this exact Agent identity.</p>
@@ -101,12 +105,12 @@ function PublicAgentProfile({ state, onRetry }: { state: PublicProfileModalState
           <div><dt className="text-neutral-600">Latest reputation</dt><dd className="mt-1 font-mono font-bold">{profile.erc8004Reputation?.state === 'COMPLETE' ? `${profile.erc8004Reputation.value}/100` : 'Not available'}</dd></div>
         </dl>
       </section>
-      <div className="mt-7 grid gap-7 lg:grid-cols-2">
-        <section aria-labelledby="marketplace-evaluation-history-heading"><h3 id="marketplace-evaluation-history-heading" className="text-xl font-bold">Evaluation history</h3>
-          {activity?.evaluations.length ? <ul className="mt-3 space-y-3">{activity.evaluations.map((row) => <li key={row.campaignId} className="retro-inset p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="font-mono font-bold">{row.overallScore === null ? 'N/A' : `${row.overallScore}/100`}</span></div><p className="mt-2 text-neutral-700">{row.scenarioCount} scenario{row.scenarioCount === 1 ? '' : 's'} · {activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public evaluation history yet.</p>}
+      <div className="mt-7 grid items-start gap-7 lg:grid-cols-2">
+        <section className="min-w-0" aria-labelledby="marketplace-evaluation-history-heading"><h3 id="marketplace-evaluation-history-heading" className="text-xl font-bold">Evaluation history</h3>
+          {activity?.evaluations.length ? <ul className="mt-3 space-y-3">{activity.evaluations.map((row) => <li key={row.campaignId} className={historyCardClass}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="font-mono font-bold">{row.overallScore === null ? 'N/A' : `${row.overallScore}/100`}</span></div><p className="mt-2 text-neutral-700">{row.scenarioCount} scenario{row.scenarioCount === 1 ? '' : 's'} · {activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public evaluation history yet.</p>}
         </section>
-        <section aria-labelledby="marketplace-pair-history-heading"><h3 id="marketplace-pair-history-heading" className="text-xl font-bold">Pair match history</h3>
-          {activity?.pairMatches.length ? <ul className="mt-3 space-y-3">{activity.pairMatches.map((row) => <li key={row.roomId} className="retro-inset p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.role)}</span></div><p className="mt-2 text-neutral-700">{activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No public Pair match history yet.</p>}
+        <section className="min-w-0" aria-labelledby="marketplace-pair-history-heading"><h3 id="marketplace-pair-history-heading" className="text-xl font-bold">Pair match history</h3>
+          {successfulPairMatches.length ? <ul className="mt-3 space-y-3">{successfulPairMatches.map((row) => <li key={row.roomId} className={historyCardClass}><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{displayLabel(row.state)}</span><span className="retro-chip px-2 py-1 text-xs">{displayLabel(row.role)}</span></div><p className="mt-2 text-neutral-700">{activityDate(row.createdAt)}</p></li>)}</ul> : <p className="mt-3 text-sm text-neutral-600">No successful Pair match history yet.</p>}
         </section>
       </div>
       <section className="mt-7" aria-labelledby="marketplace-tournament-history-heading"><h3 id="marketplace-tournament-history-heading" className="text-xl font-bold">Tournament history</h3>
