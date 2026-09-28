@@ -482,27 +482,31 @@ button:disabled { cursor: not-allowed; }
   .login-trigger { font-size: 13px; }
   .menu-toggle { display: flex; }
   .primary-nav {
-    position: fixed;
-    inset: 0;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 16px;
     z-index: 60;
-    min-height: 100dvh;
+    width: min(360px, calc(100vw - 32px));
+    max-height: calc(100dvh - 96px);
     overflow-y: auto;
     overscroll-behavior: contain;
     visibility: hidden;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 18px;
-    padding: 100px 32px 40px;
-    background: rgba(255,255,255,.96);
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--retro-frame);
+    background: rgba(248,245,238,.98);
+    box-shadow: var(--retro-raised), 0 18px 42px rgba(0,0,0,.22);
     opacity: 0;
-    backdrop-filter: blur(12px);
-    transition: opacity .3s ease, visibility .3s ease;
+    pointer-events: none;
+    transform: translateY(-8px);
+    transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
   }
-  .primary-nav[data-open='true'] { visibility: visible; opacity: 1; }
-  .nav-link { width: 100%; min-height: 52px; justify-content: flex-start; padding: 0 18px; font-size: 28px; }
-  body.menu-open { overflow: hidden; }
+  .primary-nav[data-open='true'] { visibility: visible; opacity: 1; pointer-events: auto; transform: none; }
+  .nav-link { width: 100%; min-height: 48px; justify-content: flex-start; padding: 0 16px; font-size: 18px; }
 }
 
 @media (max-width: 767px) {

@@ -188,4 +188,17 @@ describe('managed Arena ISS wallet account', () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
+
+  it('uses a dismissible dropdown for compact product navigation without locking page scroll', async () => {
+    render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={identity()} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
+    const toggle = await screen.findByRole('button', { name: 'Open menu' });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toHaveAttribute('data-open', 'true');
+    expect(document.body).not.toHaveClass('menu-open');
+
+    fireEvent.pointerDown(document.body);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
 });

@@ -49,6 +49,8 @@ describe('Agent management', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Safety Scout details' }));
     expect(await screen.findByText(/# Safety Scout/)).toBeInTheDocument();
     expect(screen.getByText(/Safety Arena/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View evaluation 1' })).toHaveAttribute('href', `/evaluations/${detail.evaluations[0].campaignId}`);
+    expect(screen.getByRole('link', { name: 'View evaluation 2' })).toHaveAttribute('href', `/evaluations/${detail.evaluations[1].campaignId}`);
     fireEvent.click(screen.getByRole('button', { name: 'Close Agent details' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Safety Scout' }));

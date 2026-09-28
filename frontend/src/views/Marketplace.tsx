@@ -332,14 +332,18 @@ export function Marketplace() {
         {busy === `delivery-${row.listingId}` ? 'Loading delivery…' : 'Open purchased Agent'}
       </button>;
     }
+    if (!account && row.state === 'ACTIVE') {
+      return <button type="button" className="metal-button-solid w-full" disabled>Sign in to buy</button>;
+    }
     return <p className="text-xs text-neutral-600">{row.state === 'ACTIVE' ? 'Sign in to purchase.' : row.state === 'SOLD' ? 'Sold on Arc.' : 'Awaiting Arc confirmation. Reload to check status.'}</p>;
   }
 
   function listingCard(row: MarketplaceListing, privateRecord = false) {
     return <article className="glass-panel flex min-h-64 flex-col p-5" key={`${privateRecord ? 'private' : 'public'}-${row.listingId}`}>
-      <div className="flex items-start justify-between gap-3">{privateRecord ? <div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">Private account record</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div> : <button type="button" className="min-w-0 text-left outline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4e59c7]" onClick={() => openPublicProfile(row)} aria-label={`View ${row.name} public details`}><span className="block text-xs uppercase tracking-widest text-neutral-600">Agent listing</span><span className="mt-2 block text-2xl font-bold" role="heading" aria-level={2}>{row.name}</span><span className="mt-2 block text-xs font-semibold text-[#343d9f]">View metrics and history</span></button>}<span className="retro-chip shrink-0 px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
-      <dl className="mt-8 space-y-3 text-sm"><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
-      <div className="mt-auto pt-6">{listingAction(row, privateRecord)}</div>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">{privateRecord ? 'Private account record' : 'Agent listing'}</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip shrink-0 px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
+      {!privateRecord && <div role="group" aria-label={`${row.name} listing actions`} className="mt-5 grid grid-cols-2 gap-2"><button type="button" className="metal-button-ghost w-full" onClick={() => openPublicProfile(row)}>View details</button>{listingAction(row)}</div>}
+      <dl className={`${privateRecord ? 'mt-8' : 'mt-5'} space-y-3 text-sm`}><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
+      {privateRecord && <div className="mt-auto pt-6">{listingAction(row, true)}</div>}
     </article>;
   }
 

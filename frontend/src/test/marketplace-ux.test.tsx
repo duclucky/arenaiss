@@ -80,6 +80,10 @@ describe('Marketplace website UX', () => {
     const publicListings = await screen.findByRole('region', { name: 'Agents for sale' });
     expect(within(publicListings).getByText('2.000000 USDC')).toBeInTheDocument();
     expect(within(publicListings).getByRole('heading', { name: 'Safety Scout' })).toBeInTheDocument();
+    const actions = within(publicListings).getByRole('group', { name: 'Safety Scout listing actions' });
+    expect(within(actions).getByRole('button', { name: 'View details' })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Cancel Safety Scout listing' })).toBeInTheDocument();
+    expect(within(publicListings).queryByText('View metrics and history')).not.toBeInTheDocument();
     expect(within(publicListings).queryByRole('heading', { name: 'Purchased Scout' })).not.toBeInTheDocument();
     expect(within(publicListings).queryByText('SOLD')).not.toBeInTheDocument();
     const purchases = screen.getByRole('region', { name: 'My purchased Agents' });
@@ -93,6 +97,15 @@ describe('Marketplace website UX', () => {
     fireEvent.change(screen.getByLabelText('Price (USDC)'), { target: { value: '2.50' } });
     fireEvent.click(screen.getByRole('button', { name: 'List on Arc' }));
     await waitFor(() => expect(createListing).toHaveBeenCalledWith(expect.objectContaining({ price: '2500000' })));
+  });
+
+  it('keeps public details and purchase as two separate listing actions', async () => {
+    const buyerListing = { ...ownedActive, sellerAddress: '0x5555555555555555555555555555555555555555' };
+    mount({ ...marketplaceApi, async listListings() { return [buyerListing]; }, async listOwnedListings() { return []; } });
+
+    const actions = await screen.findByRole('group', { name: 'Safety Scout listing actions' });
+    expect(within(actions).getByRole('button', { name: 'View details' })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Buy for 2.000000 USDC' })).toBeInTheDocument();
   });
 
   it('opens a public Agent profile with metrics and history without loading private AGENTS.md', async () => {
@@ -115,7 +128,7 @@ describe('Marketplace website UX', () => {
     }]);
     mount(marketplaceApi, { ...agentApi, listPublicAgents, getAgent });
 
-    const trigger = await screen.findByRole('button', { name: 'View Safety Scout public details' });
+    const trigger = await screen.findByRole('button', { name: 'View details' });
     trigger.focus();
     fireEvent.click(trigger);
 
@@ -148,7 +161,7 @@ describe('Marketplace website UX', () => {
     vi.stubGlobal('fetch', fetcher);
     try {
       render(<MemoryRouter><AppProvider config={{ ...config, apiUrl: 'https://arena.example' }} marketplaceApiAdapter={marketplaceApi}><Marketplace /></AppProvider></MemoryRouter>);
-      fireEvent.click(await screen.findByRole('button', { name: 'View Safety Scout public details' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
 
       const dialog = await screen.findByRole('dialog', { name: 'Safety Scout' });
       expect(within(dialog).getByText('91/100')).toBeInTheDocument();

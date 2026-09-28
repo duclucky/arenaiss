@@ -23,15 +23,14 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setMenuOpen(false);
     setAccountOpen(false);
-    document.body.classList.remove('menu-open');
   }, [location.pathname]);
 
   useEffect(() => {
-    document.body.classList.toggle('menu-open', menuOpen);
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setMenuOpen(false);
@@ -42,10 +41,19 @@ export function Layout() {
     document.addEventListener('keydown', close);
     window.addEventListener('resize', resize);
     return () => {
-      document.body.classList.remove('menu-open');
       document.removeEventListener('keydown', close);
       window.removeEventListener('resize', resize);
     };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!menuRef.current?.contains(target) && !accountRef.current?.contains(target)) setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
   }, [menuOpen]);
 
   useEffect(() => {
@@ -86,7 +94,7 @@ export function Layout() {
         <span>Arena ISS</span><img className="brand-mark" src="/brand/arena-iss-mark.png" alt="" aria-hidden="true" draggable="false" />
       </Link>
 
-      {account ? <nav id="site-nav" aria-label="Primary" data-open={menuOpen} className="primary-nav">
+      {account ? <nav ref={menuRef} id="site-nav" aria-label="Primary" data-open={menuOpen} className="primary-nav">
         {navItems.map(([to, label]) => <NavLink key={to} to={to} className={({ isActive }) => clsx('nav-link', isActive && 'is-active')}>{label}</NavLink>)}
       </nav> : null}
 
@@ -101,7 +109,7 @@ export function Layout() {
           </div>}
         </> : <button onClick={() => openLogin()} className="header-cta login-trigger" aria-label="Login">Login</button>}
         {account && <button
-          onClick={() => setMenuOpen((open) => !open)}
+          onClick={() => { setAccountOpen(false); setMenuOpen((open) => !open); }}
           className="menu-toggle"
           aria-controls="site-nav"
           aria-expanded={menuOpen}
