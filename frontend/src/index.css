@@ -257,11 +257,11 @@ button:disabled { cursor: not-allowed; }
 .hero-pill--light, .hero-pill--outline { background: var(--retro-face); color: #000; }
 .hero-pill--light:hover { background: var(--retro-face-hover); color: #000; }
 .hero-pill--light:active { box-shadow: var(--retro-pressed); }
-.hero-platform-lines { display: grid; width: min(100%, 390px); gap: 10px; margin-top: 20px; }
-.hero-platform-line { display: grid; min-width: 0; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 14px; }
-.hero-platform-line__logo { display: block; width: auto; max-width: 92px; object-fit: contain; object-position: left center; }
-.hero-platform-line__logo--arc { height: 27px; }
-.hero-platform-line__logo--genlayer { height: 22px; }
+.hero-platform-lines { display: grid; width: min(100%, 410px); gap: 18px; margin-top: 28px; }
+.hero-platform-line { display: grid; min-width: 0; grid-template-columns: 118px minmax(0, 1fr); align-items: center; gap: 18px; }
+.hero-platform-line__brand { display: grid; min-width: 0; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; }
+.hero-platform-line__mark { display: block; width: 30px; height: 30px; object-fit: contain; }
+.hero-platform-line__name { font-family: var(--font-heading); font-size: 22px; font-weight: 500; line-height: 1; letter-spacing: -.035em; }
 .hero-platform-line p { min-width: 0; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.35; }
 .page-kicker { margin: 0 0 14px; color: #56524c; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; }
 .page-title { font-family: var(--font-heading); font-size: clamp(48px, 7vw, 88px); font-weight: 400; line-height: .95; letter-spacing: -.065em; }
@@ -551,11 +551,11 @@ button:disabled { cursor: not-allowed; }
   .hero-line--detail { font-size: clamp(14px, 3.8vw, 16px); line-height: 1.35; }
   .hero-line--marketplace { margin-top: 12px; padding-top: 10px; font-size: clamp(10px, 2.8vw, 12px); line-height: 1.4; }
   .hero-pill { min-height: 44px; }
-  .hero-platform-lines { width: min(100%, 340px); margin-top: 18px; }
-  .hero-platform-line { grid-template-columns: 82px minmax(0, 1fr); gap: 12px; }
-  .hero-platform-line__logo { max-width: 80px; }
-  .hero-platform-line__logo--arc { height: 24px; }
-  .hero-platform-line__logo--genlayer { height: 19px; }
+  .hero-platform-lines { width: min(100%, 350px); gap: 16px; margin-top: 24px; }
+  .hero-platform-line { grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+  .hero-platform-line__brand { grid-template-columns: 27px minmax(0, 1fr); gap: 7px; }
+  .hero-platform-line__mark { width: 27px; height: 27px; }
+  .hero-platform-line__name { font-size: 20px; }
   .hero-platform-line p { font-size: 11px; }
   .docs-hero { grid-template-columns: 1fr; gap: 44px; padding: 6px 0 42px; }
   .docs-hero h1 { font-size: clamp(48px, 15vw, 68px); }

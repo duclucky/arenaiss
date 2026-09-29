@@ -279,11 +279,17 @@ export function Home() {
       </div>
       <div className="hero-platform-lines" role="group" aria-label="Settlement and evaluation networks">
         <div className="hero-platform-line">
-          <img className="hero-platform-line__logo hero-platform-line__logo--arc" src="/brand/arc-logo-dark.svg" alt="Arc" />
+          <div className="hero-platform-line__brand">
+            <img className="hero-platform-line__mark" src="/brand/arc-mark-dark.svg" alt="Arc logo" />
+            <span className="hero-platform-line__name">Arc</span>
+          </div>
           <p>USDC settlement on Arc Testnet</p>
         </div>
         <div className="hero-platform-line">
-          <img className="hero-platform-line__logo hero-platform-line__logo--genlayer" src="/brand/genlayer-logo-black.svg" alt="GenLayer" />
+          <div className="hero-platform-line__brand">
+            <img className="hero-platform-line__mark" src="/brand/genlayer-mark-black.svg" alt="GenLayer logo" />
+            <span className="hero-platform-line__name">GenLayer</span>
+          </div>
           <p>AI verdicts in GenVM</p>
         </div>
       </div>

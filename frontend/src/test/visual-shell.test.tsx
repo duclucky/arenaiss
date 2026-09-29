@@ -75,9 +75,11 @@ describe('Arena ISS visual shell', () => {
     expect(screen.queryByRole('link', { name: 'Evaluations' })).not.toBeInTheDocument();
     const start = screen.getByRole('button', { name: 'Start with Agent' });
     expect(screen.getByRole('link', { name: 'Read Docs' })).toHaveAttribute('href', '/docs');
-    expect(screen.getByRole('img', { name: 'Arc' })).toHaveAttribute('src', '/brand/arc-logo-dark.svg');
+    expect(screen.getByRole('img', { name: 'Arc logo' })).toHaveAttribute('src', '/brand/arc-mark-dark.svg');
+    expect(screen.getByText('Arc')).toHaveClass('hero-platform-line__name');
     expect(screen.getByText('USDC settlement on Arc Testnet')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'GenLayer' })).toHaveAttribute('src', '/brand/genlayer-logo-black.svg');
+    expect(screen.getByRole('img', { name: 'GenLayer logo' })).toHaveAttribute('src', '/brand/genlayer-mark-black.svg');
+    expect(screen.getByText('GenLayer')).toHaveClass('hero-platform-line__name');
     expect(screen.getByText('AI verdicts in GenVM')).toBeInTheDocument();
     const platformLines = screen.getByRole('group', { name: 'Settlement and evaluation networks' });
     expect(platformLines).toHaveClass('hero-platform-lines');
