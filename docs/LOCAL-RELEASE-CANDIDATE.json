@@ -3,7 +3,7 @@
   "createdAt": "2026-09-28",
   "scope": "LOCAL_ONLY",
   "fileCount": 320,
-  "sourceBundleSha256": "7179aa304be0d1d9e3d8b757a1e0a087ef9112add050d59488e22f4e51534c03",
+  "sourceBundleSha256": "251abf04ba644d723f08d2d413915ab0ebafd27655ca4446023002cd26e6efa4",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
