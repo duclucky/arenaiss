@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ShoppingBag, Tag, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { formatUnits, parseUnits } from 'viem';
 import { useAppContext } from '../context';
 import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, MarketplaceListing } from '../adapters/interfaces';
@@ -160,7 +160,7 @@ function MarketplaceError({ message, onRefresh }: { message: string; onRefresh: 
 
 export function Marketplace() {
   const { account, marketplaceApi, agentApi, evaluationApi, networkConfig } = useAppContext();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const activeView = searchParams.get('view') === 'sell' ? 'sell' : 'browse';
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [ownedListings, setOwnedListings] = useState<MarketplaceListing[]>([]);
@@ -355,7 +355,6 @@ export function Marketplace() {
   return <section aria-labelledby="marketplace-heading" className="mx-auto max-w-6xl">
     <p className="page-kicker">Agent Exchange · Arc Testnet</p>
     <div className="flex flex-wrap items-end justify-between gap-6"><div><h1 id="marketplace-heading" className="page-title">Marketplace</h1><p className="page-lede">Buy exact Agent versions that passed Arena ISS evaluation. Every sale settles in USDC with a fixed 1% platform fee.</p></div><span className="retro-chip px-3 py-2 text-xs">Platform fee · 1%</span></div>
-    <div role="tablist" aria-label="Marketplace sections" className="mt-8 grid gap-2 sm:grid-cols-2"><button role="tab" aria-selected={activeView === 'browse'} className={activeView === 'browse' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({}, { replace: true })}><ShoppingBag size={17} aria-hidden="true" /> Agents for sale</button><button role="tab" aria-selected={activeView === 'sell'} className={activeView === 'sell' ? 'metal-button-solid' : 'metal-button-ghost'} onClick={() => setSearchParams({ view: 'sell' }, { replace: true })}><Tag size={17} aria-hidden="true" /> Sell my Agent</button></div>
     {error && <MarketplaceError message={error} onRefresh={() => refresh().catch((cause) => setError(cause instanceof Error ? cause.message : 'Refresh failed.'))}/>}
     {activeView === 'browse' && <section className="mt-12" role="region" aria-label="Agents for sale">
       {activeListings.length > 0 ? <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{activeListings.map((row) => listingCard(row))}</div>

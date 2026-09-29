@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentApiAdapter, EvaluationApiAdapter, ManagedIdentityAdapter, MarketplaceApiAdapter } from '../adapters/interfaces';
@@ -26,14 +26,13 @@ const withdrawOperatorCredit = vi.fn().mockResolvedValue({ transactionId: 'platf
 const cancelListing = vi.fn().mockResolvedValue({ ...ownedActive, state: 'CANCELLED' });
 const marketplaceApi: MarketplaceApiAdapter = { async listListings() { return [sold, ownedActive]; }, async listOwnedListings() { return [ownedActive]; }, async listCertificates() { return [certificate]; }, async listPurchases() { return [sold]; }, async getCredit() { return { amount: '990000' }; }, withdrawCredit, async listOperatorCertificates() { return [eligible]; }, approveCertificate, async getOperatorCredit() { return { amount: '10000' }; }, withdrawOperatorCredit, cancelListing, createEligibility, createListing, async buy() { return sold; }, getDelivery };
 const config = { chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', genLayer: { chainId: 61997 as const, rpcUrl: 'https://studio-next.genlayer.com/api', name: 'Studio Next', explorerUrl: 'https://explorer-studio-dev.genlayer.com', evaluationJudgeAddress: '0x0aA2B27D04BAa4438f2c3B9560eb7989de5a934d' as const, comparisonJudgeAddress: '0xe5210eCCC4182090A1416f515Dc7001B27274BcB' as const } };
-function mount(api: MarketplaceApiAdapter = marketplaceApi, agents: AgentApiAdapter = agentApi) { render(<MemoryRouter><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agents} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
+function mount(api: MarketplaceApiAdapter = marketplaceApi, agents: AgentApiAdapter = agentApi, initialEntry = '/marketplace') { render(<MemoryRouter initialEntries={[initialEntry]}><AppProvider config={config} identityAdapter={identity} agentApiAdapter={agents} evaluationApiAdapter={evaluationApi} marketplaceApiAdapter={api}><Marketplace /></AppProvider></MemoryRouter>); }
 
 describe('Marketplace website UX', () => {
   it('explains evaluation eligibility and the platform fee without internal Evo terminology', async () => {
-    mount();
+    mount(marketplaceApi, agentApi, '/marketplace?view=sell');
     expect(await screen.findByText(/passed Arena ISS evaluation/i)).toBeInTheDocument();
     expect(screen.getByText('Platform fee · 1%')).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
     expect(await screen.findByRole('option', { name: 'Safety Scout' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Agent to certify'), { target: { value: agentId } });
     expect(screen.getByText(/2 finalized evaluations available/i)).toBeInTheDocument();
@@ -46,8 +45,7 @@ describe('Marketplace website UX', () => {
 
   it('explains every failed Marketplace eligibility rule and the next step', async () => {
     const rejectedEligibility = vi.fn().mockRejectedValue(new Error('Agent version is not marketplace eligible: CRITICAL_POLICY_FINDING,SCORE_SPREAD_ABOVE_THRESHOLD'));
-    mount({ ...marketplaceApi, createEligibility: rejectedEligibility });
-    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
+    mount({ ...marketplaceApi, createEligibility: rejectedEligibility }, agentApi, '/marketplace?view=sell');
     fireEvent.change(await screen.findByLabelText('Agent to certify'), { target: { value: agentId } });
     fireEvent.click(screen.getByRole('button', { name: 'Check eligibility' }));
 
@@ -63,8 +61,7 @@ describe('Marketplace website UX', () => {
     const listCertificates = vi.fn().mockResolvedValue([]);
     const automaticEligibility = vi.fn().mockResolvedValue(certificate);
     mount({ ...marketplaceApi, listCertificates, createEligibility: automaticEligibility,
-      async listOperatorCertificates() { return []; } });
-    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
+      async listOperatorCertificates() { return []; } }, agentApi, '/marketplace?view=sell');
     fireEvent.change(await screen.findByLabelText('Agent to certify'), { target: { value: agentId } });
     fireEvent.click(screen.getByRole('button', { name: 'Check eligibility' }));
 
@@ -92,7 +89,9 @@ describe('Marketplace website UX', () => {
     expect(screen.queryByText(certificateDigest)).not.toBeInTheDocument();
     expect(screen.queryByText(new RegExp(certificateDigest.slice(0, 20)))).not.toBeInTheDocument();
     expect(screen.queryByText(eligible.certificateDigest)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Sell my Agent' }));
+    cleanup();
+    mount(marketplaceApi, agentApi, '/marketplace?view=sell');
+    await screen.findByRole('option', { name: 'Approved Agent · 90/100' });
     fireEvent.change(screen.getByLabelText('Approved certificate'), { target: { value: certificateDigest } });
     fireEvent.change(screen.getByLabelText('Price (USDC)'), { target: { value: '2.50' } });
     fireEvent.click(screen.getByRole('button', { name: 'List on Arc' }));
@@ -201,14 +200,13 @@ describe('Marketplace website UX', () => {
 
   it('moves seller proceeds to Account Claim instead of duplicating withdrawal controls', async () => {
     mount();
-    expect(await screen.findByRole('tab', { name: 'Agents for sale' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('region', { name: 'Agents for sale' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Withdraw Marketplace proceeds' })).not.toBeInTheDocument();
     expect(withdrawCredit).not.toHaveBeenCalled();
   });
 
   it('shows operator approval with score and coverage before the Arc transaction', async () => {
-    mount();
-    fireEvent.click(await screen.findByRole('tab', { name: 'Sell my Agent' }));
+    mount(marketplaceApi, agentApi, '/marketplace?view=sell');
     expect(await screen.findByRole('heading', { name: 'Operator review' })).toBeInTheDocument();
     expect(screen.getByText(/90\/100.*100% coverage/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Approve certificate on Arc' }));
@@ -228,15 +226,17 @@ describe('Marketplace website UX', () => {
 
   it('offers a safe retry for the original buyer or seller while an Arc write is unresolved', async () => {
     const buy = vi.fn().mockResolvedValue({ ...sold, state: 'BUY_SUBMITTED' });
-    mount({ ...marketplaceApi,
+    const recoveryApi: MarketplaceApiAdapter = { ...marketplaceApi,
       async listListings() { return []; },
       async listPurchases() { return [{ ...sold, listingId: '3', state: 'BUY_SUBMITTED', buyerAddress: address }]; },
       async listOwnedListings() { return [{ ...ownedActive, state: 'CANCEL_SUBMITTED' }]; },
-      buy });
+      buy };
+    mount(recoveryApi);
     fireEvent.click(await screen.findByRole('button', { name: 'Resume Purchased Scout purchase' }));
     await waitFor(() => expect(buy).toHaveBeenCalledWith('3', expect.any(String), expect.any(String)));
-    fireEvent.click(screen.getByRole('tab', { name: 'Sell my Agent' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Retry Safety Scout cancellation' }));
+    cleanup();
+    mount(recoveryApi, agentApi, '/marketplace?view=sell');
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry Safety Scout cancellation' }));
     await waitFor(() => expect(cancelListing).toHaveBeenCalledWith('2', expect.any(String)));
   });
 });

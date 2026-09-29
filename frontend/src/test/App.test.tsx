@@ -121,6 +121,32 @@ describe('App Tests', () => {
     fireEvent.click(providerBtn!);
 
     await screen.findByRole('heading', { name: 'My Agents' });
+    const sidebar = document.querySelector('.site-header');
+    expect(sidebar).toHaveClass('site-sidebar');
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(primaryNav).toHaveClass('primary-nav--vertical');
+    expect(primaryNav.querySelectorAll('.nav-link')).toHaveLength(7);
+    expect(primaryNav.querySelectorAll('.nav-link svg')).toHaveLength(7);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Pair matches' }));
+    const pairPages = await screen.findByRole('navigation', { name: 'Pair matches pages' });
+    expect(pairPages).toHaveTextContent('Open rooms');
+    expect(pairPages).toHaveTextContent('My rooms');
+    expect(pairPages).toHaveTextContent('Completed');
+    expect(screen.queryByRole('navigation', { name: 'Marketplace pages' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Marketplace' }));
+    const marketplacePages = await screen.findByRole('navigation', { name: 'Marketplace pages' });
+    expect(marketplacePages).toHaveTextContent('Agents for sale');
+    expect(marketplacePages).toHaveTextContent('Sell my Agent');
+    expect(screen.queryByRole('navigation', { name: 'Pair matches pages' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Sell my Agent' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Sell my Agent' })).toHaveAttribute('aria-current', 'page'));
+
+    fireEvent.click(screen.getByRole('link', { name: 'Account' }));
+    const accountPages = await screen.findByRole('navigation', { name: 'Account pages' });
+    expect(accountPages).toHaveTextContent('Overview');
+    expect(accountPages).toHaveTextContent('Claim');
     fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
     const disconnectBtn = await screen.findByText('Disconnect');
     expect(disconnectBtn).toBeInTheDocument();

@@ -21,7 +21,7 @@ const CCTP_CHAINS = [
 export function Account() {
   const { account, managedAccount, agentApi, evaluationApi, marketplaceApi, networkConfig, disconnectWallet, wallet } = useAppContext();
   const { managedIdentity } = useAppContext();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const activeTab = ['claim', 'credits'].includes(searchParams.get('tab') || '') ? 'claim' : 'overview';
   const [balanceState, setBalanceState] = useState<'loading' | 'unavailable' | string>('loading');
   const [balanceReload, setBalanceReload] = useState(0);
@@ -223,10 +223,6 @@ export function Account() {
     return () => window.clearTimeout(timer);
   }, [activeTab, evoRefunds, nowSeconds]);
 
-  function selectTab(tab: 'overview' | 'claim') {
-    setSearchParams(tab === 'claim' ? { tab: 'claim' } : {}, { replace: true });
-  }
-
   async function claim(tournamentId: string) {
     if (!account || !networkConfig) return;
     setClaimState((current) => ({ ...current, [tournamentId]: 'submitting' }));
@@ -351,14 +347,7 @@ export function Account() {
         </div>
       )}
 
-      <div className="glass-panel rounded-[28px] p-2">
-        <div role="tablist" aria-label="Account sections" className="grid grid-cols-2 gap-2">
-          <button id="account-overview-tab" role="tab" aria-selected={activeTab === 'overview'} aria-controls="account-overview-panel" onClick={() => selectTab('overview')} className={activeTab === 'overview' ? 'metal-button-solid' : 'metal-button-ghost'}>Overview</button>
-          <button id="account-claim-tab" role="tab" aria-selected={activeTab === 'claim'} aria-controls="account-claim-panel" onClick={() => selectTab('claim')} className={activeTab === 'claim' ? 'metal-button-solid' : 'metal-button-ghost'}>Claim</button>
-        </div>
-      </div>
-
-      {activeTab === 'overview' && <div id="account-overview-panel" role="tabpanel" aria-labelledby="account-overview-tab" className="glass-panel rounded-[28px] p-6 md:p-8">
+      {activeTab === 'overview' && <div id="account-overview-panel" role="region" aria-label="Account overview" className="glass-panel rounded-[28px] p-6 md:p-8">
         {account ? (
           <div className="space-y-6">
             <div>
@@ -471,7 +460,7 @@ export function Account() {
         )}
       </div>}
 
-      {activeTab === 'claim' && <div id="account-claim-panel" role="tabpanel" aria-labelledby="account-claim-tab" className="space-y-4">
+      {activeTab === 'claim' && <div id="account-claim-panel" role="region" aria-label="Account claims" className="space-y-4">
         <div className="glass-panel flex flex-wrap items-start justify-between gap-4 rounded-[28px] p-6 md:p-8">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight">Claim assets</h2>

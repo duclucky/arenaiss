@@ -122,7 +122,6 @@ it.each([
     return rooms;
   } })));
   render(<MemoryRouter initialEntries={[`/pairs/${view}`]}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view={view} /></AppProvider></MemoryRouter>);
-  for (const name of ['Open rooms', 'My rooms', 'Completed']) expect(screen.getByRole('link', { name })).toHaveAttribute('href', `/pairs/${name === 'Open rooms' ? 'open' : name === 'My rooms' ? 'mine' : 'completed'}`);
   const title = view === 'open' ? 'Open rooms' : view === 'mine' ? 'My rooms' : 'Completed';
   const roomList = await screen.findByRole('list', { name: `${title} list` });
   expect(roomList).toHaveClass('grid', 'md:grid-cols-2', 'xl:grid-cols-3');

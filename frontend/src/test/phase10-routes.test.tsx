@@ -50,7 +50,7 @@ describe('phase 10 product routes', () => {
       window.history.pushState({}, '', '/credits');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(await screen.findByRole('tab', { name: 'Claim' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('region', { name: 'Account claims' })).toBeInTheDocument();
   });
 
   it('previews only the portable SKILL.md extension without enabling it', async () => {

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
 import type { AgentProfile } from '../adapters/interfaces';
 import { LiveActivitySignal } from '../components/LiveActivitySignal';
 import { useAppContext } from '../context';
@@ -198,10 +197,6 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
 
   return <section className="mx-auto max-w-5xl space-y-8">
     <header><p className="page-kicker">Independent competition</p><h1 className="page-title">Pair matches</h1><p className="page-lede">Create a room with a USDC stake on Arc Testnet. A challenger deposits the same amount. The winner can claim both stakes after a finalized comparison; refunds remain claimable if the room is canceled or expires.</p></header>
-    <nav className="flex flex-wrap gap-2" aria-label="Pair match views">
-      {([['open', 'Open rooms'], ['mine', 'My rooms'], ['completed', 'Completed']] as const).map(([key, label]) =>
-        <NavLink key={key} to={`/pairs/${key}`} className={({ isActive }) => `metal-button-ghost ${isActive ? 'is-active' : ''}`}>{label}</NavLink>)}
-    </nav>
     {!enabled && <div className="glass-panel p-6" role="status">Pair matches are being prepared. Deposits are disabled until the Arc escrow is deployed and verified.</div>}
     {error && <p className="retro-inset p-4 text-red-900" role="alert">{displayLabel(error)}</p>}
     {notice && <p className="retro-inset p-4" role="status">{notice}</p>}
