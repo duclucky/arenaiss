@@ -79,9 +79,11 @@ describe('Arena ISS visual shell', () => {
     expect(screen.getByText('USDC settlement on Arc Testnet')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'GenLayer' })).toHaveAttribute('src', '/brand/genlayer-logo-black.svg');
     expect(screen.getByText('AI verdicts in GenVM')).toBeInTheDocument();
-    const platformStrip = screen.getByRole('group', { name: 'Settlement and evaluation networks' });
-    expect(platformStrip).toHaveClass('hero-platforms');
-    expect(platformStrip.querySelectorAll('.hero-platform-card')).toHaveLength(2);
+    const platformLines = screen.getByRole('group', { name: 'Settlement and evaluation networks' });
+    expect(platformLines).toHaveClass('hero-platform-lines');
+    expect(container.querySelector('.hero-content')).toContainElement(platformLines);
+    expect(platformLines.querySelectorAll('.hero-platform-line')).toHaveLength(2);
+    expect(platformLines.querySelector('.hero-platform-card')).not.toBeInTheDocument();
     fireEvent.click(start);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Explore tournaments' })).not.toBeInTheDocument();
@@ -199,6 +201,9 @@ describe('Arena ISS visual shell', () => {
 
     expect(await screen.findByRole('heading', { name: 'Tournaments' })).toBeInTheDocument();
     expect(container.querySelector('.app-shell')).toHaveAttribute('data-surface', 'editorial');
+    const brand = screen.getByRole('link', { name: 'Arena ISS' });
+    expect(brand).toHaveTextContent('Arena ISS');
+    expect(brand).toHaveTextContent('Arena Intelligence, Safety & Standards.');
     expect(container.querySelector('.brand-mark')).toHaveAttribute('src', '/brand/arena-iss-mark.png');
     expect(container.querySelector('.brand-star')).not.toBeInTheDocument();
     expect(container.querySelector('.page-kicker')).toHaveTextContent('Tournament mode');

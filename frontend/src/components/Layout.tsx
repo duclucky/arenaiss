@@ -29,26 +29,20 @@ const navItems = [
 ] as const;
 
 export function Layout() {
-  const { account, disconnectWallet } = useAppContext();
+  const { account } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginDestination, setLoginDestination] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const accountRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    setAccountOpen(false);
-  }, [location.pathname]);
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setMenuOpen(false);
-        setAccountOpen(false);
       }
     };
     const resize = () => { if (window.innerWidth >= 1024) setMenuOpen(false); };
@@ -64,25 +58,11 @@ export function Layout() {
     if (!menuOpen) return;
     const closeOutside = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!menuRef.current?.contains(target) && !accountRef.current?.contains(target)) setMenuOpen(false);
+      if (!menuRef.current?.contains(target) && !actionsRef.current?.contains(target)) setMenuOpen(false);
     };
     document.addEventListener('pointerdown', closeOutside);
     return () => document.removeEventListener('pointerdown', closeOutside);
   }, [menuOpen]);
-
-  useEffect(() => {
-    if (!accountOpen) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (accountRef.current && !accountRef.current.contains(event.target as Node)) setAccountOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOutside);
-    return () => document.removeEventListener('pointerdown', closeOutside);
-  }, [accountOpen]);
-
-  async function disconnect() {
-    await disconnectWallet();
-    setAccountOpen(false);
-  }
 
   function openLogin(destination?: string) {
     setLoginDestination(destination ?? null);
@@ -110,7 +90,11 @@ export function Layout() {
     <div className="site-grain" aria-hidden="true" />
     {!isHome && <header className="site-header site-sidebar">
       <Link to="/" aria-label="Arena ISS" className="brand-lockup">
-        <span>Arena ISS</span><img className="brand-mark" src="/brand/arena-iss-mark.png" alt="" aria-hidden="true" draggable="false" />
+        <span className="brand-copy">
+          <span className="brand-name">Arena ISS</span>
+          <span className="brand-tagline">Arena Intelligence, Safety &amp; Standards.</span>
+        </span>
+        <img className="brand-mark" src="/brand/arena-iss-mark.png" alt="" aria-hidden="true" draggable="false" />
       </Link>
 
       {account ? <div className="sidebar-nav-block">
@@ -135,18 +119,10 @@ export function Layout() {
         </nav>
       </div> : null}
 
-      <div className="header-actions" ref={accountRef}>
-        {account ? <>
-          <button className="header-account" onClick={() => setAccountOpen((open) => !open)} aria-label="Account" aria-expanded={accountOpen} aria-haspopup="menu">
-            <span>Account</span>
-          </button>
-          {accountOpen && <div role="menu" className="account-menu">
-            <Link role="menuitem" to="/account">View account</Link>
-            <button role="menuitem" onClick={disconnect}>Disconnect</button>
-          </div>}
-        </> : <button onClick={() => openLogin()} className="header-cta login-trigger" aria-label="Login">Login</button>}
+      <div className="header-actions" ref={actionsRef}>
+        {!account && <button onClick={() => openLogin()} className="header-cta login-trigger" aria-label="Login">Login</button>}
         {account && <button
-          onClick={() => { setAccountOpen(false); setMenuOpen((open) => !open); }}
+          onClick={() => setMenuOpen((open) => !open)}
           className="menu-toggle"
           aria-controls="site-nav"
           aria-expanded={menuOpen}

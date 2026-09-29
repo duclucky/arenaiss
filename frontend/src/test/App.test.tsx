@@ -147,9 +147,8 @@ describe('App Tests', () => {
     const accountPages = await screen.findByRole('navigation', { name: 'Account pages' });
     expect(accountPages).toHaveTextContent('Overview');
     expect(accountPages).toHaveTextContent('Claim');
-    fireEvent.click(await screen.findByRole('button', { name: 'Account' }));
-    const disconnectBtn = await screen.findByText('Disconnect');
-    expect(disconnectBtn).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument();
+    const disconnectBtn = await screen.findByRole('button', { name: 'Sign out' });
     
     // Disconnect
     fireEvent.click(disconnectBtn);
@@ -372,10 +371,10 @@ describe('App Tests', () => {
     const providerBtn = (await screen.findByText('Test Provider')).closest('button');
     fireEvent.click(providerBtn!);
 
-    // Account details stay inside the signed-in Account menu.
-    const accountMenu = await screen.findByRole('button', { name: 'Account' });
-    fireEvent.click(accountMenu);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'View account' }));
+    // Account has a single entry in the primary navigation.
+    const accountLink = await screen.findByRole('link', { name: 'Account' });
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument();
+    fireEvent.click(accountLink);
     
     // Since usdcAddress is missing, balance fails and shows Unavailable
     const unavailableSpan = await screen.findByText('Unavailable');

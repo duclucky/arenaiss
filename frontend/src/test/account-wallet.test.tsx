@@ -181,14 +181,10 @@ describe('managed Arena ISS wallet account', () => {
     expect(screen.getByText(/Approving USDC spend on the source network/i)).toBeInTheDocument();
   });
 
-  it('closes the account menu when clicking elsewhere', async () => {
+  it('renders one Account entry in primary navigation without a duplicate account menu', async () => {
     render(<MemoryRouter initialEntries={['/account']}><AppProvider identityAdapter={identity()} config={{ chainId: 5_042_002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }}><Routes><Route element={<Layout />}><Route path="/account" element={<Account />} /></Route></Routes></AppProvider></MemoryRouter>);
-    const trigger = await screen.findByRole('button', { name: 'Account' });
-    expect(trigger).toHaveTextContent('Account');
-    expect(trigger).not.toHaveTextContent('Signed in');
-    fireEvent.click(trigger);
-    expect(screen.getByRole('menu')).toBeInTheDocument();
-    fireEvent.pointerDown(document.body);
+    expect(await screen.findAllByRole('link', { name: 'Account' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Account' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
