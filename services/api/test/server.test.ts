@@ -25,7 +25,7 @@ test('Pair worker ticks overlap so a slow room batch cannot block the next scan'
   finally { releaseFirst(); await first; }
 });
 
-test('startup purge removes only the three archived Tournament graphs and is idempotent', () => {
+test('startup purge removes obsolete Tournament graphs but preserves the verified live walkthrough', () => {
   const database = new SqliteRuntimeStore(':memory:');
   try {
     const recoveryId = `sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd`;
@@ -35,7 +35,8 @@ test('startup purge removes only the three archived Tournament graphs and is ide
     const referenceArcId = `0x3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61`;
     const pairId = `sha256:${'9'.repeat(64)}`;
     database.put('api-tournaments', recoveryId, { id: recoveryId });
-    database.put('tournament-operations', referenceId, { input: { tournamentId: referenceId } });
+    database.put('api-tournaments', referenceId, { id: referenceId });
+    database.put('tournament-operations', recoveryId, { input: { tournamentId: recoveryId } });
     database.put('api-tournaments', referenceCupId, { id: referenceCupId, name: 'Arena ISS Reference Cup', status: 'CANCELLED' });
     database.put('api-registrations', 'recovery-registration', { tournamentId: recoveryArcId });
     database.put('api-registrations', 'reference-registration', { tournamentId: referenceArcId });
@@ -43,10 +44,10 @@ test('startup purge removes only the three archived Tournament graphs and is ide
     database.increment('inference-cost', recoveryId, 3);
     database.claimLease('tournament-operation-leases', referenceId, referenceId, 'worker', 1, 100);
 
-    assert.deepEqual(purgeArchivedTournamentLogs(database), { records: 5, counters: 1, leases: 1 });
-    assert.deepEqual(database.list('api-tournaments'), []);
+    assert.deepEqual(purgeArchivedTournamentLogs(database), { records: 4, counters: 1, leases: 0 });
+    assert.deepEqual(database.list('api-tournaments'), [{ id: referenceId }]);
     assert.deepEqual(database.list('tournament-operations'), []);
-    assert.deepEqual(database.list('api-registrations'), []);
+    assert.deepEqual(database.list('api-registrations'), [{ tournamentId: referenceArcId }]);
     assert.deepEqual(database.list('pair-rooms-v1'), [{ roomId: pairId, state: 'JOINED' }]);
     assert.deepEqual(purgeArchivedTournamentLogs(database), { records: 0, counters: 0, leases: 0 });
   } finally { database.close(); }

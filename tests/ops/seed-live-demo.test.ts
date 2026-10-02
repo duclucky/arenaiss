@@ -42,3 +42,11 @@ test('sanitized live evidence seeds idempotent public projections without privat
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('production startup republishes the verified walkthrough and opens the approved October Tournament', () => {
+  const dockerfile = readFileSync(resolve('Dockerfile'), 'utf8');
+  const compose = readFileSync(resolve('compose.yaml'), 'utf8');
+  assert.match(dockerfile, /node scripts\/ops\/seed-live-demo\.mjs/);
+  assert.match(compose, /ARENA_ONE_SHOT_TOURNAMENT: october-open-2026-v1/);
+  assert.match(compose, /ARENA_TOURNAMENTS_PAUSED: 0/);
+});

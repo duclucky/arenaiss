@@ -26,6 +26,13 @@ describe('arena live-read adapter', () => {
     await expect(adapter.listTournaments()).rejects.toThrow('ARENA_READ_NOT_CONFIGURED');
   });
 
+  it('decorates the verified live Tournament with its public evidence walkthrough', async () => {
+    const id = 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61';
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ id, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', prizePool: '0.008', entrantIds: [] }), { status: 200 }));
+    const adapter = new HttpArenaReadAdapter('/', fetcher as typeof fetch);
+    expect((await adapter.getTournament(id))?.demo).toMatchObject({ evidenceSource: 'LIVE', entrants: 8, entryFee: '0.001 USDC' });
+  });
+
   it('exposes marked walkthrough fixtures alongside an empty development API', async () => {
     const fetcher = vi.fn(async (url: string) => {
       if (url.endsWith('/api/tournaments')) return new Response(JSON.stringify([]), { status: 200 });
@@ -58,9 +65,9 @@ describe('arena live-read adapter', () => {
 
   it('preserves the registration deadline and confirmed entrant count', async () => {
     const bracketSeed = { schema: 'arena-bracket-seed-v2', seedDigest: `sha256:${'a'.repeat(64)}`, rosterDigest: `sha256:${'b'.repeat(64)}`, entropyBlockHash: `0x${'c'.repeat(64)}`, entropyBlockNumber: '123' };
-    const fetcher = vi.fn(async () => new Response(JSON.stringify([{ id: 'daily', name: 'Daily', status: 'UPCOMING', prizePool: '1', registrationClosesAt: 1789603200, entrantIds: ['sha256:entrant'], bracketSeed }]), { status: 200 }));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify([{ id: 'daily', name: 'Daily', status: 'UPCOMING', prizePool: '1', registrationClosesAt: 1789603200, startsAt: 1789606800, entrantIds: ['sha256:entrant'], bracketSeed }]), { status: 200 }));
     const adapter = new HttpArenaReadAdapter('/', fetcher as typeof fetch);
-    expect((await adapter.listTournaments())[0]).toMatchObject({ registrationClosesAt: 1789603200, entrantCount: 1, bracketSeed });
+    expect((await adapter.listTournaments())[0]).toMatchObject({ registrationClosesAt: 1789603200, startsAt: 1789606800, entrantCount: 1, bracketSeed });
   });
 
   it('preserves the public recovery state for an active tournament', async () => {

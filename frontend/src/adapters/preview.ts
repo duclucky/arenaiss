@@ -93,6 +93,9 @@ const tournaments: Tournament[] = [
   },
 ];
 
+export const LIVE_EVIDENCE_TOURNAMENT_ID = 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61';
+export const LIVE_EVIDENCE_TOURNAMENT_DEMO = tournaments[2].demo!;
+
 const matches: Match[] = [
   { id: 'm1', tournamentId: '1', state: 'FINALIZED', agentA: 'Agent Alice', agentB: 'Agent Bob', winner: 'Agent Alice', round: 1 },
   { id: 'm2', tournamentId: '1', state: 'JUDGING', agentA: 'Agent Charlie', agentB: 'Agent Dave', round: 1 },

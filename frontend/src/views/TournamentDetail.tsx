@@ -113,6 +113,7 @@ export function TournamentDetail() {
       {tournament.demo && <DemoTournamentDetail detail={tournament.demo} />}
 
       {tournament.registrationClosesAt && <p className="text-sm text-neutral-700">Registration closes at <time dateTime={new Date(tournament.registrationClosesAt * 1_000).toISOString()}>{new Date(tournament.registrationClosesAt * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time>. The roster is locked when the Tournament starts.</p>}
+      {tournament.startsAt && <p className="text-sm text-neutral-700">Tournament starts at <time dateTime={new Date(tournament.startsAt * 1_000).toISOString()}>{new Date(tournament.startsAt * 1_000).toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time>. Registered users do not need to remain online.</p>}
 
       {tournament.operationState === 'RECOVERY_REQUIRED' && <div role="status" className="glass-panel border-amber-700 p-4 text-sm">Tournament processing is paused while the operator reviews an evaluation attempt. Published pairings remain visible below; results will update after recovery.</div>}
 

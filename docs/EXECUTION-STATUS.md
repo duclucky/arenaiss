@@ -1,5 +1,23 @@
 # Implementation execution status
 
+## 2026-10-02 Public Tournament walkthrough and October Open — release authorized
+
+The sanitized projection of the completed live Tournament is restored at API
+startup and is no longer removed by the obsolete-demo purge or hidden by the
+frontend. Its public detail view explains the bracket, finalized GenLayer
+verdicts, activity sequence and Arc Testnet payout summary without exposing
+private model output or credentials.
+
+The owner also authorized one public `Arena ISS October Open 2026`. Its durable,
+idempotent intent opens registration immediately, closes at `2026-10-16
+00:00:00 UTC` (after the full UTC day on 15 October), and starts at the same
+instant. The accepted policy is 8–32 entrants, 1 USDC per entrant on Arc
+Testnet, and the existing top-five payout/10% platform-fee Tournament policy.
+The public API and UI now project the distinct start time. Deployment of this
+release is expected to perform the single Arc Testnet Tournament creation
+transaction; the transaction and runtime capability state must be verified
+after deployment before this section is treated as live-network evidence.
+
 ## 2026-10-02 Transferred Agent evaluation-detail access — release authorized
 
 Evaluation result pages now load the immutable campaign and run evidence

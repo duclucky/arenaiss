@@ -1,5 +1,5 @@
 import type { ArenaReadAdapter, GenLayerReadAdapter, Match, MatchState, MatchVerdict, PreviewFixtureAdapter, Tournament } from './interfaces';
-import { previewAdapter } from './preview';
+import { LIVE_EVIDENCE_TOURNAMENT_DEMO, LIVE_EVIDENCE_TOURNAMENT_ID, previewAdapter } from './preview';
 
 type Fetcher = typeof fetch;
 const TOURNAMENT_STATES = new Set(['UPCOMING', 'ACTIVE', 'COMPLETED', 'CANCELLED']);
@@ -143,6 +143,7 @@ function normalizeTournament(value: unknown): Tournament {
   const status = text(item.status);
   if (!TOURNAMENT_STATES.has(status)) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.registrationClosesAt !== undefined && (!Number.isSafeInteger(item.registrationClosesAt) || (item.registrationClosesAt as number) < 1)) throw new Error('INVALID_ARENA_RESPONSE');
+  if (item.startsAt !== undefined && (!Number.isSafeInteger(item.startsAt) || (item.startsAt as number) < 1 || (item.registrationClosesAt !== undefined && (item.startsAt as number) < (item.registrationClosesAt as number)))) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.stakeAmount !== undefined && (typeof item.stakeAmount !== 'string' || !/^[1-9][0-9]*$/.test(item.stakeAmount))) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.entrantIds !== undefined && (!Array.isArray(item.entrantIds) || item.entrantIds.some((id) => typeof id !== 'string'))) throw new Error('INVALID_ARENA_RESPONSE');
   if (item.bracketRevision !== undefined && (!Number.isSafeInteger(item.bracketRevision) || (item.bracketRevision as number) < 1 || (item.bracketRevision as number) > 2)) throw new Error('INVALID_ARENA_RESPONSE');
@@ -155,11 +156,14 @@ function normalizeTournament(value: unknown): Tournament {
     if (schema !== 'arena-bracket-seed-v2' || !/^sha256:[0-9a-f]{64}$/.test(seedDigest) || !/^sha256:[0-9a-f]{64}$/.test(rosterDigest) || !/^0x[0-9a-f]{64}$/.test(entropyBlockHash) || !/^(0|[1-9][0-9]*)$/.test(entropyBlockNumber)) throw new Error('INVALID_ARENA_RESPONSE');
     bracketSeed = { schema, seedDigest, rosterDigest, entropyBlockHash, entropyBlockNumber };
   }
-  return { id: text(item.id), name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
+  const id = text(item.id);
+  return { id, name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
     ...(item.stakeAmount !== undefined ? { stakeAmount: item.stakeAmount as string } : {}),
     ...(item.registrationClosesAt !== undefined ? { registrationClosesAt: item.registrationClosesAt as number } : {}),
+    ...(item.startsAt !== undefined ? { startsAt: item.startsAt as number } : {}),
     ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}), ...(item.bracketRevision !== undefined ? { bracketRevision: item.bracketRevision as number } : {}),
-    ...(bracketSeed ? { bracketSeed } : {}), ...(item.operationState ? { operationState: item.operationState as Tournament['operationState'] } : {}) };
+    ...(bracketSeed ? { bracketSeed } : {}), ...(item.operationState ? { operationState: item.operationState as Tournament['operationState'] } : {}),
+    ...(id === LIVE_EVIDENCE_TOURNAMENT_ID ? { demo: structuredClone(LIVE_EVIDENCE_TOURNAMENT_DEMO) } : {}) };
 }
 function normalizeMatch(value: unknown): Match {
   const item = record(value);

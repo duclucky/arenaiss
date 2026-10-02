@@ -5,6 +5,8 @@ import type { CreateTournamentOperation, TournamentOperationAction, TournamentOp
 
 const REQUEST_KEY = 'arena-iss-reference-cup-8x1-usdc-30m-2026-09-16-v1';
 const TOURNAMENT_ID = `sha256:${createHash('sha256').update(REQUEST_KEY).digest('hex')}`;
+const OCTOBER_REQUEST_KEY = 'arena-iss-october-open-2026-v1';
+const OCTOBER_TOURNAMENT_ID = `sha256:${createHash('sha256').update(OCTOBER_REQUEST_KEY).digest('hex')}`;
 const INTENT_NAMESPACE = 'one-time-tournament-intents';
 
 export async function launchReferenceTournament(runtime: SqliteRuntimeStore, operations: TournamentOperationsPort, nowSeconds: number) {
@@ -29,6 +31,26 @@ export async function launchReferenceTournament(runtime: SqliteRuntimeStore, ope
     throw new Error('stored reference tournament intent conflicts with approved policy');
   }
   const existing = await operations.get(TOURNAMENT_ID);
+  const snapshot = existing ?? await operations.create(input);
+  return { input, snapshot };
+}
+
+export async function launchOctoberTournament(runtime: SqliteRuntimeStore, operations: TournamentOperationsPort) {
+  const planned: CreateTournamentOperation = {
+    tournamentId: OCTOBER_TOURNAMENT_ID,
+    name: 'Arena ISS October Open 2026',
+    registrationOpensAt: Date.UTC(2026, 9, 2) / 1_000,
+    registrationClosesAt: Date.UTC(2026, 9, 16) / 1_000,
+    startsAt: Date.UTC(2026, 9, 16) / 1_000,
+    expiresAt: Date.UTC(2026, 9, 23) / 1_000,
+    minEntrants: 8,
+    maxEntrants: 32,
+    stakeAmount: '1000000',
+  };
+  runtime.putIfAbsent(INTENT_NAMESPACE, OCTOBER_TOURNAMENT_ID, planned);
+  const input = runtime.get<CreateTournamentOperation>(INTENT_NAMESPACE, OCTOBER_TOURNAMENT_ID);
+  if (!input || JSON.stringify(input) !== JSON.stringify(planned)) throw new Error('stored October Tournament intent conflicts with approved policy');
+  const existing = await operations.get(OCTOBER_TOURNAMENT_ID);
   const snapshot = existing ?? await operations.create(input);
   return { input, snapshot };
 }

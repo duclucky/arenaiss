@@ -33,7 +33,7 @@ export type AgentDetail = PublicAgent & {
   evaluations: PublicEvaluationCampaign[];
 };
 export type PublicTournamentStatus = "UPCOMING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; bracketSeed?: PublicBracketSeed; bracketRevision?: number; operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' };
+export type PublicTournament = { id: string; name: string; status: PublicTournamentStatus; entrantIds: readonly string[]; stakeAmount?: string; prizePool: string; registrationClosesAt?: number; startsAt?: number; bracketSeed?: PublicBracketSeed; bracketRevision?: number; operationState?: 'RECOVERY_REQUIRED' | 'WAITING_FOR_JUDGE' | 'RUNNING' | 'SETTLEMENT_PENDING' | 'REFUND_PENDING' };
 export type PublicMatchState = "SCHEDULED" | "WAITING_FOR_OUTPUTS" | "JUDGING" | "ACCEPTED" | "FAILED" | "RETRYABLE" | "FINALIZED" | "TIE" | "RETRY" | "WINNER_ADVANCED";
 export type PublicMatch = { id: string; tournamentId: string; state: PublicMatchState; agentA: string; agentB: string; agentIdA?: Digest; agentIdB?: Digest; winner?: string; round: number; stage?: 'preliminary' | 'main' | 'third_place' | 'fifth_place' };
 export type PublicMatchEvent = { state: PublicMatchState; at?: number };
@@ -302,6 +302,7 @@ export class ArenaApiService {
       || !/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(tournament.prizePool)
       || (tournament.stakeAmount !== undefined && !/^[1-9][0-9]*$/.test(tournament.stakeAmount))
       || (tournament.registrationClosesAt !== undefined && (!Number.isSafeInteger(tournament.registrationClosesAt) || tournament.registrationClosesAt < 1))
+      || (tournament.startsAt !== undefined && (!Number.isSafeInteger(tournament.startsAt) || tournament.startsAt < 1 || (tournament.registrationClosesAt !== undefined && tournament.startsAt < tournament.registrationClosesAt)))
       || (tournament.bracketRevision !== undefined && (!Number.isSafeInteger(tournament.bracketRevision) || tournament.bracketRevision < 1 || tournament.bracketRevision > 2))
       || (tournament.operationState !== undefined && !['RECOVERY_REQUIRED', 'WAITING_FOR_JUDGE', 'RUNNING', 'SETTLEMENT_PENDING', 'REFUND_PENDING'].includes(tournament.operationState))
       || (tournament.bracketSeed !== undefined && (tournament.bracketSeed.schema !== "arena-bracket-seed-v2" || !isDigest(tournament.bracketSeed.seedDigest) || !isDigest(tournament.bracketSeed.rosterDigest) || !/^0x[0-9a-f]{64}$/.test(tournament.bracketSeed.entropyBlockHash) || !/^(0|[1-9][0-9]*)$/.test(tournament.bracketSeed.entropyBlockNumber)))) throw new Error("invalid tournament");

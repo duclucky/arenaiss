@@ -7,7 +7,6 @@ import { displayLabel } from '../display-label';
 
 const ARCHIVED_TOURNAMENT_IDS = new Set([
   'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
-  'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
   'sha256:17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480',
 ]);
 
@@ -79,7 +78,13 @@ function TournamentSkeleton() { return <div className="glass-panel animate-pulse
 function entrantCount(tournament: Tournament) { return tournament.entrantCount ?? tournament.entrantIds?.length ?? 0; }
 function isRegistrationOpen(tournament: Tournament) { return tournament.status === 'UPCOMING' && (!tournament.registrationClosesAt || Date.now() < tournament.registrationClosesAt * 1_000); }
 function tournamentPriority(tournament: Tournament) { if (isRegistrationOpen(tournament)) return 0; return { ACTIVE: 1, UPCOMING: 2, COMPLETED: 3, CANCELLED: 4 }[tournament.status]; }
-function deadlineLabel(tournament: Tournament) { if (!tournament.registrationClosesAt) return tournament.status === 'COMPLETED' ? 'Completed' : tournament.status === 'CANCELLED' ? 'Refund path' : 'Schedule pending'; const date = new Date(tournament.registrationClosesAt * 1_000).toLocaleString(undefined, { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }); return tournament.status === 'UPCOMING' ? `${date} UTC` : `Closed ${date} UTC`; }
+function deadlineLabel(tournament: Tournament) {
+  if (!tournament.registrationClosesAt) return tournament.status === 'COMPLETED' ? 'Completed' : tournament.status === 'CANCELLED' ? 'Refund path' : 'Schedule pending';
+  const closes = formatUtc(tournament.registrationClosesAt);
+  if (tournament.status !== 'UPCOMING') return `Closed ${closes} UTC`;
+  return tournament.startsAt ? `Closes ${closes} UTC · Starts ${formatUtc(tournament.startsAt)} UTC` : `${closes} UTC`;
+}
+function formatUtc(timestamp: number) { return new Date(timestamp * 1_000).toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }); }
 function statusLabel(tournament: Tournament) { if (tournament.operationState === 'RECOVERY_REQUIRED') return 'Recovery in progress'; if (tournament.operationState === 'WAITING_FOR_JUDGE') return 'GenLayer judging'; if (tournament.operationState === 'SETTLEMENT_PENDING') return 'Settlement pending'; if (tournament.operationState === 'REFUND_PENDING') return 'Refund pending'; return { UPCOMING: 'Registration', ACTIVE: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled' }[tournament.status]; }
 function statusTone(tournament: Tournament) { if (tournament.operationState === 'RECOVERY_REQUIRED' || tournament.operationState === 'REFUND_PENDING' || tournament.status === 'CANCELLED') return 'border-amber-700 text-amber-900'; if (tournament.status === 'UPCOMING') return 'border-emerald-700 text-emerald-900'; if (tournament.status === 'ACTIVE') return 'border-accent text-accent'; return 'border-neutral-500 text-neutral-700'; }
 function formatUsdc(baseUnits: string) { const value = BigInt(baseUnits); const whole = value / 1_000_000n; const fraction = (value % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, ''); return fraction ? `${whole}.${fraction}` : `${whole}.00`; }

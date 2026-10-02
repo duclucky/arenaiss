@@ -15,7 +15,7 @@ COPY scripts/ops ./scripts/ops
 COPY docs/evidence/live/trusted-operator-lifecycle-settlement-2.json ./docs/evidence/live/trusted-operator-lifecycle-settlement-2.json
 USER node
 EXPOSE 8787
-CMD ["node", "services/api/src/server.ts"]
+CMD ["sh", "-c", "node scripts/ops/seed-live-demo.mjs && exec node services/api/src/server.ts"]
 
 FROM node:24-bookworm-slim AS frontend-build
 WORKDIR /app/frontend

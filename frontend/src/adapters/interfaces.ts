@@ -5,6 +5,7 @@ export type Tournament = {
   prizePool: string;
   stakeAmount?: string;
   registrationClosesAt?: number;
+  startsAt?: number;
   entrantCount?: number;
   entrantIds?: string[];
   bracketSeed?: {

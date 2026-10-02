@@ -21,7 +21,7 @@ import { PersistentSoloCampaignStore, SoloEvaluationRunner } from '../../../pack
 import { createStudioNextAgentEvaluationPort } from '../../../packages/genlayer/src/evaluation-sdk-port.ts';
 import type { TournamentOperationsPort } from './tournament-operations.ts';
 import { tournamentOperationsFromEnvironment } from './tournament-operations-live.ts';
-import { launchReferenceTournament, runReferenceTournamentTick } from './reference-tournament-launch.ts';
+import { launchOctoberTournament, launchReferenceTournament, runReferenceTournamentTick } from './reference-tournament-launch.ts';
 import { DailyTournamentWorker } from './daily-tournament.ts';
 import { PairRoomCoordinator } from './pair-rooms.ts';
 import { ArcPairChainPort } from './pair-arc.ts';
@@ -34,8 +34,6 @@ const MAX_BODY_BYTES = 64 * 1024;
 const ARCHIVED_TOURNAMENT_IDENTIFIERS = [
   'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
   '0x4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd',
-  'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
-  '0x3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61',
   'sha256:17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480',
   '0x17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480',
 ] as const;
@@ -361,9 +359,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   process.once('SIGINT', shutdown);
   server.listen(port, host, () => {
     process.stdout.write(`${JSON.stringify({ event: 'server_listening', host, port, fallbackConfigured: Boolean(providerConfigurationFromEnvironment(process.env)) })}\n`);
-    if (process.env.ARENA_ONE_SHOT_TOURNAMENT === 'reference-8x1-30m-v1') {
+    const oneShotTournament = process.env.ARENA_ONE_SHOT_TOURNAMENT;
+    if (oneShotTournament === 'reference-8x1-30m-v1' || oneShotTournament === 'october-open-2026-v1') {
       if (!tournamentOperations) process.stderr.write(`${JSON.stringify({ event: 'reference_tournament_launch_failed', error: 'Tournament operations unavailable' })}\n`);
-      else void launchReferenceTournament(runtime, tournamentOperations, Math.floor(Date.now() / 1_000))
+      else void (oneShotTournament === 'october-open-2026-v1'
+        ? launchOctoberTournament(runtime, tournamentOperations)
+        : launchReferenceTournament(runtime, tournamentOperations, Math.floor(Date.now() / 1_000)))
         .then(({ input, snapshot }) => {
           process.stdout.write(`${JSON.stringify({ event: 'reference_tournament_launch_confirmed', tournamentId: input.tournamentId, registrationClosesAt: input.registrationClosesAt, startsAt: input.startsAt, stakeAmount: input.stakeAmount, minEntrants: input.minEntrants, maxEntrants: input.maxEntrants, transactionHash: snapshot.arc?.transactionHash ?? null })}\n`);
           const tick = async () => {

@@ -12,7 +12,7 @@ const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, ident
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
 
 describe('Tournament operator console', () => {
-  it('keeps archived production Tournaments out of the public schedule', async () => {
+  it('keeps obsolete Tournaments out while publishing the verified live walkthrough', async () => {
     const archivedRecoveryId = 'sha256:4cd199d746966f2df0325d307267e23ffbf9bc0c3605ab372132e0478ff06fcd';
     const archivedReferenceId = 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61';
     const archivedReferenceCupId = 'sha256:17b7579726b7fde3cd3e793aa0e7acb6a3c529f09bfd6c05ea33f732bf431480';
@@ -28,7 +28,7 @@ describe('Tournament operator console', () => {
 
     expect(await screen.findByRole('heading', { name: 'Visible Tournament history' })).toBeInTheDocument();
     expect(screen.queryByText('Arena ISS Daily 2026-09-17 UTC')).not.toBeInTheDocument();
-    expect(screen.queryByText('Gamma Finals · Verified Live Run')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gamma Finals · Verified Live Run' })).toBeInTheDocument();
     expect(screen.queryByText('Arena ISS Reference Cup')).not.toBeInTheDocument();
   });
 
@@ -49,6 +49,14 @@ describe('Tournament operator console', () => {
     expect(screen.getByRole('heading', { name: 'Register once' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Arena runs the bracket' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Claim on Arc' })).toBeInTheDocument();
+  });
+
+  it('shows the exact UTC start time for an open Tournament', async () => {
+    const id = `sha256:${'d'.repeat(64)}`;
+    const reads = { async listTournaments() { return [{ id, name: 'Arena ISS October Open 2026', status: 'UPCOMING', entrantIds: [], prizePool: '0', stakeAmount: '1000000', registrationClosesAt: Date.UTC(2026, 9, 16) / 1_000, startsAt: Date.UTC(2026, 9, 16) / 1_000 }]; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter><AppProvider arenaReadAdapter={reads}><Tournaments /></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Arena ISS October Open 2026' })).toBeInTheDocument();
+    expect(screen.getByText(/Starts Oct 16, 2026, 12:00 AM UTC/)).toBeInTheDocument();
   });
 
   it('shows UTC registration deadline and hides registration after the roster closes', async () => {

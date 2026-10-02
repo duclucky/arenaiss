@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { SqliteRuntimeStore } from '../../../packages/persistence/src/sqlite-runtime.ts';
-import { launchReferenceTournament, runReferenceTournamentTick } from '../src/reference-tournament-launch.ts';
+import { launchOctoberTournament, launchReferenceTournament, runReferenceTournamentTick } from '../src/reference-tournament-launch.ts';
 import type { CreateTournamentOperation, TournamentOperationsPort, TournamentOperationSnapshot } from '../src/tournament-operations.ts';
 
 test('system launch creates one eight-place 1 USDC tournament with a durable 30-minute schedule', async () => {
@@ -51,6 +51,34 @@ test('system launch retries a failed Arc creation with the original persisted ti
     await launchReferenceTournament(runtime, operations, 1_800_000_600);
     assert.equal(calls.length, 2);
     assert.deepEqual(calls[0], calls[1]);
+  } finally { runtime.close(); }
+});
+
+test('October Open registers through 15 October and starts at 00:00 UTC on 16 October 2026', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  const calls: CreateTournamentOperation[] = [];
+  let created: TournamentOperationSnapshot | null = null;
+  const operations: TournamentOperationsPort = {
+    async create(input) {
+      calls.push(input);
+      created = { tournamentId: input.tournamentId, name: input.name, state: 'REGISTRATION', entrantCount: 0, matchCount: 0, finalizedMatchCount: 0, nextActions: ['PROGRESS'], arc: { state: 'DRAFT', transactionHash: `0x${'b'.repeat(64)}` } };
+      return created;
+    },
+    async get() { return created; }, async list() { return created ? [created] : []; }, async execute() { throw new Error('not used'); },
+  };
+  try {
+    const first = await launchOctoberTournament(runtime, operations);
+    assert.equal(first.input.name, 'Arena ISS October Open 2026');
+    assert.equal(first.input.registrationOpensAt, Date.UTC(2026, 9, 2) / 1_000);
+    assert.equal(first.input.registrationClosesAt, Date.UTC(2026, 9, 16) / 1_000);
+    assert.equal(first.input.startsAt, Date.UTC(2026, 9, 16) / 1_000);
+    assert.equal(first.input.expiresAt, Date.UTC(2026, 9, 23) / 1_000);
+    assert.equal(first.input.stakeAmount, '1000000');
+    assert.equal(first.input.minEntrants, 8);
+    assert.equal(first.input.maxEntrants, 32);
+    const second = await launchOctoberTournament(runtime, operations);
+    assert.deepEqual(second.input, first.input);
+    assert.equal(calls.length, 1);
   } finally { runtime.close(); }
 });
 
