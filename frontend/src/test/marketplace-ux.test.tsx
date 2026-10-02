@@ -97,6 +97,17 @@ describe('Marketplace website UX', () => {
     })));
   });
 
+  it('shows seller-owned listings that are hidden from the public Marketplace', async () => {
+    const submitted = { ...ownedActive, state: 'SUBMITTED' as const };
+    mount({ ...marketplaceApi, async listListings() { return []; }, async listOwnedListings() { return [submitted]; } },
+      agentApi, '/marketplace?view=sell');
+
+    const records = await screen.findByRole('region', { name: 'My listing records' });
+    expect(within(records).getByRole('heading', { name: 'Safety Scout' })).toBeInTheDocument();
+    expect(within(records).getByText('SUBMITTED')).toBeInTheDocument();
+    expect(within(records).getByText(/Awaiting Arc confirmation/i)).toBeInTheDocument();
+  });
+
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
     const publicListings = await screen.findByRole('region', { name: 'Agents for sale' });

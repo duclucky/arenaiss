@@ -1,5 +1,17 @@
 # Implementation execution status
 
+## 2026-10-02 Marketplace hidden-listing reconciliation — local only
+
+Marketplace eligibility now reconciles every recoverable seller listing against
+Arc before deciding that an Agent version is already listed. A stale local
+`SUBMITTED` record therefore becomes `EXPIRED`, `CANCELLED`, `ACTIVE` or `SOLD`
+from the exact onchain snapshot before the duplicate-listing guard runs. The
+seller page also shows all private listing records and their current states,
+while public search remains limited to `ACTIVE` listings. This removes the
+previous mismatch where a hidden pending record blocked relisting but was not
+visible to its owner. No Circle call, Arc transaction, commit, push or deployment
+was performed for this repair.
+
 ## 2026-10-02 Marketplace consumed-certificate relist repair — local only
 
 Marketplace no longer offers a certificate after its listing intent has resolved

@@ -232,6 +232,7 @@ export class ArenaHttpApi {
       if (request.method === 'POST' && request.path === '/api/marketplace/eligibility') {
         const owner = this.requireSession(request.headers); const body = request.body || {};
         if (!this.marketplaceChain?.approveEligibility) throw new Error('marketplace operator unavailable');
+        await this.reconcileMarketplaceListings();
         const eligibilityInput = { agentId: requireDigest(body.agentId), agentsVersion: requireDigest(body.agentsVersion), campaignIds: requireStringArray(body.campaignIds) as `sha256:${string}`[], issuedAt: requireInteger(body.issuedAt), expiresAt: requireInteger(body.expiresAt), network: requireString(body.network), chainId: requireInteger(body.chainId), judgeAddress: requireAddress(body.judgeAddress) };
         const reusable = this.service.listOwnedMarketplaceCertificates(owner)
           .filter((row) => row.agentId === eligibilityInput.agentId && row.agentVersionId === eligibilityInput.agentsVersion && row.expiresAt > Math.floor(Date.now() / 1000))

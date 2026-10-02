@@ -129,6 +129,10 @@ test('Marketplace issues a fresh single-use certificate after a prior listing co
       owner: alice, sellerAddress: alice, tokenId: '42', agentId, agentsVersion: version, agentsCommitment: commitment,
       price: '3000000', expiresAt: 2_000_000_000, nftApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
       listingIdempotencyKey: '22222222-2222-4222-8222-222222222222', listingId: '1' });
+    runtime.put('marketplace-listings', '1', { schema: 'arena-marketplace-listing-v1', listingId: '1',
+      certificateDigest: oldDigest, agentId, agentVersionId: version, agentsCommitment: commitment,
+      erc8004TokenId: '42', name: 'Agent', seller: alice, sellerAddress: alice, price: '3000000',
+      expiresAt: 2_000_000_000, state: 'SUBMITTED' });
     const service = new ArenaApiService(operator, runtime);
     let created = 0;
     service.createMarketplaceEligibility = (() => {
@@ -139,7 +143,10 @@ test('Marketplace issues a fresh single-use certificate after a prior listing co
       return structuredClone(certificate);
     }) as typeof service.createMarketplaceEligibility;
     let approved = '';
-    const chain = { async snapshot() { throw new Error('not used'); }, async approveEligibility(input: { digest: string }) {
+    let reads = 0;
+    const chain = { async snapshot(listingId: string) { reads += 1; return { listingId, tokenId: '42', agentId, version,
+      commitment, sellerAddress: alice, price: '3000000', expiresAt: 2_000_000_000,
+      state: 'EXPIRED' as const, registryOwner: alice, registryActive: true }; }, async approveEligibility(input: { digest: string }) {
       approved = input.digest;
       return { transactionId: 'fresh-approval', state: 'COMPLETE', txHash: `0x${'8'.repeat(64)}` };
     } };
@@ -156,6 +163,8 @@ test('Marketplace issues a fresh single-use certificate after a prior listing co
     assert.equal(response.body.certificateDigest, freshDigest);
     assert.equal(created, 1);
     assert.equal(approved, freshDigest);
+    assert.equal(reads, 1);
+    assert.equal(runtime.get<{ state: string }>('marketplace-listings', '1')?.state, 'EXPIRED');
   } finally { runtime.close(); }
 });
 
