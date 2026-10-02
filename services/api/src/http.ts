@@ -219,6 +219,11 @@ export class ArenaHttpApi {
       }
       if (request.method === 'GET' && request.path === '/api/tournaments') return this.json(200, this.service.listTournaments());
       if (request.method === 'GET' && request.path === '/api/marketplace/listings') return this.json(200, await this.reconcileMarketplaceListings());
+      const listingProfile = request.path.match(/^\/api\/marketplace\/listings\/([1-9][0-9]*)\/profile$/);
+      if (request.method === 'GET' && listingProfile) {
+        await this.reconcileMarketplaceListings();
+        return this.json(200, this.service.getMarketplaceListingProfile(listingProfile[1]));
+      }
       if (request.method === 'GET' && request.path === '/api/marketplace/my-purchases') { const buyer = this.requireSession(request.headers); await this.reconcileMarketplaceListings(); return this.json(200, this.service.listOwnedMarketplacePurchases(buyer)); }
       if (request.method === 'GET' && request.path === '/api/marketplace/certificates') { const owner = this.requireSession(request.headers); return this.json(200, this.service.listOwnedMarketplaceCertificates(owner)); }
       if (request.method === 'GET' && request.path === '/api/marketplace/operator/certificates') { const operator = this.requireSession(request.headers); return this.json(200, this.service.listMarketplaceCertificatesForOperator(operator)); }

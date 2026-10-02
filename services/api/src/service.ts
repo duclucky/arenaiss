@@ -220,6 +220,20 @@ export class ArenaApiService {
       .map((agent) => ({ ...this.publicView(agent), marketplaceListed: listedAgentIds.has(agent.agentId), activity: this.publicAgentActivity(agent), stats: this.agentStats(agent) }))
       .sort((left, right) => right.createdAt - left.createdAt || left.agentId.localeCompare(right.agentId));
   }
+  getMarketplaceListingProfile(listingId: string): PublicAgent {
+    const listing = this.marketplaceListings.get(listingId);
+    if (!listing || listing.state !== "ACTIVE") throw new Error("marketplace listing unavailable");
+    const agent = this.agents.get(listing.agentId);
+    const version = agent?.versions.find((candidate) => candidate.agentsVersion === listing.agentVersionId);
+    if (!agent || !version || version.agentsCommitment !== listing.agentsCommitment
+      || agent.erc8004Identity?.tokenId !== listing.erc8004TokenId) throw new Error("Marketplace Agent profile binding mismatch");
+    return {
+      ...this.publicView(agent, version),
+      marketplaceListed: true,
+      activity: this.publicAgentActivity(agent, version.agentsVersion),
+      stats: this.agentStats(agent, version.agentsVersion),
+    };
+  }
   getAgentDetail(caller: string, agentId: Digest): AgentDetail {
     const agent = this.requireOwner(caller, agentId);
     const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agentId));
@@ -690,12 +704,11 @@ export class ArenaApiService {
     this.runtime?.put("api-tournaments", tournamentId, updated);
   }
 
-  private publicView(agent: Agent): PublicAgent {
-    const latest = agent.versions.at(-1)!;
+  private publicView(agent: Agent, version: AgentVersion = agent.versions.at(-1)!): PublicAgent {
     const reputation = this.runtime?.list<Erc8004FeedbackRecord>('erc8004-feedbacks')
-      .filter((record) => record.agentVersionId === latest.agentsVersion)
+      .filter((record) => record.agentVersionId === version.agentsVersion)
       .sort((left, right) => right.createdAt - left.createdAt)[0];
-    return { agentId: latest.agentId, agentsVersion: latest.agentsVersion, agentsCommitment: latest.agentsCommitment, createdAt: latest.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}), ...(agent.erc8004Identity ? { erc8004Identity: structuredClone(agent.erc8004Identity) } : {}), ...(reputation ? { erc8004Reputation: { state: reputation.state, value: reputation.value, ...(reputation.feedbackIndex !== undefined ? { feedbackIndex: reputation.feedbackIndex } : {}), ...(reputation.transaction ? { transaction: structuredClone(reputation.transaction) } : {}) } } : {}) };
+    return { agentId: version.agentId, agentsVersion: version.agentsVersion, agentsCommitment: version.agentsCommitment, createdAt: version.createdAt, owner: agent.owner, name: agent.name, active: agent.active !== false, ...(agent.registration ? { registration: structuredClone(agent.registration) } : {}), ...(agent.deactivation ? { deactivation: structuredClone(agent.deactivation) } : {}), ...(agent.erc8004Identity ? { erc8004Identity: structuredClone(agent.erc8004Identity) } : {}), ...(reputation ? { erc8004Reputation: { state: reputation.state, value: reputation.value, ...(reputation.feedbackIndex !== undefined ? { feedbackIndex: reputation.feedbackIndex } : {}), ...(reputation.transaction ? { transaction: structuredClone(reputation.transaction) } : {}) } } : {}) };
   }
 
   private marketplaceOwnershipIsStale(listing: MarketplaceListing): boolean {
@@ -715,8 +728,8 @@ export class ArenaApiService {
     agent.erc8004Identity.ownerAddress = listing.buyerAddress;
     this.runtime?.put("api-agents", agent.agentId, agent);
   }
-  private agentStats(agent: Agent): AgentStats {
-    const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
+  private agentStats(agent: Agent, exactVersion?: Digest): AgentStats {
+    const versionIds = new Set(exactVersion ? [exactVersion] : agent.versions.map((version) => version.agentsVersion));
     const evaluations = (this.runtime ? this.runtime.listNewest<SoloCampaignRecord>("evaluation-campaigns") : [...this.evaluationCampaigns.values()].reverse())
       .filter((campaign) => versionIds.has(campaign.agent.versionId as Digest));
     const latestCompleted = evaluations.find((campaign) => campaign.state === "FINALIZED"
@@ -724,14 +737,21 @@ export class ArenaApiService {
       && campaign.items.every((item) => item.state === "FINALIZED" && item.scorecard));
     const scores = latestCompleted?.items.map((item) => effectiveEvaluationScore(item.scorecard!)) ?? [];
     const latestEvaluationScore = scores.length > 0 ? Math.floor(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
-    const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agent.agentId));
+    const registrations = [...this.registrations.values()].filter((item) => item.agentId === digestBytes32(agent.agentId)
+      && (!exactVersion || item.agentsVersion === digestBytes32(exactVersion)));
+    if (exactVersion) {
+      const pairCount = (this.runtime?.list<PairRoom>('pair-rooms-v1') ?? []).filter((room) => room.state === 'SETTLED'
+        && ((room.creatorAgentId === agent.agentId && room.creatorVersion === exactVersion)
+          || (room.challengerAgentId === agent.agentId && room.challengerVersion === exactVersion))).length;
+      return { latestEvaluationScore, tournamentCount: registrations.length, adversarialMatchCount: pairCount };
+    }
     const tournamentIds = new Set(registrations.map((item) => `sha256:${item.tournamentId.slice(2)}`));
     const relevantMatches = [...this.matches.values()].filter((match) => tournamentIds.has(match.tournamentId));
     const hasUnboundMatch = relevantMatches.some((match) => !match.agentIdA || !match.agentIdB);
     return { latestEvaluationScore, tournamentCount: registrations.length, adversarialMatchCount: hasUnboundMatch ? null : relevantMatches.filter((match) => match.agentIdA === agent.agentId || match.agentIdB === agent.agentId).length };
   }
-  private publicAgentActivity(agent: Agent): PublicAgentActivity {
-    const versionIds = new Set(agent.versions.map((version) => version.agentsVersion));
+  private publicAgentActivity(agent: Agent, exactVersion?: Digest): PublicAgentActivity {
+    const versionIds = new Set(exactVersion ? [exactVersion] : agent.versions.map((version) => version.agentsVersion));
     const evaluations = this.allEvaluationCampaigns()
       .filter((campaign) => versionIds.has(campaign.agent.versionId as Digest)
         && campaign.state === "FINALIZED"
@@ -749,11 +769,14 @@ export class ArenaApiService {
       })
       .sort((left, right) => (right.createdAt ?? 0) - (left.createdAt ?? 0));
     const pairMatches = (this.runtime?.list<PairRoom>('pair-rooms-v1') ?? [])
-      .filter((room) => room.state === 'SETTLED' && (room.creatorAgentId === agent.agentId || room.challengerAgentId === agent.agentId))
+      .filter((room) => room.state === 'SETTLED'
+        && ((room.creatorAgentId === agent.agentId && (!exactVersion || room.creatorVersion === exactVersion))
+          || (room.challengerAgentId === agent.agentId && (!exactVersion || room.challengerVersion === exactVersion))))
       .map((room) => ({ roomId: room.roomId, state: room.state, role: room.creatorAgentId === agent.agentId ? 'CREATOR' as const : 'CHALLENGER' as const, createdAt: room.createdAt }))
       .sort((left, right) => right.createdAt - left.createdAt);
     const tournaments = [...this.registrations.values()]
-      .filter((registration) => registration.agentId === digestBytes32(agent.agentId))
+      .filter((registration) => registration.agentId === digestBytes32(agent.agentId)
+        && (!exactVersion || registration.agentsVersion === digestBytes32(exactVersion)))
       .map((registration) => this.tournaments.get(`sha256:${registration.tournamentId.slice(2)}`))
       .filter((tournament): tournament is PublicTournament => Boolean(tournament))
       .map(({ id, name, status }) => ({ id, name, status }));

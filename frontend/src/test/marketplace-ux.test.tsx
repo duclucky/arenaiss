@@ -107,6 +107,42 @@ describe('Marketplace website UX', () => {
     expect(within(actions).getByRole('button', { name: 'Buy for 2.000000 USDC' })).toBeInTheDocument();
   });
 
+  it('requires an explicit purchase review before submitting the Arc transaction', async () => {
+    const buyerListing = { ...ownedActive, sellerAddress: '0x5555555555555555555555555555555555555555' };
+    const buy = vi.fn().mockResolvedValue({ ...buyerListing, state: 'BUY_SUBMITTED' });
+    mount({ ...marketplaceApi, async listListings() { return [buyerListing]; }, async listOwnedListings() { return []; }, buy });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Buy for 2.000000 USDC' }));
+    expect(buy).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Review purchase' });
+    expect(within(dialog).getByText('ERC-8004 #42')).toBeInTheDocument();
+    expect(within(dialog).getByText('2.000000 USDC')).toBeInTheDocument();
+    expect(within(dialog).getByText('Arc Testnet')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm purchase' }));
+    await waitFor(() => expect(buy).toHaveBeenCalledWith('2', expect.any(String), expect.any(String)));
+  });
+
+  it('loads the public profile bound to the exact Marketplace listing', async () => {
+    const listPublicAgents = vi.fn();
+    const getListingProfile = vi.fn().mockResolvedValue({
+      agentId, name: 'Safety Scout', agentsVersion: version, agentsCommitment: commitment,
+      active: true, marketplaceListed: true,
+      stats: { latestEvaluationScore: 95, tournamentCount: 0, adversarialMatchCount: 0 },
+      activity: { evaluations: [], pairMatches: [], tournaments: [] },
+      erc8004Identity: {
+        schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5042002,
+        registryAddress: address, tokenId: '42', ownerAddress: address, agentUri: 'https://example.test/agent.json',
+        transaction: { transactionId: 'identity', state: 'COMPLETE' },
+      },
+    });
+    mount({ ...marketplaceApi, getListingProfile }, { ...agentApi, listPublicAgents });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'View details' }));
+    expect(await screen.findByRole('dialog', { name: 'Safety Scout' })).toBeInTheDocument();
+    expect(getListingProfile).toHaveBeenCalledWith('2');
+    expect(listPublicAgents).not.toHaveBeenCalled();
+  });
+
   it('opens a public Agent profile with metrics and history without loading private AGENTS.md', async () => {
     const getAgent = vi.fn();
     const listPublicAgents = vi.fn().mockResolvedValue([{
@@ -233,6 +269,7 @@ describe('Marketplace website UX', () => {
       buy };
     mount(recoveryApi);
     fireEvent.click(await screen.findByRole('button', { name: 'Resume Purchased Scout purchase' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm purchase' }));
     await waitFor(() => expect(buy).toHaveBeenCalledWith('3', expect.any(String), expect.any(String)));
     cleanup();
     mount(recoveryApi, agentApi, '/marketplace?view=sell');

@@ -176,6 +176,7 @@ export function Marketplace() {
   const [agentId, setAgentId] = useState('');
   const [listing, setListing] = useState({ certificateDigest: '', price: '', expiresAt: String(nowSeconds() + 7 * 86400) });
   const [delivery, setDelivery] = useState<{ listingId: string; name: string; agentsMd: string } | null>(null);
+  const [purchaseConfirm, setPurchaseConfirm] = useState<MarketplaceListing | null>(null);
   const [publicProfileModal, setPublicProfileModal] = useState<PublicProfileModalState | null>(null);
   const publicProfileRequest = useRef(0);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -248,7 +249,7 @@ export function Marketplace() {
   async function buy(row: MarketplaceListing) {
     if (!marketplaceApi) return;
     setBusy(`buy-${row.listingId}`); setError('');
-    try { await marketplaceApi.buy(row.listingId, uuid(), uuid()); await refresh(); }
+    try { await marketplaceApi.buy(row.listingId, uuid(), uuid()); await refresh(); setPurchaseConfirm(null); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Purchase failed. Check the Arc receipt before trying again.'); }
     finally { setBusy(''); }
   }
@@ -275,14 +276,15 @@ export function Marketplace() {
   async function openPublicProfile(row: MarketplaceListing) {
     const requestId = ++publicProfileRequest.current;
     setPublicProfileModal({ listing: row, status: 'LOADING' });
-    if (!agentApi?.listPublicAgents) {
+    if (!marketplaceApi?.getListingProfile && !agentApi?.listPublicAgents) {
       setPublicProfileModal({ listing: row, status: 'ERROR', message: 'Public Agent evidence is not available on this server.' });
       return;
     }
     try {
-      const profiles = await agentApi.listPublicAgents();
+      const profile = marketplaceApi?.getListingProfile
+        ? await marketplaceApi.getListingProfile(row.listingId)
+        : (await agentApi!.listPublicAgents!()).find((candidate) => candidate.agentId === row.agentId);
       if (publicProfileRequest.current !== requestId) return;
-      const profile = profiles.find((candidate) => candidate.agentId === row.agentId);
       if (!profile) throw new Error('This Agent public profile could not be found.');
       setPublicProfileModal({ listing: row, status: 'READY', profile });
     } catch (cause) {
@@ -327,7 +329,7 @@ export function Marketplace() {
     }
     if (account && (row.state === 'ACTIVE' || (row.state === 'BUY_SUBMITTED' && row.buyerAddress?.toLowerCase() === account.toLowerCase()))) {
       return <button type="button" className="metal-button-solid w-full" disabled={busy !== ''}
-        onClick={() => buy(row)} aria-label={row.state === 'BUY_SUBMITTED' ? `Resume ${row.name} purchase` : undefined}>
+        onClick={() => setPurchaseConfirm(row)} aria-label={row.state === 'BUY_SUBMITTED' ? `Resume ${row.name} purchase` : undefined}>
         {busy === `buy-${row.listingId}` ? 'Purchase submitting…' : row.state === 'BUY_SUBMITTED' ? 'Resume purchase' : `Buy for ${usdc(row.price)}`}
       </button>;
     }
@@ -347,7 +349,7 @@ export function Marketplace() {
     return <article className="glass-panel flex min-h-64 flex-col p-5" key={`${privateRecord ? 'private' : 'public'}-${row.listingId}`}>
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-neutral-600">{privateRecord ? 'Private account record' : 'Agent listing'}</p><h2 className="mt-2 text-2xl font-bold">{row.name}</h2></div><span className="retro-chip shrink-0 px-2 py-1 text-xs">{displayLabel(row.state)}</span></div>
       {!privateRecord && <div role="group" aria-label={`${row.name} listing actions`} className="mt-5 grid grid-cols-2 gap-2"><button type="button" className="metal-button-ghost w-full" onClick={() => openPublicProfile(row)}>View details</button>{listingAction(row)}</div>}
-      <dl className={`${privateRecord ? 'mt-8' : 'mt-5'} space-y-3 text-sm`}><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div></dl>
+      <dl className={`${privateRecord ? 'mt-8' : 'mt-5'} space-y-3 text-sm`}><div className="flex justify-between gap-3"><dt className="text-neutral-600">Price</dt><dd className="font-mono font-bold">{usdc(row.price)}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Identity</dt><dd className="font-mono font-bold">ERC-8004 #{row.erc8004TokenId}</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Version</dt><dd className="font-semibold">Verified Agent version</dd></div><div className="flex justify-between gap-3"><dt className="text-neutral-600">Listing expires</dt><dd className="text-right font-semibold">{activityDate(row.expiresAt)}</dd></div></dl>
       {privateRecord && <div className="mt-auto pt-6">{listingAction(row, true)}</div>}
     </article>;
   }
@@ -378,6 +380,19 @@ export function Marketplace() {
     {activeView === 'sell' && !account && <p className="mt-10 text-sm text-neutral-600">Sign in to certify or list an Agent. <Link to="/agents" className="font-semibold underline">Manage Agents</Link>.</p>}
     {publicProfileModal && <MarketplaceModal titleId="marketplace-agent-profile-heading" onClose={closePublicProfile}>
       <PublicAgentProfile state={publicProfileModal} onRetry={() => openPublicProfile(publicProfileModal.listing)}/>
+    </MarketplaceModal>}
+    {purchaseConfirm && <MarketplaceModal titleId="marketplace-purchase-review-heading" onClose={() => setPurchaseConfirm(null)} width="max-w-xl">
+      <p className="page-kicker">Arc Testnet purchase</p>
+      <h2 id="marketplace-purchase-review-heading" className="mt-2 text-3xl font-bold">Review purchase</h2>
+      <p className="mt-3 text-sm text-neutral-700">Confirm the exact onchain identity and total before Arena ISS submits the USDC approval and purchase transactions.</p>
+      <dl className="retro-inset mt-6 space-y-4 p-5 text-sm">
+        <div className="flex justify-between gap-4"><dt className="text-neutral-600">Agent</dt><dd className="text-right font-bold">{purchaseConfirm.name}</dd></div>
+        <div className="flex justify-between gap-4"><dt className="text-neutral-600">Identity</dt><dd className="font-mono font-bold">ERC-8004 #{purchaseConfirm.erc8004TokenId}</dd></div>
+        <div className="flex justify-between gap-4"><dt className="text-neutral-600">Network</dt><dd className="font-bold">Arc Testnet</dd></div>
+        <div className="flex justify-between gap-4 border-t border-black/20 pt-4"><dt className="font-bold">Total</dt><dd className="font-mono text-lg font-bold">{usdc(purchaseConfirm.price)}</dd></div>
+      </dl>
+      <p className="mt-5 text-sm leading-relaxed text-neutral-700">A successful sale transfers the complete ERC-8004 identity to your managed wallet. The exact private AGENTS.md version becomes available only after canonical Arc ownership readback.</p>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2"><button type="button" className="metal-button-ghost w-full" disabled={busy !== ''} onClick={() => setPurchaseConfirm(null)}>Cancel</button><button type="button" className="metal-button-solid w-full" disabled={busy !== ''} onClick={() => buy(purchaseConfirm)}>{busy === `buy-${purchaseConfirm.listingId}` ? 'Purchasing on Arc…' : 'Confirm purchase'}</button></div>
     </MarketplaceModal>}
     {delivery && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDelivery(null); }}><div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="marketplace-delivery-heading" className="glass-panel max-h-[85vh] w-full max-w-2xl overflow-auto bg-[#f8f5ee] p-6"><div className="flex items-start justify-between gap-4"><div><h2 id="marketplace-delivery-heading" className="text-2xl font-bold">Purchased Agent</h2><p className="mt-2 text-sm">{delivery.name}</p></div><button type="button" className="metal-button-ghost" onClick={() => setDelivery(null)}>Close</button></div><h3 className="mt-6 font-semibold">Private AGENTS.md</h3><pre className="retro-inset mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words p-4 text-sm">{delivery.agentsMd}</pre></div></div>}
   </section>;

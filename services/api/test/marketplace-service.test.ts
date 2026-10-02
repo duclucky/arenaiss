@@ -71,6 +71,40 @@ test('public Marketplace exposes only active listings while owner and buyer reco
   } finally { runtime.close(); }
 });
 
+test('Marketplace public profile is bound to the exact Agent version being sold', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const newerVersion = `sha256:${'8'.repeat(64)}` as const;
+    const newerCommitment = `sha256:${'9'.repeat(64)}` as const;
+    runtime.put('api-agents', agentId, {
+      agentId, owner: seller, name: 'Versioned Agent', active: true,
+      erc8004Identity: {
+        schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5_042_002,
+        registryAddress: `0x${'d'.repeat(40)}`, tokenId, ownerAddress: seller,
+        agentUri: 'https://arenaiss.xyz/api/agents/example/erc8004.json',
+        transaction: { transactionId: 'identity', state: 'COMPLETE' },
+      },
+      versions: [
+        { agentId, agentsVersion: version, agentsCommitment: commitment, agentsMd: '# Sold version', createdAt: 1 },
+        { agentId, agentsVersion: newerVersion, agentsCommitment: newerCommitment, agentsMd: '# Newer private version', createdAt: 2 },
+      ],
+    });
+    runtime.put('marketplace-listings', '6', {
+      schema: 'arena-marketplace-listing-v1', listingId: '6', certificateDigest, agentId,
+      agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId,
+      name: 'Versioned Agent', seller, sellerAddress: seller, price: '1000000', expiresAt: 2_000_000_000, state: 'ACTIVE',
+    });
+
+    const profile = new ArenaApiService(operator, runtime).getMarketplaceListingProfile('6');
+    assert.equal(profile.agentsVersion, version);
+    assert.equal(profile.agentsCommitment, commitment);
+    assert.equal(profile.createdAt, 1);
+    assert.equal(profile.erc8004Identity?.tokenId, tokenId);
+    assert.equal(JSON.stringify(profile).includes('Sold version'), false);
+    assert.equal(JSON.stringify(profile).includes('Newer private version'), false);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace reconciliation repairs a previously finalized sale with stale Arena ownership', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

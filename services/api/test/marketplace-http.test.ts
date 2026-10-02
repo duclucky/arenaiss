@@ -110,6 +110,43 @@ test('Marketplace reconciles a submitted listing from Arc after service restart'
   } finally { runtime.close(); }
 });
 
+test('Marketplace listing profile returns the exact public version bound on Arc', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const agentId = `sha256:${'1'.repeat(64)}`;
+    const version = `sha256:${'2'.repeat(64)}`;
+    const commitment = `sha256:${'3'.repeat(64)}`;
+    const newerVersion = `sha256:${'8'.repeat(64)}`;
+    runtime.put('api-agents', agentId, {
+      agentId, owner: alice, name: 'Versioned Agent', active: true,
+      erc8004Identity: { schema: 'arena-erc8004-identity-v1', network: 'Arc Testnet', chainId: 5_042_002,
+        registryAddress: `0x${'d'.repeat(40)}`, tokenId: '42', ownerAddress: alice,
+        agentUri: 'https://arenaiss.xyz/api/agents/example/erc8004.json', transaction: { transactionId: 'identity', state: 'COMPLETE' } },
+      versions: [
+        { agentId, agentsVersion: version, agentsCommitment: commitment, agentsMd: '# Sold private version', createdAt: 1 },
+        { agentId, agentsVersion: newerVersion, agentsCommitment: `sha256:${'9'.repeat(64)}`, agentsMd: '# Newer private version', createdAt: 2 },
+      ],
+    });
+    runtime.put('marketplace-listings', '6', {
+      schema: 'arena-marketplace-listing-v1', listingId: '6', certificateDigest: `sha256:${'4'.repeat(64)}`,
+      agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: '42', name: 'Versioned Agent',
+      seller: alice, sellerAddress: alice, price: '1000000', expiresAt: 2_000_000_000, state: 'ACTIVE',
+    });
+    const chain = { async snapshot(listingId: string) {
+      return { listingId, tokenId: '42', agentId, version, commitment, sellerAddress: alice, price: '1000000',
+        expiresAt: 2_000_000_000, state: 'ACTIVE' as const, registryOwner: alice, registryActive: true };
+    } };
+    const response = await new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true, undefined, chain)
+      .handle({ method: 'GET', path: '/api/marketplace/listings/6/profile' });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.agentsVersion, version);
+    assert.equal(response.body.agentsCommitment, commitment);
+    assert.equal(response.body.createdAt, 1);
+    assert.equal(response.body.erc8004Identity.tokenId, '42');
+    assert.equal(JSON.stringify(response.body).includes('private version'), false);
+  } finally { runtime.close(); }
+});
+
 test('Public Agent reconciliation transfers Arena control after a canonical ERC-8004 sale', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

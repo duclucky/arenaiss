@@ -204,9 +204,12 @@ export class CircleManagedWalletAdapter implements CircleWalletPort {
   }
 
   async marketplaceBuy(input: { walletId: string; marketplaceAddress: string; listingId: string; price: string; approvalIdempotencyKey: string; buyIdempotencyKey: string }): Promise<WalletTransactionResult> {
+    if (!/^[1-9][0-9]*$/.test(input.listingId)) throw new Error('invalid Marketplace listing ID');
+    if (!/^[1-9][0-9]*$/.test(input.price)) throw new Error('invalid Marketplace price');
     const balances = await this.client.getWalletTokenBalance({ id: input.walletId });
     const token = balances.data?.tokenBalances?.find((balance) => !balance.token?.isNative && balance.token?.blockchain === 'ARC-TESTNET' && balance.token?.tokenAddress?.toLowerCase() === ARC_USDC.toLowerCase());
     if (!token?.token?.id) throw new Error('Circle did not return Arc USDC token metadata');
+    if (BigInt(decimalToBaseUnits(normalizeCircleAmount(token.amount))) < BigInt(input.price)) throw new Error('insufficient Arc USDC balance for Marketplace purchase');
     const approval = await this.client.createContractExecutionTransaction({ walletId: input.walletId, contractAddress: ARC_USDC, abiFunctionSignature: 'approve(address,uint256)', abiParameters: [input.marketplaceAddress, input.price], fee: { type: 'level', config: { feeLevel: 'MEDIUM' } }, idempotencyKey: input.approvalIdempotencyKey, refId: 'arena-iss-marketplace-approve' });
     if (!approval.data?.id) throw new Error('Circle returned an invalid marketplace approval response');
     await this.client.getTransaction({ id: approval.data.id, waitForState: 'COMPLETE', pollingInterval: 1000 });

@@ -301,6 +301,47 @@ test('Circle adapter approves the ERC-8004 identity before creating a V2 listing
   ]);
 });
 
+test('Circle adapter checks Arc USDC and submits Marketplace approval before purchase', async () => {
+  const executions: any[] = [];
+  const adapter = new CircleManagedWalletAdapter({
+    async getWalletTokenBalance() {
+      return { data: { tokenBalances: [{ amount: '2.5', token: { id: 'arc-usdc', blockchain: 'ARC-TESTNET', tokenAddress: '0x3600000000000000000000000000000000000000', isNative: false } }] } };
+    },
+    async createContractExecutionTransaction(input: any) { executions.push(input); return { data: { id: `buy-${executions.length}` } }; },
+    async getTransaction({ id }: any) { return { data: { transaction: { id, state: 'COMPLETE', txHash: `0x${String(executions.length).repeat(64)}` } } }; },
+  } as any, 'wallet-set-id');
+
+  await adapter.marketplaceBuy({
+    walletId: 'wallet-id', marketplaceAddress: '0x2222222222222222222222222222222222222222',
+    listingId: '7', price: '2000000',
+    approvalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+    buyIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+  });
+
+  assert.deepEqual(executions.map((row) => ({ address: row.contractAddress, signature: row.abiFunctionSignature, parameters: row.abiParameters })), [
+    { address: '0x3600000000000000000000000000000000000000', signature: 'approve(address,uint256)', parameters: ['0x2222222222222222222222222222222222222222', '2000000'] },
+    { address: '0x2222222222222222222222222222222222222222', signature: 'buy(uint256)', parameters: ['7'] },
+  ]);
+});
+
+test('Circle adapter rejects an underfunded Marketplace purchase before approval', async () => {
+  let executions = 0;
+  const adapter = new CircleManagedWalletAdapter({
+    async getWalletTokenBalance() {
+      return { data: { tokenBalances: [{ amount: '1.999999', token: { id: 'arc-usdc', blockchain: 'ARC-TESTNET', tokenAddress: '0x3600000000000000000000000000000000000000', isNative: false } }] } };
+    },
+    async createContractExecutionTransaction() { executions += 1; return { data: { id: 'unexpected' } }; },
+  } as any, 'wallet-set-id');
+
+  await assert.rejects(() => adapter.marketplaceBuy({
+    walletId: 'wallet-id', marketplaceAddress: '0x2222222222222222222222222222222222222222',
+    listingId: '7', price: '2000000',
+    approvalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+    buyIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+  }), /insufficient Arc USDC balance/i);
+  assert.equal(executions, 0);
+});
+
 test('Circle adapter reuses separately persisted approval and burn idempotency keys', async () => {
   const executions: any[] = [];
   const progress: any[] = [];

@@ -1,5 +1,17 @@
 # Implementation execution status
 
+## 2026-10-02 Marketplace purchase review and exact-version evidence — local only
+
+Marketplace public details are now resolved from the selected listing instead
+of the Agent's latest generic profile. The API verifies the listing's exact
+Agent version, commitment and ERC-8004 token binding, returns only public
+metrics/history for that version, and never returns AGENTS.md. Listing cards
+show the ERC-8004 identity and expiry. Buying now requires a separate review
+step showing the Agent, token ID, Arc Testnet network and total USDC amount
+before any managed-wallet transaction is submitted. The Circle adapter also
+rejects an underfunded Arc USDC purchase before submitting an approval. No purchase, Arc write,
+deployment, push or publication was performed for this local batch.
+
 ## 2026-09-24 Marketplace Arena ownership handoff
 
 Marketplace reconciliation now transfers the backend Agent owner and stored

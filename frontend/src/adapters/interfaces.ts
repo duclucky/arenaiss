@@ -233,6 +233,7 @@ export type MarketplaceCertificate = { schema: string; certificateDigest: string
 export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; erc8004TokenId: string; name: string; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'CANCEL_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
 export interface MarketplaceApiAdapter {
   listListings(): Promise<MarketplaceListing[]>;
+  getListingProfile?(listingId: string): Promise<AgentProfile>;
   listOwnedListings?(): Promise<MarketplaceListing[]>;
   listPurchases?(): Promise<MarketplaceListing[]>;
   listCertificates(): Promise<MarketplaceCertificate[]>;
