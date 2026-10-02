@@ -89,6 +89,82 @@ test('a completed sale does not block the current owner from certifying the same
   } finally { runtime.close(); }
 });
 
+test('verified evaluation evidence follows an ERC-8004 Agent to its new owner for relisting', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    seedAgent(runtime, buyer, buyer);
+    const scenarioIds = Array.from({ length: 6 }, (_, index) => `inherited_${index + 1}`);
+    const campaignIds = [`sha256:${'8'.repeat(64)}`, `sha256:${'9'.repeat(64)}`] as const;
+    for (const [campaignIndex, campaignId] of campaignIds.entries()) {
+      const items = scenarioIds.map((scenarioId, scenarioIndex) => {
+        const runId = `sha256:${(campaignIndex * 6 + scenarioIndex + 10).toString(16).padStart(64, '0')}`;
+        runtime.put('evaluation-runs', runId, {
+          schema: 'arena-evaluation-run-v1', runId,
+          input: { mode: 'ACTION_DECISION', agent: { version_id: version, commitment }, scenario: { scenario_id: scenarioId } },
+          rubricVersion: 'AgentEvaluationV5', provider: { state: 'SUCCESS', model: 'fixture' }, judge: { state: 'FINALIZED' },
+          scorecard: { status: 'FINAL', run_id: runId, agent_version_id: version, agents_digest: commitment,
+            rubric_version: 'AgentEvaluationV5', result_class: 'PASS', overall_score: 90, policy_findings: [],
+            dimensions: ['instruction_adherence', 'reasoning_quality', 'action_selection', 'rule_compliance', 'task_completion', 'safety']
+              .map((dimension_id) => ({ dimension_id, grade: 'EXCELLENT' })) },
+        });
+        return { scenarioId, state: 'FINALIZED', attempt: 1, runIds: [runId], currentRunId: runId };
+      });
+      runtime.put('evaluation-campaigns', campaignId, {
+        schema: 'arena-solo-campaign-v1', campaignId, owner: seller,
+        agent: { versionId: version, commitment, agentsMd: '# Private Agent' },
+        testPack: { packId: `sha256:${'6'.repeat(64)}`, version: '1.0.0', scenarios: scenarioIds.map((scenarioId) => ({ scenarioId })) },
+        runtimePolicy: { model: 'fixture', maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 },
+        rubricVersion: 'AgentEvaluationV5', state: 'FINALIZED', items,
+      });
+    }
+    runtime.put('evaluation-campaigns', `sha256:${'7'.repeat(64)}`, {
+      schema: 'arena-solo-campaign-v1', campaignId: `sha256:${'7'.repeat(64)}`, owner: seller,
+      agent: { versionId: version, commitment, agentsMd: '# Private Agent' },
+      testPack: { packId: `sha256:${'6'.repeat(64)}`, version: '1.0.0', scenarios: [] },
+      runtimePolicy: { model: 'fixture', maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 },
+      rubricVersion: 'AgentEvaluationV5', state: 'PENDING', items: [],
+    });
+
+    seedAgent(runtime);
+    const original = new ArenaApiService(operator, runtime).createMarketplaceEligibility(seller, {
+      agentId, agentsVersion: version, campaignIds: [...campaignIds], issuedAt: 2_000, expiresAt: 4_000,
+      network: 'studio-next', chainId: 61_997, judgeAddress: operator,
+    });
+    runtime.put('marketplace-listings', '10', {
+      schema: 'arena-marketplace-listing-v1', listingId: '10', certificateDigest: original.certificateDigest,
+      agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId,
+      name: 'Private Agent', seller, sellerAddress: seller, buyer, buyerAddress: buyer,
+      price: '1000000', expiresAt: 4_000, state: 'BUY_SUBMITTED',
+    });
+    const service = new ArenaApiService(operator, runtime);
+    service.publishMarketplaceListing(operator, { listingId: '10', tokenId, agentId, version, commitment,
+      sellerAddress: seller, buyerAddress: buyer, registryOwner: buyer, registryActive: true,
+      price: '1000000', expiresAt: 4_000, state: 'SOLD' });
+    assert.deepEqual(service.listOwnedEvaluationCampaigns(buyer).map((row) => row.campaignId), [...campaignIds].reverse());
+    assert.equal(JSON.stringify(service.listOwnedEvaluationCampaigns(buyer)).includes('# Private Agent'), false);
+    const certificate = service.createMarketplaceEligibility(buyer, {
+      agentId, agentsVersion: version, campaignIds: [...campaignIds], issuedAt: 3_000, expiresAt: 4_000,
+      network: 'studio-next', chainId: 61_997, judgeAddress: operator,
+    });
+    assert.equal(certificate.owner, buyer);
+    assert.equal(certificate.agentVersionId, version);
+    assert.equal(certificate.state, 'ELIGIBLE');
+    assert.notEqual(certificate.certificateDigest, original.certificateDigest);
+    assert.equal(certificate.evidenceDigest, original.evidenceDigest);
+    assert.deepEqual(certificate.dimensionScores, original.dimensionScores);
+    assert.equal(runtime.list('evaluation-runs').length, 12);
+    assert.throws(() => service.createMarketplaceEligibility(seller, {
+      agentId, agentsVersion: version, campaignIds: [...campaignIds], issuedAt: 3_001, expiresAt: 4_001,
+      network: 'studio-next', chainId: 61_997, judgeAddress: operator,
+    }), /unauthorized/);
+    const updated = service.updateAgent(buyer, agentId, '# Changed Agent');
+    assert.throws(() => service.createMarketplaceEligibility(buyer, {
+      agentId, agentsVersion: updated.agentsVersion, campaignIds: [...campaignIds], issuedAt: 3_002, expiresAt: 4_002,
+      network: 'studio-next', chainId: 61_997, judgeAddress: operator,
+    }), /evaluation campaign is not finalized or bound to this version/);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace public profile is bound to the exact Agent version being sold', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

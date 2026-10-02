@@ -1,5 +1,24 @@
 # Implementation execution status
 
+## 2026-10-02 Marketplace inherited evaluation evidence — local only
+
+Finalized evaluation evidence now follows the exact Agent version after its
+ERC-8004 identity is sold. The current Agent owner can see the redacted public
+campaign projections and use the same canonical runs to obtain a fresh,
+single-use Marketplace certificate without paying for or executing another
+evaluation. Pending and failed campaigns are not added to the new owner's
+campaign list; campaign ownership and existing run-detail permissions are
+unchanged. The previous owner cannot certify after losing Agent ownership, and
+a changed version cannot reuse the prior version's evaluations. No Circle call,
+Arc transaction, commit, push or deployment was performed for this repair.
+
+Verification: `npm run check` passed (84 direct tests, 393 TypeScript tests,
+39 Solidity tests, 164 frontend tests, typecheck and production build). The
+sale-to-recertification regression preserves the evidence digest and score,
+creates no new evaluation runs, excludes inherited pending campaigns and rejects
+both the former owner and old evidence used for a modified version. This is
+local fixture evidence, not a live resale transaction.
+
 ## 2026-10-02 Marketplace completed-sale relist repair — local only
 
 A historical `SOLD` listing is now terminal for duplicate-listing checks, so the

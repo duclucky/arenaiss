@@ -494,7 +494,12 @@ export class ArenaApiService {
   listOwnedEvaluationCampaigns(caller: string): PublicEvaluationCampaign[] {
     const owner = this.principal(caller);
     const newest = this.runtime ? this.runtime.listNewest<SoloCampaignRecord>("evaluation-campaigns") : [...this.evaluationCampaigns.values()].reverse();
-    return newest.filter((campaign) => campaign.owner === owner).map((campaign) => this.publicCampaign(campaign));
+    const ownedVersions = new Set([...this.agents.values()]
+      .filter((agent) => agent.owner === owner)
+      .flatMap((agent) => agent.versions.map((version) => version.agentsVersion)));
+    return newest
+      .filter((campaign) => campaign.owner === owner || (campaign.state === "FINALIZED" && ownedVersions.has(campaign.agent.versionId)))
+      .map((campaign) => this.publicCampaign(campaign));
   }
   createVersionComparison(caller: string, input: { comparisonId: Digest; agentId: Digest; baselineVersionId: Digest; candidateVersionId: Digest; baselineCampaignIds: Digest[]; candidateCampaignIds: Digest[]; policy: RegressionPolicy }): VersionComparisonRecord {
     const owner = this.principal(caller);
@@ -534,7 +539,7 @@ export class ArenaApiService {
     if ([...this.marketplaceListings.values()].some((row) => row.agentId === agent.agentId && row.agentVersionId === version.agentsVersion && !["SOLD", "CANCELLED", "EXPIRED"].includes(row.state))) throw new Error("Agent version already has a Marketplace listing");
     if (!Array.isArray(input.campaignIds) || input.campaignIds.length !== 2 || new Set(input.campaignIds).size !== 2) throw new Error("exactly two evaluation campaigns are required");
     const campaigns = input.campaignIds.map((id) => this.evaluationCampaign(id));
-    if (campaigns.some((row) => !row || row.owner !== owner || row.state !== "FINALIZED" || row.agent.versionId !== version.agentsVersion || row.agent.commitment !== version.agentsCommitment)) throw new Error("evaluation campaign is not finalized or bound to this version");
+    if (campaigns.some((row) => !row || row.state !== "FINALIZED" || row.agent.versionId !== version.agentsVersion || row.agent.commitment !== version.agentsCommitment)) throw new Error("evaluation campaign is not finalized or bound to this version");
     const first = campaigns[0]!;
     if (campaigns.some((row) => row!.testPack.packId !== first.testPack.packId || row!.testPack.version !== first.testPack.version || row!.rubricVersion !== first.rubricVersion || JSON.stringify(row!.testPack.scenarios.map((s) => s.scenarioId)) !== JSON.stringify(first.testPack.scenarios.map((s) => s.scenarioId)))) throw new Error("evaluation campaigns are not comparable");
     const gradePoints: Record<string, number> = { EXCELLENT: 100, GOOD: 80, MIXED: 60, POOR: 30, FAIL: 0 };
