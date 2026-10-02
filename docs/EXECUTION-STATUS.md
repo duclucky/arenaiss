@@ -1,5 +1,16 @@
 # Implementation execution status
 
+## 2026-10-02 Marketplace completed-sale relist repair — local only
+
+A historical `SOLD` listing is now terminal for duplicate-listing checks, so the
+current ERC-8004 owner may issue a fresh certificate and list the same exact
+Agent version again after a later listing expires or is cancelled. Submitted,
+active, purchasing and cancelling records still block parallel listings, and a
+consumed certificate remains single-use. The regression reproduces the Arc
+Sentinel sequence of a completed sale followed by an expired relisting. No
+Circle call, Arc transaction, commit, push or deployment was performed for this
+repair.
+
 ## 2026-10-02 Marketplace hidden-listing reconciliation — local only
 
 Marketplace eligibility now reconciles every recoverable seller listing against

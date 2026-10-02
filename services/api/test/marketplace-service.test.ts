@@ -71,6 +71,24 @@ test('public Marketplace exposes only active listings while owner and buyer reco
   } finally { runtime.close(); }
 });
 
+test('a completed sale does not block the current owner from certifying the same Agent version again', () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    seedAgent(runtime, buyer, buyer);
+    runtime.put('marketplace-listings', '1', {
+      schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest, agentId,
+      agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId,
+      name: 'Private Agent', seller, sellerAddress: seller, buyer, buyerAddress: buyer,
+      price: '1000000', expiresAt: 2_000, state: 'SOLD',
+    });
+    const service = new ArenaApiService(operator, runtime);
+    assert.throws(() => service.createMarketplaceEligibility(buyer, {
+      agentId, agentsVersion: version, campaignIds: [], issuedAt: 3_000, expiresAt: 4_000,
+      network: 'studio-next', chainId: 61_997, judgeAddress: operator,
+    }), /exactly two evaluation campaigns are required/);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace public profile is bound to the exact Agent version being sold', () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
