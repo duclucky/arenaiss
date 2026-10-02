@@ -231,9 +231,11 @@ export interface ManagedIdentityAdapter {
 
 export type MarketplaceCertificate = { schema: string; certificateDigest: string; evidenceDigest: string; owner: string; agentId: string; agentVersionId: string; agentsCommitment: string; erc8004TokenId: string; packId: string; packVersion: string; rubricVersion: string; executionModels?: string[]; coverageBps: number; overallScore: number; dimensionScores: Record<string, number>; maxSpread: number; issuedAt: number; expiresAt: number; state: 'ELIGIBLE' | 'APPROVED'; authorization?: ManagedWalletTransaction };
 export type MarketplaceListing = { schema: string; listingId: string; certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; erc8004TokenId: string; name: string; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: 'SUBMITTED' | 'ACTIVE' | 'BUY_SUBMITTED' | 'CANCEL_SUBMITTED' | 'SOLD' | 'CANCELLED' | 'EXPIRED'; transaction?: ManagedWalletTransaction; purchase?: ManagedWalletTransaction };
+export type MarketplaceListingIntent = { certificateDigest: string; agentId: string; agentVersionId: string; agentsCommitment: string; erc8004TokenId: string; price: string; expiresAt: number; state: 'PREPARED' | 'SUBMITTED' };
 export interface MarketplaceApiAdapter {
   listListings(): Promise<MarketplaceListing[]>;
   getListingProfile?(listingId: string): Promise<AgentProfile>;
+  listListingIntents?(): Promise<MarketplaceListingIntent[]>;
   listOwnedListings?(): Promise<MarketplaceListing[]>;
   listPurchases?(): Promise<MarketplaceListing[]>;
   listCertificates(): Promise<MarketplaceCertificate[]>;

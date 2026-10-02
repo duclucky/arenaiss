@@ -1,5 +1,16 @@
 # Implementation execution status
 
+## 2026-10-02 Marketplace listing-intent recovery — local only
+
+The seller UI now restores unfinished Marketplace listing intents instead of
+submitting a new price or expiry and surfacing `conflicting marketplace listing
+intent`. An authenticated, owner-scoped API returns only the exact Agent,
+certificate, ERC-8004 token, price, expiry and prepared/submitted state; Circle
+idempotency keys remain server-private. The explicit Resume action reuses the
+persisted transaction identity, so reloads and changed form defaults cannot
+create a second Arc listing attempt. No Circle call, Arc transaction, commit,
+push or deployment was performed for this repair.
+
 ## 2026-10-02 Marketplace purchase review and exact-version evidence — local only
 
 Marketplace public details are now resolved from the selected listing instead

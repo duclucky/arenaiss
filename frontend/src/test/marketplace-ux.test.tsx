@@ -72,6 +72,31 @@ describe('Marketplace website UX', () => {
     expect(listCertificates).toHaveBeenCalledTimes(1);
   });
 
+  it('offers an explicit safe resume for a persisted Marketplace listing intent', async () => {
+    const expiresAt = Math.floor(Date.now() / 1000) + 6 * 86400;
+    const resumeCreateListing = vi.fn().mockResolvedValue(ownedActive);
+    const recoveryApi = {
+      ...marketplaceApi,
+      async listListings() { return []; },
+      async listOwnedListings() { return []; },
+      async listPurchases() { return []; },
+      async listListingIntents() { return [{ certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment,
+        erc8004TokenId: '42', price: '3000000', expiresAt, state: 'PREPARED' as const }]; },
+      createListing: resumeCreateListing,
+    };
+    mount(recoveryApi as MarketplaceApiAdapter, agentApi, '/marketplace?view=sell');
+
+    const recovery = await screen.findByRole('region', { name: 'Listing recovery' });
+    expect(within(recovery).getByText('3.000000 USDC')).toBeInTheDocument();
+    const expiry = new Date(expiresAt * 1000).toLocaleString();
+    expect(within(recovery).getByText((_content, node) => node?.tagName === 'P' && Boolean(node.textContent?.includes(expiry)))).toBeInTheDocument();
+    fireEvent.click(within(recovery).getByRole('button', { name: 'Resume listing attempt' }));
+    await waitFor(() => expect(resumeCreateListing).toHaveBeenCalledWith(expect.objectContaining({
+      certificateDigest, agentId, agentsVersion: version, agentsCommitment: commitment,
+      price: '3000000', expiresAt,
+    })));
+  });
+
   it('shows Marketplace prices in USDC and converts decimal entry to six-decimal base units', async () => {
     mount();
     const publicListings = await screen.findByRole('region', { name: 'Agents for sale' });

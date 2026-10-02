@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { formatUnits, parseUnits } from 'viem';
 import { useAppContext } from '../context';
-import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, MarketplaceListing } from '../adapters/interfaces';
+import type { AgentProfile, EvaluationCampaign, MarketplaceCertificate, MarketplaceListing, MarketplaceListingIntent } from '../adapters/interfaces';
 import { displayLabel } from '../display-label';
 
 const uuid = () => crypto.randomUUID();
@@ -165,6 +165,7 @@ export function Marketplace() {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [ownedListings, setOwnedListings] = useState<MarketplaceListing[]>([]);
   const [purchases, setPurchases] = useState<MarketplaceListing[]>([]);
+  const [listingIntents, setListingIntents] = useState<MarketplaceListingIntent[]>([]);
   const [certificates, setCertificates] = useState<MarketplaceCertificate[]>([]);
   const [operatorCertificates, setOperatorCertificates] = useState<MarketplaceCertificate[]>([]);
   const [operatorCredit, setOperatorCredit] = useState<string | null>(null);
@@ -183,14 +184,15 @@ export function Marketplace() {
 
   async function refresh() {
     if (!marketplaceApi) return;
-    const [next, owned, sellerRows, bought, reviewQueue, platformCredit] = await Promise.all([
+    const [next, owned, sellerRows, bought, intents, reviewQueue, platformCredit] = await Promise.all([
       marketplaceApi.listListings(), account ? marketplaceApi.listCertificates() : Promise.resolve([]),
       account && marketplaceApi.listOwnedListings ? marketplaceApi.listOwnedListings() : Promise.resolve([]),
       account && marketplaceApi.listPurchases ? marketplaceApi.listPurchases() : Promise.resolve([]),
+      account && marketplaceApi.listListingIntents ? marketplaceApi.listListingIntents() : Promise.resolve([]),
       account && marketplaceApi.listOperatorCertificates ? marketplaceApi.listOperatorCertificates().catch(() => []) : Promise.resolve([]),
       account && marketplaceApi.getOperatorCredit ? marketplaceApi.getOperatorCredit().catch(() => null) : Promise.resolve(null),
     ]);
-    setListings(next); setOwnedListings(sellerRows); setCertificates(owned); setPurchases(bought); setOperatorCertificates(reviewQueue); setOperatorCredit(platformCredit?.amount ?? null);
+    setListings(next); setOwnedListings(sellerRows); setCertificates(owned); setPurchases(bought); setListingIntents(intents); setOperatorCertificates(reviewQueue); setOperatorCredit(platformCredit?.amount ?? null);
   }
   useEffect(() => {
     let active = true;
@@ -199,13 +201,14 @@ export function Marketplace() {
       marketplaceApi.listListings(), account ? marketplaceApi.listCertificates() : Promise.resolve([]),
       account && marketplaceApi.listOwnedListings ? marketplaceApi.listOwnedListings() : Promise.resolve([]),
       account && marketplaceApi.listPurchases ? marketplaceApi.listPurchases() : Promise.resolve([]),
+      account && marketplaceApi.listListingIntents ? marketplaceApi.listListingIntents() : Promise.resolve([]),
       account && agentApi ? agentApi.listOwnedAgents() : Promise.resolve([]),
       account && evaluationApi ? evaluationApi.listCampaigns() : Promise.resolve([]),
       account && marketplaceApi.listOperatorCertificates ? marketplaceApi.listOperatorCertificates().catch(() => []) : Promise.resolve([]),
       account && marketplaceApi.getOperatorCredit ? marketplaceApi.getOperatorCredit().catch(() => null) : Promise.resolve(null),
-    ]).then(([next, owned, sellerRows, bought, profiles, records, reviewQueue, platformCredit]) => {
+    ]).then(([next, owned, sellerRows, bought, intents, profiles, records, reviewQueue, platformCredit]) => {
       if (!active) return;
-      setListings(next); setOwnedListings(sellerRows); setCertificates(owned); setPurchases(bought);
+      setListings(next); setOwnedListings(sellerRows); setCertificates(owned); setPurchases(bought); setListingIntents(intents);
       setAgents(profiles); setCampaigns(records); setOperatorCertificates(reviewQueue); setOperatorCredit(platformCredit?.amount ?? null);
     }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Could not load Marketplace.'); });
     return () => { active = false; };
@@ -213,7 +216,8 @@ export function Marketplace() {
 
   const selectedAgent = agents.find((row) => row.agentId === agentId);
   const finalized = useMemo(() => campaigns.filter((row) => row.state === 'FINALIZED' && row.agentVersionId === selectedAgent?.agentsVersion), [campaigns, selectedAgent?.agentsVersion]);
-  const selectedCertificate = certificates.find((row) => row.certificateDigest === listing.certificateDigest && row.state === 'APPROVED');
+  const availableCertificates = certificates.filter((row) => row.state === 'APPROVED' && !listingIntents.some((intent) => intent.certificateDigest === row.certificateDigest));
+  const selectedCertificate = availableCertificates.find((row) => row.certificateDigest === listing.certificateDigest);
   const activeListings = listings.filter((row) => row.state === 'ACTIVE');
   const privatePurchases = purchases.filter((row) => row.state === 'BUY_SUBMITTED' || row.state === 'SOLD');
   const sellerRecovery = ownedListings.filter((row) => row.state === 'CANCEL_SUBMITTED');
@@ -242,7 +246,24 @@ export function Marketplace() {
       if (price <= 0n || price > (2n ** 128n - 1n)) throw new Error('Enter a positive USDC price with at most six decimal places.');
       await marketplaceApi.createListing({ listingId: String(Date.now()), certificateDigest: selectedCertificate.certificateDigest, agentId: selectedCertificate.agentId, agentsVersion: selectedCertificate.agentVersionId, agentsCommitment: selectedCertificate.agentsCommitment, price: price.toString(), expiresAt: Number(listing.expiresAt), nftApprovalIdempotencyKey: uuid(), listingIdempotencyKey: uuid() });
       await refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Listing failed. Check the price and certificate.'); }
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === 'conflicting marketplace listing intent') {
+        try { await refresh(); setError(''); }
+        catch { setError('A previous listing attempt exists, but its recovery state could not be loaded.'); }
+      } else setError(cause instanceof Error ? cause.message : 'Listing failed. Check the price and certificate.');
+    }
+    finally { setBusy(''); }
+  }
+
+  async function resumeListing(intent: MarketplaceListingIntent) {
+    if (!marketplaceApi) return;
+    setBusy(`intent-${intent.certificateDigest}`); setError('');
+    try {
+      await marketplaceApi.createListing({ listingId: String(Date.now()), certificateDigest: intent.certificateDigest,
+        agentId: intent.agentId, agentsVersion: intent.agentVersionId, agentsCommitment: intent.agentsCommitment,
+        price: intent.price, expiresAt: intent.expiresAt, nftApprovalIdempotencyKey: uuid(), listingIdempotencyKey: uuid() });
+      await refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not resume the previous listing attempt.'); }
     finally { setBusy(''); }
   }
 
@@ -364,6 +385,7 @@ export function Marketplace() {
     </section>}
     {activeView === 'browse' && account && privatePurchases.length > 0 && <section className="mt-14" role="region" aria-label="My purchased Agents"><p className="page-kicker">Private account records</p><h2 className="mt-1 text-2xl font-bold">My purchased Agents</h2><p className="mt-2 text-sm text-neutral-700">Completed purchases and purchases still awaiting Arc confirmation are visible only to this account.</p><div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">{privatePurchases.map((row) => listingCard(row, true))}</div></section>}
     {activeView === 'sell' && account && sellerRecovery.length > 0 && <section className="glass-panel mt-12 p-6" role="region" aria-label="Seller recovery"><p className="page-kicker">Private seller recovery</p><h2 className="mt-1 text-2xl font-bold">Listings awaiting Arc confirmation</h2><p className="mt-2 text-sm text-neutral-700">These listings are hidden from public search while cancellation is unresolved.</p><div className="mt-5 grid gap-5 md:grid-cols-2">{sellerRecovery.map((row) => listingCard(row, true))}</div></section>}
+    {activeView === 'sell' && account && listingIntents.length > 0 && <section className="glass-panel mt-12 p-6" role="region" aria-label="Listing recovery"><p className="page-kicker">Safe transaction recovery</p><h2 className="mt-1 text-2xl font-bold">Resume a previous listing attempt</h2><p className="mt-2 text-sm text-neutral-700">Arena ISS found an unfinished listing. Resume its original price, expiry and server-held transaction identity instead of creating a conflicting Arc transaction.</p><ul className="mt-5 space-y-3">{listingIntents.map((intent) => { const agentName = agents.find((agent) => agent.agentId === intent.agentId)?.name ?? 'Agent'; const expired = intent.state === 'PREPARED' && intent.expiresAt <= nowSeconds(); return <li key={intent.certificateDigest} className="retro-inset flex flex-wrap items-center justify-between gap-4 p-4"><div><p className="font-bold">{agentName}</p><p className="mt-1 font-mono text-sm">{usdc(intent.price)}</p><p className="mt-1 text-xs text-neutral-700">Expires {activityDate(intent.expiresAt)} · {displayLabel(intent.state)}</p>{expired && <p className="mt-2 text-xs text-red-900">This prepared attempt has expired and cannot submit a new Arc listing.</p>}</div><button type="button" className="metal-button-solid" disabled={busy !== '' || expired} onClick={() => resumeListing(intent)}>{busy === `intent-${intent.certificateDigest}` ? 'Resuming on Arc…' : 'Resume listing attempt'}</button></li>; })}</ul></section>}
     {activeView === 'sell' && (operatorCertificates.some((row) => row.state === 'ELIGIBLE') || operatorCredit !== null) && <section className="glass-panel mt-12 p-6" aria-labelledby="operator-review-heading"><p className="page-kicker">Restricted operator action</p><div className="flex flex-wrap items-start justify-between gap-5"><div><h2 id="operator-review-heading" className="mt-1 text-2xl font-bold">Operator review</h2><p className="mt-2 text-sm text-neutral-700">Approve only after checking the bound Agent version, score, coverage and expiry. Approval writes the immutable eligibility record to Arc.</p></div>{operatorCredit !== null && <div className="text-right"><p className="font-mono font-bold">{usdc(operatorCredit)} platform credit</p><button type="button" className="metal-button-ghost mt-2" disabled={busy !== '' || BigInt(operatorCredit) === 0n || !marketplaceApi?.withdrawOperatorCredit} onClick={withdrawOperatorCredit}>{busy === 'platform-withdraw' ? 'Withdrawing…' : 'Withdraw platform fee'}</button>{operatorNotice && <p role="status" className="mt-2 text-sm font-semibold">{operatorNotice}</p>}</div>}</div><ul className="mt-5 space-y-3">{operatorCertificates.filter((row) => row.state === 'ELIGIBLE').map((row) => <li key={row.certificateDigest} className="retro-inset flex flex-wrap items-center justify-between gap-4 p-4"><div><p className="text-sm font-semibold">Eligible Agent certificate</p><p className="mt-2 font-semibold">{row.overallScore}/100 · {(row.coverageBps / 100).toFixed(0)}% coverage</p><p className="mt-1 text-xs text-neutral-700">Expires {new Date(row.expiresAt * 1000).toLocaleString()}</p></div><button type="button" className="metal-button-solid" disabled={busy !== ''} onClick={() => approveCertificate(row.certificateDigest)}>{busy === `approve-${row.certificateDigest}` ? 'Approving on Arc…' : 'Approve certificate on Arc'}</button></li>)}</ul></section>}
     {activeView === 'sell' && account && <div className="mt-14 grid gap-6 lg:grid-cols-2"><form className="glass-panel p-6" onSubmit={issueEligibility}><h2 className="text-xl font-bold">Certify an evaluated version</h2><p className="mt-2 text-sm text-neutral-600">Arena ISS checks two completed evaluations for the same version. Digests and Studio Next contract details are filled from verified records.</p>
       <label className="mt-5 block text-sm font-semibold" htmlFor="marketplace-agent">Agent to certify</label><select id="marketplace-agent" className="field-control mt-2 w-full" value={agentId} onChange={(event) => setAgentId(event.target.value)} required><option value="">Select your Agent</option>{agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.name}</option>)}</select>
@@ -372,7 +394,7 @@ export function Marketplace() {
       <button type="submit" className="metal-button-solid mt-6" disabled={busy !== '' || !selectedAgent || finalized.length < 2 || !networkConfig?.genLayer}>{busy === 'eligibility' ? 'Checking…' : 'Check eligibility'}</button>
       {eligibilityNotice && <p className="mt-3 text-sm font-semibold" role="status">{eligibilityNotice}</p>}
     </form><form className="glass-panel p-6" onSubmit={createListing}><h2 className="text-xl font-bold">List an approved version</h2><p className="mt-2 text-sm text-neutral-600">Listing binds the approved version to its ERC-8004 identity NFT. Arena ISS grants the Marketplace transfer permission automatically; a completed sale transfers the complete identity to the buyer while the private profile remains delivered through Arena ISS.</p>
-      <label className="mt-5 block text-sm font-semibold" htmlFor="marketplace-certificate">Approved certificate</label><select id="marketplace-certificate" className="field-control mt-2 w-full" value={listing.certificateDigest} onChange={(event) => setListing((current) => ({ ...current, certificateDigest: event.target.value }))} required><option value="">Select certificate</option>{certificates.filter((row) => row.state === 'APPROVED').map((row) => <option key={row.certificateDigest} value={row.certificateDigest}>Approved Agent · {row.overallScore}/100</option>)}</select>
+      <label className="mt-5 block text-sm font-semibold" htmlFor="marketplace-certificate">Approved certificate</label><select id="marketplace-certificate" className="field-control mt-2 w-full" value={listing.certificateDigest} onChange={(event) => setListing((current) => ({ ...current, certificateDigest: event.target.value }))} required><option value="">Select certificate</option>{availableCertificates.map((row) => <option key={row.certificateDigest} value={row.certificateDigest}>Approved Agent · {row.overallScore}/100</option>)}</select>
       {certificates.some((row) => row.state === 'ELIGIBLE') && <p className="mt-3 text-sm text-neutral-700">Eligible certificate awaiting operator approval.</p>}
       <label className="mt-4 block text-sm font-semibold" htmlFor="marketplace-price">Price (USDC)</label><input id="marketplace-price" className="field-control mt-2 w-full" inputMode="decimal" pattern="^(?:0|[1-9][0-9]*)(?:[.][0-9]{1,6})?$" placeholder="2.50" value={listing.price} onChange={(event) => setListing((current) => ({ ...current, price: event.target.value }))} required aria-describedby="marketplace-price-help"/><p id="marketplace-price-help" className="mt-2 text-xs text-neutral-700">Enter USDC, not base units. Settlement deducts a fixed 1% platform fee from the seller credit.</p>
       <button type="submit" className="metal-button-solid mt-6" disabled={busy !== '' || !selectedCertificate}>{busy === 'listing' ? 'Approving ERC-8004 identity and listing…' : 'List on Arc'}</button>

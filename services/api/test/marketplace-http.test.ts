@@ -22,6 +22,34 @@ test('Marketplace routes are public-read, owner-private and fail closed without 
   assert.equal((await api.handle({ method: 'GET', path: '/api/marketplace/listings/1/delivery', headers })).status, 503);
 });
 
+test('Marketplace exposes an owner-scoped safe recovery view for an unfinished listing intent', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const certificateDigest = `sha256:${'4'.repeat(64)}`;
+    const agentId = `sha256:${'1'.repeat(64)}`;
+    const version = `sha256:${'2'.repeat(64)}`;
+    const commitment = `sha256:${'3'.repeat(64)}`;
+    runtime.put('marketplace-listing-intents', certificateDigest, {
+      protocol: 'ERC8004_V2', certificateDigest, owner: alice, sellerAddress: alice, tokenId: '42',
+      agentId, agentsVersion: version, agentsCommitment: commitment, price: '3000000', expiresAt: 2_000_000_000,
+      nftApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+      listingIdempotencyKey: '22222222-2222-4222-8222-222222222222',
+    });
+    const api = new ArenaHttpApi(new ArenaApiService(operator, runtime), async () => true);
+    assert.equal((await api.handle({ method: 'GET', path: '/api/marketplace/listing-intents' })).status, 401);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const login = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const response = await api.handle({ method: 'GET', path: '/api/marketplace/listing-intents', headers: { cookie: login.headers['set-cookie'].split(';')[0] } });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, [{ certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment,
+      erc8004TokenId: '42', price: '3000000', expiresAt: 2_000_000_000, state: 'PREPARED' }]);
+    assert.equal(JSON.stringify(response.body).includes('IdempotencyKey'), false);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: bob } });
+    const otherLogin = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: bob, signature: 'ok' } });
+    assert.deepEqual((await api.handle({ method: 'GET', path: '/api/marketplace/listing-intents', headers: { cookie: otherLogin.headers['set-cookie'].split(';')[0] } })).body, []);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace operator approval is executed by the configured Arc signer and then projected', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

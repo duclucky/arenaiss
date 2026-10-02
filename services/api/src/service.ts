@@ -74,6 +74,7 @@ export type MarketplaceListing = { schema: "arena-marketplace-listing-v1"; listi
 export type PublicMarketplaceListing = Omit<MarketplaceListing, "seller" | "buyer" | "purchaseApprovalIdempotencyKey" | "purchaseIdempotencyKey" | "purchaseStartedAt" | "cancellationIdempotencyKey">;
 export type MarketplaceArcSnapshot = { listingId: string; tokenId: string; agentId: Digest; version: Digest; commitment: Digest; sellerAddress: string; buyerAddress?: string; price: string; expiresAt: number; state: "ACTIVE" | "SOLD" | "CANCELLED" | "EXPIRED"; registryOwner: string; registryActive: boolean };
 export type MarketplaceListingIntent = { protocol: "ERC8004_V2"; certificateDigest: Digest; owner: string; sellerAddress: string; tokenId: string; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string; transaction?: MarketplaceTransaction; listingId?: string };
+export type PublicMarketplaceListingIntent = { certificateDigest: Digest; agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; erc8004TokenId: string; price: string; expiresAt: number; state: "PREPARED" | "SUBMITTED" };
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const USER_PRINCIPAL = /^usr_[0-9a-f]{64}$/;
@@ -661,6 +662,16 @@ export class ArenaApiService {
   listMarketplaceListings(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state === "ACTIVE").map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   listMarketplaceListingsForReconciliation(): PublicMarketplaceListing[] { return [...this.marketplaceListings.values()].filter((row) => row.state === "SUBMITTED" || row.state === "BUY_SUBMITTED" || row.state === "CANCEL_SUBMITTED" || this.marketplaceOwnershipIsStale(row)).map((row) => this.publicMarketplaceListing(row)); }
   listOwnedMarketplaceListings(caller: string): PublicMarketplaceListing[] { const owner = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.seller === owner).map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
+  listOwnedMarketplaceListingIntents(caller: string): PublicMarketplaceListingIntent[] {
+    const owner = this.principal(caller);
+    return [...this.marketplaceListingIntents.values()]
+      .filter((intent) => intent.owner === owner && !intent.listingId)
+      .map((intent) => ({ certificateDigest: intent.certificateDigest, agentId: intent.agentId,
+        agentVersionId: intent.agentsVersion, agentsCommitment: intent.agentsCommitment,
+        erc8004TokenId: intent.tokenId, price: intent.price, expiresAt: intent.expiresAt,
+        state: intent.transaction ? "SUBMITTED" as const : "PREPARED" as const }))
+      .sort((left, right) => right.expiresAt - left.expiresAt || left.certificateDigest.localeCompare(right.certificateDigest));
+  }
   listOwnedMarketplacePurchases(caller: string): PublicMarketplaceListing[] { const buyer = this.principal(caller); return [...this.marketplaceListings.values()].filter((row) => row.buyer === buyer && (row.state === "BUY_SUBMITTED" || row.state === "SOLD")).map((row) => this.publicMarketplaceListing(row)).sort((a, b) => Number(b.listingId) - Number(a.listingId)); }
   getMarketplaceDelivery(caller: string, listingId: string, snapshot: MarketplaceArcSnapshot): { agentId: Digest; agentVersionId: Digest; agentsCommitment: Digest; agentsMd: string } { const buyer = this.principal(caller); const row = this.marketplaceListings.get(listingId); if (!row || row.state !== "SOLD" || row.buyer !== buyer || snapshot.state !== "SOLD" || snapshot.registryOwner.toLowerCase() !== row.buyerAddress || snapshot.buyerAddress?.toLowerCase() !== row.buyerAddress || snapshot.agentId !== row.agentId || snapshot.version !== row.agentVersionId || snapshot.commitment !== row.agentsCommitment) throw new Error("marketplace delivery unavailable"); const agent = this.agents.get(row.agentId)!; const version = agent.versions.find((item) => item.agentsVersion === row.agentVersionId)!; return { agentId: row.agentId, agentVersionId: row.agentVersionId, agentsCommitment: row.agentsCommitment, agentsMd: version.agentsMd }; }
   prepareRegistration(caller: string, tournamentId: Digest, agentId: Digest, entrantWalletAddress?: string): PreparedRegistration {

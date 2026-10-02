@@ -1,10 +1,11 @@
-import type { AgentProfile, MarketplaceApiAdapter, MarketplaceCertificate, MarketplaceListing } from './interfaces';
+import type { AgentProfile, MarketplaceApiAdapter, MarketplaceCertificate, MarketplaceListing, MarketplaceListingIntent } from './interfaces';
 
 type Fetcher = typeof fetch;
 export class HttpMarketplaceAdapter implements MarketplaceApiAdapter {
   constructor(private readonly baseUrl: string, private readonly fetcher: Fetcher = fetch) {}
   listListings() { return this.request<MarketplaceListing[]>('/api/marketplace/listings'); }
   getListingProfile(listingId: string) { return this.request<AgentProfile>(`/api/marketplace/listings/${listingId}/profile`); }
+  listListingIntents() { return this.request<MarketplaceListingIntent[]>('/api/marketplace/listing-intents'); }
   listOwnedListings() { return this.request<MarketplaceListing[]>('/api/marketplace/my-listings'); }
   listPurchases() { return this.request<MarketplaceListing[]>('/api/marketplace/my-purchases'); }
   listCertificates() { return this.request<MarketplaceCertificate[]>('/api/marketplace/certificates'); }

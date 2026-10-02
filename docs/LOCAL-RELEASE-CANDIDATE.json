@@ -3,7 +3,7 @@
   "createdAt": "2026-10-02",
   "scope": "LOCAL_ONLY",
   "fileCount": 320,
-  "sourceBundleSha256": "e5de470b08ab034e5f3cdef4aff0069401cec0713e94b35fbdde23ce4910d36e",
+  "sourceBundleSha256": "1e051dc3510aeb39a35afb5e7e68cab29fc2a4c42393d9b2bb2c2f36fc866f50",
   "hashAlgorithm": "sha256(sorted(path + NUL + fileSha256 + LF))",
   "includedRoots": [
     "contracts",
@@ -47,9 +47,9 @@
   },
   "verification": {
     "pythonDirectTests": 84,
-    "typescriptTests": 389,
+    "typescriptTests": 390,
     "foundryTests": 39,
-    "frontendTests": 162
+    "frontendTests": 163
   },
   "claims": [
     "This manifest freezes a local implementation candidate only.",
