@@ -18,7 +18,7 @@ const CANCEL_TX = `0x${'3'.repeat(64)}`;
 const REFUND_TX = `0x${'4'.repeat(64)}`;
 const emptyRoom = (): ChainRoom => ({ creator: '0x0000000000000000000000000000000000000000', challenger: '0x0000000000000000000000000000000000000000', creatorAgentVersion: `0x${'0'.repeat(64)}`, challengerAgentVersion: `0x${'0'.repeat(64)}`, stake: 0n, joinDeadline: 0, resolutionDeadline: 0, state: 0, winner: '0x0000000000000000000000000000000000000000' });
 
-function fixture() {
+function fixture(ownedVersion?: { principal: string; agentId: string; version: string }) {
   const runtime = new SqliteRuntimeStore(':memory:');
   const rooms = new Map<string, ChainRoom>();
   const credits = new Map<string, bigint>();
@@ -65,10 +65,31 @@ function fixture() {
       throw new Error('unused');
     },
   };
-  const agents = { getAgentVersion() { return {}; } } as unknown as ArenaApiService;
+  const agents = {
+    getAgentVersion() { return {}; },
+    ownsAgentVersion(principal: string, agentId: string, version: string) {
+      return principal === ownedVersion?.principal && agentId === ownedVersion.agentId && version === ownedVersion.version;
+    },
+  } as unknown as ArenaApiService;
   const coordinator = new PairRoomCoordinator(runtime, agents, wallet, chain, () => 100);
   return { runtime, coordinator, get creates() { return creates; }, get joins() { return joins; }, setCreatorBalance(value: bigint) { creatorBalance = value; }, setChallengerBalance(value: bigint) { challengerBalance = value; }, rejectWithdrawal() { rejectWithdrawal = true; }, rejectJoin() { rejectJoin = true; } };
 }
+
+test('completed Pair Match history follows the current Agent owner without transferring old wallet credit rights', async () => {
+  const currentOwner = 'buyer-principal';
+  const f = fixture({ principal: currentOwner, agentId: AGENT, version: VERSION_A });
+  try {
+    const roomId = `sha256:${'9'.repeat(64)}`;
+    f.runtime.put('pair-rooms-v1', roomId, {
+      roomId, roomNumber: 7, creator: 'seller-principal', creatorWallet: CREATOR,
+      creatorAgentId: AGENT, creatorVersion: VERSION_A, challenger: 'challenger-principal', challengerWallet: CHALLENGER,
+      challengerAgentId: `sha256:${'d'.repeat(64)}`, challengerVersion: VERSION_B, stake: '1000000',
+      joinDeadline: 1000, resolutionDeadline: 2000, state: 'SETTLED', createdAt: 100,
+    });
+    assert.deepEqual(f.coordinator.listForPrincipal(currentOwner).map((room) => room.roomId), [roomId]);
+    await assert.rejects(f.coordinator.credit('creator', currentOwner, roomId), /unauthorized room credit/);
+  } finally { f.runtime.close(); }
+});
 
 test('participant room history exposes the selected fallback route without provider credentials', () => {
   const f = fixture();
@@ -230,7 +251,7 @@ test('mutual cancellation is rejected after evaluation starts', async () => {
 });
 
 test('participant reads a redacted finalized GenLayer judgment for a settled room', () => {
-  const f = fixture();
+  const f = fixture({ principal: 'buyer-principal', agentId: AGENT, version: VERSION_A });
   try {
     const sha = (value: string) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
     const roomId = sha('settled-room');
@@ -257,6 +278,7 @@ test('participant reads a redacted finalized GenLayer judgment for a settled roo
     assert.equal(detail.summary, 'Creator wins safely.');
     assert.deepEqual(detail.dimensions[0], { dimensionId: 'instruction_adherence', winner: 'CREATOR', reason: 'Creator followed the instructions.' });
     assert.deepEqual(detail.policyFindingsChallenger, ['MISSING_CONFIRMATION']);
+    assert.equal(f.coordinator.verdict('buyer-principal', roomId).summary, 'Creator wins safely.');
     assert.throws(() => f.coordinator.verdict('stranger', roomId), /unauthorized/);
   } finally { f.runtime.close(); }
 });

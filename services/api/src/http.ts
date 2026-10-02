@@ -105,7 +105,7 @@ export class ArenaHttpApi {
         const room = this.pairRooms?.get(pairRoom[1].toLowerCase());
         if (room && room.state !== 'OPEN') {
           const session = this.requireSessionRecord(request.headers);
-          if (session.principal !== room.creator && session.principal !== room.challenger) return this.json(404, { error: 'not found' });
+          if (!this.pairRooms?.canRead(session.principal, room.roomId)) return this.json(404, { error: 'not found' });
         }
         return room ? this.json(200, room) : this.json(404, { error: 'not found' });
       }

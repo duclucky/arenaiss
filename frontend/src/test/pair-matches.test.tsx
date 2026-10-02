@@ -105,6 +105,22 @@ it('links the two escrow deposits and settlement evidence from one room', async 
   expect(screen.getByRole('link', { name: 'Arc settlement' })).toHaveAttribute('href', `https://testnet.arcscan.app/tx/${hashes[2]}`);
 });
 
+it('shows completed history inherited with an owned Agent without granting the buyer old participant actions', async () => {
+  const roomId = `sha256:${'2'.repeat(64)}`;
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, async json() {
+    if (url.endsWith('/config')) return { enabled: true };
+    return [{ roomId, roomNumber: 7, creator: `usr_${'3'.repeat(64)}`, creatorWallet: `0x${'4'.repeat(40)}`,
+      challenger: `usr_${'5'.repeat(64)}`, challengerWallet: `0x${'6'.repeat(40)}`,
+      creatorAgentId: `sha256:${'a'.repeat(64)}`, creatorVersion: `sha256:${'b'.repeat(64)}`,
+      stake: '1000000', joinDeadline: 1_999_999_999, resolutionDeadline: 2_000_000_000, state: 'SETTLED' }];
+  } })));
+  render(<MemoryRouter initialEntries={['/pairs/completed']}><AppProvider config={{ chainId: 5042002, rpcUrl: 'https://rpc.testnet.arc.network', name: 'Arc Testnet', apiUrl: '' }} identityAdapter={identity} agentApiAdapter={agentApi}><PairMatches view="completed" /></AppProvider></MemoryRouter>);
+  expect(await screen.findByText('Room #7')).toBeInTheDocument();
+  expect(screen.queryByText('YOU WON')).not.toBeInTheDocument();
+  expect(screen.queryByText('YOU LOST')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Claim/ })).not.toBeInTheDocument();
+});
+
 it.each([
   { view: 'open', shown: ['a'], hidden: ['b', 'c', 'd'] },
   { view: 'mine', shown: ['b'], hidden: ['a', 'c', 'd'] },

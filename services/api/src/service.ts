@@ -190,6 +190,13 @@ export class ArenaApiService {
     if (!version) throw new Error("agent version not found"); return structuredClone(version);
   }
 
+  ownsAgentVersion(caller: string, agentId: string, agentsVersion: string): boolean {
+    if (!isDigest(agentId) || !isDigest(agentsVersion)) return false;
+    const owner = this.principal(caller);
+    const agent = this.agents.get(agentId as Digest);
+    return agent?.owner === owner && agent.versions.some((candidate) => candidate.agentsVersion === agentsVersion);
+  }
+
   getPublicAgent(agentId: Digest): PublicAgent { const agent = this.agents.get(agentId); if (!agent) throw new Error("agent not found"); return this.publicView(agent); }
   getErc8004RegistrationFile(agentId: Digest, applicationUrl: string): Erc8004RegistrationFile {
     const agent = this.agents.get(agentId);
@@ -245,6 +252,7 @@ export class ArenaApiService {
       ...this.publicView(agent), agentsMd: agent.versions.at(-1)!.agentsMd,
       versions: agent.versions.map(({ agentsVersion, agentsCommitment, createdAt }) => ({ agentsVersion, agentsCommitment, createdAt })),
       stats: this.agentStats(agent),
+      activity: this.publicAgentActivity(agent),
       tournaments, evaluations,
     };
   }

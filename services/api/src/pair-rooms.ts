@@ -88,7 +88,13 @@ export class PairRoomCoordinator {
 
   listForPrincipal(principal: string): PairRoom[] {
     if (!principal) throw new Error('unauthorized');
-    return this.list().filter((room) => room.creator === principal || room.challenger === principal);
+    return this.list().filter((room) => this.canReadRoom(principal, room));
+  }
+
+  canRead(principal: string, roomId: string): boolean {
+    if (!principal) return false;
+    const room = this.get(roomId);
+    return Boolean(room && this.canReadRoom(principal, room));
   }
 
   get(roomId: string): PairRoom | null {
@@ -118,7 +124,7 @@ export class PairRoomCoordinator {
 
   verdict(principal: string, roomId: string): PairVerdictDetail {
     const room = this.requireRoom(roomId);
-    if (principal !== room.creator && principal !== room.challenger) throw new Error('unauthorized pair verdict');
+    if (!this.canReadRoom(principal, room)) throw new Error('unauthorized pair verdict');
     if (room.state !== 'SETTLED' || !room.challengerVersion || !room.verdictTx) throw new Error('pair verdict is not final');
     const matchId = sha(`arena-pair-match-v1|${room.roomId}`);
     const attemptId = sha(`arena-pair-attempt-v1|${room.roomId}|${room.verdictAttempt ?? 1}`);
@@ -156,6 +162,13 @@ export class PairRoomCoordinator {
 
   async ready(): Promise<boolean> {
     try { await this.chain.assertReady(); return true; } catch { return false; }
+  }
+
+  private canReadRoom(principal: string, room: PairRoom): boolean {
+    return principal === room.creator || principal === room.challenger
+      || this.agents.ownsAgentVersion(principal, room.creatorAgentId, room.creatorVersion)
+      || Boolean(room.challengerAgentId && room.challengerVersion
+        && this.agents.ownsAgentVersion(principal, room.challengerAgentId, room.challengerVersion));
   }
 
   async credit(userId: string, principal: string, roomId: string): Promise<string> {

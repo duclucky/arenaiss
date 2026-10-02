@@ -29,6 +29,29 @@ test('Marketplace projection requires exact Arc bindings and delivery requires c
   const runtime = new SqliteRuntimeStore(':memory:');
   try {
     seedAgent(runtime);
+    const campaignId = `sha256:${'5'.repeat(64)}`;
+    const tournamentId = `sha256:${'6'.repeat(64)}`;
+    const roomId = `sha256:${'7'.repeat(64)}`;
+    runtime.put('evaluation-campaigns', campaignId, {
+      schema: 'arena-solo-campaign-v1', campaignId, owner: seller,
+      agent: { versionId: version, commitment, agentsMd: '# Private Agent' },
+      testPack: { packId: `sha256:${'8'.repeat(64)}`, version: '1.0.0', scenarios: [] },
+      runtimePolicy: { model: 'fixture', maxOutputTokens: 500, temperature: 0, maxProviderAttempts: 2 },
+      rubricVersion: 'AgentEvaluationV5', state: 'PENDING', items: [],
+    });
+    runtime.put('api-tournaments', tournamentId, { id: tournamentId, name: 'Inherited Arena', status: 'COMPLETED', entrantIds: [], prizePool: '0' });
+    runtime.put('api-registrations', 'inherited-registration', {
+      tournamentId: `0x${tournamentId.slice(7)}`, entrantId: `0x${'9'.repeat(64)}`,
+      agentId: `0x${agentId.slice(7)}`, agentsVersion: `0x${version.slice(7)}`,
+      agentsCommitment: `0x${commitment.slice(7)}`, stakeAmount: '1000000',
+    });
+    runtime.put('pair-rooms-v1', roomId, {
+      roomId, roomNumber: 7, creator: seller, creatorWallet: seller,
+      creatorAgentId: agentId, creatorVersion: version, challenger: `usr_${'e'.repeat(64)}`,
+      challengerWallet: `0x${'e'.repeat(40)}`, challengerAgentId: `sha256:${'e'.repeat(64)}`,
+      challengerVersion: `sha256:${'f'.repeat(64)}`, stake: '1000000', joinDeadline: 100,
+      resolutionDeadline: 200, state: 'SETTLED', createdAt: 10,
+    });
     runtime.put('marketplace-listings', '1', { schema: 'arena-marketplace-listing-v1', listingId: '1', certificateDigest, agentId, agentVersionId: version, agentsCommitment: commitment, erc8004TokenId: tokenId, name: 'Private Agent', seller, sellerAddress: seller, price: '1000000', expiresAt: 2000, state: 'BUY_SUBMITTED', buyer, buyerAddress: buyer });
     const service = new ArenaApiService(operator, runtime);
     const snapshot = { listingId: '1', tokenId, agentId, version, commitment, sellerAddress: seller, buyerAddress: buyer, price: '1000000', expiresAt: 2000, state: 'SOLD' as const, registryOwner: buyer, registryActive: true };
@@ -40,7 +63,12 @@ test('Marketplace projection requires exact Arc bindings and delivery requires c
     assert.deepEqual(service.listOwnedMarketplacePurchases(seller), []);
     assert.deepEqual(service.listOwnedAgents(buyer).map((row) => row.agentId), [agentId]);
     assert.deepEqual(service.listOwnedAgents(seller), []);
-    assert.equal(service.getAgentDetail(buyer, agentId).agentsMd, '# Private Agent');
+    const detail = service.getAgentDetail(buyer, agentId);
+    assert.equal(detail.agentsMd, '# Private Agent');
+    assert.deepEqual(detail.evaluations.map((row) => row.campaignId), [campaignId]);
+    assert.deepEqual(detail.tournaments.map((row) => row.id), [tournamentId]);
+    assert.deepEqual(detail.activity?.pairMatches, [{ roomId, state: 'SETTLED', role: 'CREATOR', createdAt: 10 }]);
+    assert.deepEqual(service.listOwnedRegistrations(buyer), [{ tournamentId: `0x${tournamentId.slice(7)}`, entrantId: `0x${'9'.repeat(64)}`, agentId: `0x${agentId.slice(7)}` }]);
     assert.throws(() => service.getAgentDetail(seller, agentId), /unauthorized/);
     assert.equal(service.getPublicAgent(agentId).erc8004Identity?.ownerAddress, buyer);
     assert.equal(runtime.get<any>('api-agents', agentId)?.owner, buyer);

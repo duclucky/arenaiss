@@ -110,6 +110,7 @@ test('anonymous pair listing is open-only and participant rooms require a sessio
     get(roomId: string) { return roomId.endsWith('a'.repeat(64))
       ? { roomId, state: 'OPEN', creator: bob }
       : { roomId, state: 'JOINED', creator: alice, challenger: bob }; },
+    canRead(principal: string, roomId: string) { return principal === alice && roomId.endsWith('b'.repeat(64)); },
     verdict(principal: string, roomId: string) { calls.push(`${principal}:${roomId}`); return { schema: 'arena-pair-verdict-v1', result: 'A_WIN' }; },
   } as unknown as PairRoomCoordinator;
   const api = new ArenaHttpApi(new ArenaApiService(operator), async () => true, undefined, undefined, undefined, undefined, undefined, undefined, pairs);

@@ -5,6 +5,8 @@ import { useAppContext } from '../context';
 import type { AgentDetail, AgentProfile, RegressionPolicy, VersionComparison } from '../adapters/interfaces';
 import { displayLabel } from '../display-label';
 
+const ARC_TESTNET_EXPLORER_URL = 'https://explorer.testnet.arc.io';
+
 const LOCKED_REGRESSION_POLICY: RegressionPolicy = {
   schema: 'arena-regression-policy-v1', requiredRunsPerScenario: 1, minimumScenarioCoverageBps: 10_000,
   maximumOverallDrop: 5, maximumDimensionDrop: 10, maximumOverallSpread: 20, maximumDimensionSpread: 25,
@@ -100,6 +102,7 @@ export function Agents() {
         <div className="flex flex-wrap items-center justify-between gap-2"><strong>ERC-8004 #{detail.erc8004Identity.tokenId}</strong><span className="text-xs uppercase tracking-wide">{detail.erc8004Identity.network}</span></div>
         <p className="mt-2 break-all font-mono text-xs">Registry {detail.erc8004Identity.registryAddress}</p>
         <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold underline">
+          <a href={`${ARC_TESTNET_EXPLORER_URL}/token/${encodeURIComponent(detail.erc8004Identity.registryAddress)}/instance/${encodeURIComponent(detail.erc8004Identity.tokenId)}`} target="_blank" rel="noreferrer">View Agent on Arc Explorer <ExternalLink className="inline" size={14}/></a>
           {detail.erc8004Identity.transaction.explorerUrl && <a href={detail.erc8004Identity.transaction.explorerUrl} target="_blank" rel="noreferrer">View identity transaction <ExternalLink className="inline" size={14}/></a>}
           <a href={detail.erc8004Identity.agentUri} target="_blank" rel="noreferrer">View registration file <ExternalLink className="inline" size={14}/></a>
         </div>
@@ -108,7 +111,7 @@ export function Agents() {
       {!detail.erc8004Identity && detail.registration?.explorerUrl && <a href={detail.registration.explorerUrl} target="_blank" rel="noreferrer" className="mb-5 inline-block font-semibold underline">Registered on Arc <ExternalLink className="inline" size={14}/></a>}
       <div className="flex items-center justify-between gap-3"><h3 className="font-bold">AGENTS.md</h3><button type="button" className="metal-button-ghost" onClick={() => navigator.clipboard.writeText(detail.agentsMd)}><Copy size={15}/> Copy</button></div>
       <pre className="retro-inset mt-3 max-h-64 overflow-auto whitespace-pre-wrap p-4 text-sm">{detail.agentsMd}</pre>
-      <div className="mt-6 grid gap-5 sm:grid-cols-2"><History title="Tournaments" rows={detail.tournaments.map((item) => `${item.name} · ${displayLabel(item.status)}`)}/><EvaluationHistory evaluations={detail.evaluations}/></div>
+      <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"><EvaluationHistory evaluations={detail.evaluations}/><PairMatchHistory pairMatches={detail.activity?.pairMatches ?? []}/><TournamentHistory tournaments={detail.tournaments}/></div>
       <section className="mt-6 border-t border-black/20 pt-5" aria-labelledby="comparison-heading">
         <p className="page-kicker">Regression check</p><h3 id="comparison-heading" className="text-xl font-bold">Version comparison</h3>
         <p className="mt-2 text-sm text-neutral-600">Compares finalized evaluation evidence under the locked Arena ISS thresholds.</p>
@@ -131,9 +134,14 @@ export function Agents() {
 }
 
 function Stat({ label, value }: { label: string; value: number | null | undefined }) { return <div><dt className="text-[11px] uppercase tracking-wide text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-bold">{value ?? 'N/A'}</dd></div>; }
-function History({ title, rows }: { title: string; rows: string[] }) { return <section><h3 className="font-bold">{title}</h3>{rows.length ? <ul className="mt-2 space-y-2">{rows.map((row, index) => <li key={`${row}-${index}`} className="retro-inset p-3 text-sm">{row}</li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">No activity yet.</p>}</section>; }
 function EvaluationHistory({ evaluations }: { evaluations: AgentDetail['evaluations'] }) {
   return <section><h3 className="font-bold">Evaluations</h3>{evaluations.length ? <ul className="mt-2 space-y-2">{evaluations.map((evaluation, index) => <li key={evaluation.campaignId} className="retro-inset flex items-center justify-between gap-3 p-3 text-sm"><span>Agent evaluation · {displayLabel(evaluation.state)}</span><Link className="metal-button-ghost shrink-0 px-3 py-2" to={`/evaluations/${evaluation.campaignId}`} aria-label={`View evaluation ${index + 1}`}>View</Link></li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">No activity yet.</p>}</section>;
+}
+function PairMatchHistory({ pairMatches }: { pairMatches: NonNullable<AgentDetail['activity']>['pairMatches'] }) {
+  return <section><h3 className="font-bold">Pair Matches</h3>{pairMatches.length ? <ul className="mt-2 space-y-2">{pairMatches.map((match, index) => <li key={match.roomId} className="retro-inset flex items-center justify-between gap-3 p-3 text-sm"><span>Match {index + 1} · {displayLabel(match.role)} · {displayLabel(match.state)}</span><Link className="metal-button-ghost shrink-0 px-3 py-2" to="/pairs/completed" aria-label={`View Pair Match ${index + 1}`}>View</Link></li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">No activity yet.</p>}</section>;
+}
+function TournamentHistory({ tournaments }: { tournaments: AgentDetail['tournaments'] }) {
+  return <section><h3 className="font-bold">Tournaments</h3>{tournaments.length ? <ul className="mt-2 space-y-2">{tournaments.map((tournament) => <li key={tournament.id} className="retro-inset flex items-center justify-between gap-3 p-3 text-sm"><span>{tournament.name} · {displayLabel(tournament.status)}</span><Link className="metal-button-ghost shrink-0 px-3 py-2" to={`/tournaments/${tournament.id}`} aria-label={`View tournament ${tournament.name}`}>View</Link></li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">No activity yet.</p>}</section>;
 }
 function Modal({ title, closeLabel, onClose, children }: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDivElement>(null);

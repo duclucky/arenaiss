@@ -178,6 +178,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   const myRoom = (room: Room) => Boolean(managedAccount &&
     (room.creatorWallet.toLowerCase() === managedAccount.managedWallet.address.toLowerCase()
       || room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase()));
+  const ownedAgentRoom = (room: Room) => agents.some((agent) => agent.agentId === room.creatorAgentId || agent.agentId === room.challengerAgentId);
   const myCreatedRoom = (room: Room) => Boolean(managedAccount && room.creatorWallet.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
   const myJoinedRoom = (room: Room) => Boolean(managedAccount && room.challengerWallet?.toLowerCase() === managedAccount.managedWallet.address.toLowerCase());
   const settledOutcome = (room: Room): 'YOU WON' | 'YOU LOST' | null => {
@@ -188,7 +189,7 @@ export function PairMatches({ view = 'open' }: { view?: PairRoomView }) {
   };
   const visibleRooms = rooms.filter((room) => view === 'open' ? room.state === 'OPEN'
     : view === 'mine' ? myRoom(room) && !['SETTLED', 'REFUNDABLE'].includes(room.state)
-      : myRoom(room) && (room.state === 'SETTLED' || room.state === 'REFUNDABLE'))
+      : (myRoom(room) || ownedAgentRoom(room)) && (room.state === 'SETTLED' || room.state === 'REFUNDABLE'))
     .sort((a, b) => a.roomNumber - b.roomNumber);
   const viewCopy = view === 'open'
     ? { title: 'Open rooms', empty: 'No open rooms.' }

@@ -8,7 +8,7 @@ import { Agents } from '../views/Agents';
 
 const agent = { agentId: `sha256:${'a'.repeat(64)}`, name: 'Safety Scout', agentsVersion: `sha256:${'b'.repeat(64)}`, agentsCommitment: `sha256:${'c'.repeat(64)}`, active: true, stats: { latestEvaluationScore: 88, tournamentCount: 2, adversarialMatchCount: 4 } };
 const oldVersion = `sha256:${'d'.repeat(64)}`;
-const detail: AgentDetail = { ...agent, agentsMd: '# Safety Scout\nNever transfer funds.', versions: [{ agentsVersion: oldVersion, agentsCommitment: `sha256:${'e'.repeat(64)}`, createdAt: 1 }, { agentsVersion: agent.agentsVersion, agentsCommitment: agent.agentsCommitment, createdAt: 2 }], tournaments: [{ id: 't1', name: 'Safety Arena', status: 'COMPLETED', entrantIds: [], prizePool: '0' }], evaluations: [{ schema: 'arena-public-evaluation-campaign-v1', campaignId: `sha256:${'1'.repeat(64)}`, agentVersionId: oldVersion, packId: 'p1', packVersion: '1', rubricVersion: 'r1', state: 'FINALIZED', items: [] }, { schema: 'arena-public-evaluation-campaign-v1', campaignId: `sha256:${'2'.repeat(64)}`, agentVersionId: agent.agentsVersion, packId: 'p1', packVersion: '1', rubricVersion: 'r1', state: 'FINALIZED', items: [] }] };
+const detail: AgentDetail = { ...agent, agentsMd: '# Safety Scout\nNever transfer funds.', versions: [{ agentsVersion: oldVersion, agentsCommitment: `sha256:${'e'.repeat(64)}`, createdAt: 1 }, { agentsVersion: agent.agentsVersion, agentsCommitment: agent.agentsCommitment, createdAt: 2 }], tournaments: [{ id: 't1', name: 'Safety Arena', status: 'COMPLETED', entrantIds: [], prizePool: '0' }], evaluations: [{ schema: 'arena-public-evaluation-campaign-v1', campaignId: `sha256:${'1'.repeat(64)}`, agentVersionId: oldVersion, packId: 'p1', packVersion: '1', rubricVersion: 'r1', state: 'FINALIZED', items: [] }, { schema: 'arena-public-evaluation-campaign-v1', campaignId: `sha256:${'2'.repeat(64)}`, agentVersionId: agent.agentsVersion, packId: 'p1', packVersion: '1', rubricVersion: 'r1', state: 'FINALIZED', items: [] }], activity: { evaluations: [], pairMatches: [{ roomId: `sha256:${'3'.repeat(64)}`, state: 'SETTLED', role: 'CREATOR', createdAt: 3 }], tournaments: [] } };
 const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, identity: { kind: 'EMAIL' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: '0x4444444444444444444444444444444444444444', blockchain: 'ARC-TESTNET' as const, accountType: 'EOA' as const } };
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
 
@@ -31,6 +31,10 @@ describe('Agent management', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Safety Scout details' }));
     expect(await screen.findByText('ERC-8004 #42')).toBeInTheDocument();
     expect(screen.getByText('Reputation 88 / 100')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Agent on Arc Explorer' })).toHaveAttribute(
+      'href',
+      'https://explorer.testnet.arc.io/token/0x8004A818BFB912233c491871b3d84c89A494BD9e/instance/42',
+    );
     expect(screen.getByRole('link', { name: 'View identity transaction' })).toHaveAttribute('href', 'https://testnet.arcscan.app/tx/0x1');
     expect(screen.getByRole('link', { name: 'View reputation transaction' })).toHaveAttribute('href', 'https://testnet.arcscan.app/tx/0x2');
   });
@@ -49,6 +53,8 @@ describe('Agent management', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Safety Scout details' }));
     expect(await screen.findByText(/# Safety Scout/)).toBeInTheDocument();
     expect(screen.getByText(/Safety Arena/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View tournament Safety Arena' })).toHaveAttribute('href', '/tournaments/t1');
+    expect(screen.getByRole('link', { name: 'View Pair Match 1' })).toHaveAttribute('href', '/pairs/completed');
     expect(screen.getByRole('link', { name: 'View evaluation 1' })).toHaveAttribute('href', `/evaluations/${detail.evaluations[0].campaignId}`);
     expect(screen.getByRole('link', { name: 'View evaluation 2' })).toHaveAttribute('href', `/evaluations/${detail.evaluations[1].campaignId}`);
     fireEvent.click(screen.getByRole('button', { name: 'Close Agent details' }));

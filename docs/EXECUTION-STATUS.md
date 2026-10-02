@@ -1,5 +1,29 @@
 # Implementation execution status
 
+## 2026-10-02 ERC-8004 explorer link and inherited Agent history — release authorized
+
+The private Agent detail modal now links each ERC-8004 identity directly to its
+ERC-721 token-instance page on the canonical Arc Testnet explorer. The URL is
+derived from the returned registry address and token ID, so it works for every
+registered Agent rather than one fixture. The existing identity transaction,
+registration file and reputation transaction links remain unchanged.
+
+Marketplace ownership now also carries read access to the exact Agent/version's
+immutable Evaluation, Pair Match and Tournament history. Agent detail presents
+all three history groups with navigation to their records. Completed Pair Match
+history and its redacted GenLayer verdict can be read by the current Agent owner
+even when another wallet originally entered the room. Cancellation, timeout,
+credit and withdrawal authority remains bound to the original participant and
+funding wallet; the ownership transfer does not move old financial rights.
+
+Verification: focused service regressions first reproduced the missing Agent
+activity projection and current-owner Pair Match access, and focused frontend
+regressions first reproduced the absent history controls. All focused service
+and frontend tests pass after implementation, including the negative assertion
+that the buyer receives no old Pair Match claim action. The final full project
+check passed 84 direct tests, 394 TypeScript tests, 39 Solidity tests and 165
+frontend tests, plus frontend typecheck and the production build.
+
 ## 2026-10-02 Marketplace inherited evaluation evidence — local only
 
 Finalized evaluation evidence now follows the exact Agent version after its
