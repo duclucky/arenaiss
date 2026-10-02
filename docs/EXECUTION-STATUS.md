@@ -1,5 +1,16 @@
 # Implementation execution status
 
+## 2026-10-02 Transferred Agent evaluation-detail access — release authorized
+
+Evaluation result pages now load the immutable campaign and run evidence
+independently from the evaluation-fee record. After an Agent sale, the current
+owner can therefore open the transferred Agent's finalized evaluation history,
+while fee custody, refund details and settlement authority remain private to the
+original payer. A focused frontend regression reproduced the production `not
+found` page before the change and passes after the fix. The final full project
+check passed 84 direct tests, 394 TypeScript tests, 39 Solidity tests and 166
+frontend tests, plus frontend typecheck and the production build.
+
 ## 2026-10-02 ERC-8004 explorer link and inherited Agent history — release authorized
 
 The private Agent detail modal now links each ERC-8004 identity directly to its

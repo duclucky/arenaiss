@@ -16,10 +16,21 @@ export function EvaluationDetail() {
     const refresh = async () => {
       let pollAgain = true;
       try {
-        const [nextCampaign, allRuns, nextFee] = await Promise.all([evaluationApi.getCampaign(id), evaluationApi.listRuns(), evaluationApi.getFee?.(id) ?? Promise.resolve(null)]);
+        const [nextCampaign, allRuns] = await Promise.all([evaluationApi.getCampaign(id), evaluationApi.listRuns()]);
         if (!active) return;
         if (!nextCampaign) { setError('Evaluation not found.'); pollAgain = false; return; }
-        setCampaign(nextCampaign); setFee(nextFee); setFeeLoaded(Boolean(evaluationApi.getFee));
+        let nextFee: Awaited<ReturnType<NonNullable<EvaluationApiAdapter['getFee']>>> | null = null;
+        let nextFeeLoaded = false;
+        if (evaluationApi.getFee) {
+          try {
+            nextFee = await evaluationApi.getFee(id);
+            nextFeeLoaded = true;
+          } catch {
+            // Fee custody remains private to the original payer after an Agent transfer.
+          }
+        }
+        if (!active) return;
+        setCampaign(nextCampaign); setFee(nextFee); setFeeLoaded(nextFeeLoaded);
         setRuns(allRuns.filter((run) => nextCampaign.items.some((item) => item.runIds.includes(run.runId))));
         setError('');
         pollAgain = !['FINALIZED', 'FAILED', 'PAYMENT_FAILED'].includes(nextCampaign.state) || Boolean(nextFee && !['RELEASED', 'REFUNDED', 'PAYMENT_FAILED'].includes(nextFee.state));

@@ -212,6 +212,15 @@ describe('evaluation product UX', () => {
     expect(screen.getByText(/Legacy campaign, no evaluation escrow record/i)).toBeInTheDocument();
   });
 
+  it('keeps transferred Agent evaluation history visible when fee details belong to the original payer', async () => {
+    const api = { ...evaluationApi, async getFee() { throw new Error('not found'); } };
+    render(<MemoryRouter initialEntries={['/evaluations/campaign_1']}><AppProvider config={config} evaluationApiAdapter={api}><Routes><Route path="/evaluations/:id" element={<EvaluationDetail />} /></Routes></AppProvider></MemoryRouter>);
+    expect(await screen.findByRole('table', { name: 'Evaluation results' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open attempt 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Legacy campaign, no evaluation escrow record/i)).not.toBeInTheDocument();
+  });
+
   it('keeps backend evaluation IDs out of the user-facing list', async () => {
     const campaignId = `sha256:${'c'.repeat(64)}`;
     const api = { ...evaluationApi, async listCampaigns() { return [{ ...campaign, campaignId }]; } };
