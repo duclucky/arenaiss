@@ -1,5 +1,18 @@
 # Implementation execution status
 
+## 2026-10-02 Marketplace consumed-certificate relist repair — local only
+
+Marketplace no longer offers a certificate after its listing intent has resolved
+to an Arc listing ID. This mirrors `AgentMarketplaceV2`, where an eligibility
+digest is single-use: a later `Check eligibility` request must issue and approve a
+fresh digest from the qualifying evaluations instead of reusing the consumed
+certificate and hitting `conflicting marketplace listing intent`. Unresolved
+intents remain immutable and recoverable, preserving duplicate-transaction
+protection. No Circle call, Arc transaction, commit, push or deployment was
+performed for this repair. Eligibility issuance also rejects an Agent version
+while any prior listing remains submitted, active, purchasing, cancelling or
+sold, preventing parallel listings for the same ERC-8004 identity.
+
 ## 2026-10-02 Marketplace listing-intent recovery — local only
 
 The seller UI now restores unfinished Marketplace listing intents instead of

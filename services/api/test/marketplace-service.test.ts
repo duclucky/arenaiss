@@ -215,6 +215,11 @@ test('Marketplace listing validates and persists a reusable Circle intent before
     const listing = restarted.finishMarketplaceListing(seller, certificateDigest, '3');
     assert.equal(listing.state, 'SUBMITTED');
     assert.equal(restarted.finishMarketplaceListing(seller, certificateDigest, '3').listingId, '3');
+    assert.deepEqual(restarted.listOwnedMarketplaceCertificates(seller), []);
+    assert.throws(() => restarted.createMarketplaceEligibility(seller, { agentId, agentsVersion: version,
+      campaignIds: [`sha256:${'8'.repeat(64)}`, `sha256:${'9'.repeat(64)}`], issuedAt: 2,
+      expiresAt: 2_100_000_000, network: 'studio-next', chainId: 61997, judgeAddress: operator }),
+    /Agent version already has a Marketplace listing/);
   } finally { runtime.close(); }
 });
 

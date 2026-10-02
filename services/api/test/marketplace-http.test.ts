@@ -111,6 +111,54 @@ test('Marketplace eligibility is approved automatically by the configured system
   } finally { runtime.close(); }
 });
 
+test('Marketplace issues a fresh single-use certificate after a prior listing consumed its digest', async () => {
+  const runtime = new SqliteRuntimeStore(':memory:');
+  try {
+    const oldDigest = `sha256:${'4'.repeat(64)}`;
+    const freshDigest = `sha256:${'5'.repeat(64)}`;
+    const agentId = `sha256:${'1'.repeat(64)}`;
+    const version = `sha256:${'2'.repeat(64)}`;
+    const commitment = `sha256:${'3'.repeat(64)}`;
+    const base = { schema: 'arena-marketplace-certificate-v1', evidenceDigest: `sha256:${'6'.repeat(64)}`,
+      owner: alice, agentId, agentVersionId: version, agentsCommitment: commitment,
+      packId: `sha256:${'7'.repeat(64)}`, packVersion: '1.0.0', rubricVersion: 'v1', coverageBps: 10000,
+      overallScore: 97, dimensionScores: {}, maxSpread: 0, expiresAt: 3_000_000_000,
+      state: 'APPROVED' as const, erc8004TokenId: '42' };
+    runtime.put('marketplace-certificates', oldDigest, { ...base, certificateDigest: oldDigest, issuedAt: 1 });
+    runtime.put('marketplace-listing-intents', oldDigest, { protocol: 'ERC8004_V2', certificateDigest: oldDigest,
+      owner: alice, sellerAddress: alice, tokenId: '42', agentId, agentsVersion: version, agentsCommitment: commitment,
+      price: '3000000', expiresAt: 2_000_000_000, nftApprovalIdempotencyKey: '11111111-1111-4111-8111-111111111111',
+      listingIdempotencyKey: '22222222-2222-4222-8222-222222222222', listingId: '1' });
+    const service = new ArenaApiService(operator, runtime);
+    let created = 0;
+    service.createMarketplaceEligibility = (() => {
+      created += 1;
+      const certificate = { ...base, certificateDigest: freshDigest, issuedAt: 2, state: 'ELIGIBLE' as const };
+      (service as any).marketplaceCertificates.set(freshDigest, certificate);
+      runtime.put('marketplace-certificates', freshDigest, certificate);
+      return structuredClone(certificate);
+    }) as typeof service.createMarketplaceEligibility;
+    let approved = '';
+    const chain = { async snapshot() { throw new Error('not used'); }, async approveEligibility(input: { digest: string }) {
+      approved = input.digest;
+      return { transactionId: 'fresh-approval', state: 'COMPLETE', txHash: `0x${'8'.repeat(64)}` };
+    } };
+    const api = new ArenaHttpApi(service, async () => true, undefined, chain as any);
+    await api.handle({ method: 'POST', path: '/api/auth/challenge', body: { address: alice } });
+    const login = await api.handle({ method: 'POST', path: '/api/auth/verify', body: { address: alice, signature: 'ok' } });
+    const headers = { cookie: login.headers['set-cookie'].split(';')[0] };
+    assert.deepEqual((await api.handle({ method: 'GET', path: '/api/marketplace/certificates', headers })).body, []);
+    const response = await api.handle({ method: 'POST', path: '/api/marketplace/eligibility', headers, body: {
+      agentId, agentsVersion: version, campaignIds: [`sha256:${'8'.repeat(64)}`, `sha256:${'9'.repeat(64)}`],
+      issuedAt: 2, expiresAt: 3_000_000_000, network: 'studio-next', chainId: 61997, judgeAddress: operator,
+    } });
+    assert.equal(response.status, 201);
+    assert.equal(response.body.certificateDigest, freshDigest);
+    assert.equal(created, 1);
+    assert.equal(approved, freshDigest);
+  } finally { runtime.close(); }
+});
+
 test('Marketplace reconciles a submitted listing from Arc after service restart', async () => {
   const runtime = new SqliteRuntimeStore(':memory:');
   try {

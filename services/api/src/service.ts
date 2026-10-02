@@ -531,6 +531,7 @@ export class ArenaApiService {
     const owner = this.principal(caller); const agent = this.requireOwner(owner, input.agentId);
     if (!agent.erc8004Identity || !/^[1-9][0-9]*$/.test(agent.erc8004Identity.tokenId)) throw new Error("ERC-8004 identity is required for Marketplace eligibility");
     const version = agent.versions.find((row) => row.agentsVersion === input.agentsVersion); if (!version) throw new Error("agent version not found");
+    if ([...this.marketplaceListings.values()].some((row) => row.agentId === agent.agentId && row.agentVersionId === version.agentsVersion && !["CANCELLED", "EXPIRED"].includes(row.state))) throw new Error("Agent version already has a Marketplace listing");
     if (!Array.isArray(input.campaignIds) || input.campaignIds.length !== 2 || new Set(input.campaignIds).size !== 2) throw new Error("exactly two evaluation campaigns are required");
     const campaigns = input.campaignIds.map((id) => this.evaluationCampaign(id));
     if (campaigns.some((row) => !row || row.owner !== owner || row.state !== "FINALIZED" || row.agent.versionId !== version.agentsVersion || row.agent.commitment !== version.agentsCommitment)) throw new Error("evaluation campaign is not finalized or bound to this version");
@@ -558,7 +559,7 @@ export class ArenaApiService {
     this.marketplaceCertificates.set(certificateDigest, record); this.runtime?.put("marketplace-certificates", certificateDigest, record); return structuredClone(record);
   }
   approveMarketplaceEligibility(caller: string, digest: Digest, transaction: MarketplaceTransaction): MarketplaceCertificate { this.requireOperator(caller); const record = this.marketplaceCertificates.get(digest); if (!record) throw new Error("marketplace certificate not found"); record.state = "APPROVED"; record.authorization = structuredClone(transaction); this.runtime?.put("marketplace-certificates", digest, record); return structuredClone(record); }
-  listOwnedMarketplaceCertificates(caller: string): MarketplaceCertificate[] { const owner = this.principal(caller); return [...this.marketplaceCertificates.values()].filter((row) => row.owner === owner).map((row) => structuredClone(row)); }
+  listOwnedMarketplaceCertificates(caller: string): MarketplaceCertificate[] { const owner = this.principal(caller); return [...this.marketplaceCertificates.values()].filter((row) => row.owner === owner && !this.marketplaceListingIntents.get(row.certificateDigest)?.listingId).map((row) => structuredClone(row)); }
   listMarketplaceCertificatesForOperator(caller: string): MarketplaceCertificate[] { this.requireOperator(caller); return [...this.marketplaceCertificates.values()].map((row) => structuredClone(row)).sort((a, b) => b.issuedAt - a.issuedAt); }
   beginMarketplaceListing(caller: string, input: { certificateDigest: Digest; agentId: Digest; agentsVersion: Digest; agentsCommitment: Digest; sellerAddress: string; price: string; expiresAt: number; nftApprovalIdempotencyKey: string; listingIdempotencyKey: string }): MarketplaceListingIntent {
     const owner = this.principal(caller);
