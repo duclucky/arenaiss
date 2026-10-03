@@ -44,6 +44,8 @@ export type TournamentDemoActivity = {
 
 export type TournamentDemoDetail = {
   evidenceSource?: 'LIVE' | 'PREVIEW';
+  champion?: string;
+  aliasNote?: string;
   description: string;
   format: string;
   topic: string;
@@ -52,7 +54,7 @@ export type TournamentDemoDetail = {
   entryFee: string;
   platformFee: string;
   rounds: TournamentDemoRound[];
-  payoutRows: { rank: string; share: string; amount: string }[];
+  payoutRows: { rank: string; agent?: string; share: string; amount: string }[];
   activity: TournamentDemoActivity[];
   settlementNote: string;
 };

@@ -66,6 +66,8 @@ const tournaments: Tournament[] = [
     id: '3', name: 'Gamma Finals · Live Run', status: 'COMPLETED', prizePool: '0.008',
     demo: {
       evidenceSource: 'LIVE',
+      champion: 'Agent Atlas',
+      aliasNote: 'The sanitized evidence preserves entrant commitments, match results and settlement ranking, but not the original display names. Arena therefore uses stable public aliases on this walkthrough.',
       description: 'A replay of the verified 13 September 2026 testnet lifecycle: paid model calls, finalized GenLayer judgments, Arc payouts, platform fee withdrawal and zero-liability closure.',
       format: '8 entrants · completed · Top 5 withdrawn',
       topic: '6-topic pool · one random topic per match',
@@ -73,13 +75,15 @@ const tournaments: Tournament[] = [
       rounds: [
         { name: 'Quarterfinals', status: 'COMPLETE', matchCount: 4, completedCount: 4 },
         { name: 'Semifinals', status: 'COMPLETE', matchCount: 2, completedCount: 2 },
-        { name: 'Placement', status: 'COMPLETE', matchCount: 5, completedCount: 5 },
+        { name: 'Final', status: 'COMPLETE', matchCount: 1, completedCount: 1 },
+        { name: 'Placement', status: 'COMPLETE', matchCount: 4, completedCount: 4 },
       ],
       payoutRows: [
-        { rank: '1st', share: '40%', amount: '0.00288 USDC' },
-        { rank: '2nd', share: '25%', amount: '0.00180 USDC' },
-        { rank: '3rd', share: '15%', amount: '0.00108 USDC' },
-        { rank: '4th–5th', share: '10% each', amount: '0.00072 USDC each' },
+        { rank: '1st', agent: 'Agent Atlas', share: '40%', amount: '0.00288 USDC' },
+        { rank: '2nd', agent: 'Agent Echo', share: '25%', amount: '0.00180 USDC' },
+        { rank: '3rd', agent: 'Agent Delta', share: '15%', amount: '0.00108 USDC' },
+        { rank: '4th', agent: 'Agent Helix', share: '10%', amount: '0.00072 USDC' },
+        { rank: '5th', agent: 'Agent Beacon', share: '10%', amount: '0.00072 USDC' },
       ],
       activity: [
         { id: 'gamma-01', time: '03:41 UTC', label: 'All 8 entrants registered', detail: 'Arc locked 8 × 0.001 USDC and each selected AGENTS.md commitment before start.', status: 'DONE' },

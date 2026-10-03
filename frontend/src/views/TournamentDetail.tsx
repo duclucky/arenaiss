@@ -87,6 +87,7 @@ export function TournamentDetail() {
   const expectedMatches = (round: string) => round === 'third' || round === 'fifth' ? 1
     : tournament.bracketRevision && tournament.bracketRevision >= 2 ? (rollingRoundSizes[Number(round) - 1] ?? 0)
     : round === '0' ? preliminaryCount : bracketBase / 2 ** Number(round);
+  const isVerifiedWalkthrough = tournament.demo?.evidenceSource === 'LIVE';
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -128,7 +129,9 @@ export function TournamentDetail() {
         </dl>
       </section>}
 
-      <div className="glass-panel rounded-[28px] p-6 md:p-8">
+      {isVerifiedWalkthrough && <VerifiedLiveBracket matches={matches} />}
+
+      {!isVerifiedWalkthrough && <div className="glass-panel rounded-[28px] p-6 md:p-8">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
           Match bracket <Info size={16} className="text-muted-foreground" aria-hidden="true" />
         </h2>
@@ -173,7 +176,7 @@ export function TournamentDetail() {
             ))}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -196,6 +199,10 @@ function DemoTournamentDetail({ detail }: { detail: NonNullable<Tournament['demo
         <DetailStat label="Entrants" value={`${detail.entrants} / ${detail.maxEntrants}`} />
         <DetailStat label="Entry fee" value={detail.entryFee} />
       </div>
+      {isLiveEvidence && detail.champion && <div className="retro-inset mt-5 border-2 border-accent p-4 md:flex md:items-end md:justify-between md:gap-5">
+        <div><p className="page-kicker text-accent">Tournament winner</p><h2 className="text-2xl font-bold">Champion · {detail.champion}</h2></div>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-neutral-700 md:mt-0">{detail.aliasNote}</p>
+      </div>}
     </div>
 
     <div className="grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
@@ -222,11 +229,45 @@ function DemoTournamentDetail({ detail }: { detail: NonNullable<Tournament['demo
         </div>
         <div className="glass-panel rounded-[28px] p-5 md:p-6">
           <p className="page-kicker">Arc settlement</p><h2 className="text-xl font-bold">{isLiveEvidence ? 'Top 5 payout receipts' : 'Top 5 payout preview'}</h2>
-          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[360px] text-left text-sm"><thead><tr className="border-b border-black/20 text-xs uppercase tracking-wider text-neutral-600"><th className="pb-2">Rank</th><th className="pb-2">Share</th><th className="pb-2 text-right">Amount</th></tr></thead><tbody>{detail.payoutRows.map((row) => <tr key={row.rank} className="border-b border-black/10"><td className="py-2.5 font-semibold">{row.rank}</td><td className="py-2.5">{row.share}</td><td className="py-2.5 text-right font-mono text-xs">{row.amount}</td></tr>)}</tbody></table></div>
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[420px] text-left text-sm"><thead><tr className="border-b border-black/20 text-xs uppercase tracking-wider text-neutral-600"><th className="pb-2">Rank</th>{detail.payoutRows.some((row) => row.agent) && <th className="pb-2">Agent</th>}<th className="pb-2">Share</th><th className="pb-2 text-right">Amount</th></tr></thead><tbody>{detail.payoutRows.map((row) => <tr key={row.rank} className="border-b border-black/10"><td className="py-2.5 font-semibold">{row.rank}</td>{detail.payoutRows.some((item) => item.agent) && <td className="py-2.5 font-medium">{row.agent ?? 'Not listed'}</td>}<td className="py-2.5">{row.share}</td><td className="py-2.5 text-right font-mono text-xs">{row.amount}</td></tr>)}</tbody></table></div>
           <p className="mt-4 text-sm leading-relaxed text-neutral-700"><strong>Fee:</strong> {detail.platformFee}. {detail.settlementNote}</p>
         </div>
       </div>
     </div>
+  </section>;
+}
+
+function VerifiedLiveBracket({ matches }: { matches: Match[] }) {
+  const groups = [
+    { label: 'Quarterfinals', matches: matches.filter((match) => match.stage === 'main' && match.round === 1) },
+    { label: 'Semifinals', matches: matches.filter((match) => match.stage === 'main' && match.round === 2) },
+    { label: 'Fifth-place bracket', matches: matches.filter((match) => match.stage === 'fifth_place').sort((a, b) => a.round - b.round) },
+    { label: 'Third place', matches: matches.filter((match) => match.stage === 'third_place') },
+    { label: 'Final', matches: matches.filter((match) => match.stage === 'main' && match.round === 3) },
+  ];
+  return <section className="glass-panel rounded-[28px] p-5 md:p-8" aria-labelledby="verified-bracket-heading">
+    <p className="page-kicker">Complete bracket</p>
+    <h2 id="verified-bracket-heading" className="text-2xl font-bold">Who played, who advanced, who won</h2>
+    <p className="mt-2 max-w-3xl text-sm leading-relaxed text-neutral-700">Read from top to bottom. Winners are called out on every match; the final card identifies the Tournament champion. The same stable labels are carried through every round.</p>
+    <div className="mt-6 grid gap-5 lg:grid-cols-2">
+      {groups.map((group) => <BracketRound key={group.label} label={group.label} matches={group.matches} />)}
+    </div>
+  </section>;
+}
+
+function BracketRound({ label, matches }: { label: string; matches: Match[] }) {
+  return <section className={`retro-inset p-4 ${label === 'Final' ? 'border-2 border-accent' : ''}`} aria-label={label}>
+    <div className="flex items-center justify-between gap-3 border-b border-black/20 pb-3"><h3 className="text-lg font-bold">{label}</h3><span className="retro-chip px-2 py-1 text-[11px] font-bold uppercase tracking-wider">{matches.length} {matches.length === 1 ? 'match' : 'matches'}</span></div>
+    <ol className="mt-3 space-y-3">
+      {matches.map((match, index) => <li key={match.id} className="border border-black/30 bg-white/55 p-3">
+        <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-wider text-neutral-600"><span>Match {index + 1}</span><span>Finalized</span></div>
+        <div className="mt-2 grid gap-1 text-sm">
+          <span className={match.winner === match.agentA ? 'font-bold text-accent' : ''}>{agentDisplayName(match.agentA)}</span>
+          <span className={match.winner === match.agentB ? 'font-bold text-accent' : ''}>{agentDisplayName(match.agentB)}</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-black/10 pt-2"><strong className="text-sm">Winner {match.winner ? agentDisplayName(match.winner) : 'Pending'}</strong><Link to={`/matches/${match.id}`} className="underline">View verdict</Link></div>
+      </li>)}
+    </ol>
   </section>;
 }
 

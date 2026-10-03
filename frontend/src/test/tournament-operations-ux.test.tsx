@@ -7,6 +7,7 @@ import { AppProvider } from '../context';
 import { Tournaments } from '../views/Tournaments';
 import { TournamentDetail } from '../views/TournamentDetail';
 import { MatchDetail } from '../views/MatchDetail';
+import { LIVE_EVIDENCE_TOURNAMENT_DEMO } from '../adapters/preview';
 
 const account = { userId: 'usr_owner', principal: `usr_${'1'.repeat(64)}`, identity: { kind: 'WALLET' as const }, managedWallet: { state: 'READY' as const, userId: 'usr_owner', walletId: 'wallet', address: `0x${'9'.repeat(40)}`, blockchain: 'ARC-TESTNET' as const, accountType: 'EOA' as const } };
 const identity: ManagedIdentityAdapter = { async capabilities() { return { wallet: true, email: true, managedWallet: true }; }, async restore() { return account; }, async signInWithWallet() { return account; }, async requestEmailCode() {}, async verifyEmail() { return account; }, async logout() {} };
@@ -57,6 +58,34 @@ describe('Tournament operator console', () => {
     render(<MemoryRouter><AppProvider arenaReadAdapter={reads}><Tournaments /></AppProvider></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Arena ISS October Open 2026' })).toBeInTheDocument();
     expect(screen.getByText(/Starts Oct 16, 2026, 12:00 AM UTC/)).toBeInTheDocument();
+  });
+
+  it('explains the verified Tournament as a readable bracket with public Agent aliases and an explicit champion', async () => {
+    const id = 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61';
+    const matches = [
+      { id: 'q1', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Atlas', agentB: 'Agent Beacon', winner: 'Agent Atlas', round: 1, stage: 'main' as const },
+      { id: 'q2', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Cipher', agentB: 'Agent Delta', winner: 'Agent Delta', round: 1, stage: 'main' as const },
+      { id: 'q3', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Echo', agentB: 'Agent Forge', winner: 'Agent Echo', round: 1, stage: 'main' as const },
+      { id: 'q4', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Grove', agentB: 'Agent Helix', winner: 'Agent Helix', round: 1, stage: 'main' as const },
+      { id: 's1', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Atlas', agentB: 'Agent Delta', winner: 'Agent Atlas', round: 2, stage: 'main' as const },
+      { id: 's2', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Echo', agentB: 'Agent Helix', winner: 'Agent Echo', round: 2, stage: 'main' as const },
+      { id: 'final', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Atlas', agentB: 'Agent Echo', winner: 'Agent Atlas', round: 3, stage: 'main' as const },
+      { id: 'third', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Delta', agentB: 'Agent Helix', winner: 'Agent Delta', round: 1, stage: 'third_place' as const },
+      { id: 'fifth-a', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Beacon', agentB: 'Agent Cipher', winner: 'Agent Beacon', round: 1, stage: 'fifth_place' as const },
+      { id: 'fifth-b', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Forge', agentB: 'Agent Grove', winner: 'Agent Grove', round: 1, stage: 'fifth_place' as const },
+      { id: 'fifth-final', tournamentId: id, state: 'FINALIZED' as const, agentA: 'Agent Beacon', agentB: 'Agent Grove', winner: 'Agent Beacon', round: 2, stage: 'fifth_place' as const },
+    ];
+    const reads = { async getTournament() { return { id, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED' as const, entrantIds: [], entrantCount: 8, prizePool: '0.008', demo: LIVE_EVIDENCE_TOURNAMENT_DEMO }; }, async getMatches() { return matches; } } as unknown as ArenaReadAdapter;
+    render(<MemoryRouter initialEntries={[`/tournaments/${id}`]}><AppProvider arenaReadAdapter={reads}><Routes><Route path="/tournaments/:id" element={<TournamentDetail />} /></Routes></AppProvider></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Champion · Agent Atlas' })).toBeInTheDocument();
+    expect(screen.getByText(/public aliases/i)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Quarterfinals' })).toHaveTextContent('Winner Agent Atlas');
+    expect(screen.getByRole('region', { name: 'Semifinals' })).toHaveTextContent('Agent Echo');
+    expect(screen.getByRole('region', { name: 'Fifth-place bracket' })).toHaveTextContent('Winner Agent Beacon');
+    expect(screen.getByRole('region', { name: 'Third place' })).toHaveTextContent('Winner Agent Delta');
+    expect(screen.getByRole('region', { name: 'Final' })).toHaveTextContent('Winner Agent Atlas');
+    expect(screen.queryByText(/Round of 0/)).not.toBeInTheDocument();
   });
 
   it('shows UTC registration deadline and hides registration after the roster closes', async () => {

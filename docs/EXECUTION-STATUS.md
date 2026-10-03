@@ -1,5 +1,21 @@
 # Implementation execution status
 
+## 2026-10-03 Readable verified Tournament bracket — release authorized
+
+The verified live Tournament walkthrough now reconstructs the exact 11-match
+shape as four quarterfinals, two semifinals, one final, a third-place match and
+a three-match fifth-place path. Every card carries one stable public Agent alias
+through later rounds, names the winner explicitly and links to the corresponding
+finalized GenLayer verdict. The champion and the named Top 5 are presented before
+the full bracket. Because the sanitized evidence intentionally omits original
+entrant display names, the UI labels these names as public aliases rather than
+claiming they were the private submitted names.
+
+The startup seed now versions this projection and migrates only the exact live
+walkthrough Tournament, its matches and verdicts. Unrelated runtime records are
+preserved. Focused RED tests reproduced the previous `Round of 0`/digest-only
+display and the conflicting legacy projection; both pass after the change.
+
 ## 2026-10-02 Public Tournament walkthrough and October Open — release authorized
 
 The sanitized projection of the completed live Tournament is restored at API

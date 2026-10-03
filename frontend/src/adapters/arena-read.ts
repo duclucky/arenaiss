@@ -157,13 +157,14 @@ function normalizeTournament(value: unknown): Tournament {
     bracketSeed = { schema, seedDigest, rosterDigest, entropyBlockHash, entropyBlockNumber };
   }
   const id = text(item.id);
+  const liveEvidenceDemo = id === LIVE_EVIDENCE_TOURNAMENT_ID ? structuredClone(LIVE_EVIDENCE_TOURNAMENT_DEMO) : undefined;
   return { id, name: text(item.name), status: status as Tournament['status'], prizePool: text(item.prizePool),
     ...(item.stakeAmount !== undefined ? { stakeAmount: item.stakeAmount as string } : {}),
     ...(item.registrationClosesAt !== undefined ? { registrationClosesAt: item.registrationClosesAt as number } : {}),
     ...(item.startsAt !== undefined ? { startsAt: item.startsAt as number } : {}),
-    ...(Array.isArray(item.entrantIds) ? { entrantCount: item.entrantIds.length, entrantIds: item.entrantIds as string[] } : {}), ...(item.bracketRevision !== undefined ? { bracketRevision: item.bracketRevision as number } : {}),
+    ...(Array.isArray(item.entrantIds) ? { entrantCount: liveEvidenceDemo?.entrants ?? item.entrantIds.length, entrantIds: item.entrantIds as string[] } : liveEvidenceDemo ? { entrantCount: liveEvidenceDemo.entrants } : {}), ...(item.bracketRevision !== undefined ? { bracketRevision: item.bracketRevision as number } : {}),
     ...(bracketSeed ? { bracketSeed } : {}), ...(item.operationState ? { operationState: item.operationState as Tournament['operationState'] } : {}),
-    ...(id === LIVE_EVIDENCE_TOURNAMENT_ID ? { demo: structuredClone(LIVE_EVIDENCE_TOURNAMENT_DEMO) } : {}) };
+    ...(liveEvidenceDemo ? { demo: liveEvidenceDemo } : {}) };
 }
 function normalizeMatch(value: unknown): Match {
   const item = record(value);

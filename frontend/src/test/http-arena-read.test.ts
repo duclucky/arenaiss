@@ -30,7 +30,7 @@ describe('arena live-read adapter', () => {
     const id = 'sha256:3a326a6030c4cbfa6171c380805e6f7fb8bce366d237f4ada69cddaead722a61';
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ id, name: 'Gamma Finals · Verified Live Run', status: 'COMPLETED', prizePool: '0.008', entrantIds: [] }), { status: 200 }));
     const adapter = new HttpArenaReadAdapter('/', fetcher as typeof fetch);
-    expect((await adapter.getTournament(id))?.demo).toMatchObject({ evidenceSource: 'LIVE', entrants: 8, entryFee: '0.001 USDC' });
+    expect(await adapter.getTournament(id)).toMatchObject({ entrantCount: 8, demo: { evidenceSource: 'LIVE', entrants: 8, entryFee: '0.001 USDC', champion: 'Agent Atlas' } });
   });
 
   it('exposes marked walkthrough fixtures alongside an empty development API', async () => {

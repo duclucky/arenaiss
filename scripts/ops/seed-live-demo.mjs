@@ -5,13 +5,31 @@ import { fileURLToPath } from 'node:url';
 import { SqliteRuntimeStore } from '../../packages/persistence/src/sqlite-runtime.ts';
 import { ArenaApiService } from '../../services/api/src/service.ts';
 
+const PROJECTION_NAMESPACE = 'live-demo-projection';
+const PROJECTION_VERSION = 2;
+const PUBLIC_BRACKET = [
+  { agentA: 'Agent Atlas', agentB: 'Agent Beacon', winner: 'Agent Atlas', round: 1, stage: 'main' },
+  { agentA: 'Agent Cipher', agentB: 'Agent Delta', winner: 'Agent Delta', round: 1, stage: 'main' },
+  { agentA: 'Agent Echo', agentB: 'Agent Forge', winner: 'Agent Echo', round: 1, stage: 'main' },
+  { agentA: 'Agent Grove', agentB: 'Agent Helix', winner: 'Agent Helix', round: 1, stage: 'main' },
+  { agentA: 'Agent Atlas', agentB: 'Agent Delta', winner: 'Agent Atlas', round: 2, stage: 'main' },
+  { agentA: 'Agent Echo', agentB: 'Agent Helix', winner: 'Agent Echo', round: 2, stage: 'main' },
+  { agentA: 'Agent Atlas', agentB: 'Agent Echo', winner: 'Agent Atlas', round: 3, stage: 'main' },
+  { agentA: 'Agent Delta', agentB: 'Agent Helix', winner: 'Agent Delta', round: 1, stage: 'third_place' },
+  { agentA: 'Agent Beacon', agentB: 'Agent Cipher', winner: 'Agent Beacon', round: 1, stage: 'fifth_place' },
+  { agentA: 'Agent Forge', agentB: 'Agent Grove', winner: 'Agent Grove', round: 1, stage: 'fifth_place' },
+  { agentA: 'Agent Beacon', agentB: 'Agent Grove', winner: 'Agent Beacon', round: 2, stage: 'fifth_place' },
+];
+
 export function seedLiveDemo({ databasePath, evidencePath, operator }) {
   const evidence = JSON.parse(readFileSync(resolve(evidencePath), 'utf8'));
   requireEvidence(evidence);
   const runtime = new SqliteRuntimeStore(resolve(databasePath));
   try {
-    const api = new ArenaApiService(operator, runtime);
     const tournamentId = `sha256:${evidence.arc.tournamentId.slice(2).toLowerCase()}`;
+    const projection = runtime.get(PROJECTION_NAMESPACE, tournamentId);
+    if (JSON.stringify(projection) !== JSON.stringify({ version: PROJECTION_VERSION })) removePreviousProjection(runtime, tournamentId);
+    const api = new ArenaApiService(operator, runtime);
     const tournament = {
       id: tournamentId,
       name: 'Gamma Finals · Verified Live Run',
@@ -26,27 +44,27 @@ export function seedLiveDemo({ databasePath, evidencePath, operator }) {
 
     const finalByMatch = new Map();
     for (const verdict of evidence.genLayer.verdicts) finalByMatch.set(verdict.matchId, verdict);
+    if (finalByMatch.size !== PUBLIC_BRACKET.length) throw new Error('live evidence bracket size is unsupported');
     let matchIndex = 0;
     for (const verdict of finalByMatch.values()) {
       if (!['A_WIN', 'B_WIN', 'TIE'].includes(verdict.result)) throw new Error('unsupported live verdict result');
-      const sideA = `Entrant A · ${verdict.matchId.slice(7, 13)}`;
-      const sideB = `Entrant B · ${verdict.matchId.slice(-6)}`;
-      const tied = verdict.result === 'TIE';
-      const winner = tied ? undefined : verdict.result === 'A_WIN' ? sideA : sideB;
-      const round = matchIndex < 4 ? 1 : matchIndex < 6 ? 2 : 3;
+      const bracketMatch = PUBLIC_BRACKET[matchIndex];
+      const winner = verdict.result === 'A_WIN' ? bracketMatch.agentA : verdict.result === 'B_WIN' ? bracketMatch.agentB : undefined;
+      if (!winner || winner !== bracketMatch.winner) throw new Error('live evidence result conflicts with the public bracket');
       api.publishMatch(operator, {
         id: verdict.matchId,
         tournamentId,
-        state: tied ? 'TIE' : 'FINALIZED',
-        agentA: sideA,
-        agentB: sideB,
+        state: 'FINALIZED',
+        agentA: bracketMatch.agentA,
+        agentB: bracketMatch.agentB,
         winner,
-        round,
+        round: bracketMatch.round,
+        stage: bracketMatch.stage,
       });
       api.publishVerdict(operator, {
         id: verdict.attemptId,
         matchId: verdict.matchId,
-        winner: tied ? 'TIE' : verdict.result === 'A_WIN' ? 'A' : 'B',
+        winner: verdict.result === 'A_WIN' ? 'A' : 'B',
         reasons: verdict.criteria.slice(0, 5).map((criterion) => criterion.reason),
         summary: verdict.summary,
         transactionHash: verdict.transactionHash,
@@ -78,10 +96,22 @@ export function seedLiveDemo({ databasePath, evidencePath, operator }) {
       });
       matchIndex += 1;
     }
+    runtime.put(PROJECTION_NAMESPACE, tournamentId, { version: PROJECTION_VERSION });
     return { tournaments: 1, matches: finalByMatch.size, tournamentId };
   } finally {
     runtime.close();
   }
+}
+
+function removePreviousProjection(runtime, tournamentId) {
+  const matches = runtime.list('api-matches').filter((match) => match?.tournamentId === tournamentId);
+  for (const match of matches) {
+    runtime.delete('api-verdicts', match.id);
+    runtime.delete('api-match-events', match.id);
+    runtime.delete('api-matches', match.id);
+  }
+  runtime.delete('api-tournaments', tournamentId);
+  runtime.delete(PROJECTION_NAMESPACE, tournamentId);
 }
 
 function criterionLabel(id) {
